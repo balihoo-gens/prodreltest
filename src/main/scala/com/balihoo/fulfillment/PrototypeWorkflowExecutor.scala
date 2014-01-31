@@ -3,6 +3,7 @@ package com.balihoo.fulfillment
 import com.amazonaws.services.simpleworkflow.model._
 import com.balihoo.fulfillment.config.WorkflowConfig
 import com.balihoo.fulfillment.deciders.PrototypeDeciderConfig
+import play.api.libs.json.Json
 
 //todo: define a base that defines required WF params.
 object PrototypeWorkflowExecutorConfig {
@@ -49,12 +50,19 @@ object PrototypeWorkflowExecutorConfig {
 object PrototypeWorkflowExecutor {
   def main(args: Array[String]) {
 
+    val inputFile: Option[String] = args.headOption
+    val defaultInputFile = "testWorkflowInput.json"
+
+    val inputSource = io.Source.fromFile(inputFile.getOrElse(defaultInputFile))
+    val inputString = inputSource.mkString
+    inputSource.close()
+    val inputJson = Json.parse(inputString)
+
     val executionRequest: StartWorkflowExecutionRequest = new StartWorkflowExecutionRequest()
     executionRequest.setDomain(WorkflowConfig.domain)
-    executionRequest.setTaskList(PrototypeDeciderConfig.taskList)//todo: can leave as default for workflow type?
-    executionRequest.setWorkflowId("Test1")//todo: name according to something unique, like order id. Must only be unique among running workflows
+    executionRequest.setWorkflowId("ProtoWFOrder_" + (inputJson \ "orderid"))
     executionRequest.setWorkflowType(PrototypeWorkflowExecutorConfig.workflowType)
-    executionRequest.setInput("Here is some workflow input")//todo: get from command line or something
+    executionRequest.setInput(inputString)
 
     WorkflowConfig.client.startWorkflowExecution(executionRequest)
   }

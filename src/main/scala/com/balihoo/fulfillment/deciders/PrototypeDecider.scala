@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.deciders
 import com.amazonaws.services.simpleworkflow.model._
 import com.balihoo.fulfillment.workers.PrototypeListProviderWorkerConfig
 import com.balihoo.fulfillment.config.WorkflowConfig
+import play.api.libs.json._
 
 object PrototypeDeciderConfig extends DeciderBaseConfig {
   val taskList: TaskList = new TaskList()
@@ -22,7 +23,9 @@ class PrototypeDecider extends DeciderBase {
 
     EventType.fromValue(previousEvent.getEventType) match {
       case EventType.WorkflowExecutionStarted =>
-        createActivityTask(dt, workflowAttributes.getInput, PrototypeListProviderWorkerConfig, activityTaskId)
+        val wfInput = Json.parse(workflowAttributes.getInput)
+        val lpInput = wfInput \ "target"
+        createActivityTask(dt, lpInput.toString(), PrototypeListProviderWorkerConfig, activityTaskId)
       case EventType.ActivityTaskCompleted =>
         respondWorkflowCompleted(dt, previousEvent.getActivityTaskCompletedEventAttributes.getResult)
       case _ => println("Unhandled event type: " + previousEvent.getEventType)
