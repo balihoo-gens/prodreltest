@@ -6,6 +6,7 @@ import java.net.SocketException
 import java.util
 import com.balihoo.fulfillment.config.WorkflowConfig
 import com.balihoo.fulfillment.workers.WorkerBaseConfig
+import scala.collection.JavaConverters._
 
 /**
  * Required configs for each decider
@@ -30,14 +31,16 @@ abstract class DeciderBase {
 
   /*** Common ***/
   val config = WorkflowConfig
-  val decisionEventTypes = Array(
-    EventType.DecisionTaskCompleted,
-    EventType.DecisionTaskScheduled,
-    EventType.DecisionTaskStarted,
-    EventType.DecisionTaskTimedOut)
   val taskReq: PollForDecisionTaskRequest = new PollForDecisionTaskRequest()
   taskReq.setDomain(config.domain)
   taskReq.setTaskList(getConfig.taskList)
+
+  /*
+  Implicitly converts HistoryEvents to ExtendedHistoryEvents whenever I need to call isDeciderEvent.
+  Pimp my library pattern - https://coderwall.com/p/k_1jzw
+  The implicit def is local to this class, so extending HistoryEvent is scoped!
+   */
+  implicit def extendHistoryEvent(event: HistoryEvent) = new ExtendedHistoryEvent(event)
 
   /**
    * Poll for new decision tasks and handle disconnects.  Calls the handleDecisionTaskStarted method
@@ -71,14 +74,9 @@ abstract class DeciderBase {
    * @param eventHistory The workflow history event list
    * @return The history event object of the last element that wasn't related to a decision task.
    */
-  def getPreviousNonDeciderEvent(eventHistory:java.util.List[HistoryEvent]): HistoryEvent = {
-    var i:Int = eventHistory.size - 1
-
-    while (i>=0 && decisionEventTypes.contains(EventType.fromValue(eventHistory.get(i).getEventType))) {
-      i = i-1
-    }
-    if (i < 0) return null
-    eventHistory.get(i)
+  def getPreviousNonDeciderEvent(eventHistory:java.util.List[HistoryEvent]): Option[HistoryEvent] = {
+    val scalaHistory = eventHistory.asScala
+    scalaHistory.reverse.find(!_.isDeciderEvent)
   }
 
   /**
@@ -149,4 +147,14 @@ abstract class DeciderBase {
     println("responding decision task complete with " + result)
     config.client.respondDecisionTaskCompleted(response)
   }
+}
+
+class ExtendedHistoryEvent(event: HistoryEvent) {
+  private val decisionEventTypes = Array(
+    EventType.DecisionTaskCompleted,
+    EventType.DecisionTaskScheduled,
+    EventType.DecisionTaskStarted,
+    EventType.DecisionTaskTimedOut)
+
+  def isDeciderEvent = decisionEventTypes.contains(EventType.fromValue(event.getEventType))
 }

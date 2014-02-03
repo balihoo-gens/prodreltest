@@ -18,10 +18,3 @@ object WorkflowConfig {
   private val creds = new BasicAWSCredentials(accessKey, secretKey)
   val client = new AmazonSimpleWorkflowAsyncClient(creds)//async client has sync methods too
 }
-
-object WorkflowRegister {
-  def main(args: Array[String]) {
-    PrototypeWorkflowExecutorConfig.registerWorkflowType()
-    PrototypeListProviderWorkerConfig.registerActivityType()
-  }
-}

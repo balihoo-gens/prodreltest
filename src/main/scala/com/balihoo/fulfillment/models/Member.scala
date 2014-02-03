@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment.workers.db
+package com.balihoo.fulfillment.models
 
 import scala.slick.driver.SQLiteDriver.simple._
 import org.joda.time.DateTime
@@ -26,17 +26,17 @@ case class Member(
   gender: String,
 //  income: Int,
   email: String
-//  emailsubscribed: DateTime,
-//  emailunsubscribed: DateTime,
-//  emailbounced: DateTime,
+//  emailsubscribed: Option[DateTime],
+//  emailunsubscribed: Option[DateTime],
+//  emailbounced: Option[DateTime],
 //  address1: String,
 //  city: String,
 //  stateprovince: String,
 //  postalcode: String,
-//  movedin: DateTime,
+//  movedin: Option[DateTime],
 //  phone: String,
 //  mobile: String,
-//  year: Int,
+//  year: Option[Int] = None,
 //  make: String,
 //  model: String,
 //  lastvisit: DateTime,
@@ -49,13 +49,14 @@ case class Member(
 //  catowner: Int,
 //  dogowner: Int,
 //  petowner: Int,
-//  address2: String,
-//  country: String
+//  address2: Option[String],
+//  country: Option[String]
 )
 
 
 object Members extends Table[Member]("recipient") {
 
+  //NotNull is the default. To be Nullable, must mark here and make case class value Option[T]
   def id = column[Int]("recipientid", O.PrimaryKey, O.NotNull)
   def affiliatenumber = column[Int]("affiliatenumber", O.NotNull)
   def brandkey = column[String]("brandkey", O.NotNull, O.DBType("VARCHAR(10)"))//todo: does DBType limit writes?
@@ -66,17 +67,17 @@ object Members extends Table[Member]("recipient") {
   def gender = column[String]("gender", O.NotNull, O.DBType("CHAR(1)"))//note: no default mapper from Char to Char(1)
   def income = column[Int]("income", O.NotNull)
   def email = column[String]("email", O.NotNull, O.DBType("VARCHAR(70)"))
-  def emailsubscribed = column[DateTime]("emailsubscribed")
-  def emailunsubscribed = column[DateTime]("emailunsubscribed")
-  def emailbounced = column[DateTime]("emailbounced")
+  def emailsubscribed = column[DateTime]("emailsubscribed", O.Nullable)
+  def emailunsubscribed = column[DateTime]("emailunsubscribed", O.Nullable)
+  def emailbounced = column[DateTime]("emailbounced", O.Nullable)
   def address1 = column[String]("address1", O.NotNull, O.DBType("VARCHAR(50)"))
   def city = column[String]("city", O.NotNull, O.DBType("VARCHAR(30)"))
   def stateprovince = column[String]("stateprovince", O.NotNull, O.DBType("CHAR(2)"))
   def postalcode = column[String]("postalcode", O.NotNull, O.DBType("VARCHAR(5)"))
-  def movedin = column[DateTime]("movedin")
+  def movedin = column[DateTime]("movedin", O.Nullable)
   def phone = column[String]("phone", O.NotNull, O.DBType("CHAR(12)"))
   def mobile = column[String]("mobile", O.NotNull, O.DBType("CHAR(12)"))
-  def year = column[Int]("year", O.Nullable)//todo: same as column def NULL?
+  def year = column[Int]("year", O.Nullable)
   def make = column[String]("make", O.NotNull, O.DBType("VARCHAR(25)"))
   def model = column[String]("model", O.NotNull, O.DBType("VARCHAR(30)"))
   def lastvisit = column[DateTime]("lastvisit", O.NotNull)
