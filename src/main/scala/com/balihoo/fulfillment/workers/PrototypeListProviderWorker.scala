@@ -28,7 +28,7 @@ class PrototypeListProviderWorker extends WorkerBase {
   def getConfig: WorkerBaseConfig = PrototypeListProviderWorkerConfig
 
   def doWork(task: ActivityTask): Unit = {
-    respondTaskComplete(task.getTaskToken, "TEST immediate task completion")
+    respondTaskComplete(task.getTaskToken, "TEST immediate task completion. Input was \n" + task.getInput)
     /* todo: query sqlite
     get inputs
     form query

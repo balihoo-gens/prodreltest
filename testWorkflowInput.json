@@ -1,0 +1,21 @@
+{
+	"orderid": 142857,
+	"campaignid": 6174,
+	"affiliateid": 3435,
+	"affiliatenumber": "snap01xv",
+	"medium": "email",
+	"listprovider": "snap-preferred",
+	"executionvendor": "sendgrid",
+	"creativeid": 8675309,
+	"target": {
+		"formid": 31415,
+		"birthday": [-7, 0],
+		"bdenrolled": true,
+		"memstatus": "active"
+	},
+	"baligeo": {
+		"standardized" : "intersection of geo selections and affiliate marketing area"
+	},
+	"sendtime": "2014-07-16T19:20:30+01:00",
+	"expires": "2014-07-17T07:20:30+01:00"
+}
