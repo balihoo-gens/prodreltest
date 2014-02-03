@@ -10,24 +10,3 @@
 domain=AndyTest
 aws.accessKey=put_your_access_key_here
 aws.secretKey=put_your_secret_key_here
-
-# prototype workflow settings
-workflowStartToClose=60
-deciderStartToClose=5
-workflowTypeName=PrototypeWorkflowType
-workflowTypeVersion=0.1
-workflowTypeDescription=Prototype fulfillment workflow
-
-# prototype decider settings
-deciderTaskListName=test_dt
-
-# prototype list provider worker settings
-LPtaskName=PrototypeLPActivityType
-LPtaskVersion=0.1
-LPtaskScheduleToClose=300
-LPtaskScheduleToStart=70
-LPtaskStartToClose=200
-LPtaskDescription=Gets a list of recipients from a Sqlite database using input criteria
-LPtaskHeartbeatTimeout=5
-LPtaskHeartbeatFrequency=3
-LPtaskCheckResultsFrequency=12
