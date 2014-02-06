@@ -1,26 +1,26 @@
 package com.balihoo.fulfillment.workers
 
 import com.amazonaws.services.simpleworkflow.model.{ActivityType, ActivityTask, TaskList}
-import com.balihoo.fulfillment.workers.db.{Member, Members}
+import com.balihoo.fulfillment.models.{Member, Members}
 import com.balihoo.fulfillment.config.WorkflowConfig
 
 object PrototypeListProviderWorkerConfig extends WorkerBaseConfig  {
   val activityType: ActivityType = new ActivityType()
-  activityType.setName(WorkflowConfig.properties.getString("LPtaskName"))
-  activityType.setVersion(WorkflowConfig.properties.getString("LPtaskVersion"))
+  activityType.setName("PrototypeLPActivityType")
+  activityType.setVersion("0.1")
 
   val taskList: TaskList = new TaskList()
   taskList.setName(activityType.getName + "-v" + activityType.getVersion)
 
-  val taskScheduleToClose: Int = WorkflowConfig.properties.getInt("LPtaskScheduleToClose")
-  val taskScheduleToStart: Int = WorkflowConfig.properties.getInt("LPtaskScheduleToStart")
-  val taskStartToClose: Int = WorkflowConfig.properties.getInt("LPtaskStartToClose")
-  val taskHeartbeatTimeout: Int = WorkflowConfig.properties.getInt("LPtaskHeartbeatTimeout")
-  val taskDescription: String = WorkflowConfig.properties.getString("LPtaskDescription")
+  val taskScheduleToClose: Int = 300
+  val taskScheduleToStart: Int = 70
+  val taskStartToClose: Int = 200
+  val taskHeartbeatTimeout: Int = 5
+  val taskDescription: String = "Gets a list of recipients from a Sqlite database using input criteria"
 
   //worker implementation specific
-  val heartbeatFrequency: Int = WorkflowConfig.properties.getInt("LPtaskHeartbeatFrequency")
-  val checkResultsFrequency: Int = WorkflowConfig.properties.getInt("LPtaskCheckResultsFrequency")
+  val heartbeatFrequency: Int = 3
+  val checkResultsFrequency: Int = 12
 }
 
 class PrototypeListProviderWorker extends WorkerBase {
@@ -51,6 +51,11 @@ object worker {
   def main(args: Array[String]) {
     val worker: PrototypeListProviderWorker = new PrototypeListProviderWorker
     worker.pollForWorkerTasks()
+//    testDDL()
+  }
+
+  def testDDL() = {
+    Members.ddl.createStatements.foreach(println)
   }
 
   def testQuery() = {

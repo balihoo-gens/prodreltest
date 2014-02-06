@@ -8,13 +8,13 @@ import play.api.libs.json.Json
 //todo: define a base that defines required WF params.
 object PrototypeWorkflowExecutorConfig {
   val workflowType: WorkflowType = new WorkflowType()
-  workflowType.setName(WorkflowConfig.properties.getString("workflowTypeName"))
-  workflowType.setVersion(WorkflowConfig.properties.getString("workflowTypeVersion"))
+  workflowType.setName("PrototypeWorkflowType")
+  workflowType.setVersion("0.1")
 
-  val workflowTypeDescription: String = WorkflowConfig.properties.getString("workflowTypeDescription")
+  val workflowTypeDescription: String = "Prototype fulfillment workflow"
 
-  val workflowStartToClose: Int = WorkflowConfig.properties.getInt("workflowStartToClose")
-  val deciderStartToClose: Int = WorkflowConfig.properties.getInt("deciderStartToClose")
+  val workflowStartToClose: Int = 60
+  val deciderStartToClose: Int = 5
 
   def registerWorkflowType() {
 

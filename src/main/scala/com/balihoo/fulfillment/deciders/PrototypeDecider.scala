@@ -7,28 +7,31 @@ import play.api.libs.json._
 
 object PrototypeDeciderConfig extends DeciderBaseConfig {
   val taskList: TaskList = new TaskList()
-  taskList.setName(WorkflowConfig.properties.getString("deciderTaskListName"))
-}
-class PrototypeDecider extends DeciderBase {
+  taskList.setName("test_dt")
+
   //note: Task ID must only be unique among tasks in the workflow.
   //If there would be more than one, need to give it a different, unique name.
   val activityTaskId: String = "PrototypeListProviderWorkerTaskId"
+}
+
+class PrototypeDecider extends DeciderBase {
 
   def getConfig: DeciderBaseConfig = PrototypeDeciderConfig
   def handleDecisionTaskStarted(dt: DecisionTask) = {
 
     val history: java.util.List[HistoryEvent] = dt.getEvents
-    val previousEvent: HistoryEvent = getPreviousNonDeciderEvent(history)
+    val previousEvent: Option[HistoryEvent] = getPreviousNonDeciderEvent(history)
     val workflowAttributes: WorkflowExecutionStartedEventAttributes = getWorkflowAttributes(history)
 
-    EventType.fromValue(previousEvent.getEventType) match {
+    EventType.fromValue(previousEvent.get.getEventType) match {
       case EventType.WorkflowExecutionStarted =>
+        createActivityTask(dt, workflowAttributes.getInput, PrototypeListProviderWorkerConfig, PrototypeDeciderConfig.activityTaskId)
         val wfInput = Json.parse(workflowAttributes.getInput)
         val lpInput = wfInput \ "target"
-        createActivityTask(dt, lpInput.toString(), PrototypeListProviderWorkerConfig, activityTaskId)
+        createActivityTask(dt, lpInput.toString(), PrototypeListProviderWorkerConfig, PrototypeDeciderConfig.activityTaskId)
       case EventType.ActivityTaskCompleted =>
-        respondWorkflowCompleted(dt, previousEvent.getActivityTaskCompletedEventAttributes.getResult)
-      case _ => println("Unhandled event type: " + previousEvent.getEventType)
+        respondWorkflowCompleted(dt, previousEvent.get.getActivityTaskCompletedEventAttributes.getResult)
+      case _ => println("Unhandled event type: " + previousEvent.get.getEventType)
     }
   }
 }
