@@ -25,8 +25,8 @@ class PrototypeDecider extends DeciderBase {
 
     EventType.fromValue(previousEvent.get.getEventType) match {
       case EventType.WorkflowExecutionStarted =>
-        val wfInput = Json.parse(workflowAttributes.getInput)
-        val lpInput = wfInput \ "target"
+        val wfInput = Json.parse(workflowAttributes.getInput) //workflow input
+        val lpInput = wfInput \ "target" // list provider input
         createActivityTask(dt, lpInput.toString(), PrototypeListProviderWorkerConfig, PrototypeDeciderConfig.activityTaskId)
       case EventType.ActivityTaskCompleted =>
         respondWorkflowCompleted(dt, previousEvent.get.getActivityTaskCompletedEventAttributes.getResult)

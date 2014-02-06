@@ -25,9 +25,9 @@ case class Member(
 //  age: Int,
   gender: String,
 //  income: Int,
-  email: String
-//  emailsubscribed: Option[DateTime],
-//  emailunsubscribed: Option[DateTime],
+  email: String,
+  emailsubscribed: Option[DateTime],
+  emailunsubscribed: Option[DateTime]
 //  emailbounced: Option[DateTime],
 //  address1: String,
 //  city: String,
@@ -53,7 +53,7 @@ case class Member(
 //  country: Option[String]
 )
 
-
+//table class for slick lifted queries
 object Members extends Table[Member]("recipient") {
 
   //NotNull is the default. To be Nullable, must mark here and make case class value Option[T]
@@ -100,7 +100,7 @@ object Members extends Table[Member]("recipient") {
       if (dt == null) {
         null
       } else {
-        dt.toString("yyyy-DD-yy")
+        dt.toString("yyyy-MM-dd")
       }
     },
     {s =>
@@ -112,7 +112,8 @@ object Members extends Table[Member]("recipient") {
     }
   )
 
-  def * = id ~ brandkey ~ firstname ~ lastname ~ birthdate ~ gender ~ email <> (Member, Member.unapply _)
+  def * = id ~ brandkey ~ firstname ~ lastname ~ birthdate ~ gender ~ email ~
+    emailsubscribed.? ~ emailunsubscribed.? <> (Member, Member.unapply _)
 
 
   //test query. This type of logic should go in the place doing the querying, not in the table object.
@@ -132,6 +133,10 @@ object Members extends Table[Member]("recipient") {
       println("done getting list")
       list
     }
+  }
+
+  def printDDL() = {
+    Members.ddl.createStatements.foreach(println)
   }
 }
 
