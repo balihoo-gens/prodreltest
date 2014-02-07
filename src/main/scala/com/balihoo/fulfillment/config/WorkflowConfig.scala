@@ -15,6 +15,6 @@ object WorkflowConfig {
   val domain: String = properties.getString("domain")
   private val accessKey: String = properties.getString("aws.accessKey")
   private val secretKey = properties.getString("aws.secretKey")
-  private val creds = new BasicAWSCredentials(accessKey, secretKey)
+  val creds = new BasicAWSCredentials(accessKey, secretKey)
   val client = new AmazonSimpleWorkflowAsyncClient(creds)//async client has sync methods too
 }

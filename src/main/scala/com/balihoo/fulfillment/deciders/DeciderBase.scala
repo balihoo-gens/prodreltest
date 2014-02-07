@@ -118,7 +118,7 @@ abstract class DeciderBase {
     response.setDecisions(decisions)
     response.setTaskToken(dt.getTaskToken)
 
-    println("responding with " + response)
+    println("responding with create task details")
     config.client.respondDecisionTaskCompleted(response)
   }
 
