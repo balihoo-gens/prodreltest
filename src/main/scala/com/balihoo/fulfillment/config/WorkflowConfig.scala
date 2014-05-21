@@ -2,8 +2,6 @@ package com.balihoo.fulfillment.config
 
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
-import com.balihoo.fulfillment.workers.PrototypeListProviderWorkerConfig
-import com.balihoo.fulfillment.PrototypeWorkflowExecutorConfig
 
 object WorkflowConfig {
 
