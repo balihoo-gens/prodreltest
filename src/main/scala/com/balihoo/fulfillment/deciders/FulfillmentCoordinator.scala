@@ -7,12 +7,11 @@ import scala.collection.convert.wrapAsScala._
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
 
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.SWFAdapter
 
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
+import com.balihoo.fulfillment.config.PropertiesLoader
 
 object SectionStatus extends Enumeration {
   val INCOMPLETE = Value("INCOMPLETE")
@@ -221,6 +220,8 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   var notes: mutable.MutableList[String] = mutable.MutableList[String]()
   val timers = collection.mutable.Map[String, String]()
 
+  notes += s"Processing ${history.last.getEventType}..."
+
   for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
     EventType.fromValue(event.getEventType) match {
       case EventType.WorkflowExecutionStarted =>
@@ -349,6 +350,16 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
     map(sectionName).status = status
   }
+
+  override def toString = {
+    var out = ""
+    for((k, s) <- map) {
+      out += s"$k\t\t${s.status.toString}\n"
+    }
+
+    out
+  }
+
 }
 
 class SectionReference(sectionName: String) {
@@ -357,28 +368,21 @@ class SectionReference(sectionName: String) {
   override def toString: String = s"section($name)"
 }
 
-class SWFAdapter(propertiesFile: String) {
-  private val properties = new PropertiesLoader(propertiesFile)
-  private val accessKey: String = properties.getString("aws.accessKey")
-  private val secretKey = properties.getString("aws.secretKey")
 
-  val domain: String = properties.getString("domain")
-  val taskList: String = properties.getString("tasklist")
-
-  private val credentials = new BasicAWSCredentials(accessKey, secretKey)
-  val client = new AmazonSimpleWorkflowAsyncClient(credentials)
-}
 
 class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
+  val domain = swfAdapter.config.getString("domain")
+  val taskListName = swfAdapter.config.getString("tasklist")
+
+  val taskList: TaskList = new TaskList()
+    .withName(taskListName)
+
+  val taskReq: PollForDecisionTaskRequest = new PollForDecisionTaskRequest()
+    .withDomain(domain)
+    .withTaskList(taskList)
+
   def coordinate() = {
-
-    val taskList: TaskList = new TaskList()
-    taskList.setName(swfAdapter.taskList)
-
-    val taskReq: PollForDecisionTaskRequest = new PollForDecisionTaskRequest()
-    taskReq.setDomain(swfAdapter.domain)
-    taskReq.setTaskList(taskList)
 
     while(true) {
       print(".")
@@ -452,6 +456,8 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
                              ,sections: SectionMap): Boolean = {
 
     var failReasons: mutable.MutableList[String] = mutable.MutableList[String]()
+
+    sections.notes += sections.toString
 
     if(categorized.workComplete()) {
       // If we're done then let's just bail here
@@ -539,7 +545,6 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
       decisions += decision
 
       sections.notes += s"Scheduling work for ${section.name}"
-//      println(section)
     }
 
     if(decisions.length == 0 && !categorized.hasPendingSections) {
@@ -574,7 +579,8 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
 object coordinator {
   def main(args: Array[String]) {
-    val fc: FulfillmentCoordinator = new FulfillmentCoordinator(new SWFAdapter(".fulfillment.properties"))
+    val config = new PropertiesLoader(".fulfillment.properties")
+    val fc: FulfillmentCoordinator = new FulfillmentCoordinator(new SWFAdapter(config))
     println("Running decider")
     fc.coordinate()
   }

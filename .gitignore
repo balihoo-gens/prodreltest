@@ -1,4 +1,4 @@
-.fulfillment.properties
+*.properties
 
 # sbt specific
 dist/*
