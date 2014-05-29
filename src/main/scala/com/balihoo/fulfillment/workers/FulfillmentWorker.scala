@@ -49,7 +49,12 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
       val task : ActivityTask = swfAdapter.client.pollForActivityTask(taskReq)
       if(task.getTaskToken != null) {
         updateStatus("Processing task..")
-        handleTask(task)
+        try {
+          handleTask(task)
+        } catch {
+          case e:Exception =>
+            failTask(task.getTaskToken, "Unhandled Exception", e.getMessage)
+        }
       }
     }
   }

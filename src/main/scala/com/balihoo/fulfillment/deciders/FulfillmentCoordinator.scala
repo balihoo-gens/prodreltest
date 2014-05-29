@@ -352,7 +352,10 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   }
 
   protected def processActivityTaskFailed(event: HistoryEvent) = {
-    val name = registry(event.getActivityTaskFailedEventAttributes.getScheduledEventId)
+    val attribs = event.getActivityTaskFailedEventAttributes
+    val name = registry(attribs.getScheduledEventId)
+    map(name).notes += attribs.getReason
+    map(name).notes += attribs.getDetails
     map(name).status = SectionStatus.FAILED
     map(name).failedCount += 1
   }
@@ -364,7 +367,9 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   }
 
   protected def processActivityTaskCanceled(event: HistoryEvent) = {
-    val name = registry(event.getActivityTaskCanceledEventAttributes.getScheduledEventId)
+    val attribs = event.getActivityTaskCanceledEventAttributes
+    val name = registry(attribs.getScheduledEventId)
+    map(name).notes += attribs.getDetails
     map(name).status = SectionStatus.CANCELED
     map(name).canceledCount += 1
   }
