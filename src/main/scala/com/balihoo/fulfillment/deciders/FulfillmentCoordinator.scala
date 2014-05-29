@@ -22,6 +22,7 @@ object SectionStatus extends Enumeration {
   val CANCELED = Value("CANCELED")
   val COMPLETE = Value("COMPLETE")
   val DEFERRED = Value("DEFERRED")
+  val IMPOSSIBLE = Value("IMPOSSIBLE")
 
 }
 
@@ -52,6 +53,11 @@ class FulfillmentSection(sectionName: String
   var timeoutParams = new ActionParams(0, 0)
   var cancelationParams = new ActionParams(0, 0)
 
+  var startToCloseTimeout = ""
+  var scheduleToStartTimeout = ""
+  var scheduleToCloseTimeout = ""
+  var heartbeatTimeout = ""
+
   for((key, value) <- jsonNode.fields) {
     key match {
       case "action" =>
@@ -74,6 +80,18 @@ class FulfillmentSection(sectionName: String
           val cancelation = jaction.value("cancelation").as[JsObject]
           cancelationParams.maxRetries =  cancelation.value("max").as[String].toInt
           cancelationParams.delaySeconds =  cancelation.value("delay").as[String].toInt
+        }
+        if(jaction.keys contains "startToCloseTimeout") {
+          startToCloseTimeout = jaction.value("startToCloseTimeout").as[String]
+        }
+        if(jaction.keys contains "scheduleToCloseTimeout") {
+          startToCloseTimeout = jaction.value("scheduleToCloseTimeout").as[String]
+        }
+        if(jaction.keys contains "scheduleToStartTimeout") {
+          startToCloseTimeout = jaction.value("scheduleToStartTimeout").as[String]
+        }
+        if(jaction.keys contains "heartbeatTimeout") {
+          startToCloseTimeout = jaction.value("heartbeatTimeout").as[String]
         }
 
       case "params" =>
@@ -122,7 +140,7 @@ class FulfillmentSection(sectionName: String
 
 /**
  * Bin the sections by status. So we can make decisions
- * @param sections
+ * @param sections SectionMap
  */
 class CategorizedSections(sections: SectionMap) {
   var complete: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
@@ -133,6 +151,7 @@ class CategorizedSections(sections: SectionMap) {
   var failed: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
   var canceled: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
   var ready: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
+  var impossible: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
 
   for((name, section) <- sections.map) {
     section.status match {
@@ -152,6 +171,8 @@ class CategorizedSections(sections: SectionMap) {
         deferred += section
       case SectionStatus.INCOMPLETE =>
         categorizeIncompleteSection(section)
+      case SectionStatus.IMPOSSIBLE =>
+        impossible += section
       case _ => println(section.status + " is not handled here!")
     }
   }
@@ -222,35 +243,77 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   notes += s"Processing ${history.last.getEventType}..."
 
-  for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
-    EventType.fromValue(event.getEventType) match {
-      case EventType.WorkflowExecutionStarted =>
-        processWorkflowExecutionStarted(event)
-      case EventType.ActivityTaskScheduled =>
-        processActivityTaskScheduled(event)
-      case EventType.ActivityTaskStarted =>
-        processActivityTaskStarted(event)
-      case EventType.ActivityTaskCompleted =>
-        processActivityTaskCompleted(event)
-      case EventType.ActivityTaskFailed =>
-        processActivityTaskFailed(event)
-      case EventType.ActivityTaskTimedOut =>
-        processActivityTaskTimedOut(event)
-      case EventType.ActivityTaskCanceled =>
-        processActivityTaskCanceled(event)
-      case EventType.WorkflowExecutionSignaled =>
-        processWorkflowExecutionSignaled(event)
-      case EventType.ScheduleActivityTaskFailed =>
-        processScheduleActivityTaskFailed(event)
-      case EventType.TimerStarted =>
-        processTimerStarted(event)
-      case EventType.TimerFired =>
-        processTimerFired(event)
-    //case EventType.Q =>
-    //  processQ(event, sections)
-      case _ => //println("Unhandled event type: " + event.getEventType)
+  try {
+    for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
+      EventType.fromValue(event.getEventType) match {
+        case EventType.WorkflowExecutionStarted =>
+          processWorkflowExecutionStarted(event)
+        case EventType.ActivityTaskScheduled =>
+          processActivityTaskScheduled(event)
+        case EventType.ActivityTaskStarted =>
+          processActivityTaskStarted(event)
+        case EventType.ActivityTaskCompleted =>
+          processActivityTaskCompleted(event)
+        case EventType.ActivityTaskFailed =>
+          processActivityTaskFailed(event)
+        case EventType.ActivityTaskTimedOut =>
+          processActivityTaskTimedOut(event)
+        case EventType.ActivityTaskCanceled =>
+          processActivityTaskCanceled(event)
+        case EventType.WorkflowExecutionSignaled =>
+          processWorkflowExecutionSignaled(event)
+        case EventType.ScheduleActivityTaskFailed =>
+          processScheduleActivityTaskFailed(event)
+        case EventType.TimerStarted =>
+          processTimerStarted(event)
+        case EventType.TimerFired =>
+          processTimerFired(event)
+        //case EventType.Q =>
+        //  processQ(event, sections)
+        case _ => //println("Unhandled event type: " + event.getEventType)
+      }
     }
+  } catch {
+    case e:Exception =>
+      notes += e.getMessage
+  }
 
+  protected def ensureSanity() = {
+    for((name, section) <- map) {
+      for(prereq <- section.prereqs) {
+        if(prereq == name) {
+          section.status = SectionStatus.IMPOSSIBLE
+          val ception = s"Fulfillment is impossible! $name has a self-referential prereq!"
+          section.notes += ception
+          throw new Exception(ception)
+        }
+        if(!(map contains prereq)) {
+          section.status = SectionStatus.IMPOSSIBLE
+          val ception = s"Fulfillment is impossible! Prereq ($prereq) for $name does not exist!"
+          section.notes += ception
+          throw new Exception(ception)
+        }
+      }
+      for((pname, param) <- section.params) {
+        if(pname == name) {
+          section.status = SectionStatus.IMPOSSIBLE
+          val ception = s"Fulfillment is impossible! $name has a self-referential parameter!"
+          section.notes += ception
+          throw new Exception(ception)
+        }
+        param match {
+          case sectionReference: SectionReference =>
+            val refname = param.asInstanceOf[SectionReference].name
+            if(!(map contains refname)) {
+              section.status = SectionStatus.IMPOSSIBLE
+              val ception = s"Fulfillment is impossible! Param ($pname -> $refname) for $name does not exist!"
+              section.notes += ception
+              throw new Exception(ception)
+            }
+          case _ =>
+        }
+      }
+    }
   }
 
   /**
@@ -263,6 +326,8 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     for((jk, jv) <- fulfillmentInput.as[JsObject].fields) {
       map += (jk -> new FulfillmentSection(jk, jv.as[JsObject]))
     }
+
+    ensureSanity()
   }
 
   protected def processActivityTaskScheduled(event: HistoryEvent) = {
@@ -368,8 +433,6 @@ class SectionReference(sectionName: String) {
   override def toString: String = s"section($name)"
 }
 
-
-
 class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
   val domain = swfAdapter.config.getString("domain")
@@ -469,6 +532,14 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
     }
 
+    if(categorized.impossible.length > 0) {
+      var details: String = "Impossible Sections:"
+      for(section <- categorized.impossible) {
+        details += s"${section.name} ${section.notes}, "
+      }
+      failReasons += details
+    }
+
     // Loop through the problem sections
     for(section <- categorized.failed) {
       if(section.failedCount < section.failureParams.maxRetries) {
@@ -536,10 +607,10 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
       attribs.setTaskList(taskList)
       attribs.setActivityId(section.getActivityId)
 
-      // TODO make this configurable via the JSON
-//        attribs.setStartToCloseTimeout()
-//        attribs.setScheduleToStartTimeout()
-//        attribs.setScheduleToCloseTimeout()
+      if(section.startToCloseTimeout.nonEmpty) attribs.setStartToCloseTimeout(section.startToCloseTimeout)
+      if(section.scheduleToStartTimeout.nonEmpty) attribs.setScheduleToStartTimeout(section.scheduleToStartTimeout)
+      if(section.scheduleToCloseTimeout.nonEmpty) attribs.setScheduleToCloseTimeout(section.scheduleToCloseTimeout)
+      if(section.heartbeatTimeout.nonEmpty) attribs.setHeartbeatTimeout(section.heartbeatTimeout)
 
       decision.setScheduleActivityTaskDecisionAttributes(attribs)
       decisions += decision

@@ -7,6 +7,12 @@ import play.api.libs.json._
 
 import org.junit.runner._
 
+import scala.language.implicitConversions
+import scala.collection.convert.wrapAsScala._
+import scala.collection.convert.wrapAsJava._
+import scala.collection.mutable
+import com.amazonaws.services.simpleworkflow.model.{ActivityTaskStartedEventAttributes, WorkflowExecutionStartedEventAttributes, EventType, HistoryEvent}
+
 @RunWith(classOf[JUnitRunner])
 class TestFulfillmentCoordinator extends Specification with Mockito
 {
@@ -28,7 +34,8 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                       "timeout" : {
                           "max" : "14",
                           "delay" : "0"
-                      }
+                      },
+                      "startToCloseTimeout" : "tuna sandwich"
                     },
          "params" : { "cake_batter" : { "section" : "batter" },
 				              "cake_pan" : "9\" x 11\"",
@@ -57,6 +64,8 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.canceledCount mustEqual 0
       section.startedCount mustEqual 0
 
+      section.startToCloseTimeout mustEqual "tuna sandwich"
+
       section.params("cake_batter").asInstanceOf[SectionReference].name mustEqual "batter"
       section.params("cake_pan").asInstanceOf[String] mustEqual "9\" x 11\""
       section.params("bake_time").asInstanceOf[String] mustEqual "40"
@@ -69,4 +78,146 @@ class TestFulfillmentCoordinator extends Specification with Mockito
   }
 
 
+  "SectionMap" should {
+    "be initialized without error" in {
+
+      val json = """{
+         "cake" : {
+           "action" : { "name" : "bake",
+                        "version" : "1",
+                        "failure" : {
+                            "max" : "3",
+                            "delay" : "100"
+                        },
+                        "cancelation" : {
+                            "max" : "7",
+                            "delay" : "4535"
+                        },
+                        "timeout" : {
+                            "max" : "14",
+                            "delay" : "0"
+                        },
+                        "startToCloseTimeout" : "tuna sandwich"
+                      },
+           "params" : { "cake_batter" : { "section" : "batter" },
+                        "cake_pan" : "9\" x 11\"",
+                        "bake_time" : "40" },
+           "prereqs" : ["heat_oven"],
+           "status" : "INCOMPLETE",
+           "totally unhandled" : "stuff"
+	       },
+        "batter" : {
+           "action" : { "name" : "bake",
+                        "version" : "1"
+                      },
+           "params" : { "cake_pan" : "9\" x 11\"",
+                        "bake_time" : "40" },
+           "prereqs" : [],
+           "status" : "INCOMPLETE"
+         },
+        "heat_oven" : {
+           "action" : { "name" : "bake",
+                        "version" : "1"
+                      },
+           "params" : { "bake_time" : "40" },
+           "prereqs" : [],
+           "status" : "INCOMPLETE"
+         }
+	      }"""
+
+      var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
+
+      val event1:HistoryEvent = new HistoryEvent
+      val event1Attribs = new WorkflowExecutionStartedEventAttributes
+      event1.setEventType(EventType.WorkflowExecutionStarted)
+      event1Attribs.setInput(json)
+      event1.setWorkflowExecutionStartedEventAttributes(event1Attribs)
+      events += event1
+
+      val event2:HistoryEvent = new HistoryEvent
+      val event2Attribs = new ActivityTaskStartedEventAttributes
+      event2.setEventType(EventType.ActivityTaskStarted)
+      event2Attribs.setScheduledEventId(100)
+      event2.setActivityTaskStartedEventAttributes(event2Attribs)
+      events += event2
+
+      val map = new SectionMap(mutableSeqAsJavaList(events))
+
+      map.getClass mustEqual classOf[SectionMap]
+
+      map.map.size mustEqual 3
+
+    }
+
+    "be angry about sanity" in {
+
+      val json = """{
+         "cake" : {
+           "action" : { "name" : "bake",
+                        "version" : "1",
+                        "failure" : {
+                            "max" : "3",
+                            "delay" : "100"
+                        },
+                        "cancelation" : {
+                            "max" : "7",
+                            "delay" : "4535"
+                        },
+                        "timeout" : {
+                            "max" : "14",
+                            "delay" : "0"
+                        },
+                        "startToCloseTimeout" : "tuna sandwich"
+                      },
+           "params" : { "cake_batter" : { "section" : "batter" },
+                        "cake_pan" : "9\" x 11\"",
+                        "bake_time" : "40" },
+           "prereqs" : ["heat_oven"],
+           "status" : "INCOMPLETE",
+           "totally unhandled" : "stuff"
+	       },
+        "batter" : {
+           "action" : { "name" : "bake",
+                        "version" : "1"
+                      },
+           "params" : { "cake_pan" : "9\" x 11\"",
+                        "bake_time" : "40" },
+           "prereqs" : ["doesnotexist"],
+           "status" : "INCOMPLETE"
+         },
+        "heat_oven" : {
+           "action" : { "name" : "bake",
+                        "version" : "1"
+                      },
+           "params" : { "bake_time" : "40" },
+           "prereqs" : [],
+           "status" : "INCOMPLETE"
+         }
+	      }"""
+
+      var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
+
+      val event1:HistoryEvent = new HistoryEvent
+      val event1Attribs = new WorkflowExecutionStartedEventAttributes
+      event1.setEventType(EventType.WorkflowExecutionStarted)
+      event1Attribs.setInput(json)
+      event1.setWorkflowExecutionStartedEventAttributes(event1Attribs)
+      events += event1
+
+      val event2:HistoryEvent = new HistoryEvent
+      val event2Attribs = new ActivityTaskStartedEventAttributes
+      event2.setEventType(EventType.ActivityTaskStarted)
+      event2Attribs.setScheduledEventId(100)
+      event2.setActivityTaskStartedEventAttributes(event2Attribs)
+      events += event2
+
+      val map = new SectionMap(mutableSeqAsJavaList(events))
+
+      map.getClass mustEqual classOf[SectionMap]
+
+      map.map.size mustEqual 3
+
+      map.notes(1) mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+    }
+  }
 }
