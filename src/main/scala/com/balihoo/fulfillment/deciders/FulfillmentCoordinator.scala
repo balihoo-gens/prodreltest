@@ -655,7 +655,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
 object coordinator {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".fulfillment.properties")
+    val config = new PropertiesLoader(".coordinator.properties")
     val fc: FulfillmentCoordinator = new FulfillmentCoordinator(new SWFAdapter(config))
     println("Running decider")
     fc.coordinate()

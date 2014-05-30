@@ -1,13 +1,19 @@
 Fulfillment
 ===========
-In its current state, the fulfillment project aims to explore the functionality
-of Amazon Simple Workflow and how to consume those services with Scala.
 
+Overview
+--------
+The core of fulfillment is the **coordinator**. This program operates as an Amazon SWF decider, managing and scheduling
+activity tasks for worker processes to complete.
+
+**Workers** are independent processes that solve small parts of the fulfillment workflow. The FulfillmentWorker base
+class takes care of registering activity types and polling the matching activity queue. 
+
+*NOTE:* Activity type+version can only be registered ONCE!
+
+Building
+--------
 SBT should take care of most of the dependencies for you.  You'll also need a
-.fulfillment.properties file in the project root.  A default has been provided
-as a template.
+.<application>.properties file in the project root.  Defaults for each application have been provided
+as templates.
 
-There are some prototype mains that demonstrate functionality. Run them in this order
-1) Register types (only needed when type values change)
-2) Start the decider and worker classes polling.
-3) Start a new workflow execution.
