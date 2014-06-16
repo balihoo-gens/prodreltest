@@ -53,7 +53,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
           handleTask(task)
         } catch {
           case e:Exception =>
-            failTask(task.getTaskToken, "Unhandled Exception", e.getMessage)
+            failTask(task.getTaskToken, "Exception", e.getMessage)
         }
       }
     }
@@ -122,6 +122,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
       val detail = swfAdapter.client.describeActivityType(describe)
     } catch {
       case ure: UnknownResourceException =>
+        updateStatus(s"Registering new Activity ($name,$version)")
         val registrationRequest = new RegisterActivityTypeRequest()
           .withDomain(domain)
           .withName(name)
@@ -137,5 +138,22 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     }
 
   }
+
+  def getRequiredParameter(param:String, input:JsObject, inputRaw:String) = {
+    if(!(input.keys contains param)) {
+      throw new Exception(s"input parameter '$param' is REQUIRED! '$inputRaw' doesn't contain '$param'")
+    }
+
+    input.value(param).as[String]
+  }
+
+  def getOptionalParameter(param:String, input:JsObject, inputRaw:String, default:Any):Any = {
+    if(!(input.keys contains param)) {
+      return default
+    }
+
+    input.value(param).as[String]
+  }
+
 }
 

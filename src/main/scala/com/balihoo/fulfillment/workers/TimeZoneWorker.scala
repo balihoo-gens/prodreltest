@@ -430,7 +430,10 @@ class TimeZoneWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 
   override def handleTask(task: ActivityTask) = {
     val input:JsObject = Json.parse(task.getInput).as[JsObject]
-    val results = latLonToTimeZone(input.value("lat").as[String], input.value("lon").as[String])
+
+    val lat = getRequiredParameter("lat", input, task.getInput)
+    val lon = getRequiredParameter("lon", input, task.getInput)
+    val results = latLonToTimeZone(lat, lon)
 
     val jresults = Json.parse(results).as[JsObject]
 

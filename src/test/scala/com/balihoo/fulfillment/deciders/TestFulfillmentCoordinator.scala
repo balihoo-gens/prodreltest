@@ -66,7 +66,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       section.startToCloseTimeout mustEqual "tuna sandwich"
 
-      section.params("cake_batter").asInstanceOf[SectionReference].name mustEqual "batter"
+      section.params("cake_batter").asInstanceOf[SectionReference].sections(0) mustEqual "batter"
       section.params("cake_pan").asInstanceOf[String] mustEqual "9\" x 11\""
       section.params("bake_time").asInstanceOf[String] mustEqual "40"
 

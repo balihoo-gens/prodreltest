@@ -14,6 +14,6 @@ class takes care of registering activity types and polling the matching activity
 Building
 --------
 SBT should take care of most of the dependencies for you.  You'll also need a
-.<application>.properties file in the project root.  Defaults for each application have been provided
+.\<application\>.properties file in the project root.  Defaults for each application have been provided
 as templates.
 

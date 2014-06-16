@@ -20,9 +20,11 @@ object SectionStatus extends Enumeration {
   val FAILED = Value("FAILED")
   val TIMED_OUT = Value("TIMED OUT")
   val CANCELED = Value("CANCELED")
+  val TERMINAL = Value("TERMINAL") // Section has FAILED/CANCELED/TIMED OUT too many times!
   val COMPLETE = Value("COMPLETE")
-  val DEFERRED = Value("DEFERRED")
-  val IMPOSSIBLE = Value("IMPOSSIBLE")
+  val CONTINGENT = Value("CONTINGENT") // Special case. We won't attempt to process this unless necessary
+  val DEFERRED = Value("DEFERRED") // A Timer will activate this later
+  val IMPOSSIBLE = Value("IMPOSSIBLE") // Section can never be completed
 
 }
 
@@ -98,8 +100,8 @@ class FulfillmentSection(sectionName: String
         val jparams = value.as[JsObject]
         for((jk, jv) <- jparams.fields) {
           jv match {
-            case jObj: JsObject =>
-              params += (jk -> new SectionReference(jObj.value("section").as[String]))
+            case jArr: JsArray =>
+              params += (jk -> new SectionReference(jArr))
             case jStr: JsValue =>
               params += (jk -> jv.as[String])
             case _ =>
@@ -119,6 +121,24 @@ class FulfillmentSection(sectionName: String
       case _ =>
         notes += s"Section $key unhandled!"
     }
+  }
+
+  def setFailed(reason:String, details:String) = {
+    failedCount += 1
+    notes += "Failed because: "+reason
+    notes += details
+    status = if(failedCount >= failureParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.FAILED
+  }
+
+  def setCanceled(details:String) = {
+    canceledCount += 1
+    notes += "Canceled because: "+details
+    status = if(canceledCount >= cancelationParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.CANCELED
+  }
+
+  def setTimedOut() = {
+    timedoutCount += 1
+    status = if(timedoutCount >= timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
   }
 
   def getActivityId = {
@@ -143,15 +163,17 @@ class FulfillmentSection(sectionName: String
  * @param sections SectionMap
  */
 class CategorizedSections(sections: SectionMap) {
-  var complete: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var inprogress: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var timedout: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var deferred: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var blocked: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var failed: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var canceled: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var ready: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
-  var impossible: mutable.MutableList[FulfillmentSection] = mutable.MutableList[FulfillmentSection]()
+  var complete = mutable.MutableList[FulfillmentSection]()
+  var inprogress = mutable.MutableList[FulfillmentSection]()
+  var timedout = mutable.MutableList[FulfillmentSection]()
+  var deferred = mutable.MutableList[FulfillmentSection]()
+  var blocked = mutable.MutableList[FulfillmentSection]()
+  var failed = mutable.MutableList[FulfillmentSection]()
+  var canceled = mutable.MutableList[FulfillmentSection]()
+  var contingent = mutable.MutableList[FulfillmentSection]()
+  var terminal = mutable.MutableList[FulfillmentSection]()
+  var ready = mutable.MutableList[FulfillmentSection]()
+  var impossible = mutable.MutableList[FulfillmentSection]()
 
   for((name, section) <- sections.map) {
     section.status match {
@@ -165,10 +187,14 @@ class CategorizedSections(sections: SectionMap) {
         failed += section
       case SectionStatus.CANCELED =>
         canceled += section
+      case SectionStatus.CONTINGENT =>
+        contingent += section
       case SectionStatus.TIMED_OUT =>
         timedout += section
       case SectionStatus.DEFERRED =>
         deferred += section
+      case SectionStatus.TERMINAL =>
+        terminal += section
       case SectionStatus.INCOMPLETE =>
         categorizeIncompleteSection(section)
       case SectionStatus.IMPOSSIBLE =>
@@ -189,12 +215,9 @@ class CategorizedSections(sections: SectionMap) {
     for((name, value) <- section.params) {
       value match {
         case sectionReference: SectionReference =>
-          val referencedSection: FulfillmentSection = sections.map(sectionReference.name)
-          if(referencedSection.status != SectionStatus.COMPLETE) {
-            section.notes += s"Waiting for parameter $name (${referencedSection.status})"
-            paramsReady = false
-          }
+          paramsReady &= sectionReference.resolved(sections)
         case _ =>
+          // non-reference params are automatically ready..
       }
     }
 
@@ -203,7 +226,7 @@ class CategorizedSections(sections: SectionMap) {
       val referencedSection: FulfillmentSection = sections.map(prereq)
       referencedSection.status match {
         case SectionStatus.COMPLETE =>
-        //          println("Section is complete")
+          // println("Section is complete")
         case _ =>
           // Anything other than complete is BLOCKING our progress
           section.notes += s"Waiting for prereq $prereq (${referencedSection.status})"
@@ -221,7 +244,7 @@ class CategorizedSections(sections: SectionMap) {
   }
 
   def workComplete() : Boolean = {
-    sections.map.size == complete.length
+    sections.map.size == (complete.length + contingent.length)
   }
 
   def hasPendingSections: Boolean = {
@@ -278,6 +301,23 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
       notes += e.getMessage
   }
 
+  // Now that all of the pending events have been processed, we look through the
+  // section references to see if anything needs to be promoted from CONTINGENT -> INCOMPLETE.
+  // Sections get promoted when they're in a SectionReference list and the prior section is TERMINAL
+  for((name, section) <- map) {
+    println(section.toString)
+    // Just process the sections that are potentially ready to run
+    if(section.status == SectionStatus.INCOMPLETE) {
+      for((pname, param) <- section.params) {
+        param match {
+          case sectionReference: SectionReference =>
+            sectionReference.processReferences(this)
+          case _ =>
+        }
+      }
+    }
+  }
+
   protected def ensureSanity() = {
     for((name, section) <- map) {
       for(prereq <- section.prereqs) {
@@ -303,12 +343,13 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
         }
         param match {
           case sectionReference: SectionReference =>
-            val refname = param.asInstanceOf[SectionReference].name
-            if(!(map contains refname)) {
-              section.status = SectionStatus.IMPOSSIBLE
-              val ception = s"Fulfillment is impossible! Param ($pname -> $refname) for $name does not exist!"
-              section.notes += ception
-              throw new Exception(ception)
+            for(sectionName <- sectionReference.sections) {
+              if(!(map contains sectionName)) {
+                section.status = SectionStatus.IMPOSSIBLE
+                val ception = s"Fulfillment is impossible! Param ($pname -> $sectionName) for $name does not exist!"
+                section.notes += ception
+                throw new Exception(ception)
+              }
             }
           case _ =>
         }
@@ -353,25 +394,17 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   protected def processActivityTaskFailed(event: HistoryEvent) = {
     val attribs = event.getActivityTaskFailedEventAttributes
-    val name = registry(attribs.getScheduledEventId)
-    map(name).notes += attribs.getReason
-    map(name).notes += attribs.getDetails
-    map(name).status = SectionStatus.FAILED
-    map(name).failedCount += 1
+    map(registry(attribs.getScheduledEventId)).setFailed(attribs.getReason, attribs.getDetails)
   }
 
   protected def processActivityTaskTimedOut(event: HistoryEvent) = {
     val name = registry(event.getActivityTaskTimedOutEventAttributes.getScheduledEventId)
-    map(name).status = SectionStatus.TIMED_OUT
-    map(name).timedoutCount += 1
+    map(name).setTimedOut()
   }
 
   protected def processActivityTaskCanceled(event: HistoryEvent) = {
     val attribs = event.getActivityTaskCanceledEventAttributes
-    val name = registry(attribs.getScheduledEventId)
-    map(name).notes += attribs.getDetails
-    map(name).status = SectionStatus.CANCELED
-    map(name).canceledCount += 1
+    map(registry(attribs.getScheduledEventId)).setCanceled(attribs.getDetails)
   }
 
   protected def processScheduleActivityTaskFailed(event: HistoryEvent) = {
@@ -382,8 +415,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
     // FIXME This isn't the typical 'FAILED'. It failed to even get scheduled
     // Not actually sure if this needs to be distinct or not.
-    map(name).status = SectionStatus.FAILED
-    map(name).failedCount += 1
+    map(name).setFailed("Failed to Schedule task!", attribs.getCause)
 
     notes += s"Failed to schedule activity task because ${attribs.getCause} $activityIdParts"
   }
@@ -426,16 +458,57 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     for((k, s) <- map) {
       out += s"$k\t\t${s.status.toString}\n"
     }
-
     out
   }
 
 }
 
-class SectionReference(sectionName: String) {
-  val name = sectionName
+class SectionReference(referencedSections:JsArray) {
+  var sections = mutable.MutableList[String]()
+  for(sectionName <- referencedSections.as[List[String]]) {
+    sections += sectionName
+  }
 
-  override def toString: String = s"section($name)"
+  def processReferences(map:SectionMap) = {
+    var priorSectionStatus = SectionStatus.TERMINAL
+    for(sectionName <- sections) {
+      val referencedSection = map.map(sectionName)
+      if(priorSectionStatus == SectionStatus.TERMINAL
+        && referencedSection.status == SectionStatus.CONTINGENT) {
+        // The prior section didn't complete successfully.. let's
+        // let the next section have a try
+        referencedSection.status = SectionStatus.INCOMPLETE
+      }
+      priorSectionStatus = referencedSection.status
+    }
+  }
+
+  def resolved(map:SectionMap):Boolean = {
+    for(sectionName <- sections) {
+      val referencedSection = map.map(sectionName)
+      referencedSection.status match {
+        case SectionStatus.COMPLETE =>
+          return true
+        case _ =>
+      }
+    }
+    false
+  }
+
+  def getValue(map:SectionMap):String = {
+    var sectionsSummary = "Sections("
+    for(sectionName <- sections) {
+      val referencedSection = map.map(sectionName)
+      sectionsSummary += s"sectionName:${referencedSection.status} "
+      if(referencedSection.status == SectionStatus.COMPLETE) {
+        return referencedSection.value
+      }
+    }
+    sectionsSummary += ")"
+    throw new Exception("Tried to get value from referenced sections and no value was available! "+sectionsSummary)
+  }
+
+  override def toString: String = s"section($sections)"
 }
 
 class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
@@ -480,8 +553,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
     for((name, value) <- section.params) {
       value match {
         case sectionReference: SectionReference =>
-          val referencedSection: FulfillmentSection = sections.map(sectionReference.name)
-          params += (name -> referencedSection.value)
+          params += (name -> sectionReference.getValue(sections))
         case v: String =>
           params += (name -> v)
         case _ =>
@@ -635,7 +707,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
       }
 
       val attribs: FailWorkflowExecutionDecisionAttributes = new FailWorkflowExecutionDecisionAttributes
-      attribs.setReason("There blocked sections and nothing is in progress!")
+      attribs.setReason("There are blocked sections and nothing is in progress!")
       attribs.setDetails(details)
 
       decision.setFailWorkflowExecutionDecisionAttributes(attribs)
