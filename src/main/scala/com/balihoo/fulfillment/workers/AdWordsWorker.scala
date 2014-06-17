@@ -3,8 +3,7 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment._
 import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.config.PropertiesLoader
-import play.api.libs.json.{Json, JsObject}
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapter: AdWordsAdapter)
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
@@ -93,6 +92,20 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
       name,
       campaignId
     )
+
+    val rawtarget = getRequiredParameter("target", input, task.getInput)
+    val target = Json.parse(rawtarget).as[JsObject]
+    val focus = target.value("focus").as[JsString].value
+
+    focus match {
+      case "interests" =>
+        val interests = target.value("interests").as[JsObject].value("interests").as[JsArray]
+        creator.addUserInterests(created, for(i <- interests.value.toArray) yield i.as[String])
+      case "keywords" =>
+        val keywords = target.value("keywords").as[JsObject].value("keywords").as[JsString]
+        creator.addKeywords(created, for(s <- keywords.value.split(",")) yield s.trim)
+      case _ =>
+    }
 
     completeTask(task.getTaskToken, String.valueOf(created.getId))
   }

@@ -47,6 +47,7 @@ class AdWordsAdapter(loader: PropertiesLoader) {
   val campaignService:CampaignServiceInterface = services.get(session, classOf[CampaignServiceInterface])
   val campaignCriterionService:CampaignCriterionServiceInterface = services.get(session, classOf[CampaignCriterionServiceInterface])
   val adGroupService:AdGroupServiceInterface = services.get(session, classOf[AdGroupServiceInterface])
+  val adGroupCriterionService:AdGroupCriterionServiceInterface = services.get(session, classOf[AdGroupCriterionServiceInterface])
   val managedCustomerService:ManagedCustomerServiceInterface = services.get(session, classOf[ManagedCustomerServiceInterface])
   val budgedService:BudgetServiceInterface = services.get(session, classOf[BudgetServiceInterface])
   val locationService:LocationCriterionServiceInterface = services.get(session, classOf[LocationCriterionServiceInterface])
@@ -55,8 +56,16 @@ class AdWordsAdapter(loader: PropertiesLoader) {
     session.setClientCustomerId(id)
   }
 
-  def setValidateOnly(tf:Boolean) = {
+  def setValidateOnly(tf:Boolean = true) = {
     session.setValidateOnly(tf)
+  }
+
+  def setPartialFailure(tf:Boolean = true) = {
+    // TODO Partial failure could be really beneficial here.
+    // It might allow for all of the legal keywords in a set to work
+    // and then we'd get an error about just the ones that failed, instead
+    // of an all-or-nothing style of updating.
+    session.setPartialFailure(tf)
   }
 
 }
@@ -398,16 +407,6 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     adGroup.setCampaignId(campaignId.toLong)
     adGroup.setStatus(AdGroupStatus.PAUSED)
 
-    val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
-    biddingStrategyConfiguration.setBiddingStrategyType(BiddingStrategyType.MANUAL_CPC)
-
-    // You can optionally provide a bidding scheme in place of the type.
-    val cpcBiddingScheme = new ManualCpcBiddingScheme()
-    cpcBiddingScheme.setEnhancedCpcEnabled(true)
-    biddingStrategyConfiguration.setBiddingScheme(cpcBiddingScheme)
-
-    adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
-
     val operation = new AdGroupOperation()
     operation.setOperand(adGroup)
     operation.setOperator(Operator.ADD)
@@ -436,6 +435,52 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
         throw new Exception("unhandled exception! " + context)
     }
   }
+
+  def addUserInterests(adGroup:AdGroup, interests:Array[String]) = {
+
+    val operations = new mutable.ArrayBuffer[AdGroupCriterionOperation]()
+
+    for(i <- interests) {
+      val interest = new CriterionUserInterest()
+      interest.setUserInterestId(AdWordsUserInterests.getInterestId(i))
+
+      val criterion = new BiddableAdGroupCriterion()
+      criterion.setAdGroupId(adGroup.getId)
+      criterion.setCriterion(interest)
+
+      val operation = new AdGroupCriterionOperation()
+      operation.setOperand(criterion)
+      operation.setOperator(Operator.ADD)
+
+      operations += operation
+    }
+
+    adwords.adGroupCriterionService.mutate(operations.toArray)
+  }
+
+  def addKeywords(adGroup:AdGroup, keywords:Array[String]) = {
+
+    val operations = new mutable.ArrayBuffer[AdGroupCriterionOperation]()
+
+    for(kw <- keywords) {
+      val keyword = new Keyword()
+      keyword.setText(kw)
+      keyword.setMatchType(KeywordMatchType.BROAD) // TODO.. is this right?
+
+      val criterion = new BiddableAdGroupCriterion()
+      criterion.setAdGroupId(adGroup.getId)
+      criterion.setCriterion(keyword)
+
+      val operation = new AdGroupCriterionOperation()
+      operation.setOperand(criterion)
+      operation.setOperator(Operator.ADD)
+
+      operations += operation
+    }
+
+    adwords.adGroupCriterionService.mutate(operations.toArray)
+  }
+
 }
 
 object adwordsAdapterTest {
@@ -516,6 +561,59 @@ object adwordsScheduleTest {
     val creator = new CampaignCreator(adwords)
     val campaign = creator.getCampaign("fulfillment Campaign", "DISPLAY")
     creator.setAdSchedule(campaign, scheduleString)
+
+  }
+}
+
+object adwordsAdGroupCreatorTest {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+
+    val newAdgroup = acreator.createAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    println(newAdgroup.getId)
+
+  }
+}
+
+object adwordsAdGroupSetInterests {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    acreator.addUserInterests(adgroup, Array("Vehicle Shows", "Livestock"))
+
+  }
+}
+
+object adwordsAdGroupSetKeywords {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    acreator.addKeywords(adgroup, Array("tuna", "dressage", "aluminum"))
 
   }
 }
