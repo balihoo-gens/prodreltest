@@ -1,0 +1,26 @@
+
+# general AWS settings
+domain=faux_fulfillment
+name=timezone
+version=1
+workerstatusqueue=faux_fulfillment_worker_status
+aws.accessKey=<key>
+aws.secretKey=<key>
+
+default_task_heartbeat_timeout=600
+default_task_schedule_to_close_timeout=3900
+default_task_schedule_to_start_timeout=300
+default_task_start_to_close_timeout=3600
+
+# google AdWords settings
+clientId= 899671684200-8iia0jkd4m96ocdcmd631shb920kuhi0.apps.googleusercontent.com
+clientSecret = JboqpgH5RNOPE
+refreshToken = 1/s7sXI3h8hK5UNOPE
+email = balihoosearch@gmail.com
+password = <NOPE>
+developerToken = f74keAPpi9NfgFs7dWwR0Q
+apiVersion = v201402
+sandbox_developerToken = balihoosearch@gmail.com++USD
+sandbox_server = https://adwords-sandbox.google.com/
+mediaBuyer = kbates@balihoo.com
+
