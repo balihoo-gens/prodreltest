@@ -105,7 +105,7 @@ class FulfillmentSection(sectionName: String
             case jStr: JsString =>
               params += (jk -> jv.as[String])
             case _ =>
-              notes += s"Parameter type ${jv.getClass.toString} for param $jk is not understood!"
+              notes += s"Parameter $jv of type ${jv.getClass.toString} for param $jk is not understood!"
           }
         }
 
