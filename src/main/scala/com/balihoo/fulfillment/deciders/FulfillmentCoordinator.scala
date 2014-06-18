@@ -123,22 +123,38 @@ class FulfillmentSection(sectionName: String
     }
   }
 
+  def setStarted() = {
+    startedCount += 1
+    status = SectionStatus.STARTED
+  }
+
+  def setScheduled() = {
+    scheduledCount += 1
+    status = SectionStatus.SCHEDULED
+  }
+
+  def setCompleted(result:String) = {
+    status = SectionStatus.COMPLETE
+    value = result
+  }
+
   def setFailed(reason:String, details:String) = {
     failedCount += 1
     notes += "Failed because: "+reason
     notes += details
-    status = if(failedCount >= failureParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.FAILED
+    status = if(failedCount > failureParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.FAILED
   }
 
   def setCanceled(details:String) = {
     canceledCount += 1
     notes += "Canceled because: "+details
-    status = if(canceledCount >= cancelationParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.CANCELED
+    status = if(canceledCount > cancelationParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.CANCELED
   }
 
   def setTimedOut() = {
     timedoutCount += 1
-    status = if(timedoutCount >= timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
+    notes += "Timed out!"
+    status = if(timedoutCount > timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
   }
 
   def getActivityId = {
@@ -305,7 +321,6 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   // section references to see if anything needs to be promoted from CONTINGENT -> INCOMPLETE.
   // Sections get promoted when they're in a SectionReference list and the prior section is TERMINAL
   for((name, section) <- map) {
-    println(section.toString)
     // Just process the sections that are potentially ready to run
     if(section.status == SectionStatus.INCOMPLETE) {
       for((pname, param) <- section.params) {
@@ -318,6 +333,9 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     }
   }
 
+  /**
+   * This checks for situations that would make fulfillment impossible
+   */
   protected def ensureSanity() = {
     for((name, section) <- map) {
       for(prereq <- section.prereqs) {
@@ -357,6 +375,14 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     }
   }
 
+  protected def getSectionByName(name:String): FulfillmentSection = {
+    map(name)
+  }
+
+  protected def getSectionById(id:Long): FulfillmentSection = {
+    map(registry(id))
+  }
+
   /**
    * This method builds all of the sections from the initial input to the workflow
    * @param event HistoryEvent
@@ -374,37 +400,33 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   protected def processActivityTaskScheduled(event: HistoryEvent) = {
     val activityIdParts = event.getActivityTaskScheduledEventAttributes.getActivityId.split("-")
     val name = activityIdParts(0)
-
     registry += (event.getEventId -> name)
-    map(name).status = SectionStatus.SCHEDULED
-    map(name).scheduledCount += 1
+    getSectionByName(name).setScheduled()
   }
 
   protected def processActivityTaskStarted(event: HistoryEvent) = {
-    val name = registry(event.getActivityTaskStartedEventAttributes.getScheduledEventId)
-    map(name).status = SectionStatus.STARTED
-    map(name).startedCount += 1
+    val attribs = event.getActivityTaskStartedEventAttributes
+    getSectionById(attribs.getScheduledEventId).setStarted()
   }
 
   protected def processActivityTaskCompleted(event: HistoryEvent) = {
-    val name = registry(event.getActivityTaskCompletedEventAttributes.getScheduledEventId)
-    map(name).status = SectionStatus.COMPLETE
-    map(name).value = event.getActivityTaskCompletedEventAttributes.getResult
+    val attribs = event.getActivityTaskCompletedEventAttributes
+    getSectionById(attribs.getScheduledEventId).setCompleted(attribs.getResult)
   }
 
   protected def processActivityTaskFailed(event: HistoryEvent) = {
     val attribs = event.getActivityTaskFailedEventAttributes
-    map(registry(attribs.getScheduledEventId)).setFailed(attribs.getReason, attribs.getDetails)
+    getSectionById(attribs.getScheduledEventId).setFailed(attribs.getReason, attribs.getDetails)
   }
 
   protected def processActivityTaskTimedOut(event: HistoryEvent) = {
-    val name = registry(event.getActivityTaskTimedOutEventAttributes.getScheduledEventId)
-    map(name).setTimedOut()
+    val attribs = event.getActivityTaskTimedOutEventAttributes
+    getSectionById(attribs.getScheduledEventId).setTimedOut()
   }
 
   protected def processActivityTaskCanceled(event: HistoryEvent) = {
     val attribs = event.getActivityTaskCanceledEventAttributes
-    map(registry(attribs.getScheduledEventId)).setCanceled(attribs.getDetails)
+    getSectionById(attribs.getScheduledEventId).setCanceled(attribs.getDetails)
   }
 
   protected def processScheduleActivityTaskFailed(event: HistoryEvent) = {
@@ -434,11 +456,13 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     val timerParams:JsObject = Json.parse(attribs.getControl).as[JsObject]
     val sectionName = timerParams.value("section").as[String]
 
-    if(map(sectionName).status == SectionStatus.DEFERRED) {
-       map(sectionName).notes += s"ERROR! Section $sectionName was already DEFERRED!!"
+    val section = getSectionByName(sectionName)
+
+    if(section.status == SectionStatus.DEFERRED) {
+       section.notes += s"ERROR! Section $sectionName was already DEFERRED!!"
     }
 
-    map(sectionName).status = SectionStatus.DEFERRED
+    section.status = SectionStatus.DEFERRED
   }
 
   protected def processTimerFired(event: HistoryEvent) = {
@@ -450,7 +474,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     val sectionName = timerParams.value("section").as[String]
     val status = SectionStatus.withName(timerParams.value("status").as[String])
 
-    map(sectionName).status = status
+    getSectionByName(sectionName).status = status
   }
 
   override def toString = {
