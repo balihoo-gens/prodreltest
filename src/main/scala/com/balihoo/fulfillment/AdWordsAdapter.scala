@@ -572,7 +572,8 @@ object test_adwordsGetSubaccounts {
       println(m.getCustomerId)
       println(m.getName)
     }
-}
+
+  }
 }
 
 object test_adwordsAccountCreator {
