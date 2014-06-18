@@ -47,16 +47,27 @@ class AdWordsAdapter(loader: PropertiesLoader) {
   val campaignService:CampaignServiceInterface = services.get(session, classOf[CampaignServiceInterface])
   val campaignCriterionService:CampaignCriterionServiceInterface = services.get(session, classOf[CampaignCriterionServiceInterface])
   val adGroupService:AdGroupServiceInterface = services.get(session, classOf[AdGroupServiceInterface])
+  val adGroupCriterionService:AdGroupCriterionServiceInterface = services.get(session, classOf[AdGroupCriterionServiceInterface])
+  val adGroupAdService:AdGroupAdServiceInterface = services.get(session, classOf[AdGroupAdServiceInterface])
   val managedCustomerService:ManagedCustomerServiceInterface = services.get(session, classOf[ManagedCustomerServiceInterface])
   val budgedService:BudgetServiceInterface = services.get(session, classOf[BudgetServiceInterface])
   val locationService:LocationCriterionServiceInterface = services.get(session, classOf[LocationCriterionServiceInterface])
+  val mediaService:MediaServiceInterface = services.get(session, classOf[MediaServiceInterface])
 
   def setClientId(id:String) = {
     session.setClientCustomerId(id)
   }
 
-  def setValidateOnly(tf:Boolean) = {
+  def setValidateOnly(tf:Boolean = true) = {
     session.setValidateOnly(tf)
+  }
+
+  def setPartialFailure(tf:Boolean = true) = {
+    // TODO Partial failure could be really beneficial here.
+    // It might allow for all of the legal keywords in a set to work
+    // and then we'd get an error about just the ones that failed, instead
+    // of an all-or-nothing style of updating.
+    session.setPartialFailure(tf)
   }
 
 }
@@ -398,16 +409,6 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     adGroup.setCampaignId(campaignId.toLong)
     adGroup.setStatus(AdGroupStatus.PAUSED)
 
-    val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
-    biddingStrategyConfiguration.setBiddingStrategyType(BiddingStrategyType.MANUAL_CPC)
-
-    // You can optionally provide a bidding scheme in place of the type.
-    val cpcBiddingScheme = new ManualCpcBiddingScheme()
-    cpcBiddingScheme.setEnhancedCpcEnabled(true)
-    biddingStrategyConfiguration.setBiddingScheme(cpcBiddingScheme)
-
-    adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
-
     val operation = new AdGroupOperation()
     operation.setOperand(adGroup)
     operation.setOperator(Operator.ADD)
@@ -436,9 +437,128 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
         throw new Exception("unhandled exception! " + context)
     }
   }
+
+  def addUserInterests(adGroup:AdGroup, interests:Array[String]) = {
+
+    val operations = new mutable.ArrayBuffer[AdGroupCriterionOperation]()
+
+    for(i <- interests) {
+      val interest = new CriterionUserInterest()
+      interest.setUserInterestId(AdWordsUserInterests.getInterestId(i))
+
+      val criterion = new BiddableAdGroupCriterion()
+      criterion.setAdGroupId(adGroup.getId)
+      criterion.setCriterion(interest)
+
+      val operation = new AdGroupCriterionOperation()
+      operation.setOperand(criterion)
+      operation.setOperator(Operator.ADD)
+
+      operations += operation
+    }
+
+    adwords.adGroupCriterionService.mutate(operations.toArray)
+  }
+
+  def addKeywords(adGroup:AdGroup, keywords:Array[String]) = {
+
+    val operations = new mutable.ArrayBuffer[AdGroupCriterionOperation]()
+
+    for(kw <- keywords) {
+      val keyword = new Keyword()
+      keyword.setText(kw)
+      keyword.setMatchType(KeywordMatchType.BROAD) // TODO.. is this right?
+
+      val criterion = new BiddableAdGroupCriterion()
+      criterion.setAdGroupId(adGroup.getId)
+      criterion.setCriterion(keyword)
+
+      val operation = new AdGroupCriterionOperation()
+      operation.setOperand(criterion)
+      operation.setOperator(Operator.ADD)
+
+      operations += operation
+    }
+
+    adwords.adGroupCriterionService.mutate(operations.toArray)
+  }
+
 }
 
-object adwordsAdapterTest {
+class AdCreator(adwords:AdWordsAdapter) {
+
+
+  def getImageAd(name: String, adGroupId:String): ImageAd = {
+
+    val selector = new SelectorBuilder()
+      .fields("Id")
+      .equals("ImageCreativeName", name)
+      .equals("AdGroupId", adGroupId)
+      .build()
+
+    val ads = adwords.adGroupAdService.get(selector)
+
+    if(ads.getTotalNumEntries == 1) {
+      ads.getEntries(0).getAd.asInstanceOf[ImageAd]
+    } else if(ads.getTotalNumEntries > 1) {
+      throw new Exception(s"Error looking up ad! Name '$name' is ambiguous!")
+    } else {
+      null
+    }
+  }
+
+  def createImageAd(name: String, url:String, displayUrl:String, imageUrl: String, adGroupId:String): ImageAd = {
+
+    val context = s"createImageAd(name='$name', url='$url', displayUrl='$displayUrl', imageUrl='$imageUrl', adGroupId='$adGroupId')"
+
+    val image = new Image()
+    image.setData(
+      com.google.api.ads.common.lib.utils.Media.getMediaDataFromUrl(imageUrl))
+    image.setType(MediaMediaType.IMAGE)
+
+    val ad = new ImageAd()
+    ad.setImage(image)
+    ad.setName(name)
+    ad.setDisplayUrl(displayUrl)
+    ad.setUrl(url)
+
+    val aga = new AdGroupAd()
+    aga.setAd(ad)
+    aga.setAdGroupId(adGroupId.toLong)
+
+    val operation = new AdGroupAdOperation()
+    operation.setOperand(aga)
+    operation.setOperator(Operator.ADD)
+
+    try {
+      val result = adwords.adGroupAdService.mutate(Array(operation))
+      result.getValue(0).getAd.asInstanceOf[ImageAd]
+    } catch {
+      case exception: ApiException =>
+        for((error) <- exception.getErrors) {
+          error match {
+            case rateExceeded: RateExceededError =>
+              throw new RateExceededException(rateExceeded)
+            case apiError: ApiError =>
+              throw new Exception(apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
+                + apiError.getFieldPath + " where:" + context)
+            case _ =>
+              throw new Exception(error.getErrorString + " " + context)
+          }
+        }
+        null
+      case exception: Exception =>
+        throw exception
+      case _: Throwable =>
+        throw new Exception("unhandled exception! " + context)
+    }
+  }
+
+}
+
+// these are one-off tests against the adwords API
+
+object test_adwordsGetSubaccounts {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")
     val adwords = new AdWordsAdapter(config)
@@ -455,7 +575,7 @@ object adwordsAdapterTest {
 }
 }
 
-object adwordsAccountCreatorTest {
+object test_adwordsAccountCreator {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")
     val adwords = new AdWordsAdapter(config)
@@ -469,7 +589,7 @@ object adwordsAccountCreatorTest {
 
 }
 
-object adwordsCampaignCreatorTest {
+object test_adwordsCampaignCreator {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")
     val adwords = new AdWordsAdapter(config)
@@ -485,7 +605,7 @@ object adwordsCampaignCreatorTest {
 
 }
 
-object adwordsLocationCriterionTest {
+object test_adwordsLocationCriterion {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")
     val adwords = new AdWordsAdapter(config)
@@ -502,7 +622,7 @@ object adwordsLocationCriterionTest {
   }
 }
 
-object adwordsScheduleTest {
+object test_adwordsSchedule {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")
     val adwords = new AdWordsAdapter(config)
@@ -515,6 +635,100 @@ object adwordsScheduleTest {
     val creator = new CampaignCreator(adwords)
     val campaign = creator.getCampaign("fulfillment Campaign", "DISPLAY")
     creator.setAdSchedule(campaign, scheduleString)
+
+  }
+}
+
+object test_adwordsAdGroupCreator {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+
+    val newAdgroup = acreator.createAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    println(newAdgroup.getId)
+
+  }
+}
+
+object test_adwordsAdGroupSetInterests {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    acreator.addUserInterests(adgroup, Array("Vehicle Shows", "Livestock"))
+
+  }
+}
+
+object test_adwordsAdGroupSetKeywords {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    acreator.addKeywords(adgroup, Array("tuna", "dressage", "aluminum"))
+
+  }
+}
+
+object test_adwordsGetAdGroupImageAd {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+    val adcreator = new AdCreator(adwords)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    val ad = adcreator.getImageAd("Nature", String.valueOf(adgroup.getId))
+
+    println(ad.toString)
+  }
+}
+
+object test_adwordsAdGroupImageAd {
+  def main(args: Array[String]) {
+    val config = new PropertiesLoader(".adwords.properties")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+    val adcreator = new AdCreator(adwords)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+
+    adcreator.createImageAd("Nature", "http://balihoo.com", "http://balihoo.com", "http://lorempixel.com/300/100/nature/", String.valueOf(adgroup.getId))
 
   }
 }

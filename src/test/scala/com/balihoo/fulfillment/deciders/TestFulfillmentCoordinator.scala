@@ -37,7 +37,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                       },
                       "startToCloseTimeout" : "tuna sandwich"
                     },
-         "params" : { "cake_batter" : { "section" : "batter" },
+         "params" : { "cake_batter" : [ "batter" ],
 				              "cake_pan" : "9\" x 11\"",
 				              "bake_time" : "40" },
          "prereqs" : ["heat_oven"],
@@ -102,7 +102,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                         },
                         "startToCloseTimeout" : "tuna sandwich"
                       },
-           "params" : { "cake_batter" : { "section" : "batter" },
+           "params" : { "cake_batter" : [ "batter" ],
                         "cake_pan" : "9\" x 11\"",
                         "bake_time" : "40" },
            "prereqs" : ["heat_oven"],
@@ -172,7 +172,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                         },
                         "startToCloseTimeout" : "tuna sandwich"
                       },
-           "params" : { "cake_batter" : { "section" : "batter" },
+           "params" : { "cake_batter" : [ "batter" ],
                         "cake_pan" : "9\" x 11\"",
                         "bake_time" : "40" },
            "prereqs" : ["heat_oven"],

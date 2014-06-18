@@ -362,9 +362,9 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
    * @param event HistoryEvent
    */
   protected def processWorkflowExecutionStarted(event: HistoryEvent) = {
-    val fulfillmentInput:JsValue = Json.parse(event.getWorkflowExecutionStartedEventAttributes.getInput)
+    val fulfillmentInput = Json.parse(event.getWorkflowExecutionStartedEventAttributes.getInput).as[JsObject]
 
-    for((jk, jv) <- fulfillmentInput.as[JsObject].fields) {
+    for((jk, jv) <- fulfillmentInput.fields) {
       map += (jk -> new FulfillmentSection(jk, jv.as[JsObject]))
     }
 
