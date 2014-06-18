@@ -11,15 +11,28 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
   override def handleTask(task: ActivityTask) = {
     adwordsAdapter.setClientId("000-000-0000") // SET AN INVALID CONTEXT TO START!!
 
-    name match {
-      case "createaccount" =>
-        createAccount(task)
-      case "createcampaign" =>
-        createCampaign(task)
-      case "createadgroup" =>
-        createAdGroup(task)
-      case _ =>
-        throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
+    try {
+      name match {
+        case "createaccount" =>
+          createAccount(task)
+        case "createcampaign" =>
+          createCampaign(task)
+        case "createadgroup" =>
+          createAdGroup(task)
+        case "createimagead" =>
+          createImageAd(task)
+        case _ =>
+          throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
+      }
+    } catch {
+      case rateExceeded:RateExceededException =>
+        // Whoops! We've hit the rate limit! Let's sleep!
+        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
+        throw rateExceeded
+      case exception:Exception =>
+        throw exception
+      case _:Throwable =>
+        println(s"Caught a throwable!")
     }
   }
 
@@ -106,6 +119,32 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
         creator.addKeywords(created, for(s <- keywords.value.split(",")) yield s.trim)
       case _ =>
     }
+
+    completeTask(task.getTaskToken, String.valueOf(created.getId))
+  }
+
+  def createImageAd(task:ActivityTask) = {
+    val input:JsObject = Json.parse(task.getInput).as[JsObject]
+
+    adwordsAdapter.setClientId(getRequiredParameter("account", input, task.getInput))
+
+    val creator = new AdCreator(adwordsAdapter)
+
+    val name = getRequiredParameter("name", input, task.getInput)
+    val adGroupId = getRequiredParameter("adGroupId", input, task.getInput)
+    val existing = creator.getImageAd(name, adGroupId)
+
+    if(existing != null) { // Look up the account first.. we don't want duplicates
+      completeTask(task.getTaskToken, String.valueOf(existing.getId))
+    }
+
+    val created = creator.createImageAd(
+      name,
+      getRequiredParameter("url", input, task.getInput),
+      getRequiredParameter("displayUrl", input, task.getInput),
+      getRequiredParameter("imageUrl", input, task.getInput),
+      adGroupId
+    )
 
     completeTask(task.getTaskToken, String.valueOf(created.getId))
   }
