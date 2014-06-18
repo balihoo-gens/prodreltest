@@ -452,8 +452,7 @@ object adwordsAdapterTest {
       println(m.getCustomerId)
       println(m.getName)
     }
-
-  }
+}
 }
 
 object adwordsAccountCreatorTest {

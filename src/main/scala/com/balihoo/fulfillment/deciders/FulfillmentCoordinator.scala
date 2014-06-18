@@ -102,10 +102,10 @@ class FulfillmentSection(sectionName: String
           jv match {
             case jArr: JsArray =>
               params += (jk -> new SectionReference(jArr))
-            case jStr: JsValue =>
+            case jStr: JsString =>
               params += (jk -> jv.as[String])
             case _ =>
-              notes += s"Parameter type for param $jk is not understood!"
+              notes += s"Parameter type ${jv.getClass.toString} for param $jk is not understood!"
           }
         }
 

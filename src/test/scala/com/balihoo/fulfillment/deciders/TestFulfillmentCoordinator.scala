@@ -45,7 +45,12 @@ class TestFulfillmentCoordinator extends Specification with Mockito
          "totally unhandled" : "stuff"
 	      }}""")
 
-      val section = new FulfillmentSection("test section", json.as[JsObject].value("cake").as[JsObject])
+
+      //val jso = json.as[JsObject].value("cake").as[JsObject]
+      val jso = json.as[JsObject].value("cake").as[JsObject]
+      println("jsot: " + jso)
+      //val jso = Json.parse(Json.toJson(jsot)).as[JsObject]
+      val section = new FulfillmentSection("test section", jso)
 
       section.name mustEqual "test section"
       section.prereqs(0) mustEqual "heat_oven"
@@ -73,10 +78,8 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.status mustEqual SectionStatus.withName("INCOMPLETE")
 
       section.notes(0) mustEqual "Section totally unhandled unhandled!"
-
     }
   }
-
 
   "SectionMap" should {
     "be initialized without error" in {
