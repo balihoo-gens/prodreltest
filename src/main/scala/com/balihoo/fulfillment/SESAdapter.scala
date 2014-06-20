@@ -38,8 +38,13 @@ class SESAdapter(loader: PropertiesLoader) {
     result.getIdentities().asScala.toList
   }
 
-  def sendEmail(from: String, recipients: List[String], subject: String, body: String): String = {
-    val msgbody = new Body(new Content(body))
+  def sendEmail(from: String, recipients: List[String], subject: String, body: String, html: Boolean = true): String = {
+    var msgbody = new Body()
+    if (html) {
+      msgbody.setHtml(new Content(body))
+    } else {
+      msgbody.setText(new Content(body))
+    }
     val rcpts = new Destination(recipients.asJava)
     val message = new Message(new Content(subject), msgbody)
     val request = new SendEmailRequest(from, rcpts, message)

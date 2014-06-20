@@ -15,12 +15,12 @@ class EmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter: SE
     sesAdapter.verifyEmailAddress(address)
   }
 
-  def listVerifiedEmailAddresses(printToScreen: Boolean): Array[String] = {
-    Array()
+  def listVerifiedEmailAddresses(): List[String] = {
+    sesAdapter.listVerifiedEmailAddresses()
   }
 
-  def sendEmail(recipients: Array[String], body: String): Boolean = {
-    true
+  def sendEmail(from: String, recipients: List[String], subject: String, body: String): String = {
+    sesAdapter.sendEmail(from, recipients, subject, body)
   }
 }
 
@@ -51,11 +51,33 @@ object test_emailworker {
     }
 
     def listAddresses() = {
-      emailworker.listVerifiedEmailAddresses(true)
+      emailworker.listVerifiedEmailAddresses().foreach{ s =>
+        println(s)
+      }
+    }
+
+    def sendEmail() = {
+      val from = "gens@balihoo.com"
+      val subject = "This is an EmailWorker Test"
+      val body = "<h1>sup<br>SUP</h1>"
+      val validEmails = emailworker.listVerifiedEmailAddresses()
+      var i = 0
+      validEmails.foreach{ s =>
+        i += 1
+        println(s"$i] $s")
+      }
+      var recipients = List[String]()
+      val choices = readLine("addresses> ")
+      choices.split(",").foreach{ i =>
+        recipients = validEmails(i.toInt - 1) :: recipients
+      }
+      val res = emailworker.sendEmail(from, recipients, subject, body)
+      println(s"$res\nsent to $recipients")
     }
 
     options("h") = ("Display Help", usage)
     options("v") = ("Verify Email Address", verifyAddress)
+    options("s") = ("Send Email", sendEmail)
     options("l") = ("List Verified Email Addresses", listAddresses)
     options("q") = ("Quit", () => println("bye"))
 
