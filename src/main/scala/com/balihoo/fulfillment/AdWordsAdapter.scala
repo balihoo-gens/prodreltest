@@ -70,27 +70,32 @@ class AdWordsAdapter(loader: PropertiesLoader) {
     session.setPartialFailure(tf)
   }
 
-  def handleApiErrors(exception:Exception, context:String):Exception = {
-    val errors = new mutable.MutableList[String]()
-    exception match {
+  def withErrorsHandled[T](context:String, code: => T):T = {
+    try {
+      code
+    } catch {
       case apiException: ApiException =>
+        val errors = new mutable.MutableList[String]()
         for((error) <- apiException.getErrors) {
           error match {
             case rateExceeded: RateExceededError =>
-              return new RateExceededException(rateExceeded)
+              throw new RateExceededException(rateExceeded)
             case apiError: ApiError =>
               errors += (apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
                 + apiError.getFieldPath + " where:" + context)
             case _ =>
               errors += error.getErrorString + " " + context
+
           }
         }
+        throw new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
+      case e:Exception =>
+        throw e
       case _ =>
-        exception
+        throw new Exception("Unhandled case")
     }
-
-    new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
   }
+
 
   def addOrSet(operatorId:Long): Operator = {
     if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
@@ -111,12 +116,9 @@ class AccountCreator(adwords:AdWordsAdapter) {
       .equals("Name", name)
       .build()
 
-    try {
+    adwords.withErrorsHandled[ManagedCustomer](context, {
       adwords.managedCustomerService.get(selector).getEntries(0)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def createAccount(name:String, currencyCode:String, timeZone:String):ManagedCustomer = {
@@ -132,12 +134,9 @@ class AccountCreator(adwords:AdWordsAdapter) {
     operation.setOperand(customer)
     operation.setOperator(Operator.ADD)
 
-    try {
+    adwords.withErrorsHandled[ManagedCustomer](context, {
       adwords.managedCustomerService.mutate(Array(operation)).getValue(0)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 }
 
@@ -152,12 +151,9 @@ class BudgetCreator(adwords:AdWordsAdapter) {
       .equals("BudgetName", name)
       .build()
 
-    try {
+    adwords.withErrorsHandled[Budget](context, {
       adwords.budgedService.get(selector).getEntries(0)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def createBudget(name:String, amount:String): Budget = {
@@ -176,12 +172,9 @@ class BudgetCreator(adwords:AdWordsAdapter) {
     operation.setOperand(budget)
     operation.setOperator(adwords.addOrSet(operation.getOperand.getBudgetId))
 
-    try {
+    adwords.withErrorsHandled[Budget](context, {
       adwords.budgedService.mutate(Array(operation)).getValue(0)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 }
 
@@ -197,12 +190,9 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .equals("AdvertisingChannelType", channel)
       .build()
 
-    try {
+    adwords.withErrorsHandled[Campaign](context, {
       adwords.campaignService.get(selector).getEntries(0)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def createCampaign(name:String
@@ -269,12 +259,9 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     operation.setOperand(campaign)
     operation.setOperator(Operator.ADD)
 
-    try {
+    adwords.withErrorsHandled[Campaign](context, {
       adwords.campaignService.mutate(Array(operation)).getValue(0)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def setTargetZips(campaign:Campaign, zipString:String) = {
@@ -310,16 +297,14 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    try {
+    adwords.withErrorsHandled[Any](context, {
       adwords.campaignCriterionService.mutate(operations.toArray)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def setAdSchedule(campaign:Campaign, scheduleString:String) = {
 
+    val context = s"setAdSchedule(campaignId='${campaign.getId}', schedule='$scheduleString')"
     val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
     for(day <- scheduleString.split(",")) {
@@ -358,12 +343,9 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    try {
+    adwords.withErrorsHandled[Any](context, {
       adwords.campaignCriterionService.mutate(operations.toArray)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, s"Setting target zips for campaign ${campaign.getId}")
-    }
+    })
   }
 }
 
@@ -379,12 +361,9 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       .equals("CampaignId", campaignId)
       .build()
 
-    try {
+    adwords.withErrorsHandled[AdGroup](context, {
       adwords.adGroupService.get(selector).getEntries(0)
-    } catch {
-      case e:Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def createAdGroup(name: String, campaignId: String): AdGroup = {
@@ -400,12 +379,9 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     operation.setOperand(adGroup)
     operation.setOperator(Operator.ADD)
 
-    try {
+    adwords.withErrorsHandled[AdGroup](context, {
       adwords.adGroupService.mutate(Array(operation)).getValue(0)
-    } catch {
-      case e: Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def addUserInterests(adGroup:AdGroup, interests:Array[String]) = {
@@ -429,12 +405,9 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    try {
+    adwords.withErrorsHandled[Any](context, {
       adwords.adGroupCriterionService.mutate(operations.toArray)
-    } catch {
-      case e: Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def addKeywords(adGroup:AdGroup, keywords:Array[String]) = {
@@ -459,12 +432,9 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    try {
+    adwords.withErrorsHandled[Any](context, {
       adwords.adGroupCriterionService.mutate(operations.toArray)
-    } catch {
-      case e: Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
 }
@@ -482,12 +452,9 @@ class AdCreator(adwords:AdWordsAdapter) {
       .equals("AdGroupId", adGroupId)
       .build()
 
-    try {
+    adwords.withErrorsHandled[ImageAd](context, {
       adwords.adGroupAdService.get(selector).getEntries(0).getAd.asInstanceOf[ImageAd]
-    } catch {
-      case e: Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
   def createImageAd(name: String, url:String, displayUrl:String, imageUrl: String, adGroupId:String): ImageAd = {
@@ -513,12 +480,9 @@ class AdCreator(adwords:AdWordsAdapter) {
     operation.setOperand(aga)
     operation.setOperator(Operator.ADD)
 
-    try {
+    adwords.withErrorsHandled[ImageAd](context, {
       adwords.adGroupAdService.mutate(Array(operation)).getValue(0).getAd.asInstanceOf[ImageAd]
-    } catch {
-      case e: Exception =>
-        throw adwords.handleApiErrors(e, context)
-    }
+    })
   }
 
 }
