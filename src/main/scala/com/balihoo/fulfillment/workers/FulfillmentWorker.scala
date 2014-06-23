@@ -38,6 +38,8 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   var failedTasks:Int = 0
   var canceledTasks:Int = 0
 
+  updateStatus("Starting")
+
   def work() = {
 
     registerActivityType()
@@ -62,7 +64,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   def handleTask(task: ActivityTask)
 
   def baseMessage() = {
-    var message: collection.mutable.Map[String, String] = collection.mutable.Map[String, String]()
+    var message = collection.mutable.Map[String, String]()
     message += ("instance" -> instanceId)
     message += ("type" -> "ActivityWorker")
     message += ("activityName" -> name)
@@ -139,6 +141,10 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 
   }
 
+  def getParams(input:JsObject): Map[String, String] = {
+    (for((key, value) <- input.fields) yield key -> value.as[String]).toMap
+  }
+
   def getRequiredParameter(param:String, input:JsObject, inputRaw:String) = {
     if(!(input.keys contains param)) {
       throw new Exception(s"input parameter '$param' is REQUIRED! '$inputRaw' doesn't contain '$param'")
@@ -147,7 +153,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     input.value(param).as[String]
   }
 
-  def getOptionalParameter(param:String, input:JsObject, inputRaw:String, default:Any):Any = {
+  def getOptionalParameter(param:String, input:JsObject, default:Any):Any = {
     if(!(input.keys contains param)) {
       return default
     }

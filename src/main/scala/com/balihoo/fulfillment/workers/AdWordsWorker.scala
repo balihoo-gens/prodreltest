@@ -13,14 +13,16 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
 
     try {
       name match {
-        case "createaccount" =>
+        case "create account" =>
           createAccount(task)
-        case "createcampaign" =>
-          createCampaign(task)
-        case "createadgroup" =>
-          createAdGroup(task)
-        case "createimagead" =>
-          createImageAd(task)
+        case "lookup account" =>
+          lookupAccount(task)
+        case "campaign" =>
+          processCampaign(task)
+        case "adgroup" =>
+          processAdGroup(task)
+        case "imagead" =>
+          processImageAd(task)
         case _ =>
           throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
       }
@@ -34,6 +36,23 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
       case _:Throwable =>
         println(s"Caught a throwable!")
     }
+  }
+
+  def lookupAccount(task:ActivityTask) = {
+    val input:JsObject = Json.parse(task.getInput).as[JsObject]
+
+    adwordsAdapter.setClientId(getRequiredParameter("parent", input, task.getInput))
+
+    val creator = new AccountCreator(adwordsAdapter)
+
+    val name = getRequiredParameter("name", input, task.getInput)
+    val existing = creator.getAccount(name)
+
+    if(existing != null) { // Look up the account first.. we don't want duplicates
+      completeTask(task.getTaskToken, String.valueOf(existing.getCustomerId))
+    }
+
+    failTask(task.getTaskToken, s"No account with name '$name' was found!", "-")
   }
 
   def createAccount(task:ActivityTask) = {
@@ -59,7 +78,7 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
     completeTask(task.getTaskToken, String.valueOf(created.getCustomerId))
   }
 
-  def createCampaign(task:ActivityTask) = {
+  def processCampaign(task:ActivityTask) = {
     val input:JsObject = Json.parse(task.getInput).as[JsObject]
 
     adwordsAdapter.setClientId(getRequiredParameter("account", input, task.getInput))
@@ -68,25 +87,36 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
 
     val name = getRequiredParameter("name", input, task.getInput)
     val channel = getRequiredParameter("channel", input, task.getInput)
-    val existing = creator.getCampaign(name, channel)
+    var campaign = creator.getCampaign(name, channel)
 
-    if(existing != null) { // Look up the account first.. we don't want duplicates
-      completeTask(task.getTaskToken, String.valueOf(existing.getId))
+    if(campaign == null) { // Look up the account first.. we don't want duplicates
+      campaign = creator.createCampaign(
+        name,
+        channel,
+        getRequiredParameter("budget", input, task.getInput)
+      )
+      creator.setTargetZips(campaign, getRequiredParameter("targetzips", input, task.getInput))
+      creator.setAdSchedule(campaign, getRequiredParameter("adschedule", input, task.getInput))
+
+    } else {
+      // An existing campaign.. update what we can..
+      for((param, value) <- getParams(input)) {
+        param match {
+          case "targetzips" =>
+            creator.setTargetZips(campaign, value)
+          case "adschedule" =>
+            creator.setAdSchedule(campaign, value)
+          case _ =>
+            // TODO.. gripe?
+        }
+      }
+
     }
 
-    val created = creator.createCampaign(
-      name,
-      channel,
-      getRequiredParameter("budget", input, task.getInput)
-    )
-
-    creator.setTargetZips(created, getRequiredParameter("targetzips", input, task.getInput))
-    creator.setAdSchedule(created, getRequiredParameter("adschedule", input, task.getInput))
-
-    completeTask(task.getTaskToken, String.valueOf(created.getId))
+    completeTask(task.getTaskToken, String.valueOf(campaign.getId))
   }
 
-  def createAdGroup(task:ActivityTask) = {
+  def processAdGroup(task:ActivityTask) = {
     val input:JsObject = Json.parse(task.getInput).as[JsObject]
 
     adwordsAdapter.setClientId(getRequiredParameter("account", input, task.getInput))
@@ -95,35 +125,36 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
 
     val name = getRequiredParameter("name", input, task.getInput)
     val campaignId = getRequiredParameter("campaignId", input, task.getInput)
-    val existing = creator.getAdGroup(name, campaignId)
+    var adGroup = creator.getAdGroup(name, campaignId)
 
-    if(existing != null) { // Look up the account first.. we don't want duplicates
-      completeTask(task.getTaskToken, String.valueOf(existing.getId))
+    var rawtarget = getOptionalParameter("target", input, "").asInstanceOf[String]
+    if(adGroup == null) {
+      adGroup = creator.createAdGroup(
+        name,
+        campaignId
+      )
+      rawtarget = getRequiredParameter("target", input, task.getInput)
     }
 
-    val created = creator.createAdGroup(
-      name,
-      campaignId
-    )
+    if(rawtarget != "") {
+      val target = Json.parse(rawtarget).as[JsObject]
+      val focus = target.value("focus").as[JsString].value
 
-    val rawtarget = getRequiredParameter("target", input, task.getInput)
-    val target = Json.parse(rawtarget).as[JsObject]
-    val focus = target.value("focus").as[JsString].value
-
-    focus match {
-      case "interests" =>
-        val interests = target.value("interests").as[JsObject].value("interests").as[JsArray]
-        creator.addUserInterests(created, for(i <- interests.value.toArray) yield i.as[String])
-      case "keywords" =>
-        val keywords = target.value("keywords").as[JsObject].value("keywords").as[JsString]
-        creator.addKeywords(created, for(s <- keywords.value.split(",")) yield s.trim)
-      case _ =>
+      focus match {
+        case "interests" =>
+          val interests = target.value("interests").as[JsObject].value("interests").as[JsArray]
+          creator.addUserInterests(adGroup, for(i <- interests.value.toArray) yield i.as[String])
+        case "keywords" =>
+          val keywords = target.value("keywords").as[JsObject].value("keywords").as[JsString]
+          creator.addKeywords(adGroup, for(s <- keywords.value.split(",")) yield s.trim)
+        case _ =>
+      }
     }
 
-    completeTask(task.getTaskToken, String.valueOf(created.getId))
+    completeTask(task.getTaskToken, String.valueOf(adGroup.getId))
   }
 
-  def createImageAd(task:ActivityTask) = {
+  def processImageAd(task:ActivityTask) = {
     val input:JsObject = Json.parse(task.getInput).as[JsObject]
 
     adwordsAdapter.setClientId(getRequiredParameter("account", input, task.getInput))

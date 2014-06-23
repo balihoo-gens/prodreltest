@@ -70,6 +70,31 @@ class AdWordsAdapter(loader: PropertiesLoader) {
     session.setPartialFailure(tf)
   }
 
+  def handleApiErrors(exception:Exception, context:String):Exception = {
+    val errors = new mutable.MutableList[String]()
+    exception match {
+      case apiException: ApiException =>
+        for((error) <- apiException.getErrors) {
+          error match {
+            case rateExceeded: RateExceededError =>
+              return new RateExceededException(rateExceeded)
+            case apiError: ApiError =>
+              errors += (apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
+                + apiError.getFieldPath + " where:" + context)
+            case _ =>
+              errors += error.getErrorString + " " + context
+          }
+        }
+      case _ =>
+        exception
+    }
+
+    new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
+  }
+
+  def addOrSet(operatorId:Long): Operator = {
+    if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
+  }
 }
 
 class RateExceededException(e:RateExceededError) extends Exception {
@@ -79,19 +104,18 @@ class RateExceededException(e:RateExceededError) extends Exception {
 class AccountCreator(adwords:AdWordsAdapter) {
 
   def getAccount(name:String):ManagedCustomer = {
+    val context = s"getAccount(name='$name')"
+
     val selector = new SelectorBuilder()
       .fields("CustomerId")
       .equals("Name", name)
       .build()
 
-    val customers:ManagedCustomerPage = adwords.managedCustomerService.get(selector)
-
-    if(customers.getTotalNumEntries == 1) {
-      customers.getEntries(0)
-    } else if(customers.getTotalNumEntries > 1) {
-      throw new Exception(s"Error looking up account! Name '$name' is ambiguous!")
-    } else {
-      null
+    try {
+      adwords.managedCustomerService.get(selector).getEntries(0)
+    } catch {
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
@@ -109,26 +133,10 @@ class AccountCreator(adwords:AdWordsAdapter) {
     operation.setOperator(Operator.ADD)
 
     try {
-      val result: ManagedCustomerReturnValue = adwords.managedCustomerService.mutate(Array(operation))
-      result.getValue(0)
+      adwords.managedCustomerService.mutate(Array(operation)).getValue(0)
     } catch {
-      case exception:ApiException =>
-        for((error) <- exception.getErrors) {
-          error match {
-            case rateExceeded:RateExceededError =>
-              throw new RateExceededException(rateExceeded)
-            case apiError:ApiError =>
-              throw new Exception(apiError.getErrorString+"("+apiError.getTrigger+") path:"
-                +apiError.getFieldPath+" where:"+context)
-            case _ =>
-              throw new Exception(error.getErrorString + " " + context)
-          }
-        }
-        null
-      case exception:Exception =>
-        throw exception
-      case _:Throwable =>
-        throw new Exception("unhandled exception! "+ context)
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 }
@@ -137,25 +145,24 @@ class BudgetCreator(adwords:AdWordsAdapter) {
 
   def getBudget(name: String): Budget = {
 
+    val context = s"getBudget(name='$name')"
+
     val selector = new SelectorBuilder()
       .fields("BudgetId")
       .equals("BudgetName", name)
       .build()
 
-    val budgets: BudgetPage = adwords.budgedService.get(selector)
-
-    if(budgets.getTotalNumEntries == 1) {
-      budgets.getEntries(0)
-    } else if(budgets.getTotalNumEntries > 1) {
-      throw new Exception(s"Error looking up budget! Name '$name' is ambiguous!")
-    } else {
-      null
+    try {
+      adwords.budgedService.get(selector).getEntries(0)
+    } catch {
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
-  def createBudget(name: String, amount: String): Budget = {
+  def createBudget(name:String, amount:String): Budget = {
+    val context = s"getCampaign(name='$name', amount='$amount'"
 
-    val context = s"createBudget(name='$name', amount='$amount')"
     val budget = new Budget()
     val money = new Money()
     money.setMicroAmount((1000000 * amount.toFloat).toLong)
@@ -163,39 +170,18 @@ class BudgetCreator(adwords:AdWordsAdapter) {
     budget.setName(name)
     budget.setDeliveryMethod(BudgetBudgetDeliveryMethod.STANDARD)
     budget.setPeriod(BudgetBudgetPeriod.DAILY)
-//    budget.setIsExplicitlyShared(true)
+    //    budget.setIsExplicitlyShared(true)
 
-    val budgetOperation = new BudgetOperation()
-    budgetOperation.setOperand(budget)
-    budgetOperation.setOperator(Operator.ADD)
+    val operation = new BudgetOperation()
+    operation.setOperand(budget)
+    operation.setOperator(adwords.addOrSet(operation.getOperand.getBudgetId))
 
     try {
-      val result = adwords.budgedService.mutate(Array(budgetOperation))
-      if(result == null) {
-        throw new Exception("Failed to create Budget! " + context)
-      }
-
-      result.getValue(0)
+      adwords.budgedService.mutate(Array(operation)).getValue(0)
     } catch {
-      case exception: ApiException =>
-        for((error) <- exception.getErrors) {
-          error match {
-            case rateExceeded: RateExceededError =>
-              throw new RateExceededException(rateExceeded)
-            case apiError: ApiError =>
-              throw new Exception(apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
-                + apiError.getFieldPath + " where:" + context)
-            case _ =>
-              throw new Exception(error.getErrorString + " " + context)
-          }
-        }
-        null
-      case exception: Exception =>
-        throw exception
-      case _: Throwable =>
-        throw new Exception("unhandled exception! " + context)
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
-
   }
 }
 
@@ -203,32 +189,39 @@ class CampaignCreator(adwords:AdWordsAdapter) {
 
   def getCampaign(name:String, channel:String):Campaign = {
 
+    val context = s"getCampaign(name='$name', channel='$channel'"
+
     val selector = new SelectorBuilder()
       .fields("Id", "ServingStatus", "Name", "AdvertisingChannelType")
       .equals("Name", name)
       .equals("AdvertisingChannelType", channel)
       .build()
 
-    val campaigns:CampaignPage = adwords.campaignService.get(selector)
-
-    if(campaigns.getTotalNumEntries == 1) {
-      campaigns.getEntries(0)
-    } else if(campaigns.getTotalNumEntries > 1) {
-      throw new Exception(s"Error looking up campaign! Name '$name' is ambiguous!")
-    } else {
-      null
+    try {
+      adwords.campaignService.get(selector).getEntries(0)
+    } catch {
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
   def createCampaign(name:String
                     ,channel:String
-                    ,budgetId:String
+                    ,budgetDollars:String
                       ):Campaign = {
 
     val context = s"createCampaign(name='$name', channel='$channel')"
 
+    val budgetName = s"$name Budget"
+    val budgetCreator = new BudgetCreator(adwords)
+    val budget:Budget = budgetCreator.getBudget(budgetName) match {
+      case b:Budget => b
+      case _ =>
+        budgetCreator.createBudget(budgetName, budgetDollars)
+    }
+
     val campaignBudget = new Budget()
-    campaignBudget.setBudgetId(budgetId.toLong)
+    campaignBudget.setBudgetId(budget.getBudgetId)
 
     val campaign = new Campaign()
     campaign.setName(name)
@@ -277,31 +270,16 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     operation.setOperator(Operator.ADD)
 
     try {
-      val result = adwords.campaignService.mutate(Array(operation))
-
-      result.getValue(0)
+      adwords.campaignService.mutate(Array(operation)).getValue(0)
     } catch {
-      case exception:ApiException =>
-        for((error) <- exception.getErrors) {
-          error match {
-            case rateExceeded:RateExceededError =>
-              throw new RateExceededException(rateExceeded)
-            case apiError:ApiError =>
-              throw new Exception(apiError.getErrorString+"("+apiError.getTrigger+") path:"
-                +apiError.getFieldPath+" where:"+context)
-            case _ =>
-              throw new Exception(error.getErrorString + " " + context)
-          }
-        }
-        null
-      case exception:Exception =>
-        throw exception
-      case _:Throwable =>
-        throw new Exception("unhandled exception! "+ context)
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
   def setTargetZips(campaign:Campaign, zipString:String) = {
+
+    val context = s"Setting target zips for campaign ${campaign.getId}"
 
     val selector = new SelectorBuilder()
       .fields(
@@ -332,7 +310,12 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.campaignCriterionService.mutate(operations.toArray)
+    try {
+      adwords.campaignCriterionService.mutate(operations.toArray)
+    } catch {
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
+    }
   }
 
   def setAdSchedule(campaign:Campaign, scheduleString:String) = {
@@ -375,7 +358,12 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.campaignCriterionService.mutate(operations.toArray)
+    try {
+      adwords.campaignCriterionService.mutate(operations.toArray)
+    } catch {
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, s"Setting target zips for campaign ${campaign.getId}")
+    }
   }
 }
 
@@ -383,20 +371,19 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
 
   def getAdGroup(name: String, campaignId: String): AdGroup = {
 
+    val context = s"getAdGroup(name='$name', campaignId='$campaignId')"
+
     val selector = new SelectorBuilder()
       .fields("Id")
       .equals("Name", name)
       .equals("CampaignId", campaignId)
       .build()
 
-    val adGroups: AdGroupPage = adwords.adGroupService.get(selector)
-
-    if(adGroups.getTotalNumEntries == 1) {
-      adGroups.getEntries(0)
-    } else if(adGroups.getTotalNumEntries > 1) {
-      throw new Exception(s"Error looking up adGroup! Name '$name' is ambiguous!")
-    } else {
-      null
+    try {
+      adwords.adGroupService.get(selector).getEntries(0)
+    } catch {
+      case e:Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
@@ -414,31 +401,16 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     operation.setOperator(Operator.ADD)
 
     try {
-      val result = adwords.adGroupService.mutate(Array(operation))
-
-      result.getValue(0)
+      adwords.adGroupService.mutate(Array(operation)).getValue(0)
     } catch {
-      case exception: ApiException =>
-        for((error) <- exception.getErrors) {
-          error match {
-            case rateExceeded: RateExceededError =>
-              throw new RateExceededException(rateExceeded)
-            case apiError: ApiError =>
-              throw new Exception(apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
-                + apiError.getFieldPath + " where:" + context)
-            case _ =>
-              throw new Exception(error.getErrorString + " " + context)
-          }
-        }
-        null
-      case exception: Exception =>
-        throw exception
-      case _: Throwable =>
-        throw new Exception("unhandled exception! " + context)
+      case e: Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
   def addUserInterests(adGroup:AdGroup, interests:Array[String]) = {
+
+    val context = s"addUserInterests(name='${adGroup.getId}', $interests)"
 
     val operations = new mutable.ArrayBuffer[AdGroupCriterionOperation]()
 
@@ -457,10 +429,17 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.adGroupCriterionService.mutate(operations.toArray)
+    try {
+      adwords.adGroupCriterionService.mutate(operations.toArray)
+    } catch {
+      case e: Exception =>
+        throw adwords.handleApiErrors(e, context)
+    }
   }
 
   def addKeywords(adGroup:AdGroup, keywords:Array[String]) = {
+
+    val context = s"addKeywords(name='${adGroup.getId}', $keywords)"
 
     val operations = new mutable.ArrayBuffer[AdGroupCriterionOperation]()
 
@@ -480,7 +459,12 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.adGroupCriterionService.mutate(operations.toArray)
+    try {
+      adwords.adGroupCriterionService.mutate(operations.toArray)
+    } catch {
+      case e: Exception =>
+        throw adwords.handleApiErrors(e, context)
+    }
   }
 
 }
@@ -490,20 +474,19 @@ class AdCreator(adwords:AdWordsAdapter) {
 
   def getImageAd(name: String, adGroupId:String): ImageAd = {
 
+    val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
+
     val selector = new SelectorBuilder()
       .fields("Id")
       .equals("ImageCreativeName", name)
       .equals("AdGroupId", adGroupId)
       .build()
 
-    val ads = adwords.adGroupAdService.get(selector)
-
-    if(ads.getTotalNumEntries == 1) {
-      ads.getEntries(0).getAd.asInstanceOf[ImageAd]
-    } else if(ads.getTotalNumEntries > 1) {
-      throw new Exception(s"Error looking up ad! Name '$name' is ambiguous!")
-    } else {
-      null
+    try {
+      adwords.adGroupAdService.get(selector).getEntries(0).getAd.asInstanceOf[ImageAd]
+    } catch {
+      case e: Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
@@ -531,26 +514,10 @@ class AdCreator(adwords:AdWordsAdapter) {
     operation.setOperator(Operator.ADD)
 
     try {
-      val result = adwords.adGroupAdService.mutate(Array(operation))
-      result.getValue(0).getAd.asInstanceOf[ImageAd]
+      adwords.adGroupAdService.mutate(Array(operation)).getValue(0).getAd.asInstanceOf[ImageAd]
     } catch {
-      case exception: ApiException =>
-        for((error) <- exception.getErrors) {
-          error match {
-            case rateExceeded: RateExceededError =>
-              throw new RateExceededException(rateExceeded)
-            case apiError: ApiError =>
-              throw new Exception(apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
-                + apiError.getFieldPath + " where:" + context)
-            case _ =>
-              throw new Exception(error.getErrorString + " " + context)
-          }
-        }
-        null
-      case exception: Exception =>
-        throw exception
-      case _: Throwable =>
-        throw new Exception("unhandled exception! " + context)
+      case e: Exception =>
+        throw adwords.handleApiErrors(e, context)
     }
   }
 
