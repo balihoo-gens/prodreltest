@@ -7,7 +7,7 @@ import com.balihoo.fulfillment.config.PropertiesLoader
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClient
 import com.amazonaws.services.simpleemail.model.{
-  VerifyEmailAddressRequest,
+  VerifyEmailIdentityRequest,
   SendEmailRequest,
   ListIdentitiesRequest,
   Destination,
@@ -25,10 +25,11 @@ class SESAdapter(loader: PropertiesLoader) {
 
   val config = loader
 
-  def verifyEmailAddress(address: String) = {
-    var request = new VerifyEmailAddressRequest()
+  def verifyEmailAddress(address: String): String  = {
+    var request = new VerifyEmailIdentityRequest()
     request.setEmailAddress(address)
-    client.verifyEmailAddress(request)
+    val result = client.verifyEmailIdentity(request)
+    result.toString()
   }
 
   def listVerifiedEmailAddresses(): List[String] = {
@@ -49,7 +50,6 @@ class SESAdapter(loader: PropertiesLoader) {
     val message = new Message(new Content(subject), msgbody)
     val request = new SendEmailRequest(from, rcpts, message)
     val result = client.sendEmail(request)
-    println(result.toString)
     result.getMessageId()
   }
 }

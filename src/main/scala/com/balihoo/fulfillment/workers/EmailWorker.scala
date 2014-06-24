@@ -1,14 +1,53 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.{SQSAdapter, SWFAdapter, SESAdapter}
+import com.balihoo.fulfillment.{
+  SQSAdapter,
+  SWFAdapter,
+  SESAdapter,
+  RateExceededException
+}
 import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.config.PropertiesLoader
+import play.api.libs.json._
 
 class EmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter: SESAdapter)
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
   override def handleTask(task: ActivityTask) = {
-    completeTask(task.getTaskToken, "{\"-EMAIL-\" : \"true\"}")
+    println("EmailWorker.handleTask: processing ${name}")
+
+    try {
+      val input:JsObject = Json.parse(task.getInput).as[JsObject]
+      val token = task.getTaskToken
+      name match {
+        case "email-send" =>
+          val id = sendEmail(
+              getRequiredParameter("from", input, task.getInput),
+              getRequiredParameter("recipients", input, task.getInput).split(",").toList,
+              getRequiredParameter("subject", input, task.getInput),
+              getRequiredParameter("body", input, task.getInput),
+              getRequiredParameter("type", input, task.getInput) == "html"
+          )
+          completeTask(token, s"""{"${name}": "${id.toString}"}""")
+        case "email-verify-address" =>
+          val result:String = verifyAddress(
+              getRequiredParameter("address", input, task.getInput)
+          )
+          completeTask(token, s"""{"${name}": "${result}"}""")
+        case "email-list-verified-addresses" =>
+          val result:String = listVerifiedEmailAddresses().mkString(",")
+          completeTask(token, s"""{"${name}": "${result}"}""")
+        case _ =>
+          throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
+      }
+    } catch {
+      case rateExceeded:RateExceededException =>
+        cancelTask(task.getTaskToken, s"""{"${name}": "RATE EXCEEDED"}""")
+      case exception:Exception =>
+        failTask(task.getTaskToken, s"""{"${name}": "${exception.toString}"}""", exception.getMessage)
+      case _:Throwable =>
+        failTask(task.getTaskToken, s"""{"${name}": "Caught a Throwable""", "caught a throwable")
+    }
   }
 
   def verifyAddress(address: String) = {
@@ -19,7 +58,7 @@ class EmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter: SE
     sesAdapter.listVerifiedEmailAddresses()
   }
 
-  def sendEmail(from: String, recipients: List[String], subject: String, body: String): String = {
+  def sendEmail(from: String, recipients: List[String], subject: String, body: String, html: Boolean = true): String = {
     sesAdapter.sendEmail(from, recipients, subject, body)
   }
 }
