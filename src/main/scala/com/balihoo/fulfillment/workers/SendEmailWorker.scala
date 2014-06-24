@@ -13,7 +13,7 @@ class SendEmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
   override def handleTask(task: ActivityTask) = {
-    println("EmailWorker.handleTask: processing ${name}")
+    println("EmailWorker.handleTask: processing $name")
 
     try {
       val input:JsObject = Json.parse(task.getInput).as[JsObject]
@@ -27,15 +27,15 @@ class SendEmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter
               getRequiredParameter("body", input, task.getInput),
               getRequiredParameter("type", input, task.getInput) == "html"
           )
-          completeTask(token, s"""{"${name}": "${id.toString}"}""")
+          completeTask(token, s"""{"$name": "${id.toString}"}""")
        case _ =>
           throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
       }
     } catch {
       case exception:Exception =>
-        failTask(task.getTaskToken, s"""{"${name}": "${exception.toString}"}""", exception.getMessage)
+        failTask(task.getTaskToken, s"""{"$name": "${exception.toString}"}""", exception.getMessage)
       case _:Throwable =>
-        failTask(task.getTaskToken, s"""{"${name}": "Caught a Throwable""", "caught a throwable")
+        failTask(task.getTaskToken, s"""{"$name": "Caught a Throwable""", "caught a throwable")
     }
   }
 

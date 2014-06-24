@@ -20,7 +20,8 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-io" % "1.3.2",
   "com.google.api-ads" % "ads-lib" % "1.28.0",
   "com.google.api-ads" % "adwords-axis" % "1.28.0",
-  "javax.activation" % "activation" % "1.1"
+  "javax.activation" % "activation" % "1.1",
+  "com.github.scopt" %% "scopt" % "3.2.0"
 )
 
 scalacOptions in Test ++= Seq("-Yrangepos")
