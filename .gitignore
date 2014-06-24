@@ -1,4 +1,4 @@
-*.properties
+*.properties.private
 
 # sbt specific
 dist/*
