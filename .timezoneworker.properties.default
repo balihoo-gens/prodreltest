@@ -1,7 +1,7 @@
 
 # general AWS settings
 domain=faux_fulfillment
-name=timezone
+name=GeoNames-timezone
 version=1
 workerstatusqueue=faux_fulfillment_worker_status
 aws.accessKey=<Access Key>

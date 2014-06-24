@@ -1,8 +1,6 @@
 package com.balihoo.fulfillment
 
 import scala.language.implicitConversions
-import scala.collection.convert.wrapAsScala._
-import scala.collection.convert.wrapAsJava._
 
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.google.api.ads.adwords.lib.client.AdWordsSession
@@ -91,11 +89,10 @@ class AdWordsAdapter(loader: PropertiesLoader) {
         throw new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
       case e:Exception =>
         throw e
-      case _ =>
+      case _:Throwable =>
         throw new Exception("Unhandled case")
     }
   }
-
 
   def addOrSet(operatorId:Long): Operator = {
     if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
