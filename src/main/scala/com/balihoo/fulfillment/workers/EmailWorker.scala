@@ -6,47 +6,43 @@ import com.balihoo.fulfillment.{
   SESAdapter,
   RateExceededException
 }
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.config.PropertiesLoader
-import play.api.libs.json._
 
 class EmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter: SESAdapter)
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
-  override def handleTask(task: ActivityTask) = {
+  override def handleTask(params: ActivityParameters) = {
     println("EmailWorker.handleTask: processing ${name}")
 
     try {
-      val input:JsObject = Json.parse(task.getInput).as[JsObject]
-      val token = task.getTaskToken
       name match {
         case "email-send" =>
           val id = sendEmail(
-              getRequiredParameter("from", input, task.getInput),
-              getRequiredParameter("recipients", input, task.getInput).split(",").toList,
-              getRequiredParameter("subject", input, task.getInput),
-              getRequiredParameter("body", input, task.getInput),
-              getRequiredParameter("type", input, task.getInput) == "html"
+              params.getRequiredParameter("from"),
+              params.getRequiredParameter("recipients").split(",").toList,
+              params.getRequiredParameter("subject"),
+              params.getRequiredParameter("body"),
+              params.getRequiredParameter("type") == "html"
           )
-          completeTask(token, s"""{"${name}": "${id.toString}"}""")
+          completeTask(s"""{"$name": "${id.toString}"}""")
         case "email-verify-address" =>
           val result:String = verifyAddress(
-              getRequiredParameter("address", input, task.getInput)
+            params.getRequiredParameter("address")
           )
-          completeTask(token, s"""{"${name}": "${result}"}""")
+          completeTask(s"""{"$name": "$result"}""")
         case "email-list-verified-addresses" =>
           val result:String = listVerifiedEmailAddresses().mkString(",")
-          completeTask(token, s"""{"${name}": "${result}"}""")
+          completeTask(s"""{"$name": "$result"}""")
         case _ =>
           throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
       }
     } catch {
       case rateExceeded:RateExceededException =>
-        cancelTask(task.getTaskToken, s"""{"${name}": "RATE EXCEEDED"}""")
+        cancelTask(s"""{"$name": "RATE EXCEEDED"}""")
       case exception:Exception =>
-        failTask(task.getTaskToken, s"""{"${name}": "${exception.toString}"}""", exception.getMessage)
+        failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
       case _:Throwable =>
-        failTask(task.getTaskToken, s"""{"${name}": "Caught a Throwable""", "caught a throwable")
+        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
     }
   }
 

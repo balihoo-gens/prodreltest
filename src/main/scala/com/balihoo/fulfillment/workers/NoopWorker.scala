@@ -1,14 +1,13 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.{SQSAdapter, SWFAdapter}
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.config.PropertiesLoader
 
 class NoopWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
-  override def handleTask(task: ActivityTask) = {
-    completeTask(task.getTaskToken, "{\"-NOOP-\" : \"true\"}")
+  override def handleTask(task: ActivityParameters) = {
+    completeTask("""{"-NOOP-" : "true"}""")
   }
 }
 
