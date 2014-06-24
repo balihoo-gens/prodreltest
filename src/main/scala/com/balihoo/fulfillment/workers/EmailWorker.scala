@@ -8,7 +8,39 @@ class EmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter: SE
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
   override def handleTask(task: ActivityTask) = {
-    completeTask(task.getTaskToken, "{\"-EMAIL-\" : \"true\"}")
+
+    try {
+      val input:JsObject = Json.parse(task.getInput).as[JsObject]
+      val token = task.getTaskToken
+      name match {
+        case "email-send" =>
+          val id = sendEmail(
+              getRequiredParameter("from", input, task.getInput),
+              getRequiredParameter("recipients", input, task.getInput).split(",").toList,
+              getRequiredParameter("subject", input, task.getInput),
+              getRequiredParameter("body", input, task.getInput),
+              getRequiredParameter("type", input, task.getInput) == "html",
+          )
+          completeTask(token, s"""{"${name}": "${id.toString}"}""")
+        case "email-verify-address" =>
+          val result:String = verifyAddress(
+              getRequiredParameter("type", input, task.getInput) == "html",
+          )
+          completeTask(token, s"""{"${name}": "${result}"}""")
+        case "email-list-verified-addresses" =>
+          val result:String = listVerifiedEmailAddresses().mkString(",")
+          completeTask(token, s"""{"${name}": "${result}"}""")
+        case _ =>
+          throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
+      }
+    } catch {
+      case rateExceeded:RateExceededException =>
+        cancelTask(task.getTaskToken, s"""{"${name}": "RATE EXCEEDED"}""")
+      case exception:Exception =>
+        failTask(task.getTaskToken, s"""{"${name}": "${exception.toString}"}""")
+      case _:Throwable =>
+        failTask(task.getTaskToken, s"""{"${name}": "Caught a throwable!"}""")
+    }
   }
 
   def verifyAddress(address: String) = {
