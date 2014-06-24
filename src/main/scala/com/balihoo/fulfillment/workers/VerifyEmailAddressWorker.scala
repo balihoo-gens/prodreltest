@@ -12,8 +12,8 @@ import play.api.libs.json._
 class VerifyEmailAddressWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter: SESAdapter)
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
-  override def handleTask(task: ActivityTask) = {
-    println("EmailWorker.handleTask: processing $name")
+  override def handleTask(params: ActivityParameters) = {
+    println("VerifyEmailAddressWorker.handleTask: processing $name")
 
     try {
       val input:JsObject = Json.parse(task.getInput).as[JsObject]
@@ -21,17 +21,17 @@ class VerifyEmailAddressWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, s
       name match {
        case "verify-email-address" =>
           val result:String = verifyAddress(
-              getRequiredParameter("address", input, task.getInput)
+              params.getRequiredParameter("address")
           )
-          completeTask(token, s"""{"$name": "$result"}""")
+          completeTask(s"""{"$name": "$result"}""")
        case _ =>
           throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
       }
     } catch {
       case exception:Exception =>
-        failTask(task.getTaskToken, s"""{"$name": "${exception.toString}"}""", exception.getMessage)
+        failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
       case _:Throwable =>
-        failTask(task.getTaskToken, s"""{"$name": "Caught a Throwable""", "caught a throwable")
+        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
     }
   }
 
