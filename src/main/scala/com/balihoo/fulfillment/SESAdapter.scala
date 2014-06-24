@@ -7,7 +7,7 @@ import com.balihoo.fulfillment.config.PropertiesLoader
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClient
 import com.amazonaws.services.simpleemail.model.{
-  VerifyEmailAddressRequest,
+  VerifyEmailIdentityRequest,
   SendEmailRequest,
   ListIdentitiesRequest,
   Destination,
