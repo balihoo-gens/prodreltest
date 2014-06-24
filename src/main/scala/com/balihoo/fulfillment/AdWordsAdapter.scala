@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment
 
+import com.balihoo.fulfillment.workers.ActivityParameters
+
 import scala.language.implicitConversions
 
 import com.balihoo.fulfillment.config.PropertiesLoader
@@ -212,11 +214,12 @@ class CampaignCreator(adwords:AdWordsAdapter) {
 
     val campaign = new Campaign()
     campaign.setName(name)
-    campaign.setStatus(CampaignStatus.PAUSED)
+    campaign.setAdvertisingChannelType(AdvertisingChannelType.fromString(channel))
+
+    campaign.setStatus(CampaignStatus.ACTIVE)
     campaign.setBudget(campaignBudget)
 //    campaign.setStartDate("20140101")
 //    campaign.setEndDate("20150101")
-    campaign.setAdvertisingChannelType(AdvertisingChannelType.fromString(channel))
 
     val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
     biddingStrategyConfiguration.setBiddingStrategyType(BiddingStrategyType.MANUAL_CPC)
@@ -255,6 +258,32 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     val operation = new CampaignOperation()
     operation.setOperand(campaign)
     operation.setOperator(Operator.ADD)
+
+    adwords.withErrorsHandled[Campaign](context, {
+      adwords.campaignService.mutate(Array(operation)).getValue(0)
+    })
+  }
+
+  def updateCampaign(campaign: Campaign, params: ActivityParameters) = {
+
+    val context = s"updateCampaign(name='${campaign.getName}')"
+
+    for((param, value) <- params.params) {
+      param match {
+        case "status" =>
+          campaign.setStatus(CampaignStatus.fromString(value))
+        case "startDate" =>
+          campaign.setStartDate(value)
+        case "endDate" =>
+          campaign.setEndDate(value)
+
+        case _ =>
+      }
+    }
+
+    val operation = new CampaignOperation()
+    operation.setOperand(campaign)
+    operation.setOperator(Operator.SET)
 
     adwords.withErrorsHandled[Campaign](context, {
       adwords.campaignService.mutate(Array(operation)).getValue(0)
@@ -363,14 +392,14 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     })
   }
 
-  def createAdGroup(name: String, campaignId: String): AdGroup = {
+  def createAdGroup(name: String, campaignId: String, status: String): AdGroup = {
 
     val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
 
     val adGroup = new AdGroup()
     adGroup.setName(name)
     adGroup.setCampaignId(campaignId.toLong)
-    adGroup.setStatus(AdGroupStatus.PAUSED)
+    adGroup.setStatus(AdGroupStatus.fromString(status))
 
     val operation = new AdGroupOperation()
     operation.setOperand(adGroup)
@@ -580,7 +609,7 @@ object test_adwordsAdGroupCreator {
 
     val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
 
-    val newAdgroup = acreator.createAdGroup("GROUP A", String.valueOf(campaign.getId))
+    val newAdgroup = acreator.createAdGroup("GROUP A", String.valueOf(campaign.getId), "PAUSED")
 
     println(newAdgroup.getId)
 

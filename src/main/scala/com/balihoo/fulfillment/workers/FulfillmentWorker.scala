@@ -8,7 +8,7 @@ import com.balihoo.fulfillment.{SQSAdapter, SWFAdapter}
 
 import com.amazonaws.services.simpleworkflow.model._
 import com.amazonaws.services.sqs.model.{GetQueueUrlRequest, SendMessageRequest}
-import play.api.libs.json._
+import play.api.libs.json.{Json, JsObject}
 
 abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter) {
 
@@ -38,39 +38,33 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   var failedTasks:Int = 0
   var canceledTasks:Int = 0
 
-  def validateSWFIdentifier(ident:String, length:Int) = {
-    for(s <- Array(":", "/", "|", "arn")) {
-      if(ident.contains(s)) throw new Exception(s"$ident must not contain '$s'")
-    }
-    if(ident.length > length) throw new Exception(s"$ident must not be longer than '$length'")
-
-    ident
-  }
-
-  updateStatus("Starting")
+  var task:ActivityTask = null
 
   def work() = {
 
     registerActivityType()
 
+    updateStatus("Starting")
+
     while(true) {
       print(".")
 
       updateStatus("Polling")
-      val task : ActivityTask = swfAdapter.client.pollForActivityTask(taskReq)
+      task = new ActivityTask
+      task = swfAdapter.client.pollForActivityTask(taskReq)
       if(task.getTaskToken != null) {
         updateStatus("Processing task..")
         try {
-          handleTask(task)
+          handleTask(new ActivityParameters(task.getInput))
         } catch {
           case e:Exception =>
-            failTask(task.getTaskToken, "Exception", e.getMessage)
+            failTask("Exception", e.getMessage)
         }
       }
     }
   }
 
-  def handleTask(task: ActivityTask)
+  def handleTask(params:ActivityParameters)
 
   def baseMessage() = {
     var message = collection.mutable.Map[String, String]()
@@ -95,27 +89,27 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     sqsAdapter.client.sendMessage(m)
   }
 
-  def completeTask(token:String, result:String) = {
+  def completeTask(result:String) = {
     completedTasks += 1
     val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
-    response.setTaskToken(token)
+    response.setTaskToken(task.getTaskToken)
     response.setResult(result)
     swfAdapter.client.respondActivityTaskCompleted(response)
   }
 
-  def failTask(token:String, reason:String, details:String) = {
+  def failTask(reason:String, details:String) = {
     failedTasks += 1
     val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
-    response.setTaskToken(token)
+    response.setTaskToken(task.getTaskToken)
     response.setReason(reason)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskFailed(response)
   }
 
-  def cancelTask(token:String, details:String) = {
+  def cancelTask(details:String) = {
     canceledTasks += 1
     val response:RespondActivityTaskCanceledRequest = new RespondActivityTaskCanceledRequest
-    response.setTaskToken(token)
+    response.setTaskToken(task.getTaskToken)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskCanceled(response)
   }
@@ -147,28 +141,32 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
       case e: Exception =>
         updateStatus(s"Failed to register Activity ($name,$version)")
     }
-
   }
 
-  def getParams(input:JsObject): Map[String, String] = {
-    (for((key, value) <- input.fields) yield key -> value.as[String]).toMap
-  }
-
-  def getRequiredParameter(param:String, input:JsObject, inputRaw:String) = {
-    if(!(input.keys contains param)) {
-      throw new Exception(s"input parameter '$param' is REQUIRED! '$inputRaw' doesn't contain '$param'")
+  def validateSWFIdentifier(ident:String, length:Int) = {
+    for(s <- Array(":", "/", "|", "arn")) {
+      if(ident.contains(s)) throw new Exception(s"$ident must not contain '$s'")
     }
+    if(ident.length > length) throw new Exception(s"$ident must not be longer than '$length'")
 
-    input.value(param).as[String]
+    ident
   }
 
-  def getOptionalParameter(param:String, input:JsObject, default:Any):Any = {
-    if(!(input.keys contains param)) {
-      return default
+}
+
+class ActivityParameters(input:String) {
+  val inputObject:JsObject = Json.parse(input).as[JsObject]
+  val params:Map[String, String] = (for((key, value) <- inputObject.fields) yield key -> value.as[String]).toMap
+
+  def getRequiredParameter(param:String):String = {
+    if(!(params contains param)) {
+      throw new Exception(s"input parameter '$param' is REQUIRED! '$input' doesn't contain '$param'")
     }
-
-    input.value(param).as[String]
+    params(param)
   }
 
+  def getOptionalParameter(param:String, default:String):String = {
+    params.getOrElse(param, default)
+  }
 }
 

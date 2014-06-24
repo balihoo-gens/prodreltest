@@ -428,11 +428,10 @@ class TimeZoneWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     "Africa/Accra" -> "Africa/Accra",
     "Africa/Abidjan" -> "Africa/Abidjan")
 
-  override def handleTask(task: ActivityTask) = {
-    val input:JsObject = Json.parse(task.getInput).as[JsObject]
+  override def handleTask(params: ActivityParameters) = {
 
-    val lat = getRequiredParameter("lat", input, task.getInput)
-    val lon = getRequiredParameter("lon", input, task.getInput)
+    val lat = params.getRequiredParameter("lat")
+    val lon = params.getRequiredParameter("lon")
     val results = latLonToTimeZone(lat, lon)
 
     val jresults = Json.parse(results).as[JsObject]
@@ -441,7 +440,7 @@ class TimeZoneWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
       throw new Exception(results+" does not contain 'timezoneId'")
     }
 
-    completeTask(task.getTaskToken, translateZone(jresults.value("timezoneId").as[String]))
+    completeTask(translateZone(jresults.value("timezoneId").as[String]))
   }
 
   def latLonToTimeZone(lat:String, lon:String) = {

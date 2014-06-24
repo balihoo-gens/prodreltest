@@ -1,28 +1,27 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment._
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.config.PropertiesLoader
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapter: AdWordsAdapter)
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
-  override def handleTask(task: ActivityTask) = {
+  override def handleTask(params: ActivityParameters) = {
     adwordsAdapter.setClientId("000-000-0000") // SET AN INVALID CONTEXT TO START!!
 
     try {
       name match {
         case "AdWords-create-account" =>
-          createAccount(task)
+          createAccount(params)
         case "AdWords-lookup-account" =>
-          lookupAccount(task)
+          lookupAccount(params)
         case "AdWords-campaign" =>
-          processCampaign(task)
+          processCampaign(params)
         case "AdWords-adgroup" =>
-          processAdGroup(task)
+          processAdGroup(params)
         case "AdWords-imagead" =>
-          processImageAd(task)
+          processImageAd(params)
         case _ =>
           throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
       }
@@ -38,69 +37,63 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
     }
   }
 
-  def lookupAccount(task:ActivityTask) = {
-    val input:JsObject = Json.parse(task.getInput).as[JsObject]
-
-    adwordsAdapter.setClientId(getRequiredParameter("parent", input, task.getInput))
+  def lookupAccount(params:ActivityParameters) = {
+    adwordsAdapter.setClientId(params.getRequiredParameter("parent"))
 
     val creator = new AccountCreator(adwordsAdapter)
 
-    val name = getRequiredParameter("name", input, task.getInput)
+    val name = params.getRequiredParameter("name")
     val existing = creator.getAccount(name)
 
     if(existing != null) { // Look up the account first.. we don't want duplicates
-      completeTask(task.getTaskToken, String.valueOf(existing.getCustomerId))
+      completeTask(String.valueOf(existing.getCustomerId))
     }
 
-    failTask(task.getTaskToken, s"No account with name '$name' was found!", "-")
+    failTask(s"No account with name '$name' was found!", "-")
   }
 
-  def createAccount(task:ActivityTask) = {
-    val input:JsObject = Json.parse(task.getInput).as[JsObject]
-
-    adwordsAdapter.setClientId(getRequiredParameter("parent", input, task.getInput))
+  def createAccount(params:ActivityParameters) = {
+    adwordsAdapter.setClientId(params.getRequiredParameter("parent"))
 
     val creator = new AccountCreator(adwordsAdapter)
 
-    val name = getRequiredParameter("name", input, task.getInput)
+    val name = params.getRequiredParameter("name")
     val existing = creator.getAccount(name)
 
     if(existing != null) { // Look up the account first.. we don't want duplicates
-      completeTask(task.getTaskToken, String.valueOf(existing.getCustomerId))
+      completeTask(String.valueOf(existing.getCustomerId))
     }
 
     val created = creator.createAccount(
       name,
-      getRequiredParameter("currencyCode", input, task.getInput),
-      getRequiredParameter("timeZone", input, task.getInput)
+      params.getRequiredParameter("currencyCode"),
+      params.getRequiredParameter("timeZone")
     )
 
-    completeTask(task.getTaskToken, String.valueOf(created.getCustomerId))
+    completeTask(String.valueOf(created.getCustomerId))
   }
 
-  def processCampaign(task:ActivityTask) = {
-    val input:JsObject = Json.parse(task.getInput).as[JsObject]
-
-    adwordsAdapter.setClientId(getRequiredParameter("account", input, task.getInput))
+  def processCampaign(params:ActivityParameters) = {
+    adwordsAdapter.setClientId(params.getRequiredParameter("account"))
 
     val creator = new CampaignCreator(adwordsAdapter)
 
-    val name = getRequiredParameter("name", input, task.getInput)
-    val channel = getRequiredParameter("channel", input, task.getInput)
+    val name = params.getRequiredParameter("name")
+    val channel = params.getRequiredParameter("channel")
     var campaign = creator.getCampaign(name, channel)
 
     if(campaign == null) { // Look up the account first.. we don't want duplicates
       campaign = creator.createCampaign(
         name,
         channel,
-        getRequiredParameter("budget", input, task.getInput)
+        params.getRequiredParameter("budget")
       )
-      creator.setTargetZips(campaign, getRequiredParameter("targetzips", input, task.getInput))
-      creator.setAdSchedule(campaign, getRequiredParameter("adschedule", input, task.getInput))
+      creator.setTargetZips(campaign, params.getRequiredParameter("targetzips"))
+      creator.setAdSchedule(campaign, params.getRequiredParameter("adschedule"))
 
     } else {
       // An existing campaign.. update what we can..
-      for((param, value) <- getParams(input)) {
+      for((param, value) <- params.params) {
         param match {
           case "targetzips" =>
             creator.setTargetZips(campaign, value)
@@ -111,29 +104,30 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
         }
       }
 
+      creator.updateCampaign(campaign, params)
+
     }
 
-    completeTask(task.getTaskToken, String.valueOf(campaign.getId))
+    completeTask(String.valueOf(campaign.getId))
   }
 
-  def processAdGroup(task:ActivityTask) = {
-    val input:JsObject = Json.parse(task.getInput).as[JsObject]
-
-    adwordsAdapter.setClientId(getRequiredParameter("account", input, task.getInput))
+  def processAdGroup(params:ActivityParameters) = {
+    adwordsAdapter.setClientId(params.getRequiredParameter("account"))
 
     val creator = new AdGroupCreator(adwordsAdapter)
 
-    val name = getRequiredParameter("name", input, task.getInput)
-    val campaignId = getRequiredParameter("campaignId", input, task.getInput)
+    val name = params.getRequiredParameter("name")
+    val campaignId = params.getRequiredParameter("campaignId")
     var adGroup = creator.getAdGroup(name, campaignId)
 
-    var rawtarget = getOptionalParameter("target", input, "").asInstanceOf[String]
+    var rawtarget = params.getOptionalParameter("target", "")
     if(adGroup == null) {
       adGroup = creator.createAdGroup(
         name,
-        campaignId
+        campaignId,
+        params.getRequiredParameter("status")
       )
-      rawtarget = getRequiredParameter("target", input, task.getInput)
+      rawtarget = params.getRequiredParameter("target")
     }
 
     if(rawtarget != "") {
@@ -151,33 +145,31 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
       }
     }
 
-    completeTask(task.getTaskToken, String.valueOf(adGroup.getId))
+    completeTask(String.valueOf(adGroup.getId))
   }
 
-  def processImageAd(task:ActivityTask) = {
-    val input:JsObject = Json.parse(task.getInput).as[JsObject]
-
-    adwordsAdapter.setClientId(getRequiredParameter("account", input, task.getInput))
+  def processImageAd(params:ActivityParameters) = {
+    adwordsAdapter.setClientId(params.getRequiredParameter("account"))
 
     val creator = new AdCreator(adwordsAdapter)
 
-    val name = getRequiredParameter("name", input, task.getInput)
-    val adGroupId = getRequiredParameter("adGroupId", input, task.getInput)
+    val name = params.getRequiredParameter("name")
+    val adGroupId = params.getRequiredParameter("adGroupId")
     val existing = creator.getImageAd(name, adGroupId)
 
     if(existing != null) { // Look up the account first.. we don't want duplicates
-      completeTask(task.getTaskToken, String.valueOf(existing.getId))
+      completeTask(String.valueOf(existing.getId))
     }
 
     val created = creator.createImageAd(
       name,
-      getRequiredParameter("url", input, task.getInput),
-      getRequiredParameter("displayUrl", input, task.getInput),
-      getRequiredParameter("imageUrl", input, task.getInput),
+      params.getRequiredParameter("url"),
+      params.getRequiredParameter("displayUrl"),
+      params.getRequiredParameter("imageUrl"),
       adGroupId
     )
 
-    completeTask(task.getTaskToken, String.valueOf(created.getId))
+    completeTask(String.valueOf(created.getId))
   }
 }
 
