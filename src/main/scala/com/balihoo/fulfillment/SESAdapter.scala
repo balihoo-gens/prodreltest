@@ -26,21 +26,21 @@ class SESAdapter(loader: PropertiesLoader) {
   val config = loader
 
   def verifyEmailAddress(address: String): String  = {
-    var request = new VerifyEmailIdentityRequest()
+    val request = new VerifyEmailIdentityRequest()
     request.setEmailAddress(address)
     val result = client.verifyEmailIdentity(request)
-    result.toString()
+    result.toString
   }
 
   def listVerifiedEmailAddresses(): List[String] = {
-    var request = new ListIdentitiesRequest()
+    val request = new ListIdentitiesRequest()
     request.setIdentityType("EmailAddress")
     val result = client.listIdentities(request)
-    result.getIdentities().asScala.toList
+    result.getIdentities.asScala.toList
   }
 
   def sendEmail(from: String, recipients: List[String], subject: String, body: String, html: Boolean = true): String = {
-    var msgbody = new Body()
+    val msgbody = new Body()
     if (html) {
       msgbody.setHtml(new Content(body))
     } else {
@@ -50,6 +50,6 @@ class SESAdapter(loader: PropertiesLoader) {
     val message = new Message(new Content(subject), msgbody)
     val request = new SendEmailRequest(from, rcpts, message)
     val result = client.sendEmail(request)
-    result.getMessageId()
+    result.getMessageId
   }
 }

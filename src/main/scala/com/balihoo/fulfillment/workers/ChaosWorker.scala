@@ -1,22 +1,21 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.{SQSAdapter, SWFAdapter}
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.config.PropertiesLoader
 import scala.util.Random
 
 class ChaosWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
-  override def handleTask(task: ActivityTask) = {
+  override def handleTask(params: ActivityParameters) = {
     val rand = new Random()
 
     if(rand.nextBoolean()) {
-      completeTask(task.getTaskToken, "Complete!!!")
+      completeTask("Complete!!!")
     } else if(rand.nextBoolean()) {
-      cancelTask(task.getTaskToken, "Cancelling!!!")
+      cancelTask("Cancelling!!!")
     } else {
-      failTask(task.getTaskToken, "Failing!!", "For reasons..")
+      failTask("Failing!!", "For reasons..")
     }
   }
 }
