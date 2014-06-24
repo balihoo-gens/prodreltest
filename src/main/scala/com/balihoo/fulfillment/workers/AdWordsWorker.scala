@@ -13,15 +13,15 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
 
     try {
       name match {
-        case "create account" =>
+        case "AdWords-create-account" =>
           createAccount(task)
-        case "lookup account" =>
+        case "AdWords-lookup-account" =>
           lookupAccount(task)
-        case "campaign" =>
+        case "AdWords-campaign" =>
           processCampaign(task)
-        case "adgroup" =>
+        case "AdWords-adgroup" =>
           processAdGroup(task)
-        case "imagead" =>
+        case "AdWords-imagead" =>
           processImageAd(task)
         case _ =>
           throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
@@ -183,9 +183,10 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
 
 object adwordsworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwordsworker.properties")
+    val config = new PropertiesLoader(if(args.length == 1) args(0) else ".adwordsworker.properties")
     val adwords = new AdWordsWorker(new SWFAdapter(config), new SQSAdapter(config), new AdWordsAdapter(config))
     println("Running adwords worker")
     adwords.work()
   }
 }
+

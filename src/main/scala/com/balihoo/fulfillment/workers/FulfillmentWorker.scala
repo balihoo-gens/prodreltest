@@ -15,9 +15,9 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   val instanceId = randomUUID().toString
 
   val domain = swfAdapter.config.getString("domain")
-  val name = swfAdapter.config.getString("name")
-  val version = swfAdapter.config.getString("version")
-  val taskListName = name+version
+  val name = validateSWFIdentifier(swfAdapter.config.getString("name"), 256)
+  val version = validateSWFIdentifier(swfAdapter.config.getString("version"), 64)
+  val taskListName = validateSWFIdentifier(name+version, 256)
   val workerStatusQueue: String = sqsAdapter.config.getString("workerstatusqueue")
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
@@ -37,6 +37,15 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   var completedTasks:Int = 0
   var failedTasks:Int = 0
   var canceledTasks:Int = 0
+
+  def validateSWFIdentifier(ident:String, length:Int) = {
+    for(s <- Array(":", "/", "|", "arn")) {
+      if(ident.contains(s)) throw new Exception(s"$ident must not contain '$s'")
+    }
+    if(ident.length > length) throw new Exception(s"$ident must not be longer than '$length'")
+
+    ident
+  }
 
   updateStatus("Starting")
 
@@ -121,7 +130,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
       .withDomain(domain)
 
     try {
-      val detail = swfAdapter.client.describeActivityType(describe)
+      swfAdapter.client.describeActivityType(describe)
     } catch {
       case ure: UnknownResourceException =>
         updateStatus(s"Registering new Activity ($name,$version)")
