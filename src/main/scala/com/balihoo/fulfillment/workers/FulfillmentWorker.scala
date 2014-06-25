@@ -156,7 +156,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   }
 
   def validateSWFIdentifier(ident:String, length:Int) = {
-    for(s <- Array("^^", ":", "/", "|", "arn")) {
+    for(s <- Array("##", ":", "/", "|", "arn")) {
       if(ident.contains(s)) throw new Exception(s"$ident must not contain '$s'")
     }
     if(ident.length > length) throw new Exception(s"$ident must not be longer than '$length'")
