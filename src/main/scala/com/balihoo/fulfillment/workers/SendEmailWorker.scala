@@ -13,29 +13,16 @@ class SendEmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
-    println("SendEmailWorker.handleTask: processing $name")
+    println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    try {
-      val input:JsObject = Json.parse(task.getInput).as[JsObject]
-      val token = task.getTaskToken
-      name match {
-        case "send-email" =>
-          val id = sendEmail(
-              params.getRequiredParameter("from"),
-              params.getRequiredParameter("recipients").split(",").toList,
-              params.getRequiredParameter("subject"),
-              params.getRequiredParameter("body"),
-              params.getRequiredParameter("type") == "html"
-          )
-          completeTask(s"""{"$name": "${id.toString}"}""")
-       case _ =>
-          throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
-      }
-    } catch {
-      case exception:Exception =>
-        failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
-      case _:Throwable =>
-        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
+    withTaskHandling {
+      sendEmail(
+        params.getRequiredParameter("from"),
+        params.getRequiredParameter("recipients").split(",").toList,
+        params.getRequiredParameter("subject"),
+        params.getRequiredParameter("body"),
+        params.getRequiredParameter("type") == "html"
+      ).toString
     }
   }
 
@@ -48,7 +35,7 @@ object sendemailworker {
   def main(args: Array[String]) {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new SendEmailWorker(new SWFAdapter(config), new SQSAdapter(config), new SESAdapter(config))
-    println("Running SendEmailWorker")
+    println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
 }

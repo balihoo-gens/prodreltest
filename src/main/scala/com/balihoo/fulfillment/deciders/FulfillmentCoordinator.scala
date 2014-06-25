@@ -13,6 +13,10 @@ import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 import com.balihoo.fulfillment.config.PropertiesLoader
 
+object Constants {
+  final val delimiter = "##"
+}
+
 object SectionStatus extends Enumeration {
   val INCOMPLETE = Value("INCOMPLETE")
   val SCHEDULED = Value("SCHEDULED")
@@ -159,7 +163,7 @@ class FulfillmentSection(sectionName: String
 
   def getActivityId = {
     val timestamp: Long = System.currentTimeMillis()
-    s"$name-${action.getName}-"+timestamp
+    s"$name${Constants.delimiter}${action.getName}${Constants.delimiter}"+timestamp
   }
 
   override def toString = {
@@ -313,6 +317,8 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
       }
     }
   } catch {
+    case e:NoSuchElementException =>
+      throw e
     case e:Exception =>
       notes += e.getMessage
   }
@@ -398,7 +404,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   }
 
   protected def processActivityTaskScheduled(event: HistoryEvent) = {
-    val activityIdParts = event.getActivityTaskScheduledEventAttributes.getActivityId.split("-")
+    val activityIdParts = event.getActivityTaskScheduledEventAttributes.getActivityId.split(Constants.delimiter)
     val name = activityIdParts(0)
     registry += (event.getEventId -> name)
     getSectionByName(name).setScheduled()
@@ -431,7 +437,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   protected def processScheduleActivityTaskFailed(event: HistoryEvent) = {
     val attribs = event.getScheduleActivityTaskFailedEventAttributes
-    val activityIdParts = attribs.getActivityId.split("-")
+    val activityIdParts = attribs.getActivityId.split(Constants.delimiter)
 
     val name = activityIdParts(0)
 
@@ -751,7 +757,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
 object coordinator {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".coordinator.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val fc: FulfillmentCoordinator = new FulfillmentCoordinator(new SWFAdapter(config))
     println("Running decider")
     fc.coordinate()

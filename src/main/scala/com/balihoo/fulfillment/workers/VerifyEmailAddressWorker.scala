@@ -13,29 +13,14 @@ class VerifyEmailAddressWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, s
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
-    println("VerifyEmailAddressWorker.handleTask: processing $name")
+    println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    try {
-      val input:JsObject = Json.parse(task.getInput).as[JsObject]
-      val token = task.getTaskToken
-      name match {
-       case "verify-email-address" =>
-          val result:String = verifyAddress(
-              params.getRequiredParameter("address")
-          )
-          completeTask(s"""{"$name": "$result"}""")
-       case _ =>
-          throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
-      }
-    } catch {
-      case exception:Exception =>
-        failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
-      case _:Throwable =>
-        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
+    withTaskHandling {
+      verifyAddress(params.getRequiredParameter("address"))
     }
   }
 
-  def verifyAddress(address: String) = {
+  def verifyAddress(address: String):String = {
     sesAdapter.verifyEmailAddress(address)
   }
 }
@@ -48,7 +33,7 @@ object verifyemailaddressworker {
       new SQSAdapter(config),
       new SESAdapter(config)
     )
-    println("Running VerifyEmailAddressWorker")
+    println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
 }
