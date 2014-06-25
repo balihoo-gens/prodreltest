@@ -180,5 +180,9 @@ class ActivityParameters(input:String) {
   def getOptionalParameter(param:String, default:String):String = {
     params.getOrElse(param, default)
   }
+
+  override def toString = {
+    input
+  }
 }
 

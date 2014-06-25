@@ -54,6 +54,10 @@ class AdWordsAdapter(loader: PropertiesLoader) {
   val locationService:LocationCriterionServiceInterface = services.get(session, classOf[LocationCriterionServiceInterface])
   val mediaService:MediaServiceInterface = services.get(session, classOf[MediaServiceInterface])
 
+  def dollarsToMicros(dollars:Float):Long = {
+    (dollars * 1000000).toLong
+  }
+
   def setClientId(id:String) = {
     session.setClientCustomerId(id)
   }
@@ -107,7 +111,8 @@ class RateExceededException(e:RateExceededError) extends Exception {
 
 class AccountCreator(adwords:AdWordsAdapter) {
 
-  def getAccount(name:String):ManagedCustomer = {
+  def getAccount(params:ActivityParameters):ManagedCustomer = {
+    val name = params.getRequiredParameter("name")
     val context = s"getAccount(name='$name')"
 
     val selector = new SelectorBuilder()
@@ -116,12 +121,20 @@ class AccountCreator(adwords:AdWordsAdapter) {
       .build()
 
     adwords.withErrorsHandled[ManagedCustomer](context, {
-      adwords.managedCustomerService.get(selector).getEntries(0)
+      val page = adwords.managedCustomerService.get(selector)
+      page.getTotalNumEntries.intValue() match {
+        case 0 => null
+        case 1 => page.getEntries(0)
+        case _ => throw new Exception(s"Account name $name is ambiguous!")
+      }
     })
   }
 
-  def createAccount(name:String, currencyCode:String, timeZone:String):ManagedCustomer = {
+  def createAccount(params:ActivityParameters):ManagedCustomer = {
 
+    val name = params.getRequiredParameter("name")
+    val currencyCode = params.getRequiredParameter("currencyCode")
+    val timeZone = params.getRequiredParameter("timeZone")
     val context = s"createAccount(name='$name', currencyCode='$currencyCode', timeZone='$timeZone')"
 
     val customer:ManagedCustomer = new ManagedCustomer()
@@ -151,7 +164,12 @@ class BudgetCreator(adwords:AdWordsAdapter) {
       .build()
 
     adwords.withErrorsHandled[Budget](context, {
-      adwords.budgedService.get(selector).getEntries(0)
+      val page = adwords.budgedService.get(selector)
+      page.getTotalNumEntries.intValue() match {
+        case 0 => null
+        case 1 => page.getEntries(0)
+        case _ => throw new Exception(s"Budget name $name is ambiguous!")
+      }
     })
   }
 
@@ -160,7 +178,7 @@ class BudgetCreator(adwords:AdWordsAdapter) {
 
     val budget = new Budget()
     val money = new Money()
-    money.setMicroAmount((1000000 * amount.toFloat).toLong)
+    money.setMicroAmount(adwords.dollarsToMicros(amount.toFloat))
     budget.setAmount(money)
     budget.setName(name)
     budget.setDeliveryMethod(BudgetBudgetDeliveryMethod.STANDARD)
@@ -169,7 +187,7 @@ class BudgetCreator(adwords:AdWordsAdapter) {
 
     val operation = new BudgetOperation()
     operation.setOperand(budget)
-    operation.setOperator(adwords.addOrSet(operation.getOperand.getBudgetId))
+    operation.setOperator(Operator.ADD)
 
     adwords.withErrorsHandled[Budget](context, {
       adwords.budgedService.mutate(Array(operation)).getValue(0)
@@ -179,8 +197,10 @@ class BudgetCreator(adwords:AdWordsAdapter) {
 
 class CampaignCreator(adwords:AdWordsAdapter) {
 
-  def getCampaign(name:String, channel:String):Campaign = {
+  def getCampaign(params: ActivityParameters):Campaign = {
 
+    val name = params.getRequiredParameter("name")
+    val channel = params.getRequiredParameter("channel")
     val context = s"getCampaign(name='$name', channel='$channel'"
 
     val selector = new SelectorBuilder()
@@ -190,15 +210,19 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .build()
 
     adwords.withErrorsHandled[Campaign](context, {
-      adwords.campaignService.get(selector).getEntries(0)
+      val page = adwords.campaignService.get(selector)
+      page.getTotalNumEntries.intValue() match {
+        case 0 => null
+        case 1 => page.getEntries(0)
+        case _ => throw new Exception(s"Campaign name $name is ambiguous!")
+      }
     })
   }
 
-  def createCampaign(name:String
-                    ,channel:String
-                    ,budgetDollars:String
-                      ):Campaign = {
+  def createCampaign(params:ActivityParameters):Campaign = {
 
+    val name = params.getRequiredParameter("name")
+    val channel = params.getRequiredParameter("channel")
     val context = s"createCampaign(name='$name', channel='$channel')"
 
     val budgetName = s"$name Budget"
@@ -206,7 +230,7 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     val budget:Budget = budgetCreator.getBudget(budgetName) match {
       case b:Budget => b
       case _ =>
-        budgetCreator.createBudget(budgetName, budgetDollars)
+        budgetCreator.createBudget(budgetName, params.getRequiredParameter("budget"))
     }
 
     val campaignBudget = new Budget()
@@ -218,15 +242,18 @@ class CampaignCreator(adwords:AdWordsAdapter) {
 
     campaign.setStatus(CampaignStatus.ACTIVE)
     campaign.setBudget(campaignBudget)
-//    campaign.setStartDate("20140101")
-//    campaign.setEndDate("20150101")
 
-    val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
-    biddingStrategyConfiguration.setBiddingStrategyType(BiddingStrategyType.MANUAL_CPC)
+    if(params.params contains "startDate") {
+      campaign.setStartDate(params.params("startDate"))
+    }
 
-    // You can optionally provide a bidding scheme in place of the type.
+    if(params.params contains "endDate") {
+      campaign.setEndDate(params.params("endDate"))
+    }
+
     val cpcBiddingScheme = new ManualCpcBiddingScheme()
     cpcBiddingScheme.setEnhancedCpcEnabled(false)
+    val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
     biddingStrategyConfiguration.setBiddingScheme(cpcBiddingScheme)
 
     campaign.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
@@ -377,8 +404,10 @@ class CampaignCreator(adwords:AdWordsAdapter) {
 
 class AdGroupCreator(adwords:AdWordsAdapter) {
 
-  def getAdGroup(name: String, campaignId: String): AdGroup = {
+  def getAdGroup(params:ActivityParameters): AdGroup = {
 
+    val name = params.getRequiredParameter("name")
+    val campaignId = params.getRequiredParameter("campaignId")
     val context = s"getAdGroup(name='$name', campaignId='$campaignId')"
 
     val selector = new SelectorBuilder()
@@ -388,18 +417,34 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       .build()
 
     adwords.withErrorsHandled[AdGroup](context, {
-      adwords.adGroupService.get(selector).getEntries(0)
+      val page = adwords.adGroupService.get(selector)
+      page.getTotalNumEntries.intValue() match {
+        case 0 => null
+        case 1 => page.getEntries(0)
+        case _ => throw new Exception(s"adGroup name $name is ambiguous in campaign $campaignId")
+      }
     })
   }
 
-  def createAdGroup(name: String, campaignId: String, status: String): AdGroup = {
+  def createAdGroup(params:ActivityParameters): AdGroup = {
 
+    val name = params.getRequiredParameter("name")
+    val campaignId = params.getRequiredParameter("campaignId")
     val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
 
     val adGroup = new AdGroup()
     adGroup.setName(name)
     adGroup.setCampaignId(campaignId.toLong)
-    adGroup.setStatus(AdGroupStatus.fromString(status))
+    adGroup.setStatus(AdGroupStatus.fromString(params.getRequiredParameter("status")))
+
+    val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
+    val money = new Money()
+    money.setMicroAmount(adwords.dollarsToMicros(params.getRequiredParameter("bid").toFloat))
+    val bid = new CpcBid()
+    bid.setBid(money)
+    biddingStrategyConfiguration.setBids(Array(bid))
+
+    adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
 
     val operation = new AdGroupOperation()
     operation.setOperand(adGroup)
@@ -467,9 +512,10 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
 
 class AdCreator(adwords:AdWordsAdapter) {
 
+  def getImageAd(params: ActivityParameters): ImageAd = {
 
-  def getImageAd(name: String, adGroupId:String): ImageAd = {
-
+    val name = params.getRequiredParameter("name")
+    val adGroupId = params.getRequiredParameter("adGroupId")
     val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
 
     val selector = new SelectorBuilder()
@@ -479,11 +525,22 @@ class AdCreator(adwords:AdWordsAdapter) {
       .build()
 
     adwords.withErrorsHandled[ImageAd](context, {
-      adwords.adGroupAdService.get(selector).getEntries(0).getAd.asInstanceOf[ImageAd]
+      val page = adwords.adGroupAdService.get(selector)
+      page.getTotalNumEntries.intValue() match {
+        case 0 => null
+        case 1 => page.getEntries(0).getAd.asInstanceOf[ImageAd]
+        case _ => throw new Exception(s"imageAd name $name is ambiguous in adGroup '$adGroupId'")
+      }
     })
   }
 
-  def createImageAd(name: String, url:String, displayUrl:String, imageUrl: String, adGroupId:String): ImageAd = {
+  def createImageAd(params:ActivityParameters): ImageAd = {
+
+    val name = params.getRequiredParameter("name")
+    val url = params.getRequiredParameter("url")
+    val displayUrl = params.getRequiredParameter("displayUrl")
+    val imageUrl = params.getRequiredParameter("imageUrl")
+    val adGroupId = params.getRequiredParameter("adGroupId")
 
     val context = s"createImageAd(name='$name', url='$url', displayUrl='$displayUrl', imageUrl='$imageUrl', adGroupId='$adGroupId')"
 
@@ -511,6 +568,36 @@ class AdCreator(adwords:AdWordsAdapter) {
     })
   }
 
+
+  def updateImageAd(ad:ImageAd, params:ActivityParameters): ImageAd = {
+
+    val name = params.getRequiredParameter("name")
+    val adGroupId = params.getRequiredParameter("adGroupId")
+
+    val context = s"updateImageAd(name='$name', adGroupId='$adGroupId', params='$params')"
+
+    for((param, value) <- params.params) {
+      param match {
+        case "url" =>
+          ad.setUrl(value)
+        case "displayUrl" =>
+          ad.setDisplayUrl(value)
+        case _ =>
+      }
+    }
+
+    val aga = new AdGroupAd()
+    aga.setAd(ad)
+    aga.setAdGroupId(adGroupId.toLong)
+
+    val operation = new AdGroupAdOperation()
+    operation.setOperand(aga)
+    operation.setOperator(Operator.SET)
+
+    adwords.withErrorsHandled[ImageAd](context, {
+      adwords.adGroupAdService.mutate(Array(operation)).getValue(0).getAd.asInstanceOf[ImageAd]
+    })
+  }
 }
 
 // these are one-off tests against the adwords API
@@ -541,7 +628,13 @@ object test_adwordsAccountCreator {
 //    adwords.setValidateOnly(false)
     adwords.setClientId("981-046-8123") // Dogtopia
     val creator = new AccountCreator(adwords)
-    val newId = creator.createAccount("fulfillment test", "USD", "America/Boise")
+    val accountParams =
+      s"""{
+       "name" : "test campaign",
+        "currencyCode" : "USD",
+        "timeZone" : "America/Boise"
+      }"""
+    val newId = creator.createAccount(new ActivityParameters(accountParams))
 
   }
 
@@ -555,7 +648,20 @@ object test_adwordsCampaignCreator {
 
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
-    val newCampaign = creator.createCampaign("fulfillment Campaign", "DISPLAY", "100")
+
+    val campaignParams =
+      s"""{
+       "name" : "test campaign",
+        "channel" : "DISPLAY",
+        "budget" : "11",
+        "adschedule" : "M,T",
+        "status" : "PAUSED",
+        "startDate" : "20140625",
+        "endDate" : "20140701",
+        "targetzips" : "83704,83713"
+      }"""
+
+    val newCampaign = creator.createCampaign(new ActivityParameters(campaignParams))
 
     println(newCampaign.getId)
 
@@ -574,7 +680,12 @@ object test_adwordsLocationCriterion {
     val zipString = "83704,83713,90210"
 
     val creator = new CampaignCreator(adwords)
-    val campaign = creator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = creator.getCampaign(new ActivityParameters(campaignParams))
     creator.setTargetZips(campaign, zipString)
 
   }
@@ -591,7 +702,12 @@ object test_adwordsSchedule {
     val scheduleString = "M,W,F,S"
 
     val creator = new CampaignCreator(adwords)
-    val campaign = creator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = creator.getCampaign(new ActivityParameters(campaignParams))
     creator.setAdSchedule(campaign, scheduleString)
 
   }
@@ -607,9 +723,21 @@ object test_adwordsAdGroupCreator {
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
 
-    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
 
-    val newAdgroup = acreator.createAdGroup("GROUP A", String.valueOf(campaign.getId), "PAUSED")
+    val adGroupParams =
+      s"""{
+       "name" : "test adgroup",
+       "status" : "ENABLED",
+        "campaignId" : "${campaign.getId}",
+        "bid" : "2.5"
+      }"""
+    val newAdgroup = acreator.createAdGroup(new ActivityParameters(adGroupParams))
 
     println(newAdgroup.getId)
 
@@ -626,8 +754,20 @@ object test_adwordsAdGroupSetInterests {
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
 
-    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
-    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
+
+    val adgroupParams =
+      s"""{
+       "name" : "GROUP A",
+        "campaignId" : "${campaign.getId}",
+      }"""
+
+    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
 
     acreator.addUserInterests(adgroup, Array("Vehicle Shows", "Livestock"))
 
@@ -644,8 +784,19 @@ object test_adwordsAdGroupSetKeywords {
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
 
-    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
-    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
+    val adgroupParams =
+      s"""{
+       "name" : "GROUP A",
+        "campaignId" : "${campaign.getId}"
+      }"""
+
+    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
 
     acreator.addKeywords(adgroup, Array("tuna", "dressage", "aluminum"))
 
@@ -663,10 +814,26 @@ object test_adwordsGetAdGroupImageAd {
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
 
-    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
-    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
+    val adgroupParams =
+      s"""{
+       "name" : "GROUP A",
+        "campaignId" : "${campaign.getId}"
+      }"""
 
-    val ad = adcreator.getImageAd("Nature", String.valueOf(adgroup.getId))
+    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
+
+    val imageAdParams =
+      s"""{
+       "name" : "Another Nature",
+        "adGroupId" : "${adgroup.getId}"
+      }"""
+    val ad = adcreator.getImageAd(new ActivityParameters(imageAdParams))
 
     println(ad.toString)
   }
@@ -683,10 +850,30 @@ object test_adwordsAdGroupImageAd {
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
 
-    val campaign = ccreator.getCampaign("fulfillment Campaign", "DISPLAY")
-    val adgroup = acreator.getAdGroup("GROUP A", String.valueOf(campaign.getId))
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
+    val adgroupParams =
+      s"""{
+       "name" : "GROUP A",
+        "campaignId" : "${campaign.getId}"
+      }"""
 
-    adcreator.createImageAd("Nature", "http://balihoo.com", "http://balihoo.com", "http://lorempixel.com/300/100/nature/", String.valueOf(adgroup.getId))
+    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
+
+    val imageAdParams =
+      s"""{
+       "name" : "Another Nature",
+        "adGroupId" : "${adgroup.getId}",
+        "url" : "http://balihoo.com",
+        "displayUrl" :    "http://balihoo.com",
+        "imageUrl" : "http://lorempixel.com/300/100/nature/"
+      }"""
+
+    adcreator.createImageAd(new ActivityParameters(imageAdParams))
 
   }
 }
