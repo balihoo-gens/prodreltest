@@ -66,6 +66,18 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 
   def handleTask(params:ActivityParameters)
 
+  def withTaskHandling(code: => String) {
+    try {
+      val result:String = code
+      completeTask(s"""{"$name": "$result"}""")
+    } catch {
+      case exception:Exception =>
+        failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
+      case _:Throwable =>
+        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
+    }
+  }
+
   def baseMessage() = {
     var message = collection.mutable.Map[String, String]()
     message += ("instance" -> instanceId)
@@ -144,7 +156,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
   }
 
   def validateSWFIdentifier(ident:String, length:Int) = {
-    for(s <- Array(":", "/", "|", "arn")) {
+    for(s <- Array("^^", ":", "/", "|", "arn")) {
       if(ident.contains(s)) throw new Exception(s"$ident must not contain '$s'")
     }
     if(ident.length > length) throw new Exception(s"$ident must not be longer than '$length'")

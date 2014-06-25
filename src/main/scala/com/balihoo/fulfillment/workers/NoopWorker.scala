@@ -13,7 +13,7 @@ class NoopWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 
 object noopworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".noopworker.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val noop = new NoopWorker(new SWFAdapter(config), new SQSAdapter(config))
     println("Running noop worker")
     noop.work()

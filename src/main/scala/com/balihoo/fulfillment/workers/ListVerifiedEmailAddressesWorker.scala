@@ -13,23 +13,10 @@ class ListVerifiedEmailAddressesWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAd
   extends FulfillmentWorker(swfAdapter, sqsAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
-    println("ListVerifiedEmailAddressesWorker.handleTask: processing $name")
+    println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    try {
-      val input:JsObject = Json.parse(task.getInput).as[JsObject]
-      val token = task.getTaskToken
-      name match {
-       case "list-verified-email-addresses" =>
-          val result:String = listVerifiedEmailAddresses().mkString(",")
-          completeTask(s"""{"$name": "$result"}""")
-        case _ =>
-          throw new Exception(s"activity '$name' is NOT IMPLEMENTED")
-      }
-    } catch {
-      case exception:Exception =>
-        failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
-      case _:Throwable =>
-        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
+    withTaskHandling {
+      listVerifiedEmailAddresses().mkString(",")
     }
   }
 
@@ -46,7 +33,7 @@ object listverifiedemailaddressworker {
       new SQSAdapter(config),
       new SESAdapter(config)
     )
-    println("Running ListVerifiedEmailAddressesWorker")
+    println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
 }

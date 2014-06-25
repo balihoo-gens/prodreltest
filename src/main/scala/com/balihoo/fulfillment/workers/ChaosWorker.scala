@@ -22,7 +22,7 @@ class ChaosWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 
 object chaosworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".chaosworker.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val chaos = new ChaosWorker(new SWFAdapter(config), new SQSAdapter(config))
     println("Running chaos worker")
     chaos.work()

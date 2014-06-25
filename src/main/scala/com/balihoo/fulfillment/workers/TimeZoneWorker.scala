@@ -465,7 +465,7 @@ class TimeZoneWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 
 object timezoneworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".timezoneworker.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val timezone = new TimeZoneWorker(new SWFAdapter(config), new SQSAdapter(config))
     println("Running timezone worker")
     timezone.work()
