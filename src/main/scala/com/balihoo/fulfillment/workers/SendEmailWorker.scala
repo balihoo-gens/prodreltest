@@ -46,7 +46,7 @@ class SendEmailWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter
 
 object sendemailworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".emailworker.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new SendEmailWorker(new SWFAdapter(config), new SQSAdapter(config), new SESAdapter(config))
     println("Running SendEmailWorker")
     worker.work()

@@ -17,7 +17,8 @@ libraryDependencies ++= Seq(
   //json. Using play's implementation because its already known to the team
   "com.typesafe.play" % "play-json_2.10" % "2.2.0",
   "org.specs2" %% "specs2" % "2.3.12" % "test",
-  "org.apache.commons" % "commons-io" % "1.3.2",
+  "commons-io" % "commons-io" % "2.4",
+  "commons-configuration" % "commons-configuration" % "1.10",
   "com.google.api-ads" % "ads-lib" % "1.28.0",
   "com.google.api-ads" % "adwords-axis" % "1.28.0",
   "javax.activation" % "activation" % "1.1",

@@ -8,7 +8,8 @@ import com.balihoo.fulfillment.{
 
 object test_emailworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".emailworker.properties")
+    println("Running SendEmailWorker")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
 
     def usage() = {
