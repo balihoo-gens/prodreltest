@@ -11,7 +11,7 @@ import scala.language.implicitConversions
 import scala.collection.convert.wrapAsScala._
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
-import com.amazonaws.services.simpleworkflow.model.{ActivityTaskStartedEventAttributes, WorkflowExecutionStartedEventAttributes, EventType, HistoryEvent}
+import com.amazonaws.services.simpleworkflow.model._
 
 @RunWith(classOf[JUnitRunner])
 class TestFulfillmentCoordinator extends Specification with Mockito
@@ -263,10 +263,10 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       events += event1
 
       val event2:HistoryEvent = new HistoryEvent
-      val event2Attribs = new ActivityTaskStartedEventAttributes
-      event2.setEventType(EventType.ActivityTaskStarted)
-      event2Attribs.setScheduledEventId(100)
-      event2.setActivityTaskStartedEventAttributes(event2Attribs)
+      val event2Attribs = new ActivityTaskScheduledEventAttributes
+      event2.setEventType(EventType.ActivityTaskScheduled)
+      event2Attribs.setActivityId("cake##blah")
+      event2.setActivityTaskScheduledEventAttributes(event2Attribs)
       events += event2
 
       val map = new SectionMap(mutableSeqAsJavaList(events))
