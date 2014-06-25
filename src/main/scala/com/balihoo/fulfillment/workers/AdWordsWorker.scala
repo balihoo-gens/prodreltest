@@ -175,7 +175,7 @@ class AdWordsWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, adwordsAdapt
 
 object adwordsworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(if(args.length == 1) args(0) else ".adwordsworker.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val adwords = new AdWordsWorker(new SWFAdapter(config), new SQSAdapter(config), new AdWordsAdapter(config))
     println("Running adwords worker")
     adwords.work()

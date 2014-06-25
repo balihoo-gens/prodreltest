@@ -40,7 +40,7 @@ class ListVerifiedEmailAddressesWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAd
 
 object listverifiedemailaddressworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".emailworker.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new ListVerifiedEmailAddressesWorker(
       new SWFAdapter(config),
       new SQSAdapter(config),

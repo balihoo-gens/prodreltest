@@ -42,7 +42,7 @@ class VerifyEmailAddressWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, s
 
 object verifyemailaddressworker {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".emailworker.properties")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new VerifyEmailAddressWorker(
       new SWFAdapter(config),
       new SQSAdapter(config),
