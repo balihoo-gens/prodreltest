@@ -1,3 +1,7 @@
+import AssemblyKeys._
+
+assemblySettings
+
 name := "fulfillment"
 
 version := "1.0-SNAPSHOT"
@@ -32,3 +36,12 @@ scalacOptions in Test ++= Seq("-Yrangepos")
 // Read here for optional dependencies:
 // http://etorreborre.github.io/specs2/guide/org.specs2.guide.Runners.html#Dependencies
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
+
+///Use this to set a specific main class and run that when running the jar with:
+///  java -jar target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar
+// exportJars := true
+// mainClass in (Compile, run) := Some("com.balihoo.fulfillment.main")
+// mainClass in (Compile, packageBin) := Some("com.balihoo.fulfillment.main")
+
+///Or, leave that all out and run the desired main like this
+// java -cp target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar com.balihoo.fulfillment.workers.sendemailworker -p <propfile> -d <propdir>
