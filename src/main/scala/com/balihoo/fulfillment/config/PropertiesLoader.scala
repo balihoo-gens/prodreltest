@@ -2,7 +2,7 @@ package com.balihoo.fulfillment.config
 
 //import java.util.Properties
 import org.apache.commons.configuration.PropertiesConfiguration
-import java.io.{FileInputStream, InputStream}
+import java.io.{File, FileInputStream, InputStream}
 import scopt._
 
 class PropertiesLoader(propertiesFileName: String, propertiesDir: String = "") {

@@ -16,15 +16,12 @@ class AdWordsAccountCreator(swfAdapter: SWFAdapter,
       adwordsAdapter.setClientId(params.getRequiredParameter("parent"))
 
       val creator = new AccountCreator(adwordsAdapter)
-      val existing = creator.getAccount(params)
-
-      if(existing != null) {
-        // Look up the account first.. we don't want duplicates
-        completeTask(String.valueOf(existing.getCustomerId))
+      val account = creator.getAccount(params) match {
+        case account:ManagedCustomer => account
+        case _ =>
+          creator.createAccount(params)
       }
-
-      val created = creator.createAccount(params)
-      completeTask(String.valueOf(created.getCustomerId))
+      completeTask(String.valueOf(account.getCustomerId))
     } catch {
       case rateExceeded: RateExceededException =>
         // Whoops! We've hit the rate limit! Let's sleep!
@@ -81,9 +78,21 @@ class AccountCreator(adwords:AdWordsAdapter) {
   }
 }
 
+object adwords_accountcreator {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsAccountCreator(
+      new SWFAdapter(config)
+      ,new SQSAdapter(config)
+      ,new AdWordsAdapter(config))
+    println(s"Running ${getClass.getSimpleName}")
+    worker.work()
+  }
+}
+
 object test_adwordsGetSubaccounts {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
 
     adwords.setClientId("981-046-8123") // Dogtopia

@@ -18,28 +18,11 @@ class AdWordsCampaignProcessor(swfAdapter: SWFAdapter,
 
       val creator = new CampaignCreator(adwordsAdapter)
 
-      var campaign = creator.getCampaign(params)
-
-      if(campaign == null) { // Look up the account first.. we don't want duplicates
-        campaign = creator.createCampaign(params)
-        creator.setTargetZips(campaign, params.getRequiredParameter("targetzips"))
-        creator.setAdSchedule(campaign, params.getRequiredParameter("adschedule"))
-
-      } else {
-        // An existing campaign.. update what we can..
-        for((param, value) <- params.params) {
-          param match {
-            case "targetzips" =>
-              creator.setTargetZips(campaign, value)
-            case "adschedule" =>
-              creator.setAdSchedule(campaign, value)
-            case _ =>
-            // TODO.. gripe?
-          }
-        }
-
-        creator.updateCampaign(campaign, params)
-
+      val campaign = creator.getCampaign(params) match {
+        case campaign:Campaign =>
+          creator.updateCampaign(campaign, params)
+        case _ =>
+          creator.createCampaign(params)
       }
 
       completeTask(String.valueOf(campaign.getId))
@@ -189,9 +172,13 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     operation.setOperand(campaign)
     operation.setOperator(Operator.ADD)
 
-    adwords.withErrorsHandled[Campaign](context, {
+    val madeCampaign = adwords.withErrorsHandled[Campaign](context, {
       adwords.campaignService.mutate(Array(operation)).getValue(0)
     })
+
+    setTargetZips(madeCampaign, params.getRequiredParameter("targetzips"))
+    setAdSchedule(madeCampaign, params.getRequiredParameter("adschedule"))
+    madeCampaign
   }
 
   def updateCampaign(campaign: Campaign, params: ActivityParameters) = {
@@ -206,7 +193,10 @@ class CampaignCreator(adwords:AdWordsAdapter) {
           campaign.setStartDate(value)
         case "endDate" =>
           campaign.setEndDate(value)
-
+        case "targetzips" =>
+          setTargetZips(campaign, value)
+        case "adschedule" =>
+          setAdSchedule(campaign, value)
         case _ =>
       }
     }
@@ -224,6 +214,31 @@ class CampaignCreator(adwords:AdWordsAdapter) {
 
     val context = s"Setting target zips for campaign ${campaign.getId}"
 
+    val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
+
+    // First we query the existing zips
+    val existingSelector = new SelectorBuilder()
+      .fields("Id")
+      .equals("CampaignId", String.valueOf(campaign.getId))
+      .build()
+
+    val existingZips:CampaignCriterionPage = adwords.campaignCriterionService.get(existingSelector)
+    for(page <- existingZips.getEntries) {
+      page.getCriterion match {
+        case location: Location =>
+          // Create operations to REMOVE the existing zips
+          val campaignCriterion = new CampaignCriterion()
+          campaignCriterion.setCampaignId(campaign.getId)
+          campaignCriterion.setCriterion(location)
+
+          val operation = new CampaignCriterionOperation()
+          operation.setOperand(campaignCriterion)
+          operation.setOperator(Operator.REMOVE)
+          operations += operation
+        case _ =>
+      }
+    }
+
     val selector = new SelectorBuilder()
       .fields(
         "Id",
@@ -237,8 +252,6 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       // Set the locale of the returned location names.
       .equals("Locale", "en")
       .build()
-
-    val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
     // Make the get request.
     val locationCriteria = adwords.locationService.get(selector)
@@ -261,8 +274,33 @@ class CampaignCreator(adwords:AdWordsAdapter) {
   def setAdSchedule(campaign:Campaign, scheduleString:String) = {
 
     val context = s"setAdSchedule(campaignId='${campaign.getId}', schedule='$scheduleString')"
+
     val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
+    // First we query the existing schedule
+    val selector = new SelectorBuilder()
+      .fields("Id")
+      .equals("CampaignId", String.valueOf(campaign.getId))
+      .build()
+
+    val existingSchedule:CampaignCriterionPage = adwords.campaignCriterionService.get(selector)
+    for(page <- existingSchedule.getEntries) {
+      page.getCriterion match {
+        case adSchedule: AdSchedule =>
+          // Create operations to REMOVE the existing schedule entries
+          val campaignCriterion = new CampaignCriterion()
+          campaignCriterion.setCampaignId(campaign.getId)
+          campaignCriterion.setCriterion(adSchedule)
+
+          val operation = new CampaignCriterionOperation()
+          operation.setOperand(campaignCriterion)
+          operation.setOperator(Operator.REMOVE)
+          operations += operation
+        case _ =>
+      }
+    }
+
+    // Now create operations to add the new schedule days
     for(day <- scheduleString.split(",")) {
       val dayOfWeek = new AdSchedule()
       dayOfWeek.setStartHour(0)
@@ -305,6 +343,18 @@ class CampaignCreator(adwords:AdWordsAdapter) {
   }
 }
 
+object adwords_campaignprocessor {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsCampaignProcessor(
+      new SWFAdapter(config)
+      ,new SQSAdapter(config)
+      ,new AdWordsAdapter(config))
+    println(s"Running ${getClass.getSimpleName}")
+    worker.work()
+  }
+}
+
 object test_adwordsCampaignCreator {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")
@@ -336,18 +386,18 @@ object test_adwordsCampaignCreator {
 
 object test_adwordsLocationCriterion {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = new PropertiesLoader("adwords.properties", "config")
     val adwords = new AdWordsAdapter(config)
 
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
 
-    val zipString = "83704,83713,90210"
+    val zipString = "53001,53002,90210"
 
     val creator = new CampaignCreator(adwords)
     val campaignParams =
       s"""{
-       "name" : "fulfillment campaign",
+       "name" : "fulfillment Campaign",
         "channel" : "DISPLAY"
       }"""
     val campaign = creator.getCampaign(new ActivityParameters(campaignParams))
@@ -358,18 +408,18 @@ object test_adwordsLocationCriterion {
 
 object test_adwordsSchedule {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
 
     adwords.setValidateOnly(false)
     adwords.setClientId("100-019-2687")
 
-    val scheduleString = "M,W,F,S"
+    val scheduleString = "T,Th"
 
     val creator = new CampaignCreator(adwords)
     val campaignParams =
       s"""{
-       "name" : "fulfillment campaign",
+       "name" : "fulfillment Campaign",
         "channel" : "DISPLAY"
       }"""
     val campaign = creator.getCampaign(new ActivityParameters(campaignParams))

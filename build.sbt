@@ -19,9 +19,11 @@ libraryDependencies ++= Seq(
   "org.specs2" %% "specs2" % "2.3.12" % "test",
   "commons-io" % "commons-io" % "2.4",
   "commons-configuration" % "commons-configuration" % "1.10",
-  "com.google.api-ads" % "ads-lib" % "1.28.0",
-  "com.google.api-ads" % "adwords-axis" % "1.28.0",
+  "commons-beanutils" % "commons-beanutils" % "1.9.2",
+  "com.google.api-ads" % "ads-lib" % "1.29.0",
+  "com.google.api-ads" % "adwords-axis" % "1.29.0",
   "javax.activation" % "activation" % "1.1",
+  "javax.mail" % "mail" % "1.4",
   "com.github.scopt" %% "scopt" % "3.2.0"
 )
 

@@ -16,16 +16,14 @@ class AdWordsImageAdProcessor(swfAdapter: SWFAdapter,
 
       val creator = new AdCreator(adwordsAdapter)
 
-      val existing = creator.getImageAd(params)
-
-      if(existing != null) {
-        creator.updateImageAd(existing, params)
-        completeTask(String.valueOf(existing.getId))
+      val imageAd = creator.getImageAd(params) match {
+        case ad:ImageAd =>
+          creator.updateImageAd(ad, params)
+        case _ =>
+          creator.createImageAd(params)
       }
+      completeTask(String.valueOf(imageAd.getId))
 
-      val created = creator.createImageAd(params)
-
-      completeTask(String.valueOf(created.getId))
     } catch {
       case rateExceeded: RateExceededException =>
         // Whoops! We've hit the rate limit! Let's sleep!
@@ -129,6 +127,18 @@ class AdCreator(adwords:AdWordsAdapter) {
   }
 }
 
+object adwords_imageadprocessor {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsImageAdProcessor(
+      new SWFAdapter(config)
+      ,new SQSAdapter(config)
+      ,new AdWordsAdapter(config))
+    println(s"Running ${getClass.getSimpleName}")
+    worker.work()
+  }
+}
+
 object test_adwordsGetAdGroupImageAd {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")
@@ -142,7 +152,7 @@ object test_adwordsGetAdGroupImageAd {
 
     val campaignParams =
       s"""{
-       "name" : "fulfillment campaign",
+       "name" : "fulfillment Campaign",
         "channel" : "DISPLAY"
       }"""
     val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
@@ -178,7 +188,7 @@ object test_adwordsAdGroupImageAd {
 
     val campaignParams =
       s"""{
-       "name" : "fulfillment campaign",
+       "name" : "fulfillment Campaign",
         "channel" : "DISPLAY"
       }"""
     val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
