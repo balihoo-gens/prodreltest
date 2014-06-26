@@ -141,7 +141,7 @@ object adwords_imageadprocessor {
 
 object test_adwordsGetAdGroupImageAd {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
     val ccreator = new CampaignCreator(adwords)
     val acreator = new AdGroupCreator(adwords)
@@ -177,7 +177,7 @@ object test_adwordsGetAdGroupImageAd {
 
 object test_adwordsAdGroupImageAd {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
     val ccreator = new CampaignCreator(adwords)
     val acreator = new AdGroupCreator(adwords)

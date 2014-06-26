@@ -95,6 +95,7 @@ object test_adwordsGetSubaccounts {
     val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
 
+    adwords.setValidateOnly(false)
     adwords.setClientId("981-046-8123") // Dogtopia
     val ss = new SelectorBuilder().fields("Login", "CustomerId", "Name").build()
 
@@ -110,7 +111,7 @@ object test_adwordsGetSubaccounts {
 
 object test_adwordsAccountCreator {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
 
     //    adwords.setValidateOnly(false)
