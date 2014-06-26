@@ -163,6 +163,18 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
 
 }
 
+object adwords_adgroupprocessor {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsAdGroupProcessor(
+      new SWFAdapter(config)
+      ,new SQSAdapter(config)
+      ,new AdWordsAdapter(config))
+    println(s"Running ${getClass.getSimpleName}")
+    worker.work()
+  }
+}
+
 object test_adwordsAdGroupCreator {
   def main(args: Array[String]) {
     val config = new PropertiesLoader(".adwords.properties")

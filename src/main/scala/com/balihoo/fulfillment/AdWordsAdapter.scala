@@ -92,8 +92,8 @@ class AdWordsAdapter(loader: PropertiesLoader) {
         throw new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
       case e:Exception =>
         throw e
-      case _:Throwable =>
-        throw new Exception("Unhandled case")
+      case e:Throwable =>
+        throw e
     }
   }
 

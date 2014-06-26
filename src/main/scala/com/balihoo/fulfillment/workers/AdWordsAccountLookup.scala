@@ -1,5 +1,6 @@
 package com.balihoo.fulfillment.workers
 
+import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.{SWFAdapter, SQSAdapter, AdWordsAdapter, RateExceededException}
 import com.google.api.ads.adwords.axis.v201402.mcm.ManagedCustomer
 
@@ -30,5 +31,17 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
       case _: Throwable =>
         println(s"Caught a throwable!")
     }
+  }
+}
+
+object adwords_accountlookup {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsAccountLookup(
+      new SWFAdapter(config)
+      ,new SQSAdapter(config)
+      ,new AdWordsAdapter(config))
+    println(s"Running ${getClass.getSimpleName}")
+    worker.work()
   }
 }
