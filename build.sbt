@@ -1,3 +1,7 @@
+import AssemblyKeys._
+
+assemblySettings
+
 name := "fulfillment"
 
 version := "1.0-SNAPSHOT"
@@ -33,6 +37,9 @@ scalacOptions in Test ++= Seq("-Yrangepos")
 // http://etorreborre.github.io/specs2/guide/org.specs2.guide.Runners.html#Dependencies
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
-exportJars := true
+//exportJars := true
 
-mainClass := Some("com.balihoo.fulfillment.main")
+// mainClass in (Compile, run) := Some("com.balihoo.fulfillment.main")
+
+// mainClass in (Compile, packageBin) := Some("com.balihoo.fulfillment.main")
+
