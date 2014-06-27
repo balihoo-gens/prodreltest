@@ -163,6 +163,51 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     })
   }
 
+  def updateTargeting(adGroup:AdGroup, targetJson:String) = {
+
+    val context = s"updateTargeting(name='${adGroup.getId}', $targetJson)"
+    val operations = new mutable.ArrayBuffer[AdGroupCriterionOperation]()
+
+    // First we query the existing criteria
+    val existingSelector = new SelectorBuilder()
+      .fields("Id")
+      .equals("AdGroupId", String.valueOf(adGroup.getId))
+      .build()
+
+    val existing:AdGroupCriterionPage = adwords.adGroupCriterionService.get(existingSelector)
+    for(page <- existing.getEntries) {
+      page.getCriterion match {
+        case keyword: Keyword =>
+          // Create operations to REMOVE the existing keywords
+          val criterion = new BiddableAdGroupCriterion()
+          criterion.setAdGroupId(adGroup.getId)
+          criterion.setCriterion(keyword)
+
+          val operation = new AdGroupCriterionOperation()
+          operation.setOperand(criterion)
+          operation.setOperator(Operator.REMOVE)
+          operations += operation
+        case interest: CriterionUserInterest =>
+          // Create operations to REMOVE the existing interests
+          val criterion = new BiddableAdGroupCriterion()
+          criterion.setAdGroupId(adGroup.getId)
+          criterion.setCriterion(interest)
+
+          val operation = new AdGroupCriterionOperation()
+          operation.setOperand(criterion)
+          operation.setOperator(Operator.REMOVE)
+          operations += operation
+        case _ =>
+      }
+    }
+
+    adwords.withErrorsHandled[Any](context, {
+      adwords.adGroupCriterionService.mutate(operations.toArray)
+    })
+
+    addTargeting(adGroup, targetJson)
+  }
+
   def addTargeting(adGroup:AdGroup, targetJson:String) = {
     val target = Json.parse(targetJson).as[JsObject]
     val focus = target.value("focus").as[JsString].value
@@ -206,13 +251,11 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
 
           adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
         case "target" =>
-          addTargeting(adGroup, value)
+          updateTargeting(adGroup, value)
         case _ =>
 
       }
     }
-
-    // TODO Update Interests and Keywords
 
     val operation = new AdGroupOperation()
     operation.setOperand(adGroup)
