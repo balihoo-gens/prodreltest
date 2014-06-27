@@ -19,32 +19,15 @@ class AdWordsAdGroupProcessor(swfAdapter: SWFAdapter,
 
       val creator = new AdGroupCreator(adwordsAdapter)
 
-      var adGroup = creator.getAdGroup(params)
-
-      var rawtarget = params.getOptionalParameter("target", "")
-      if(adGroup == null) {
-        adGroup = creator.createAdGroup(params)
-        rawtarget = params.getRequiredParameter("target")
-      } else {
-        creator.updateAdGroup(adGroup, params)
+      val adGroup = creator.getAdGroup(params) match {
+        case group: AdGroup =>
+          creator.updateAdGroup(group, params)
+        case _ =>
+          creator.createAdGroup(params)
       }
 
-      if(rawtarget != "") {
-        val target = Json.parse(rawtarget).as[JsObject]
-        val focus = target.value("focus").as[JsString].value
-
-        focus match {
-          case "interests" =>
-            val interests = target.value("interests").as[JsObject].value("interests").as[JsArray]
-            creator.addUserInterests(adGroup, for(i <- interests.value.toArray) yield i.as[String])
-          case "keywords" =>
-            val keywords = target.value("keywords").as[JsObject].value("keywords").as[JsString]
-            creator.addKeywords(adGroup, for(s <- keywords.value.split(",")) yield s.trim)
-          case _ =>
-        }
-      }
-
-      completeTask(String.valueOf(adGroup.getId))    } catch {
+      completeTask(String.valueOf(adGroup.getId))
+    } catch {
       case rateExceeded: RateExceededException =>
         // Whoops! We've hit the rate limit! Let's sleep!
         Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
@@ -118,9 +101,13 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     operation.setOperand(adGroup)
     operation.setOperator(Operator.ADD)
 
-    adwords.withErrorsHandled[AdGroup](context, {
+    val newGroup = adwords.withErrorsHandled[AdGroup](context, {
       adwords.adGroupService.mutate(Array(operation)).getValue(0)
     })
+
+    addTargeting(newGroup, params.getRequiredParameter("target"))
+
+    newGroup
   }
 
   def addUserInterests(adGroup:AdGroup, interests:Array[String]) = {
@@ -176,6 +163,21 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     })
   }
 
+  def addTargeting(adGroup:AdGroup, targetJson:String) = {
+    val target = Json.parse(targetJson).as[JsObject]
+    val focus = target.value("focus").as[JsString].value
+
+    focus match {
+      case "interests" =>
+        val interests = target.value("interests").as[JsArray]
+        addUserInterests(adGroup, for(i <- interests.value.toArray) yield i.as[String])
+      case "keywords" =>
+        val keywords = target.value("keywords").as[JsString]
+        addKeywords(adGroup, for(s <- keywords.value.split(",")) yield s.trim)
+      case _ =>
+    }
+  }
+
   def updateAdGroup(adGroup:AdGroup, params:ActivityParameters) = {
 
     val context = s"updateAdGroup(name='${adGroup.getId}', params=$params)"
@@ -203,6 +205,8 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
           }
 
           adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
+        case "target" =>
+          addTargeting(adGroup, value)
         case _ =>
 
       }
@@ -249,12 +253,16 @@ object test_adwordsAdGroupCreator {
       }"""
     val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
 
+    val target =
+      """{\"focus\" : \"interests\",\"interests\" : [\"Beauty & Fitness\",\"Books & Literature\"]}"""
+
     val adGroupParams =
       s"""{
        "name" : "CPM AdGroup",
        "status" : "ENABLED",
         "campaignId" : "${campaign.getId}",
-        "bidDollars" : "6.6"
+        "bidDollars" : "6.6",
+        "target" : "$target"
       }"""
 
     val adGroup = acreator.getAdGroup(new ActivityParameters(adGroupParams))
@@ -287,7 +295,7 @@ object test_adwordsAdGroupSetInterests {
     val adgroupParams =
       s"""{
        "name" : "GROUP A",
-        "campaignId" : "${campaign.getId}",
+        "campaignId" : "${campaign.getId}"
       }"""
 
     val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
