@@ -25,6 +25,8 @@ class AdWordsAdGroupProcessor(swfAdapter: SWFAdapter,
       if(adGroup == null) {
         adGroup = creator.createAdGroup(params)
         rawtarget = params.getRequiredParameter("target")
+      } else {
+        creator.updateAdGroup(adGroup, params)
       }
 
       if(rawtarget != "") {
@@ -64,7 +66,7 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     val context = s"getAdGroup(name='$name', campaignId='$campaignId')"
 
     val selector = new SelectorBuilder()
-      .fields("Id")
+      .fields("Id", "BiddingStrategyType")
       .equals("Name", name)
       .equals("CampaignId", campaignId)
       .build()
@@ -85,6 +87,9 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     val campaignId = params.getRequiredParameter("campaignId")
     val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
 
+    val ccreator = new CampaignCreator(adwords)
+    val campaign = ccreator.getCampaign(campaignId)
+
     val adGroup = new AdGroup()
     adGroup.setName(name)
     adGroup.setCampaignId(campaignId.toLong)
@@ -92,10 +97,20 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
 
     val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
     val money = new Money()
-    money.setMicroAmount(adwords.dollarsToMicros(params.getRequiredParameter("bid").toFloat))
-    val bid = new CpcBid()
-    bid.setBid(money)
-    biddingStrategyConfiguration.setBids(Array(bid))
+    money.setMicroAmount(adwords.dollarsToMicros(params.getRequiredParameter("bidDollars").toFloat))
+
+    campaign.getBiddingStrategyConfiguration.getBiddingStrategyType match {
+      case BiddingStrategyType.MANUAL_CPC =>
+        val bid = new CpcBid()
+        bid.setBid(money)
+        biddingStrategyConfiguration.setBids(Array(bid))
+      case BiddingStrategyType.MANUAL_CPM =>
+        val bid = new CpmBid()
+        bid.setBid(money)
+        biddingStrategyConfiguration.setBids(Array(bid))
+      case _ =>
+        throw new Exception(s"biddingStrategy ${campaign.getBiddingStrategyConfiguration.getBiddingStrategyType} is not supported!")
+    }
 
     adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
 
@@ -161,6 +176,48 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     })
   }
 
+  def updateAdGroup(adGroup:AdGroup, params:ActivityParameters) = {
+
+    val context = s"updateAdGroup(name='${adGroup.getId}', params=$params)"
+
+    for((param, value) <- params.params) {
+      param match {
+        case "status" =>
+          adGroup.setStatus(AdGroupStatus.fromString(value))
+        case "bidDollars" =>
+          val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
+          val money = new Money()
+          money.setMicroAmount(adwords.dollarsToMicros(value.toFloat))
+
+          adGroup.getBiddingStrategyConfiguration.getBiddingStrategyType match {
+            case BiddingStrategyType.MANUAL_CPC =>
+              val bid = new CpcBid()
+              bid.setBid(money)
+              biddingStrategyConfiguration.setBids(Array(bid))
+            case BiddingStrategyType.MANUAL_CPM =>
+              val bid = new CpmBid()
+              bid.setBid(money)
+              biddingStrategyConfiguration.setBids(Array(bid))
+            case _ =>
+              throw new Exception(s"biddingStrategy ${adGroup.getBiddingStrategyConfiguration.getBiddingStrategyType} is not supported!")
+          }
+
+          adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
+        case _ =>
+
+      }
+    }
+
+    // TODO Update Interests and Keywords
+
+    val operation = new AdGroupOperation()
+    operation.setOperand(adGroup)
+    operation.setOperator(Operator.SET)
+
+    adwords.withErrorsHandled[AdGroup](context, {
+      adwords.adGroupService.mutate(Array(operation)).getValue(0)
+    })
+  }
 }
 
 object adwords_adgroupprocessor {
@@ -187,19 +244,23 @@ object test_adwordsAdGroupCreator {
 
     val campaignParams =
       s"""{
-       "name" : "fulfillment campaign",
+       "name" : "fulfillment Campaign",
         "channel" : "DISPLAY"
       }"""
     val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
 
     val adGroupParams =
       s"""{
-       "name" : "test adgroup",
+       "name" : "CPM AdGroup",
        "status" : "ENABLED",
         "campaignId" : "${campaign.getId}",
-        "bid" : "2.5"
+        "bidDollars" : "6.6"
       }"""
-    val newAdgroup = acreator.createAdGroup(new ActivityParameters(adGroupParams))
+
+    val adGroup = acreator.getAdGroup(new ActivityParameters(adGroupParams))
+
+//    val newAdgroup = acreator.createAdGroup(new ActivityParameters(adGroupParams))
+    val newAdgroup = acreator.updateAdGroup(adGroup, new ActivityParameters(adGroupParams))
 
     println(newAdgroup.getId)
 

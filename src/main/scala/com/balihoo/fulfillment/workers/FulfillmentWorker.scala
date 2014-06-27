@@ -170,6 +170,10 @@ class ActivityParameters(input:String) {
   val inputObject:JsObject = Json.parse(input).as[JsObject]
   val params:Map[String, String] = (for((key, value) <- inputObject.fields) yield key -> value.as[String]).toMap
 
+  def hasParameter(param:String) = {
+    params contains param
+  }
+
   def getRequiredParameter(param:String):String = {
     if(!(params contains param)) {
       throw new Exception(s"input parameter '$param' is REQUIRED! '$input' doesn't contain '$param'")
