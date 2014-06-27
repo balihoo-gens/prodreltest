@@ -357,7 +357,7 @@ object adwords_campaignprocessor {
 
 object test_adwordsCampaignCreator {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
     val creator = new CampaignCreator(adwords)
 
@@ -369,7 +369,7 @@ object test_adwordsCampaignCreator {
        "name" : "test campaign",
         "channel" : "DISPLAY",
         "budget" : "11",
-        "adschedule" : "M,T",
+        "adschedule" : "M,T,S",
         "status" : "PAUSED",
         "startDate" : "20140625",
         "endDate" : "20140701",
@@ -386,7 +386,7 @@ object test_adwordsCampaignCreator {
 
 object test_adwordsLocationCriterion {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader("adwords.properties", "config")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
 
     adwords.setValidateOnly(false)

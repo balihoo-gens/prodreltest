@@ -177,7 +177,7 @@ object adwords_adgroupprocessor {
 
 object test_adwordsAdGroupCreator {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
     val ccreator = new CampaignCreator(adwords)
     val acreator = new AdGroupCreator(adwords)
@@ -208,7 +208,7 @@ object test_adwordsAdGroupCreator {
 
 object test_adwordsAdGroupSetInterests {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
     val ccreator = new CampaignCreator(adwords)
     val acreator = new AdGroupCreator(adwords)
@@ -238,7 +238,7 @@ object test_adwordsAdGroupSetInterests {
 
 object test_adwordsAdGroupSetKeywords {
   def main(args: Array[String]) {
-    val config = new PropertiesLoader(".adwords.properties")
+    val config = PropertiesLoader(args, "adwords")
     val adwords = new AdWordsAdapter(config)
     val ccreator = new CampaignCreator(adwords)
     val acreator = new AdGroupCreator(adwords)
