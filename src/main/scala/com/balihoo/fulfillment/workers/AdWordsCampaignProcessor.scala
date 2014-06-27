@@ -90,7 +90,7 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     val context = s"getCampaign(name='$name', channel='$channel'"
 
     val selector = new SelectorBuilder()
-      .fields("Id", "ServingStatus", "Name", "AdvertisingChannelType")
+      .fields("Id", "ServingStatus", "Name", "AdvertisingChannelType", "BiddingStrategyType")
       .equals("Name", name)
       .equals("AdvertisingChannelType", channel)
       .build()
@@ -101,6 +101,25 @@ class CampaignCreator(adwords:AdWordsAdapter) {
         case 0 => null
         case 1 => page.getEntries(0)
         case _ => throw new Exception(s"Campaign name $name is ambiguous!")
+      }
+    })
+  }
+
+  def getCampaign(id:String):Campaign = {
+
+    val context = s"getCampaign(id='$id')"
+
+    val selector = new SelectorBuilder()
+      .fields("Id", "ServingStatus", "Name", "AdvertisingChannelType", "BiddingStrategyType")
+      .equals("Id", id)
+      .build()
+
+    adwords.withErrorsHandled[Campaign](context, {
+      val page = adwords.campaignService.get(selector)
+      page.getTotalNumEntries.intValue() match {
+        case 0 => null
+        case 1 => page.getEntries(0)
+        case _ => throw new Exception(s"Campaign id $id is ambiguous!")
       }
     })
   }
@@ -373,7 +392,8 @@ object test_adwordsCampaignCreator {
         "status" : "PAUSED",
         "startDate" : "20140625",
         "endDate" : "20140701",
-        "targetzips" : "83704,83713"
+        "targetzips" : "83704,83713",
+        "biddingStrategy" : "MANUAL_CPM"
       }"""
 
     val newCampaign = creator.createCampaign(new ActivityParameters(campaignParams))
