@@ -9,11 +9,13 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
                            adwordsAdapter: AdWordsAdapter)
   extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
+  val creator = new AccountCreator(adwordsAdapter)
+
+  var brandAccountCache = collection.mutable.Map[String, String]()
+
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(params.getRequiredParameter("parent"))
-
-      val creator = new AccountCreator(adwordsAdapter)
+      adwordsAdapter.setClientId(lookupParentAccount(params.getRequiredParameter("parent")))
 
       creator.getAccount(params) match {
         case existing:ManagedCustomer =>
@@ -32,6 +34,26 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
         println(s"Caught a throwable!")
     }
   }
+
+  def lookupParentAccount(brandKey:String):String = {
+    val params = new ActivityParameters(s"""{ "name" : "$brandKey" }""")
+
+    brandAccountCache.contains(brandKey) match {
+      case true =>
+        brandAccountCache(brandKey)
+      case false =>
+        adwordsAdapter.setClientId(adwordsAdapter.baseAccountId)
+        creator.getAccount(params) match {
+          case existing:ManagedCustomer =>
+            brandAccountCache += (brandKey -> String.valueOf(existing.getCustomerId))
+            String.valueOf(existing.getCustomerId)
+          case _ =>
+            throw new Exception(s"No brand account with name '$brandKey' was found!")
+        }
+    }
+  }
+
+
 }
 
 object adwords_accountlookup {
@@ -45,3 +67,4 @@ object adwords_accountlookup {
     worker.work()
   }
 }
+
