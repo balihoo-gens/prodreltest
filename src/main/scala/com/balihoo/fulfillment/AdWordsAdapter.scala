@@ -21,6 +21,8 @@ class AdWordsAdapter(loader: PropertiesLoader) {
   configuration.addProperty("api.adwords.clientId", loader.getString("clientId"))
   configuration.addProperty("api.adwords.clientSecret", loader.getString("clientSecret"))
 
+  val baseAccountId = loader.getString("baseAccountId")
+
   // Generate a refreshable OAuth2 credential similar to a ClientLogin token
   // and can be used in place of a service account.
   private val oAuth2Credential: Credential = new OfflineCredentials.Builder()
