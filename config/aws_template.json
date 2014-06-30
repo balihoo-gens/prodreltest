@@ -283,11 +283,6 @@
                 "'",
                 "    '",
                 {
-                  "Ref": "AWSEBInstanceLaunchWaitHandle"
-                },
-                "'",
-                "    '",
-                {
                   "Ref": "AWS::StackId"
                 },
                 "'",
@@ -313,23 +308,6 @@
         "InstanceType": {
           "Ref": "InstanceType"
         }
-      }
-    },
-    "AWSEBInstanceLaunchWaitCondition": {
-      "Type": "AWS::CloudFormation::WaitCondition",
-      "DependsOn": "AWSEBAutoScalingGroup",
-      "Properties": {
-        "Handle": {
-          "Ref": "AWSEBInstanceLaunchWaitHandle"
-        },
-        "Timeout": "1200",
-        "Count": 1
-      }
-    },
-    "AWSEBWorkerDeadLetterQueue": {
-      "Type": "AWS::SQS::Queue",
-      "Properties": {
-        "MessageRetentionPeriod": 1209600
       }
     },
     "AWSEBAutoScalingGroup": {
@@ -636,7 +614,7 @@
           "Infra-WriteVersionOnStartup": {
             "commands": {
               "01writeversion": {
-                "command": "getMetadata.py --resource AWSEBBeanstalkMetadata --path AWS::ElasticBeanstalk::Metadata.Version > \/etc\/elasticbeanstalk\/.aws-eb-startup-version"
+                "command": "echo version1.1 > \/etc\/elasticbeanstalk\/.aws-eb-startup-version"
               }
             }
           },
@@ -1268,7 +1246,6 @@
           }
         }
       },
-      "DependsOn": "AWSEBBeanstalkMetadata",
       "Properties": {
         "Tags": [
           {
@@ -1306,9 +1283,6 @@
         "GroupDescription": "SecurityGroup for ElasticBeanstalk environment."
       }
     },
-    "AWSEBInstanceLaunchWaitHandle": {
-      "Type": "AWS::CloudFormation::WaitConditionHandle"
-    },
     "AWSEBSecurityGroupSSHIngress": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
@@ -1319,42 +1293,6 @@
         "ToPort": "22",
         "FromPort": "22",
         "CidrIp": "0.0.0.0\/0"
-      }
-    },
-    "AWSEBBeanstalkMetadata": {
-      "Type": "AWS::CloudFormation::WaitConditionHandle",
-      "Metadata": {
-        "AWS::ElasticBeanstalk::Ext": {
-          "Parameters": {
-            "DockerRPM": {
-              "Ref": "DockerRPM"
-            },
-            "InstanceType": {
-              "Ref": "InstanceType"
-            },
-            "DockerProxyServer": {
-              "Ref": "DockerProxyServer"
-            },
-            "DockerDEB": {
-              "Ref": "DockerDEB"
-            },
-            "AppSource": {
-              "Ref": "AppSource"
-            },
-            "EnvironmentVariables": {
-              "Ref": "EnvironmentVariables"
-            }
-          }
-        },
-        "AWS::ElasticBeanstalk::Metadata": {
-          "Name": "e-fucvpi5vsv",
-          "EnvironmentName": "fulfillment-env",
-          "Description": "TemplatePack for environment: fulfillment-env",
-          "DateCreated": "2014-06-26T22:50:19",
-          "DateUpdated": "2014-06-26T22:50:19",
-          "EnvironmentId": "e-fucvpi5vsv",
-          "Version": "3ea3f698-fd84-11e3-8f55-7d1a7a083030"
-        }
       }
     }
   }
