@@ -1,11 +1,11 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.{SQSAdapter, SWFAdapter}
+import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
 import scala.util.Random
 
-class ChaosWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+class ChaosWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter)
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
     val rand = new Random()
@@ -23,7 +23,7 @@ class ChaosWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 object chaosworker {
   def main(args: Array[String]) {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val chaos = new ChaosWorker(new SWFAdapter(config), new SQSAdapter(config))
+    val chaos = new ChaosWorker(new SWFAdapter(config), new DynamoAdapter(config))
     println("Running chaos worker")
     chaos.work()
   }

@@ -9,9 +9,9 @@ import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 import scala.collection.mutable
 
 class AdWordsAdGroupProcessor(swfAdapter: SWFAdapter,
-                              sqsAdapter: SQSAdapter,
+                              dynamoAdapter: DynamoAdapter,
                               adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
     try {
@@ -229,7 +229,7 @@ object adwords_adgroupprocessor {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAdGroupProcessor(
       new SWFAdapter(config)
-      ,new SQSAdapter(config)
+      ,new DynamoAdapter(config)
       ,new AdWordsAdapter(config))
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

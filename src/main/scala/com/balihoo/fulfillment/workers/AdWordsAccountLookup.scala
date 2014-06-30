@@ -1,13 +1,13 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.config.PropertiesLoader
-import com.balihoo.fulfillment.{SWFAdapter, SQSAdapter, AdWordsAdapter, RateExceededException}
+import com.balihoo.fulfillment._
 import com.google.api.ads.adwords.axis.v201402.mcm.ManagedCustomer
 
 class AdWordsAccountLookup(swfAdapter: SWFAdapter,
-                           sqsAdapter: SQSAdapter,
+                           dynamoAdapter: DynamoAdapter,
                            adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
     try {
@@ -39,7 +39,7 @@ object adwords_accountlookup {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAccountLookup(
       new SWFAdapter(config)
-      ,new SQSAdapter(config)
+      ,new DynamoAdapter(config)
       ,new AdWordsAdapter(config))
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

@@ -1,16 +1,14 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.{
-  SQSAdapter,
+  DynamoAdapter,
   SWFAdapter,
   SESAdapter
 }
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.config.PropertiesLoader
-import play.api.libs.json._
 
-class ListVerifiedEmailAddressesWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter, sesAdapter: SESAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+class ListVerifiedEmailAddressesWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapter: SESAdapter)
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
@@ -30,7 +28,7 @@ object listverifiedemailaddressworker {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new ListVerifiedEmailAddressesWorker(
       new SWFAdapter(config),
-      new SQSAdapter(config),
+      new DynamoAdapter(config),
       new SESAdapter(config)
     )
     println(s"Running ${getClass.getSimpleName}")

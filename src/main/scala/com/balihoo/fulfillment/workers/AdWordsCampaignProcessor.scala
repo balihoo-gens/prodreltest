@@ -8,9 +8,9 @@ import com.google.api.ads.adwords.axis.v201402.cm._
 import scala.collection.mutable
 
 class AdWordsCampaignProcessor(swfAdapter: SWFAdapter,
-                               sqsAdapter: SQSAdapter,
+                               dynamoAdapter: DynamoAdapter,
                                adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
     try {
@@ -367,7 +367,7 @@ object adwords_campaignprocessor {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsCampaignProcessor(
       new SWFAdapter(config)
-      ,new SQSAdapter(config)
+      ,new DynamoAdapter(config)
       ,new AdWordsAdapter(config))
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
