@@ -1,61 +1,11 @@
 {
   "Outputs": {
-    "AWSEBWorkerQueueURL": {
-      "Value": {
-        "Ref": "AWSEBWorkerQueue"
-      },
-      "Description": "URL of the worker queue"
-    },
-    "AWSEBWorkerDeadLetterQueueURL": {
-      "Value": {
-        "Ref": "AWSEBWorkerDeadLetterQueue"
-      },
-      "Description": "URL of the worker dead letter queue"
-    }
   },
   "Parameters": {
     "DockerRPM": {
       "Default": "https:\/\/s3.amazonaws.com\/elasticbeanstalk-env-resources-us-east-1\/stalks\/eb_docker_2.11.2\/lib\/docker-1.0.0-1.15.amzn1.x86_64.rpm",
       "NoEcho": "false",
       "Description": "Docker rpm",
-      "Type": "String"
-    },
-    "LogPublicationControl": {
-      "Default": "false",
-      "NoEcho": "false",
-      "Description": "If true customer service logs will be published to S3.",
-      "AllowedValues": [
-        "true",
-        "false"
-      ],
-      "Type": "String",
-      "ConstraintDescription": "must be Boolean."
-    },
-    "AWSEBVisibilityTimeout": {
-      "Default": 300,
-      "NoEcho": "false",
-      "Description": "The amount of time in seconds an incoming message is locked for processing",
-      "Type": "Number"
-    },
-    "AWSEBAgentId": {
-      "Default": "",
-      "NoEcho": "false",
-      "Type": "String"
-    },
-    "AWSEBWorkerQueueURL": {
-      "Default": "",
-      "NoEcho": "false",
-      "Description": "The URL to the worker SQS queue",
-      "Type": "String"
-    },
-    "AWSEBEnvironmentName": {
-      "NoEcho": "false",
-      "Type": "String"
-    },
-    "AWSEBHttpPath": {
-      "Default": "\/",
-      "NoEcho": "false",
-      "Description": "The relative path to the app to which we post",
       "Type": "String"
     },
     "InstanceType": {
@@ -70,24 +20,7 @@
         "m3.xlarge"
       ],
       "Type": "String",
-      "ConstraintDescription": "must be a valid General Purpose EC2 instance type."
-    },
-    "AWSEBMaxRetries": {
-      "Default": 10,
-      "NoEcho": "false",
-      "Description": "The maximum number of retries after which the message is discarded",
-      "Type": "Number"
-    },
-    "AWSEBHealthCheck": {
-      "Default": "",
-      "NoEcho": "false",
-      "Description": "The serialized value of the application healthcheck",
-      "Type": "String"
-    },
-    "AWSEBReferrerId": {
-      "Default": "",
-      "NoEcho": "false",
-      "Type": "String"
+      "ConstraintDescription": "valid General Purpose EC2 instance: t1.micro, m1.small, m3.medium, m3.large, m3.xlarge"
     },
     "DockerDEB": {
       "Default": "",
@@ -105,70 +38,20 @@
       "Description": "Specifies which proxy server to be used for client connections.",
       "Type": "String"
     },
-    "AWSEBHttpConnections": {
-      "Default": 50,
-      "NoEcho": "false",
-      "Description": "The maximum number of concurrent connections to the applications",
-      "Type": "Number"
-    },
-    "InstancePort": {
-      "Default": "80",
-      "NoEcho": "false",
-      "Description": "Listen Port",
-      "Type": "String"
-    },
-    "AWSEBEnvironmentId": {
-      "NoEcho": "false",
-      "Type": "String"
-    },
-    "AWSEBMimeType": {
-      "Default": "application\/json",
-      "NoEcho": "false",
-      "Description": "The mime type of the message being sent",
-      "Type": "String"
-    },
-    "AWSEBEnvironmentBucket": {
-      "NoEcho": "false",
-      "Type": "String"
-    },
     "AppSource": {
-      "Default": "https:\/\/s3.amazonaws.com\/elasticbeanstalk-samples-us-east-1\/docker-sample-v2.zip",
+      "Default": "",
       "NoEcho": "false",
       "Description": "Application Source",
       "Type": "String"
     },
-    "AWSEBInactivityTimeout": {
-      "Default": 180,
-      "NoEcho": "false",
-      "Description": "The timeout in seconds for existing connections to the application",
-      "Type": "Number"
-    },
-    "AWSEBConnectTimeout": {
-      "Default": 5,
-      "NoEcho": "false",
-      "Description": "The timeout in seconds for new connections to the application",
-      "Type": "Number"
-    },
-    "AWSEBWorkerDeadLetterQueueURL": {
-      "Default": "",
-      "NoEcho": "false",
-      "Description": "The URL to the worker dead letter SQS queue",
-      "Type": "String"
-    },
-    "AWSEBRetentionPeriod": {
-      "Default": 345600,
-      "NoEcho": "false",
-      "Description": "The amount of time in seconds a message is valid and will be actively processed",
-      "Type": "Number"
-    },
     "EnvironmentVariables": {
-      "Default": "AWS_ACCESS_KEY_ID=,AWS_SECRET_KEY=,PARAM1=,PARAM2=,PARAM3=,PARAM4=,PARAM5=",
+      "Default": "AWS_ACCESS_KEY_ID=,AWS_SECRET_KEY=",
       "NoEcho": "false",
       "Description": "Program environment variables.",
       "Type": "CommaDelimitedList"
     }
   },
-  "Description": "AWS Elastic Beanstalk environment (Name: 'dockertest-env'  Id: 'e-fucvpi5vsv')",
+  "Description": "AWS Fulfillment Docker Instance Template",
   "Mappings": {
     "EnvironmentInfoTasks": {
       "systemtail": {
@@ -219,22 +102,13 @@
     },
     "AWSEBAWSRegionArch2AMI": {
       "us-east-1": {
-        "64hvm": "ami-8cd529e4",
-        "64": "ami-b2d529da",
-        "64graphics": "ami-ad5f47c4",
-        "64gpu": "ami-56d62a3e"
+        "64": "ami-b2d529da"
       },
       "us-west-1": {
-        "64hvm": "ami-b69493f3",
-        "64": "ami-aa9493ef",
-        "64graphics": "ami-f63800b3",
-        "64gpu": ""
+        "64": "ami-aa9493ef"
       },
       "us-west-2": {
-        "64hvm": "ami-e75c21d7",
-        "64": "ami-e35c21d3",
-        "64graphics": "ami-1ad3b92a",
-        "64gpu": ""
+        "64": "ami-e35c21d3"
       }
     },
     "AWSEBAWSInstanceType2Arch": {
@@ -475,92 +349,16 @@
               "_WatchGroups": [
                 "_TriggerConfigDeployment"
               ]
-            },
-            "sqsdDeploy": {
-              "_Command": "CMD-SqsdDeploy",
-              "_WatchGroups": [
-                "_TriggerSqsdDeployment"
-              ]
             }
           },
           "_ParameterTriggers": {
             "_TriggerAppDeployment": [
               "AppSource"
             ],
-            "_TriggerSqsdDeployment": [
-              "AWSEBWorkerQueueURL",
-              "AWSEBWorkerDeadLetterQueueURL",
-              "AWSEBHttpPath",
-              "AWSEBMimeType",
-              "AWSEBMaxRetries",
-              "AWSEBHttpConnections",
-              "AWSEBConnectTimeout",
-              "AWSEBInactivityTimeout",
-              "AWSEBVisibilityTimeout",
-              "AWSEBRetentionPeriod",
-              "AWSEBHealthCheck"
-            ],
-            "_TriggerConfigDeployment": [
-              "LogPublicationControl",
-              "InstancePort",
+           "_TriggerConfigDeployment": [
               "EnvironmentVariables",
               "DockerProxyServer"
             ]
-          },
-          "_SqsDaemonConfigFileContent": {
-            "visibility_timeout": {
-              "Ref": "AWSEBVisibilityTimeout"
-            },
-            "sqs_verify_checksums": true,
-            "environment_name": {
-              "Ref": "AWSEBEnvironmentName"
-            },
-            "quiet": false,
-            "debug": false,
-            "connect_timeout": {
-              "Ref": "AWSEBConnectTimeout"
-            },
-            "inactivity_timeout": {
-              "Ref": "AWSEBInactivityTimeout"
-            },
-            "sqs_ssl": true,
-            "queue_url": {
-              "Ref": "AWSEBWorkerQueue"
-            },
-            "dynamodb_ssl": true,
-            "healthcheck": {
-              "Fn::Join": [
-                "",
-                [
-                  "TCP",
-                  ":",
-                  {
-                    "Ref": "InstancePort"
-                  }
-                ]
-              ]
-            },
-            "concurrent_sqs_polls": 8,
-            "retention_period": {
-              "Ref": "AWSEBRetentionPeriod"
-            },
-            "mime_type": {
-              "Ref": "AWSEBMimeType"
-            },
-            "threads": 50,
-            "verbose": false,
-            "http_connections": {
-              "Ref": "AWSEBHttpConnections"
-            },
-            "sqs_batch_delete": true,
-            "http_port": {
-              "Ref": "InstancePort"
-            },
-            "http_path": {
-              "Ref": "AWSEBHttpPath"
-            },
-            "keepalive": true,
-            "via_sns": false
           },
           "_ContainerConfigFileContent": {
             "docker": {
@@ -575,24 +373,10 @@
               },
               "proxyserver": {
                 "Ref": "DockerProxyServer"
-              },
-              "instanceport": {
-                "Ref": "InstancePort"
-              }
-            },
-            "system": {
-              "LogPublicationControl": {
-                "Ref": "LogPublicationControl"
-              },
-              "AWSEBReferrerId": {
-                "Ref": "AWSEBReferrerId"
-              },
-              "AWSEBAgentId": {
-                "Ref": "AWSEBAgentId"
               }
             }
           },
-          "_LaunchS3URL": "https:\/\/s3.amazonaws.com\/elasticbeanstalk-us-east-1-596229110736\/resources\/environments\/e-fucvpi5vsv\/dockertest-env_LaunchFile",
+          "_LaunchS3URL": "https:\/\/s3.amazonaws.com\/elasticbeanstalk-us-east-1-596229110736\/resources\/environments\/e-fucvpi5vsv\/fulfillment-env_LaunchFile",
           "_API": {
             "_Commands": {
               "CMD-BundleLogs": {
@@ -605,10 +389,8 @@
               "CMD-ConfigDeploy": {
                 "_Stages": {
                   "02_enact": [
-                    "_Infra-SQSD-Stop",
                     "Hook-EnactConfigDeploy",
-                    "Hook-PostConfigDeploy",
-                    "_Infra-SQSD-Start"
+                    "Hook-PostConfigDeploy"
                   ],
                   "01_pre": [
                     "Infra-WriteRuntimeConfig",
@@ -637,9 +419,7 @@
                     "Hook-EnactAppDeploy",
                     "Hook-PostAppDeploy",
                     "Hook-PostInit",
-                    "Infra-WriteVersionOnStartup",
-                    "_Infra-SQSD-WriteConfig",
-                    "_Infra-SQSD-Start"
+                    "Infra-WriteVersionOnStartup"
                   ],
                   "01_pre": [
                     "Infra-EmbeddedPreBuild",
@@ -652,10 +432,8 @@
               "CMD-RestartAppServer": {
                 "_Stages": {
                   "02_enact": [
-                    "_Infra-SQSD-Stop",
                     "Hook-EnactRestartAppServer",
-                    "Hook-PostRestartAppServer",
-                    "_Infra-SQSD-Start"
+                    "Hook-PostRestartAppServer"
                   ],
                   "01_enact": [
                     "Infra-WriteRuntimeConfig",
@@ -664,22 +442,11 @@
                 },
                 "_RunStaged": "false"
               },
-              "CMD-SqsdDeploy": {
-                "_Stages": {
-                  "02_enact": [
-                    "_Infra-SQSD-WriteConfig",
-                    "_Infra-SQSD-Restart"
-                  ]
-                },
-                "_RunStaged": "true"
-              },
               "CMD-AppDeploy": {
                 "_Stages": {
                   "02_enact": [
-                    "_Infra-SQSD-Stop",
                     "Hook-EnactAppDeploy",
-                    "Hook-PostAppDeploy",
-                    "_Infra-SQSD-Start"
+                    "Hook-PostAppDeploy"
                   ],
                   "01_pre": [
                     "Infra-WriteRuntimeConfig",
@@ -840,13 +607,6 @@
               }
             }
           },
-          "Infra-SQSD-Restart": {
-            "commands": {
-              "01-restart-sqsd": {
-                "command": "\/etc\/init.d\/aws-sqsd restart"
-              }
-            }
-          },
           "Hook-EnactAppDeploy": {
             "commands": {
               "hooks": {
@@ -909,16 +669,12 @@
               "Infra-WriteSystemTailLogsConf",
               "Infra-WriteBundleLogsConf",
               "Infra-WritePublishLogsConf",
-              "Infra-WritePublishLogsCron",
-              {
-                "ConfigSet": "_Infra-SQSD-Install"
-              }
+              "Infra-WritePublishLogsCron"
             ],
             "Infra-WriteBundleLogsConf": [
               "Infra-WriteBundleLogsConf"
             ],
             "Infra-EmbeddedPostBuild": [
-              
             ],
             "Hook-PostConfigDeploy": [
               "Hook-PostConfigDeploy"
@@ -926,27 +682,17 @@
             "Infra-WriteApplication2": [
               "Infra-WriteApplication2"
             ],
-            "_Infra-SQSD-Install": [
-              "Infra-SQSD-Install"
-            ],
             "_AppInstall": [
               "Hook-PreInit",
               "Hook-PreAppDeploy",
               "Hook-EnactAppDeploy",
               "Hook-PostAppDeploy",
-              "Hook-PostInit",
-              {
-                "ConfigSet": "_Infra-SQSD-WriteConfig"
-              },
-              {
-                "ConfigSet": "_Infra-SQSD-Start"
-              }
+              "Hook-PostInit"
             ],
             "Hook-EnactAppDeploy": [
               "Hook-EnactAppDeploy"
             ],
             "Infra-EmbeddedPreBuild": [
-              
             ],
             "Infra-WriteVersionOnStartup": [
               "Infra-WriteVersionOnStartup"
@@ -975,9 +721,6 @@
             "Infra-WritePublishLogsCron": [
               "Infra-WritePublishLogsCron"
             ],
-            "_Infra-SQSD-Restart": [
-              "Infra-SQSD-Restart"
-            ],
             "InfoTask-TailLogs": [
               "DockerContainerTailLogs",
               "InfoTask-TailLogs"
@@ -989,12 +732,6 @@
               "Infra-WriteRuntimeConfig",
               "Infra-WriteApplication1",
               "Infra-WriteApplication2"
-            ],
-            "_Infra-SQSD-WriteConfig": [
-              "Infra-SQSD-WriteConfig"
-            ],
-            "_Infra-SQSD-Stop": [
-              "Infra-SQSD-Stop"
             ],
             "Hook-PreConfigDeploy": [
               "Hook-PreConfigDeploy"
@@ -1022,9 +759,6 @@
             ],
             "_AppInstallReboot": [
               "Hook-PreAppDeploy"
-            ],
-            "_Infra-SQSD-Start": [
-              "Infra-SQSD-Start"
             ]
           },
           "Infra-WriteLeaderTestScript": {
@@ -1081,13 +815,6 @@
                   ]
                 },
                 "mode": "000644"
-              }
-            }
-          },
-          "Infra-SQSD-Start": {
-            "commands": {
-              "01-start-sqsd": {
-                "command": "\/etc\/init.d\/aws-sqsd start"
               }
             }
           },
@@ -1268,13 +995,6 @@
               }
             }
           },
-          "Infra-SQSD-Stop": {
-            "commands": {
-              "01-stop-sqsd": {
-                "command": "\/etc\/init.d\/aws-sqsd stop"
-              }
-            }
-          },
           "AWSEBBaseConfig": {
             "files": {
               "\/etc\/elasticbeanstalk\/.aws-eb-stack.properties": {
@@ -1282,15 +1002,9 @@
                   "Fn::Join": [
                     "",
                     [
-                      "environment_id=",
-                      {
-                        "Ref": "AWSEBEnvironmentId"
-                      },
+                      "environment_id=fullfilment",
                       "\n",
                       "environment_bucket=",
-                      {
-                        "Ref": "AWSEBEnvironmentBucket"
-                      },
                       "\n",
                       "stack_name=",
                       {
@@ -1396,84 +1110,6 @@
               }
             }
           },
-          "Infra-SQSD-Install": {
-            "files": {
-              "\/etc\/logrotate.d\/aws-sqsd": {
-                "content": "\/var\/log\/aws-sqsd\/*.log {\n    daily\n    rotate 10\n    missingok\n    compress\n    copytruncate\n}\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000644"
-              },
-              "\/opt\/elasticbeanstalk\/tasks\/publishlogs.d\/aws-sqsd.conf": {
-                "content": "\/var\/log\/aws-sqsd\/*.gz\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000644"
-              },
-              "\/opt\/elasticbeanstalk\/bin\/aws-sqsd-dependencies.sh": {
-                "content": "#!\/bin\/bash\n#\nRUBY_ROOT=\"\/opt\/elasticbeanstalk\/lib\/sqsd\/ruby\"\nBUCKET=\"elasticbeanstalk-env-resources-us-east-1\"\nRUBY_BUILD_DATE=\"2014-01-17\"\n\non_error() {\n    EXIT_CODE=$?\n    if [ \"${EXIT_CODE}\" != \"0\" ]\n    then\n        echo \"`basename ${0}`:${1-unknown}: error: \\\"${2:-No error message specified}\\\". exit code: ${EXIT_CODE}\"\n        exit 1\n    fi\n}\n\nif [ -d \"${RUBY_ROOT}\" ]\nthen\n    exit 0\nfi\n\nARCHITECTURE=`uname -m`\nif [ \"${ARCHITECTURE}\" == \"i686\" ]\nthen\n    ARCHITECTURE=\"i386\"\nfi\nKEY=\"eb_sqsd\/aws-sqsd-ruby-${ARCHITECTURE}-${RUBY_BUILD_DATE}.tar.gz\"\n\ncurl --retry 10 \"http:\/\/${BUCKET}.s3.amazonaws.com\/${KEY}\" > \/tmp\/aws-sqsd-ruby.tar.gz\non_error ${LINENO} \"download of http:\/\/${BUCKET}.s3.amazonaws.com\/${KEY} failed\"\n\ntar zxf \/tmp\/aws-sqsd-ruby.tar.gz -C \/\non_error ${LINENO} \"extracting archive \/tmp\/aws-sqsd-ruby.tar.gz failed\"\n\nrm -f \/tmp\/aws-sqsd-ruby.tar.gz\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000755"
-              },
-              "\/opt\/elasticbeanstalk\/tasks\/bundlelogs.d\/aws-sqsd.conf": {
-                "content": "\/var\/log\/aws-sqsd\/*\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000644"
-              },
-              "\/opt\/elasticbeanstalk\/tasks\/systemtaillogs.d\/aws-sqsd.conf": {
-                "content": "\/var\/log\/aws-sqsd\/*.log\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000644"
-              },
-              "\/etc\/cron.d\/aws-sqsd-monitor": {
-                "content": "*\/15 * * * * root \/opt\/elasticbeanstalk\/bin\/aws-sqsd-monitor\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000644"
-              },
-              "\/opt\/elasticbeanstalk\/bin\/aws-sqsd-monitor": {
-                "content": "#!\/bin\/sh\n\nif [ -f \"\/var\/run\/aws-sqsd\/default.pid\" ] && ! \/etc\/init.d\/aws-sqsd status >\/dev\/null 2>&1; then\n\tlogger -t aws-sqsd-monitor \"restarting aws-sqsd...\"\n\t\/etc\/init.d\/aws-sqsd restart\nfi\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000755"
-              },
-              "\/opt\/elasticbeanstalk\/tasks\/taillogs.d\/aws-sqsd.conf": {
-                "content": "\/var\/log\/aws-sqsd\/*.log\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000644"
-              },
-              "\/etc\/init.d\/aws-sqsd": {
-                "content": "#!\/bin\/bash\n#\n# chkconfig: - 65 45\n. \/etc\/init.d\/functions\n\nRUBY_PROFILE=\"\/opt\/elasticbeanstalk\/lib\/sqsd\/ruby\/profile.sh\" \n\naws-sqsd() {\n    su sqsd sh -c \"source ${RUBY_PROFILE} && \/opt\/elasticbeanstalk\/lib\/sqsd\/ruby\/bin\/aws-sqsd ${1}\"\n}\n\nUSER=`id -nu`\nif [ \"${USER}\" != \"root\" ]\nthen\n    echo \"aws-sqsd: permission denied\"\n    exit 1\nfi\n\ncase \"$1\" in\nstart)\n     aws-sqsd start\n     RETVAL=$?\n     ;;\nstop)\n    aws-sqsd stop\n    RETVAL=$?\n    ;;\nstatus)\n    aws-sqsd status\n    RETVAL=$?\n    ;;\nrestart|reload|condrestart)\n    aws-sqsd stop\n    aws-sqsd start\n    RETVAL=$?\n    ;;\n*)\n    echo \"Usage: $0 [start|stop|restart|reload|status]\"\n    RETVAL=2\nesac\nexit $RETVAL\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000755"
-              },
-              "\/opt\/elasticbeanstalk\/bin\/aws-sqsd-install.rb": {
-                "content": "#!\/usr\/bin\/env ruby\n\nrequire 'aws-sdk'\nrequire 'fileutils'\nrequire 'open-uri'\n\nBUCKET = 'elasticbeanstalk-env-resources-us-east-1'\nGEM_NAME = 'aws-sqsd-1.1.gem'\nGEM_KEY = \"eb_sqsd\/#{GEM_NAME}\"\nGEM_PATH = \"\/var\/tmp\/#{GEM_NAME}\"\nUSER = \"sqsd\"\n\n# download the gem\nuri = %[http:\/\/#{BUCKET}.s3.amazonaws.com\/#{GEM_KEY}]\nopen(uri) do |s|\n    open(GEM_PATH, \"w\") do |f|\n        while buf = s.read(32768)\n            f.write buf\n        end\n    end\nend\n\n# install the gem\nsystem %[gem install --local --bindir \/opt\/elasticbeanstalk\/lib\/sqsd\/ruby\/bin #{GEM_PATH} 2>&1]\nunless $?.exitstatus == 0\n    puts %[installing gem \"#{GEM_PATH}\" failed]\n    exit 1\nend\nFileUtils.rm_f GEM_PATH\n\n# create the daemon user\nunless (Etc.getpwnam USER rescue nil)\n    system %[\/usr\/sbin\/useradd --no-create-home --comment \"AWS SQSD Daemon\" #{USER}]\n    unless $?.exitstatus == 0\n        puts %[creating the user \"#{USER}\" failed]\n        exit 1\n    end\nend\n\n# create log pid and configuration directories\n%w[\/var\/log\/aws-sqsd \/var\/run\/aws-sqsd \/etc\/aws-sqsd.d].each do |path|\n    FileUtils.mkdir_p path\n    FileUtils.chown USER, USER, path\nend\n",
-                "owner": "root",
-                "group": "root",
-                "mode": "000755"
-              }
-            },
-            "commands": {
-              "03-install-dependencies": {
-                "command": "umask 0022 && \/opt\/elasticbeanstalk\/bin\/aws-sqsd-dependencies.sh"
-              },
-              "04-install-aws-sqsd": {
-                "command": "source \/opt\/elasticbeanstalk\/lib\/sqsd\/ruby\/profile.sh && umask 0022 && \/opt\/elasticbeanstalk\/bin\/aws-sqsd-install.rb"
-              },
-              "01-cron.d-clean": {
-                "command": "rm -rf \/etc\/cron.d\/aws-sqsd-monitor.bak"
-              },
-              "02-sqsd-config-clean": {
-                "command": "rm -rf \/etc\/aws-sqsd.d\/*.bak"
-              }
-            }
-          },
           "InfoTask-BundleLogs": {
             "commands": {
               "bundlelogs": {
@@ -1490,26 +1126,6 @@
                         ]
                       }
                     ]
-                  ]
-                }
-              }
-            }
-          },
-          "Infra-SQSD-WriteConfig": {
-            "commands": {
-              "01-write-sqsd-config": {
-                "command": "getMetadata.py --yaml --path AWS::ElasticBeanstalk::Ext._SqsDaemonConfigFileContent | sed \"s\/'\/\/g\" > \/etc\/aws-sqsd.d\/default.yaml"
-              }
-            }
-          },
-          "Infra-SQSD-EnsureRunning": {
-            "services": {
-              "sysvinit": {
-                "aws-sqsd": {
-                  "ensureRunning": true,
-                  "enabled": true,
-                  "sources": [
-                    "\/etc\/aws-sqsd.d"
                   ]
                 }
               }
@@ -1657,23 +1273,17 @@
         "Tags": [
           {
             "PropagateAtLaunch": true,
-            "Value": {
-              "Ref": "AWSEBEnvironmentName"
-            },
+            "Value": "fullfilment",
             "Key": "elasticbeanstalk:environment-name"
           },
           {
             "PropagateAtLaunch": true,
-            "Value": {
-              "Ref": "AWSEBEnvironmentName"
-            },
+            "Value": "fullfilment",
             "Key": "Name"
           },
           {
             "PropagateAtLaunch": true,
-            "Value": {
-              "Ref": "AWSEBEnvironmentId"
-            },
+            "Value": "fullfilment",
             "Key": "elasticbeanstalk:environment-id"
           }
         ],
@@ -1699,24 +1309,6 @@
     "AWSEBInstanceLaunchWaitHandle": {
       "Type": "AWS::CloudFormation::WaitConditionHandle"
     },
-    "AWSEBWorkerQueue": {
-      "Type": "AWS::SQS::Queue",
-      "Properties": {
-        "MessageRetentionPeriod": 1209600,
-        "RedrivePolicy": {
-          "deadLetterTargetArn": {
-            "Fn::GetAtt": [
-              "AWSEBWorkerDeadLetterQueue",
-              "Arn"
-            ]
-          },
-          "maxReceiveCount": {
-            "Ref": "AWSEBMaxRetries"
-          }
-        },
-        "VisibilityTimeout": 43200
-      }
-    },
     "AWSEBSecurityGroupSSHIngress": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
@@ -1737,35 +1329,8 @@
             "DockerRPM": {
               "Ref": "DockerRPM"
             },
-            "LogPublicationControl": {
-              "Ref": "LogPublicationControl"
-            },
-            "AWSEBVisibilityTimeout": {
-              "Ref": "AWSEBVisibilityTimeout"
-            },
-            "AWSEBAgentId": {
-              "Ref": "AWSEBAgentId"
-            },
-            "AWSEBWorkerQueueURL": {
-              "Ref": "AWSEBWorkerQueueURL"
-            },
-            "AWSEBEnvironmentName": {
-              "Ref": "AWSEBEnvironmentName"
-            },
-            "AWSEBHttpPath": {
-              "Ref": "AWSEBHttpPath"
-            },
             "InstanceType": {
               "Ref": "InstanceType"
-            },
-            "AWSEBMaxRetries": {
-              "Ref": "AWSEBMaxRetries"
-            },
-            "AWSEBHealthCheck": {
-              "Ref": "AWSEBHealthCheck"
-            },
-            "AWSEBReferrerId": {
-              "Ref": "AWSEBReferrerId"
             },
             "DockerProxyServer": {
               "Ref": "DockerProxyServer"
@@ -1773,45 +1338,18 @@
             "DockerDEB": {
               "Ref": "DockerDEB"
             },
-            "InstancePort": {
-              "Ref": "InstancePort"
-            },
-            "AWSEBHttpConnections": {
-              "Ref": "AWSEBHttpConnections"
-            },
-            "AWSEBEnvironmentId": {
-              "Ref": "AWSEBEnvironmentId"
-            },
-            "AWSEBEnvironmentBucket": {
-              "Ref": "AWSEBEnvironmentBucket"
-            },
-            "AWSEBMimeType": {
-              "Ref": "AWSEBMimeType"
-            },
             "AppSource": {
               "Ref": "AppSource"
             },
-            "AWSEBInactivityTimeout": {
-              "Ref": "AWSEBInactivityTimeout"
-            },
-            "AWSEBConnectTimeout": {
-              "Ref": "AWSEBConnectTimeout"
-            },
             "EnvironmentVariables": {
               "Ref": "EnvironmentVariables"
-            },
-            "AWSEBRetentionPeriod": {
-              "Ref": "AWSEBRetentionPeriod"
-            },
-            "AWSEBWorkerDeadLetterQueueURL": {
-              "Ref": "AWSEBWorkerDeadLetterQueueURL"
             }
           }
         },
         "AWS::ElasticBeanstalk::Metadata": {
           "Name": "e-fucvpi5vsv",
-          "EnvironmentName": "dockertest-env",
-          "Description": "TemplatePack for environment: dockertest-env",
+          "EnvironmentName": "fulfillment-env",
+          "Description": "TemplatePack for environment: fulfillment-env",
           "DateCreated": "2014-06-26T22:50:19",
           "DateUpdated": "2014-06-26T22:50:19",
           "EnvironmentId": "e-fucvpi5vsv",
