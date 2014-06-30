@@ -7,9 +7,9 @@ import com.google.api.ads.adwords.axis.v201402.cm.Operator
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
 
 class AdWordsAccountCreator(swfAdapter: SWFAdapter,
-                            sqsAdapter: SQSAdapter,
+                            dynamoAdapter: DynamoAdapter,
                             adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
     try {
@@ -83,7 +83,7 @@ object adwords_accountcreator {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAccountCreator(
       new SWFAdapter(config)
-      ,new SQSAdapter(config)
+      ,new DynamoAdapter(config)
       ,new AdWordsAdapter(config))
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

@@ -1,24 +1,28 @@
 package com.balihoo.fulfillment.workers
 
+import java.text.SimpleDateFormat
+import java.util.{Date, TimeZone}
 import java.util.UUID.randomUUID
 
 import scala.language.implicitConversions
 
-import com.balihoo.fulfillment.{SQSAdapter, SWFAdapter}
+import com.balihoo.fulfillment.{DynamoAdapter, DynamoItem, SWFAdapter}
 
 import com.amazonaws.services.simpleworkflow.model._
-import com.amazonaws.services.sqs.model.{GetQueueUrlRequest, SendMessageRequest}
 import play.api.libs.json.{Json, JsObject}
 
-abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter) {
+abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter) {
 
   val instanceId = randomUUID().toString
+
+  val tz = TimeZone.getTimeZone("UTC")
+  val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+  dateFormat.setTimeZone(tz)
 
   val domain = swfAdapter.config.getString("domain")
   val name = validateSWFIdentifier(swfAdapter.config.getString("name"), 256)
   val version = validateSWFIdentifier(swfAdapter.config.getString("version"), 64)
   val taskListName = validateSWFIdentifier(name+version, 256)
-  val workerStatusQueue: String = sqsAdapter.config.getString("workerstatusqueue")
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
@@ -31,14 +35,15 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     .withDomain(domain)
     .withTaskList(taskList)
 
-  val queueUrlRequest = new GetQueueUrlRequest(workerStatusQueue)
-  val statusQueue = sqsAdapter.client.getQueueUrl(queueUrlRequest)
-
   var completedTasks:Int = 0
   var failedTasks:Int = 0
   var canceledTasks:Int = 0
 
+  var updateCounter:Int = 0
+
   var task:ActivityTask = null
+
+  declareWorker()
 
   def work() = {
 
@@ -78,27 +83,26 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     }
   }
 
-  def baseMessage() = {
-    var message = collection.mutable.Map[String, String]()
-    message += ("instance" -> instanceId)
-    message += ("type" -> "ActivityWorker")
-    message += ("activityName" -> name)
-    message += ("activityVersion" -> version)
-    message += ("canceledTasks" -> canceledTasks.toString)
-    message += ("failedTasks" -> failedTasks.toString)
-    message += ("completedTasks" -> completedTasks.toString)
+  def declareWorker() = {
+    dynamoAdapter.putItem(
+      new DynamoItem("fulfillment_beta_worker")
+        .addString("instance", instanceId)
+        .addString("domain", domain)
+        .addString("activityName", name)
+        .addString("activityVersion", version)
+        .addString("when", dateFormat.format(new Date()))
+    )
   }
 
   def updateStatus(status:String) = {
-    var message = baseMessage()
-    message += ("status" -> status)
-
-    sendMessage(Json.stringify(Json.toJson(message.toMap)))
-  }
-
-  def sendMessage(message:String) = {
-    val m = new SendMessageRequest(statusQueue.getQueueUrl, message)
-    sqsAdapter.client.sendMessage(m)
+    updateCounter += 1
+    dynamoAdapter.putItem(
+      new DynamoItem("fulfillment_beta_workerstatus")
+        .addString("id", s"${instanceId}_$updateCounter")
+        .addString("instance", instanceId)
+        .addString("status", status)
+        .addString("when", dateFormat.format(new Date()))
+    )
   }
 
   def completeTask(result:String) = {
@@ -107,6 +111,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     response.setTaskToken(task.getTaskToken)
     response.setResult(result)
     swfAdapter.client.respondActivityTaskCompleted(response)
+    updateStatus(s"Completed Task")
   }
 
   def failTask(reason:String, details:String) = {
@@ -116,6 +121,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     response.setReason(reason)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskFailed(response)
+    updateStatus(s"Failed Task: $reason $details")
   }
 
   def cancelTask(details:String) = {
@@ -124,6 +130,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
     response.setTaskToken(task.getTaskToken)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskCanceled(response)
+    updateStatus(s"Cancel Task: $details")
   }
 
   def registerActivityType() = {

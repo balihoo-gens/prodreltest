@@ -6,9 +6,9 @@ import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 
 class AdWordsImageAdProcessor(swfAdapter: SWFAdapter,
-                              sqsAdapter: SQSAdapter,
+                              dynamoAdapter: DynamoAdapter,
                               adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
     try {
@@ -132,7 +132,7 @@ object adwords_imageadprocessor {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsImageAdProcessor(
       new SWFAdapter(config)
-      ,new SQSAdapter(config)
+      ,new DynamoAdapter(config)
       ,new AdWordsAdapter(config))
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

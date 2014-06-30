@@ -1,10 +1,6 @@
 package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.config.PropertiesLoader
-import com.balihoo.fulfillment.{
-  SQSAdapter,
-  SWFAdapter,
-  SESAdapter
-}
+import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter, SESAdapter}
 
 object test_emailworker {
   def main(args: Array[String]) {
@@ -20,7 +16,7 @@ object test_emailworker {
     def verifyAddress() = {
       val worker = new VerifyEmailAddressWorker(
         new SWFAdapter(config),
-        new SQSAdapter(config),
+        new DynamoAdapter(config),
         new SESAdapter(config)
       )
        println("enter the address to verify")
@@ -32,7 +28,7 @@ object test_emailworker {
     def getValidEmailList() = {
       val worker = new ListVerifiedEmailAddressesWorker(
         new SWFAdapter(config),
-        new SQSAdapter(config),
+        new DynamoAdapter(config),
         new SESAdapter(config)
       )
       worker.listVerifiedEmailAddresses()
@@ -47,7 +43,7 @@ object test_emailworker {
     def sendEmail() = {
       val worker = new SendEmailWorker(
         new SWFAdapter(config),
-        new SQSAdapter(config),
+        new DynamoAdapter(config),
         new SESAdapter(config)
       )
       val from = "gens@balihoo.com"

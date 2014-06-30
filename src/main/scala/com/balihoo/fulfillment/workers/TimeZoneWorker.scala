@@ -1,7 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.{SQSAdapter, SWFAdapter}
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
+import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
@@ -12,8 +11,8 @@ import java.util
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.client.utils.URLEncodedUtils
 
-class TimeZoneWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
-  extends FulfillmentWorker(swfAdapter, sqsAdapter) {
+class TimeZoneWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter)
+  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   val url = swfAdapter.config.getString("geonames.url")
   val username = swfAdapter.config.getString("geonames.user")
@@ -466,7 +465,7 @@ class TimeZoneWorker(swfAdapter: SWFAdapter, sqsAdapter: SQSAdapter)
 object timezoneworker {
   def main(args: Array[String]) {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val timezone = new TimeZoneWorker(new SWFAdapter(config), new SQSAdapter(config))
+    val timezone = new TimeZoneWorker(new SWFAdapter(config), new DynamoAdapter(config))
     println("Running timezone worker")
     timezone.work()
   }
