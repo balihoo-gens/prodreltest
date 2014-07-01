@@ -11,11 +11,12 @@ class AdWordsAccountCreator(swfAdapter: SWFAdapter,
                             adwordsAdapter: AdWordsAdapter)
   extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
+  val creator = new AccountCreator(adwordsAdapter)
+
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(params.getRequiredParameter("parent"))
+      adwordsAdapter.setClientId(creator.lookupParentAccount(params.getRequiredParameter("parent")))
 
-      val creator = new AccountCreator(adwordsAdapter)
       val account = creator.getAccount(params) match {
         case account:ManagedCustomer => account
         case _ =>
@@ -36,6 +37,8 @@ class AdWordsAccountCreator(swfAdapter: SWFAdapter,
 }
 
 class AccountCreator(adwords:AdWordsAdapter) {
+
+  var brandAccountCache = collection.mutable.Map[String, String]()
 
   def getAccount(params:ActivityParameters):ManagedCustomer = {
     val name = params.getRequiredParameter("name")
@@ -75,6 +78,24 @@ class AccountCreator(adwords:AdWordsAdapter) {
     adwords.withErrorsHandled[ManagedCustomer](context, {
       adwords.managedCustomerService.mutate(Array(operation)).getValue(0)
     })
+  }
+
+  def lookupParentAccount(brandKey:String):String = {
+    val params = new ActivityParameters( s"""{ "name" : "$brandKey" }""")
+
+    brandAccountCache.contains(brandKey) match {
+      case true =>
+        brandAccountCache(brandKey)
+      case false =>
+        adwords.setClientId(adwords.baseAccountId)
+        getAccount(params) match {
+          case existing: ManagedCustomer =>
+            brandAccountCache += (brandKey -> String.valueOf(existing.getCustomerId))
+            String.valueOf(existing.getCustomerId)
+          case _ =>
+            throw new Exception(s"No brand account with name '$brandKey' was found!")
+        }
+    }
   }
 }
 

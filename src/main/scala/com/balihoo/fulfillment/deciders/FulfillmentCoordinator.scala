@@ -161,6 +161,20 @@ class FulfillmentSection(sectionName: String
     status = if(timedoutCount > timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
   }
 
+  def resolveReferences(map:SectionMap):Boolean = {
+
+    if(status == SectionStatus.INCOMPLETE) {
+      for((pname, param) <- params) {
+        param match {
+          case sectionReference: SectionReference =>
+            sectionReference.processReferences(map)
+          case _ =>
+        }
+      }
+    }
+    true
+  }
+
   def getActivityId = {
     val timestamp: Long = System.currentTimeMillis()
     s"$name${Constants.delimiter}${action.getName}${Constants.delimiter}"+timestamp
@@ -327,16 +341,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   // section references to see if anything needs to be promoted from CONTINGENT -> INCOMPLETE.
   // Sections get promoted when they're in a SectionReference list and the prior section is TERMINAL
   for((name, section) <- map) {
-    // Just process the sections that are potentially ready to run
-    if(section.status == SectionStatus.INCOMPLETE) {
-      for((pname, param) <- section.params) {
-        param match {
-          case sectionReference: SectionReference =>
-            sectionReference.processReferences(this)
-          case _ =>
-        }
-      }
-    }
+    section.resolveReferences(this)
   }
 
   /**
@@ -508,6 +513,7 @@ class SectionReference(referencedSections:JsArray) {
         // The prior section didn't complete successfully.. let's
         // let the next section have a try
         referencedSection.status = SectionStatus.INCOMPLETE
+        referencedSection.resolveReferences(map) // <-- recurse
       }
       priorSectionStatus = referencedSection.status
     }

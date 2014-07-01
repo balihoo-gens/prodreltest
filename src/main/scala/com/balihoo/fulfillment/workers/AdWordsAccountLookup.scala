@@ -11,17 +11,16 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
 
   val creator = new AccountCreator(adwordsAdapter)
 
-  var brandAccountCache = collection.mutable.Map[String, String]()
-
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(lookupParentAccount(params.getRequiredParameter("parent")))
+      adwordsAdapter.setClientId(creator.lookupParentAccount(params.getRequiredParameter("parent")))
 
+      val aname = params.getRequiredParameter("name")
       creator.getAccount(params) match {
         case existing:ManagedCustomer =>
           completeTask(String.valueOf(existing.getCustomerId))
         case _ =>
-          failTask(s"No account with name '$name' was found!", "-")
+          failTask(s"No account with name '$aname' was found!", "-")
       }
     } catch {
       case rateExceeded: RateExceededException =>
@@ -34,25 +33,6 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
         println(s"Caught a throwable!")
     }
   }
-
-  def lookupParentAccount(brandKey:String):String = {
-    val params = new ActivityParameters(s"""{ "name" : "$brandKey" }""")
-
-    brandAccountCache.contains(brandKey) match {
-      case true =>
-        brandAccountCache(brandKey)
-      case false =>
-        adwordsAdapter.setClientId(adwordsAdapter.baseAccountId)
-        creator.getAccount(params) match {
-          case existing:ManagedCustomer =>
-            brandAccountCache += (brandKey -> String.valueOf(existing.getCustomerId))
-            String.valueOf(existing.getCustomerId)
-          case _ =>
-            throw new Exception(s"No brand account with name '$brandKey' was found!")
-        }
-    }
-  }
-
 
 }
 

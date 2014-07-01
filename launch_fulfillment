@@ -1,0 +1,29 @@
+#!/usr/bin/python
+
+import sys, os
+
+all_classes = [
+	'com.balihoo.fulfillment.workers.adwords_accountcreator',
+	'com.balihoo.fulfillment.workers.adwords_accountlookup',
+	'com.balihoo.fulfillment.workers.adwords_adgroupprocessor',
+	'com.balihoo.fulfillment.workers.adwords_campaignprocessor',
+	'com.balihoo.fulfillment.workers.adwords_imageadprocessor',
+	'com.balihoo.fulfillment.workers.chaosworker',
+	'com.balihoo.fulfillment.workers.listverifiedemailaddressworker',
+	'com.balihoo.fulfillment.workers.noopworker',
+	'com.balihoo.fulfillment.workers.sendemailworker',
+	'com.balihoo.fulfillment.workers.timezoneworker',
+	'com.balihoo.fulfillment.workers.verifyemailaddressworker',
+	'com.balihoo.fulfillment.deciders.coordinator'
+]
+
+launch = "nohup java -cp fulfillment-assembly-1.0-SNAPSHOT.jar %s > logs/%s.log 2>&1 &"
+
+if len(sys.argv) > 1:
+	all_classes = sys.argv[1:]
+
+for path in all_classes:
+	cname = path.split('.')[-1]
+	command = launch % (path, cname)
+	print "Running", command
+	os.system(command)
