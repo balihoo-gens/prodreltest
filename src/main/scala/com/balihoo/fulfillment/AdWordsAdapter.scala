@@ -39,7 +39,7 @@ class AdWordsAdapter(loader: PropertiesLoader) {
     .enableReportMoneyInMicros()
     .build()
 
-  session.setValidateOnly(true)
+  session.setValidateOnly(false)
 
   private val services = new AdWordsServices
 
