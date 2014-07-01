@@ -1,0 +1,7 @@
+#!/bin/bash
+#run this file with docker: sudo docker -v $(pwd):/share /share/install.sh
+echo "creating directory"
+mkdir -p /opt/fulfillment/bin
+echo "copying jar file"
+cp /share/*.jar /opt/fulfillment/bin
+
