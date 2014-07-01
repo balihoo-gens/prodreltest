@@ -5,3 +5,4 @@ mkdir -p /opt/fulfillment/bin
 echo "copying jar file"
 cp /share/*.jar /opt/fulfillment/bin
 cp -r /share/config /opt/fulfillment/bin
+cp /share/launch_fulfillment /opt/fulfillment/bin
