@@ -2,11 +2,13 @@
 CURDIR=$(cd $(dirname "$0"); pwd)
 ROOTDIR=$CURDIR/..
 TMPDIR=$ROOTDIR/installtmp
+#DOCKER_BASE=dockerfile/java
+DOCKER_BASE=maxexcloo/java
 echo "clean up"
 rm -rf $TMPDIR
 sudo docker rmi -f balihoo/fulfillment
 echo "get latest java image from docker..."
-sudo docker pull dockerfile/java
+sudo docker pull $DOCKER_BASE
 
 mkdir -p $TMPDIR
 
@@ -25,7 +27,7 @@ then
   cp $CURDIR/dockerinstall.script $TMPDIR/install.sh
   chmod a+x $TMPDIR/install.sh
   chmod a+x $TMPDIR/launch_fulfillment
-  CONTAINER=$(sudo docker run -d -v $TMPDIR:/share dockerfile/java /share/install.sh)
+  CONTAINER=$(sudo docker run -d -v $TMPDIR:/share $DOCKER_BASE /share/install.sh)
   echo saving container $CONTAINER
   sudo docker commit $CONTAINER balihoo/fulfillment
   echo "saving image..."
