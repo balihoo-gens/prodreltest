@@ -34,8 +34,8 @@ class AdWordsAdGroupProcessor(swfAdapter: SWFAdapter,
         throw rateExceeded
       case exception: Exception =>
         throw exception
-      case _: Throwable =>
-        println(s"Caught a throwable!")
+      case throwable: Throwable =>
+        throw new Exception(throwable.getMessage)
     }
   }
 }

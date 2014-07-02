@@ -25,6 +25,7 @@ object SectionStatus extends Enumeration {
   val TIMED_OUT = Value("TIMED OUT")
   val CANCELED = Value("CANCELED")
   val TERMINAL = Value("TERMINAL") // Section has FAILED/CANCELED/TIMED OUT too many times!
+  val DISMISSED = Value("DISMISSED") // Section was TERMINAL but a subsequent section may work out
   val COMPLETE = Value("COMPLETE")
   val CONTINGENT = Value("CONTINGENT") // Special case. We won't attempt to process this unless necessary
   val DEFERRED = Value("DEFERRED") // A Timer will activate this later
@@ -205,6 +206,7 @@ class CategorizedSections(sections: SectionMap) {
   var failed = mutable.MutableList[FulfillmentSection]()
   var canceled = mutable.MutableList[FulfillmentSection]()
   var contingent = mutable.MutableList[FulfillmentSection]()
+  var dismissed = mutable.MutableList[FulfillmentSection]()
   var terminal = mutable.MutableList[FulfillmentSection]()
   var ready = mutable.MutableList[FulfillmentSection]()
   var impossible = mutable.MutableList[FulfillmentSection]()
@@ -229,6 +231,8 @@ class CategorizedSections(sections: SectionMap) {
         deferred += section
       case SectionStatus.TERMINAL =>
         terminal += section
+      case SectionStatus.DISMISSED =>
+        dismissed += section
       case SectionStatus.INCOMPLETE =>
         categorizeIncompleteSection(section)
       case SectionStatus.IMPOSSIBLE =>
@@ -278,7 +282,7 @@ class CategorizedSections(sections: SectionMap) {
   }
 
   def workComplete() : Boolean = {
-    sections.map.size == (complete.length + contingent.length)
+    sections.map.size == (complete.length + contingent.length + dismissed.length)
   }
 
   def hasPendingSections: Boolean = {
@@ -505,17 +509,18 @@ class SectionReference(referencedSections:JsArray) {
   }
 
   def processReferences(map:SectionMap) = {
-    var priorSectionStatus = SectionStatus.TERMINAL
+    var priorSection:FulfillmentSection = null
     for(sectionName <- sections) {
       val referencedSection = map.map(sectionName)
-      if(priorSectionStatus == SectionStatus.TERMINAL
+      if((priorSection == null || priorSection.status == SectionStatus.TERMINAL)
         && referencedSection.status == SectionStatus.CONTINGENT) {
         // The prior section didn't complete successfully.. let's
         // let the next section have a try
         referencedSection.status = SectionStatus.INCOMPLETE
         referencedSection.resolveReferences(map) // <-- recurse
+        priorSection.status = SectionStatus.DISMISSED
       }
-      priorSectionStatus = referencedSection.status
+      priorSection = referencedSection
     }
   }
 
@@ -584,7 +589,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
   protected def gatherParameters(section: FulfillmentSection
                                 ,sections: SectionMap) = {
 
-    var params: collection.mutable.Map[String, String] = collection.mutable.Map[String, String]()
+    var params = collection.mutable.Map[String, String]()
 
     for((name, value) <- section.params) {
       value match {
@@ -606,7 +611,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
     val decision: Decision = new Decision
     decision.setDecisionType(DecisionType.StartTimer)
 
-    var timerParams: collection.mutable.Map[String, String] = collection.mutable.Map[String, String]()
+    var timerParams = collection.mutable.Map[String, String]()
     timerParams += ("section" -> name)
     timerParams += ("status" -> status)
     timerParams += ("reason" -> reason)
@@ -631,7 +636,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
                              ,categorized: CategorizedSections
                              ,sections: SectionMap): Boolean = {
 
-    var failReasons: mutable.MutableList[String] = mutable.MutableList[String]()
+    var failReasons = mutable.MutableList[String]()
 
     sections.notes += sections.toString
 
@@ -736,24 +741,30 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
       val decision: Decision = new Decision
       decision.setDecisionType(DecisionType.FailWorkflowExecution)
+      val attribs = new FailWorkflowExecutionDecisionAttributes
 
-      var details: String = "Blocked Sections:"
-      for(section <- categorized.blocked) {
-        details += s"${section.name}, "
+      if(categorized.blocked.length > 0) {
+        var details: String = "Blocked Sections:"
+        for(section <- categorized.blocked) {
+          details += s"${section.name}, "
+        }
+
+        attribs.setReason("There are blocked sections and nothing is in progress!")
+        attribs.setDetails(details)
+      } else {
+
+        var details: String = "Sections:"
+        for((name, section) <- sections.map) {
+          details += section.toString
+        }
+
+        attribs.setReason("FAILING because progress can't be made!")
+        attribs.setDetails(details)
       }
-
-      val attribs: FailWorkflowExecutionDecisionAttributes = new FailWorkflowExecutionDecisionAttributes
-      attribs.setReason("There are blocked sections and nothing is in progress!")
-      attribs.setDetails(details)
 
       decision.setFailWorkflowExecutionDecisionAttributes(attribs)
 
       decisions += decision
-
-      sections.notes += "FAILING because progress can't be made!"
-      for((name, section) <- sections.map) {
-        sections.notes += section.toString
-      }
 
     }
 
