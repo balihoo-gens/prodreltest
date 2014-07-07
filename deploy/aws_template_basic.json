@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "AWS CloudFormation Template created from sample for Fulfillment.",
+  "Description" : "AWS CloudFormation Template created from sample for Fulfillment. see http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/example-templates-sqs.html",
 
   "Parameters" : {
     "KeyName" : {
@@ -95,7 +95,30 @@
       "Properties" : {
         "KeyName" : { "Ref" : "KeyName" },
         "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
-        "InstanceType" : { "Ref" : "InstanceType" }
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "UserData": { "Fn::Base64" : { "Fn::Join" : ["", [
+          "#!/bin/bash\n",
+          "yum update -y aws-cfn-bootstrap\n",
+          "# Install the Worker application\n",
+          "/opt/aws/bin/cfn-init ",
+          "         --stack ", { "Ref" : "AWS::StackName" },
+          "         --resource LaunchConfig ",
+          "         --region ", { "Ref" : "AWS::Region" }, "\n"
+        ]]}}
+      },
+      "Metadata" : {
+        "Comment" : "Install the fulfillment app",
+        "AWS::CloudFormation::Init": {
+          "config" : {
+            "commands": {
+              "test" : {
+                  "command" : "echo \"$CFNTEST\" > test.txt",
+                  "env" : { "CFNTEST" : "I come from config1." },
+                  "cwd" : "~"
+              }
+            }
+          }
+        }
       }
     },
 
