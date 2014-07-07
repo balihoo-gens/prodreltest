@@ -17,16 +17,16 @@
       "Description" : "WebServer EC2 instance type",
       "Type" : "String",
       "Default" : "t2.micro",
-      "AllowedValues" : [ "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.large", "m1.xlarge" ],
+      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.large", "m1.xlarge" ],
       "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
     },
 
     "MinInstances" : {
       "Description" : "The minimum number of Workers",
       "Type" : "Number",
-      "MinValue" : "0",
-      "Default"  : "0",
-      "ConstraintDescription" : "Enter a number >=0"
+      "MinValue" : "1",
+      "Default"  : "1",
+      "ConstraintDescription" : "Enter a number >0"
     },
 
     "MaxInstances" : {
@@ -35,11 +35,22 @@
       "MinValue" : "1",
       "Default"  : "1",
       "ConstraintDescription" : "Enter a number >1"
+    },
+
+    "AWSAccessKey" : {
+      "Description" : "The AWS Access key to download the app from S3",
+      "Type" : "String"
+    },
+
+    "AWSSecretKey" : {
+      "Description" : "The AWS Secret key to download the app from S3",
+      "Type" : "String"
     }
   },
 
   "Mappings" : {
     "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "64" },
       "t2.micro"    : { "Arch" : "64" },
       "t2.small"    : { "Arch" : "64" },
       "t2.medium"   : { "Arch" : "64" },
@@ -50,37 +61,12 @@
 
     "AWSRegionArch2AMI" : {
       "us-west-1"      : { "32" : "ami-951945d0", "64" : "ami-971945d2" },
+      "us-east-1"      : { "32" : "ami-31814f58", "64" : "ami-1b814f72", "64HVM" : "ami-0da96764" },
       "us-west-2"      : { "32" : "ami-16fd7026", "64" : "ami-10fd7020" }
     }
   },
 
   "Resources" : {
-    "WorkerUser" : {
-      "Type" : "AWS::IAM::User",
-      "Properties" : {
-        "Path": "/",
-        "Policies": [{
-          "PolicyName": "root",
-          "PolicyDocument": {
-            "Version": "2012-10-17",
-            "Statement":[{
-              "Effect": "Allow",
-              "Action": [
-                "cloudformation:DescribeStackResource"
-              ],
-              "Resource": "*"
-            }]
-          }
-        }]
-      }
-    },
-
-    "WorkerKeys" : {
-      "Type" : "AWS::IAM::AccessKey",
-      "Properties" : {
-        "UserName" : {"Ref": "WorkerUser"}
-      }
-    },
 
     "InstanceSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
@@ -94,31 +80,35 @@
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
         "KeyName" : { "Ref" : "KeyName" },
+        "ImageId" : { "Fn::FindInMap" : [
+          "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
+          "Arch" ] } ] },
         "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
         "InstanceType" : { "Ref" : "InstanceType" },
         "UserData": { "Fn::Base64" : { "Fn::Join" : ["", [
           "#!/bin/bash\n",
-          "yum update -y aws-cfn-bootstrap\n",
-          "# Install the Worker application\n",
-          "/opt/aws/bin/cfn-init ",
-          "         --stack ", { "Ref" : "AWS::StackName" },
-          "         --resource LaunchConfig ",
-          "         --region ", { "Ref" : "AWS::Region" }, "\n"
+          "echo alive > /tmp/fflog\n",
+          "export AWS_ACCESS_KEY_ID=", { "Ref" : "AWSAccessKey" }, "\n",
+          "export AWS_SECRET_ACCESS_KEY=", { "Ref" : "AWSSecretKey" }, "\n",
+          "echo set aws keys >> /tmp/fflog\n",
+          "wget https://s3.amazonaws.com/aws-cli/awscli-bundle.zip\n",
+          "echo downloaded bundle >> /tmp/fflog\n",
+          "unzip awscli-bundle.zip\n",
+          "echo unzipped bundle >> /tmp/fflog\n",
+          "./awscli-bundle/install -b ~/bin/aws\n",
+          "echo installed bundle >> /tmp/fflog\n",
+          "aws s3 cp s3://balihoo.dev.fulfillment/fulfillment-1404748376.tar.gz .\n",
+          "echo downloaded ff app >> /tmp/fflog\n",
+          "mkdir -p /opt/balihoo\n",
+          "echo created opt dir >> /tmp/fflog\n",
+          "mv installtmp /opt/balihoo/fulfillment\n",
+          "echo moved app >> /tmp/fflog\n",
+          "mkdir /opt/balihoo/fulfillment/logs\n",
+          "echo created logs dir >> /tmp/fflog\n",
+          "nohup ./opt/balihoo/fulfillment/launch_fulfillment > /opt/balihoo/fulfillment/logs/launch 2>&1 &\n",
+          "echo started app >> /tmp/fflog\n"
         ]]}}
-      },
-      "Metadata" : {
-        "Comment" : "Install the fulfillment app",
-        "AWS::CloudFormation::Init": {
-          "config" : {
-            "commands": {
-              "test" : {
-                  "command" : "echo \"$CFNTEST\" > test.txt",
-                  "env" : { "CFNTEST" : "I come from config1." },
-                  "cwd" : "~"
-              }
-            }
-          }
-        }
       }
     },
 
