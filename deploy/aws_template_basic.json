@@ -98,7 +98,7 @@
           "echo downloaded bundle >> /tmp/fflog\n",
           "unzip awscli-bundle.zip >> /tmp/fflog 2>&1\n",
           "echo unzipped bundle >> /tmp/fflog\n",
-          "./awscli-bundle/install -b ~/bin/aws >> /tmp/fflog 2>&1\n",
+          "./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws >> /tmp/fflog 2>&1\n",
           "echo installed bundle >> /tmp/fflog\n",
           "aws s3 cp s3://balihoo.dev.fulfillment/fulfillment-1404748376.tar.gz . >> /tmp/fflog 2>&1\n",
           "echo downloaded ff app >> /tmp/fflog\n",
