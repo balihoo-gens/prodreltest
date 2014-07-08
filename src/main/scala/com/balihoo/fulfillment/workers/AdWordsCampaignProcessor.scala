@@ -208,8 +208,8 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       param match {
         case "status" =>
           campaign.setStatus(CampaignStatus.fromString(value))
-        case "startDate" =>
-          campaign.setStartDate(value)
+//        case "startDate" =>
+//          campaign.setStartDate(value)
         case "endDate" =>
           campaign.setEndDate(value)
         case "targetzips" =>

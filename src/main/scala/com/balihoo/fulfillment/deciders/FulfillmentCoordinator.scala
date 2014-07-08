@@ -182,10 +182,13 @@ class FulfillmentSection(sectionName: String
   }
 
   override def toString = {
-    s"""
-      |$name $status
+    var paramString = "\n"
+    for((k, s) <- params) {
+      paramString += s"\t\t$k -> $s\n"
+    }
+    s"""$name $status
       |  Action: $action
-      |  Params: $params
+      |  Params: $paramString
       |  Prereqs: $prereqs
       |  Notes: $notes
       |  Value: $value
@@ -299,10 +302,8 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   val registry = collection.mutable.Map[java.lang.Long, String]()
   val map = collection.mutable.Map[String, FulfillmentSection]()
-  var notes: mutable.MutableList[String] = mutable.MutableList[String]()
+  var notes = mutable.MutableList[String]()
   val timers = collection.mutable.Map[String, String]()
-
-  notes += s"Processing ${history.last.getEventType}..."
 
   try {
     for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
@@ -518,7 +519,9 @@ class SectionReference(referencedSections:JsArray) {
         // let the next section have a try
         referencedSection.status = SectionStatus.INCOMPLETE
         referencedSection.resolveReferences(map) // <-- recurse
-        priorSection.status = SectionStatus.DISMISSED
+        if(priorSection != null) {
+          priorSection.status = SectionStatus.DISMISSED
+        }
       }
       priorSection = referencedSection
     }
@@ -568,20 +571,27 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
     while(true) {
       print(".")
-      val task : DecisionTask = swfAdapter.client.pollForDecisionTask(taskReq)
-      if(task.getTaskToken != null) {
+      try {
+        val task: DecisionTask = swfAdapter.client.pollForDecisionTask(taskReq)
 
-        val decisions = new collection.mutable.MutableList[Decision]()
-        val sections = new SectionMap(task.getEvents)
-        val categorized = new CategorizedSections(sections)
-        makeDecisions(decisions, categorized, sections)
+        if(task.getTaskToken != null) {
 
-        println(sections.notes.mkString("\n"))
+          val sections = new SectionMap(task.getEvents)
+          val categorized = new CategorizedSections(sections)
+          val decisions = makeDecisions(categorized, sections)
 
-        val response:RespondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest
-        response.setTaskToken(task.getTaskToken)
-        response.setDecisions(asJavaCollection(decisions))
-        swfAdapter.client.respondDecisionTaskCompleted(response)
+          println(sections.notes.mkString("\n"))
+
+          val response: RespondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest
+          response.setTaskToken(task.getTaskToken)
+          response.setDecisions(asJavaCollection(decisions))
+          swfAdapter.client.respondDecisionTaskCompleted(response)
+        }
+      } catch {
+        case e:Exception =>
+          println("\n"+e.getMessage)
+        case t:Throwable =>
+          println("\n"+t.getMessage)
       }
     }
   }
@@ -628,13 +638,13 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
   /**
    *
-   * @param decisions Decisions will be added to this list
    * @param categorized The categorized current state of the segments
    * @param sections A Name -> Section mapping helper
    */
-  protected def makeDecisions(decisions: collection.mutable.MutableList[Decision]
-                             ,categorized: CategorizedSections
-                             ,sections: SectionMap): Boolean = {
+  protected def makeDecisions(categorized: CategorizedSections
+                             ,sections: SectionMap): collection.mutable.MutableList[Decision] = {
+
+    val decisions = new collection.mutable.MutableList[Decision]()
 
     var failReasons = mutable.MutableList[String]()
 
@@ -646,7 +656,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
       decision.setDecisionType(DecisionType.CompleteWorkflowExecution)
       decisions += decision
       sections.notes += "Workflow Complete!!!"
-      return false
+      return decisions
 
     }
 
@@ -707,7 +717,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
       sections.notes += "FAILING!! "+details
 
-      return true
+      return decisions
     }
 
     for(section <- categorized.ready) {
@@ -733,7 +743,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
       decision.setScheduleActivityTaskDecisionAttributes(attribs)
       decisions += decision
 
-      sections.notes += s"Scheduling work for ${section.name}"
+      sections.notes += "Scheduling work for: "+section.toString
     }
 
     if(decisions.length == 0 && !categorized.hasPendingSections) {
@@ -743,6 +753,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
       decision.setDecisionType(DecisionType.FailWorkflowExecution)
       val attribs = new FailWorkflowExecutionDecisionAttributes
 
+      sections.notes += "Workflow FAILED:"
       if(categorized.blocked.length > 0) {
         var details: String = "Blocked Sections:"
         for(section <- categorized.blocked) {
@@ -751,6 +762,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
         attribs.setReason("There are blocked sections and nothing is in progress!")
         attribs.setDetails(details)
+        sections.notes += details
       } else {
 
         var details: String = "Sections:"
@@ -768,7 +780,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
     }
 
-    decisions.length == 0
+    decisions
   }
 }
 
