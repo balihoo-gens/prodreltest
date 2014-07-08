@@ -33,8 +33,8 @@ class AdWordsCampaignProcessor(swfAdapter: SWFAdapter,
         throw rateExceeded
       case exception: Exception =>
         throw exception
-      case _: Throwable =>
-        println(s"Caught a throwable!")
+      case throwable: Throwable =>
+        throw new Exception(throwable.getMessage)
     }
   }
 }
@@ -208,8 +208,8 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       param match {
         case "status" =>
           campaign.setStatus(CampaignStatus.fromString(value))
-        case "startDate" =>
-          campaign.setStartDate(value)
+//        case "startDate" =>
+//          campaign.setStartDate(value)
         case "endDate" =>
           campaign.setEndDate(value)
         case "targetzips" =>
@@ -227,6 +227,25 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     adwords.withErrorsHandled[Campaign](context, {
       adwords.campaignService.mutate(Array(operation)).getValue(0)
     })
+  }
+
+  /**
+   * This function is the result of the unfortunate fact that you can't (or at least I couldn't figure out)
+   * filter by CountryCode = 'US' as you'd expect.
+   * Details here: https://developers.google.com/adwords/api/docs/appendix/selectorfields#v201402-LocationCriterionService
+   * @param locations Array[LocationCriterion]
+   * @return
+   */
+  def ensureLocationsInUnitedStates(locations:Array[LocationCriterion]) : Array[LocationCriterion] = {
+    val ret = new mutable.MutableList[LocationCriterion]()
+    for(loc <- locations) {
+      for(ploc <- loc.getLocation.getParentLocations) {
+        if(ploc.getLocationName == "United States") {
+          ret += loc
+        }
+      }
+    }
+    ret.toArray
   }
 
   def setTargetZips(campaign:Campaign, zipString:String) = {
@@ -273,7 +292,7 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .build()
 
     // Make the get request.
-    val locationCriteria = adwords.locationService.get(selector)
+    val locationCriteria = ensureLocationsInUnitedStates(adwords.locationService.get(selector))
     for(loc <- locationCriteria) {
       val campaignCriterion = new CampaignCriterion()
       campaignCriterion.setCampaignId(campaign.getId)
@@ -448,3 +467,40 @@ object test_adwordsSchedule {
   }
 }
 
+object test_adwordsZipsByCountry {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, "adwords")
+    val adwords = new AdWordsAdapter(config)
+
+    val zipString = "55411,55450" // These match Minnesota AND the Deutschland!
+    val selector = new SelectorBuilder()
+      .fields(
+        "Id",
+        "LocationName",
+        "CanonicalName",
+        "DisplayType",
+        "ParentLocations",
+        "Reach",
+        "CountryCode",
+        "TargetingStatus")
+      .in("LocationName", zipString.split(","): _*) // Evil scala magic to splat a tuple into a Java variadic
+      // Set the locale of the returned location names.
+      .equals("Locale", "en")
+      .build()
+
+    // Make the get request.
+    val locationCriteria = adwords.locationService.get(selector)
+    for(loc <- locationCriteria) {
+      for(ploc <- loc.getLocation.getParentLocations) {
+        println("--"+ploc.getLocationName)
+      }
+      println(loc.getLocation.getLocationName)
+      println(loc.getLocation.getDisplayType)
+      println(loc.getCanonicalName)
+      println(loc.getCountryCode)
+      println(loc.getSearchTerm)
+      println("------------------")
+    }
+
+  }
+}

@@ -4,6 +4,7 @@ import com.balihoo.fulfillment._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm.Operator
+import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
 
 class AdWordsAccountCreator(swfAdapter: SWFAdapter,
@@ -15,7 +16,7 @@ class AdWordsAccountCreator(swfAdapter: SWFAdapter,
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(creator.lookupParentAccount(params.getRequiredParameter("parent")))
+      adwordsAdapter.setClientId(creator.lookupParentAccount(params))
 
       val account = creator.getAccount(params) match {
         case account:ManagedCustomer => account
@@ -30,8 +31,8 @@ class AdWordsAccountCreator(swfAdapter: SWFAdapter,
         throw rateExceeded
       case exception: Exception =>
         throw exception
-      case _: Throwable =>
-        println(s"Caught a throwable!")
+      case throwable: Throwable =>
+        throw new Exception(throwable.getMessage)
     }
   }
 }
@@ -39,6 +40,19 @@ class AdWordsAccountCreator(swfAdapter: SWFAdapter,
 class AccountCreator(adwords:AdWordsAdapter) {
 
   var brandAccountCache = collection.mutable.Map[String, String]()
+
+  def getManagerAccount(params:ActivityParameters):ManagedCustomer = {
+    val parent = params.getRequiredParameter("parent")
+    val context = s"getManagerAccount(parent='$parent')"
+
+    val selector = new SelectorBuilder()
+      .fields("CustomerId", "Name", "CanManageClients")
+      .equals("Name", parent)
+      .equals("CanManageClients", "true")
+      .build()
+
+    _getAccount(selector, parent, context)
+  }
 
   def getAccount(params:ActivityParameters):ManagedCustomer = {
     val name = params.getRequiredParameter("name")
@@ -48,6 +62,11 @@ class AccountCreator(adwords:AdWordsAdapter) {
       .fields("CustomerId")
       .equals("Name", name)
       .build()
+
+    _getAccount(selector, name, context)
+  }
+
+  protected def _getAccount(selector:Selector, name:String, context:String):ManagedCustomer = {
 
     adwords.withErrorsHandled[ManagedCustomer](context, {
       val page = adwords.managedCustomerService.get(selector)
@@ -80,20 +99,19 @@ class AccountCreator(adwords:AdWordsAdapter) {
     })
   }
 
-  def lookupParentAccount(brandKey:String):String = {
-    val params = new ActivityParameters( s"""{ "name" : "$brandKey" }""")
-
-    brandAccountCache.contains(brandKey) match {
+  def lookupParentAccount(params:ActivityParameters):String = {
+    val parentName = params.getRequiredParameter("parent")
+    brandAccountCache.contains(parentName) match {
       case true =>
-        brandAccountCache(brandKey)
+        brandAccountCache(parentName)
       case false =>
         adwords.setClientId(adwords.baseAccountId)
-        getAccount(params) match {
+        getManagerAccount(params) match {
           case existing: ManagedCustomer =>
-            brandAccountCache += (brandKey -> String.valueOf(existing.getCustomerId))
+            brandAccountCache += (parentName -> String.valueOf(existing.getCustomerId))
             String.valueOf(existing.getCustomerId)
           case _ =>
-            throw new Exception(s"No brand account with name '$brandKey' was found!")
+            throw new Exception(s"No brand account with name '$parentName' was found!")
         }
     }
   }
@@ -126,6 +144,33 @@ object test_adwordsGetSubaccounts {
       println(m.getCustomerId)
       println(m.getName)
     }
+
+  }
+}
+
+object test_adwordsGetAccounts {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, "adwords")
+    val adwords = new AdWordsAdapter(config)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId(adwords.baseAccountId) // Dogtopia
+    val creator = new AccountCreator(adwords)
+
+    val accountParams =
+      s"""{
+       "parent" : "brand-demo"
+      }"""
+
+    val m:ManagedCustomer = creator.getManagerAccount(new ActivityParameters(accountParams))
+
+//    for((m:ManagedCustomer) <- page.getEntries) {
+      println(m.getCustomerId)
+      println(m.getName)
+      println(m.getCompanyName)
+      println(m.getCurrencyCode)
+      println(m.getCanManageClients)
+//    }
 
   }
 }

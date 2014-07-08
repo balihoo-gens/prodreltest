@@ -8,7 +8,6 @@ import play.api.libs.json._
 import org.junit.runner._
 
 import scala.language.implicitConversions
-import scala.collection.convert.wrapAsScala._
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
 import com.amazonaws.services.simpleworkflow.model._
@@ -281,7 +280,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.map.size mustEqual 3
 
-      map.notes(1) mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+      map.notes(0) mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }
   }
 }
