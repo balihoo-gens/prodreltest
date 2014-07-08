@@ -50,7 +50,7 @@
     "FFAppTarBall" : {
       "Description" : "name of the fulfillment app tarball in s3",
       "Type" : "String",
-      "Default" : "fulfillment-1404748376.tar.gz"
+      "Default" : "fulfillment-1404859639.tar.gz"
     }
   },
 
@@ -147,7 +147,7 @@
             "        if [ -d logs ]\n",
             "        then\n",
             "          echo created logs dir >> \\${LOGFILE}\n",
-            "          nohup ./launch_fulfillment > logs/launch.log 2>&1 &\n",
+            "          nohup ./launch_fulfillment fulfillment.jar > logs/launch.log 2>&1 &\n",
             "          PID=\\$!\n",
             "          #this kill does not kill, just tests the pid\n",
             "          if \\$(kill -s 0 \\$PID)\n",
