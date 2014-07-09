@@ -33,19 +33,16 @@ object SectionStatus extends Enumeration {
 
 }
 
-class ActionParams(max:Int, delay:Int) {
-  var maxRetries:Int = max
-  var delaySeconds:Int = delay
+class ActionParams(var maxRetries:Int, var delaySeconds:Int) {
 }
 
-class FulfillmentSection(sectionName: String
+class FulfillmentSection(val name: String
                          ,jsonNode: JsObject) {
 
-  var name = sectionName
   var action: ActivityType = null
-  val params: collection.mutable.Map[String, Any] = collection.mutable.Map[String, Any]()
-  var prereqs: mutable.MutableList[String] = mutable.MutableList[String]()
-  var notes: mutable.MutableList[String] = mutable.MutableList[String]()
+  val params = collection.mutable.Map[String, Any]()
+  val prereqs = mutable.MutableList[String]()
+  val notes = mutable.MutableList[String]()
   var value: String = ""
 
   var status = SectionStatus.INCOMPLETE
@@ -56,9 +53,9 @@ class FulfillmentSection(sectionName: String
   var canceledCount: Int = 0
   var failedCount: Int = 0
 
-  var failureParams = new ActionParams(0, 0)
-  var timeoutParams = new ActionParams(0, 0)
-  var cancelationParams = new ActionParams(0, 0)
+  val failureParams = new ActionParams(0, 0)
+  val timeoutParams = new ActionParams(0, 0)
+  val cancelationParams = new ActionParams(0, 0)
 
   var startToCloseTimeout = ""
   var scheduleToStartTimeout = ""
@@ -106,9 +103,9 @@ class FulfillmentSection(sectionName: String
         for((jk, jv) <- jparams.fields) {
           jv match {
             case jArr: JsArray =>
-              params += (jk -> new SectionReference(jArr))
+              params(jk) = new SectionReference(jArr.as[List[String]])
             case jStr: JsString =>
-              params += (jk -> jv.as[String])
+              params(jk) = jv.as[String]
             case _ =>
               notes += s"Parameter $jv of type ${jv.getClass.toString} for param $jk is not understood!"
           }
@@ -116,9 +113,7 @@ class FulfillmentSection(sectionName: String
 
       case "prereqs" =>
         val jprereqs = value.as[JsArray]
-        for(element <- jprereqs.as[List[String]]) {
-          prereqs += element
-        }
+        prereqs ++= jprereqs.as[List[String]]
 
       case "status" =>
         status = SectionStatus.withName(value.as[String])
@@ -182,10 +177,7 @@ class FulfillmentSection(sectionName: String
   }
 
   override def toString = {
-    var paramString = "\n"
-    for((k, s) <- params) {
-      paramString += s"\t\t$k -> $s\n"
-    }
+    val paramString = "\n"+ (for((k, s) <- params) yield s"\t$k -> $s\n" ).mkString("\n")
     s"""$name $status
       |  Action: $action
       |  Params: $paramString
@@ -201,18 +193,18 @@ class FulfillmentSection(sectionName: String
  * @param sections SectionMap
  */
 class CategorizedSections(sections: SectionMap) {
-  var complete = mutable.MutableList[FulfillmentSection]()
-  var inprogress = mutable.MutableList[FulfillmentSection]()
-  var timedout = mutable.MutableList[FulfillmentSection]()
-  var deferred = mutable.MutableList[FulfillmentSection]()
-  var blocked = mutable.MutableList[FulfillmentSection]()
-  var failed = mutable.MutableList[FulfillmentSection]()
-  var canceled = mutable.MutableList[FulfillmentSection]()
-  var contingent = mutable.MutableList[FulfillmentSection]()
-  var dismissed = mutable.MutableList[FulfillmentSection]()
-  var terminal = mutable.MutableList[FulfillmentSection]()
-  var ready = mutable.MutableList[FulfillmentSection]()
-  var impossible = mutable.MutableList[FulfillmentSection]()
+  val complete = mutable.MutableList[FulfillmentSection]()
+  val inprogress = mutable.MutableList[FulfillmentSection]()
+  val timedout = mutable.MutableList[FulfillmentSection]()
+  val deferred = mutable.MutableList[FulfillmentSection]()
+  val blocked = mutable.MutableList[FulfillmentSection]()
+  val failed = mutable.MutableList[FulfillmentSection]()
+  val canceled = mutable.MutableList[FulfillmentSection]()
+  val contingent = mutable.MutableList[FulfillmentSection]()
+  val dismissed = mutable.MutableList[FulfillmentSection]()
+  val terminal = mutable.MutableList[FulfillmentSection]()
+  val ready = mutable.MutableList[FulfillmentSection]()
+  val impossible = mutable.MutableList[FulfillmentSection]()
 
   for((name, section) <- sections.map) {
     section.status match {
@@ -302,7 +294,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   val registry = collection.mutable.Map[java.lang.Long, String]()
   val map = collection.mutable.Map[String, FulfillmentSection]()
-  var notes = mutable.MutableList[String]()
+  val notes = mutable.MutableList[String]()
   val timers = collection.mutable.Map[String, String]()
 
   try {
@@ -494,20 +486,13 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   }
 
   override def toString = {
-    var out = ""
-    for((k, s) <- map) {
-      out += s"$k\t\t${s.status.toString}\n"
-    }
-    out
+    (for((k, s) <- map) yield s"$k\t${s.status.toString}").mkString("\n")
   }
+
 
 }
 
-class SectionReference(referencedSections:JsArray) {
-  var sections = mutable.MutableList[String]()
-  for(sectionName <- referencedSections.as[List[String]]) {
-    sections += sectionName
-  }
+class SectionReference(val sections:List[String]) {
 
   def processReferences(map:SectionMap) = {
     var priorSection:FulfillmentSection = null
@@ -588,6 +573,8 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
           swfAdapter.client.respondDecisionTaskCompleted(response)
         }
       } catch {
+        case se:java.net.SocketException =>
+          // these happen.. no biggie.
         case e:Exception =>
           println("\n"+e.getMessage)
         case t:Throwable =>
@@ -599,14 +586,14 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
   protected def gatherParameters(section: FulfillmentSection
                                 ,sections: SectionMap) = {
 
-    var params = collection.mutable.Map[String, String]()
+    val params = collection.mutable.Map[String, String]()
 
     for((name, value) <- section.params) {
       value match {
         case sectionReference: SectionReference =>
-          params += (name -> sectionReference.getValue(sections))
+          params(name) = sectionReference.getValue(sections)
         case v: String =>
-          params += (name -> v)
+          params(name) = v
         case _ =>
           sections.notes += s"Parameter $name doesn't have a recognizable value $value"
       }
@@ -621,10 +608,10 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
     val decision: Decision = new Decision
     decision.setDecisionType(DecisionType.StartTimer)
 
-    var timerParams = collection.mutable.Map[String, String]()
-    timerParams += ("section" -> name)
-    timerParams += ("status" -> status)
-    timerParams += ("reason" -> reason)
+    val timerParams = collection.mutable.Map[String, String]()
+    timerParams("section") = name
+    timerParams("status") = status
+    timerParams("reason") = reason
 
     val attribs: StartTimerDecisionAttributes = new StartTimerDecisionAttributes
     attribs.setTimerId(randomUUID().toString)
@@ -646,7 +633,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
     val decisions = new collection.mutable.MutableList[Decision]()
 
-    var failReasons = mutable.MutableList[String]()
+    val failReasons = mutable.MutableList[String]()
 
     sections.notes += sections.toString
 
@@ -743,7 +730,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
       decision.setScheduleActivityTaskDecisionAttributes(attribs)
       decisions += decision
 
-      sections.notes += "Scheduling work for: "+section.toString
+      sections.notes += "Scheduling work for: \n\t"+section.toString
     }
 
     if(decisions.length == 0 && !categorized.hasPendingSections) {
@@ -772,6 +759,7 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
         attribs.setReason("FAILING because progress can't be made!")
         attribs.setDetails(details)
+        sections.notes += details
       }
 
       decision.setFailWorkflowExecutionDecisionAttributes(attribs)

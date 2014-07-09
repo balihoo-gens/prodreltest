@@ -85,8 +85,8 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
     } catch {
       case exception:Exception =>
         failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
-      case _:Throwable =>
-        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
+      case t:Throwable =>
+        failTask(s"""{"$name": "Caught a Throwable"}""", t.getMessage)
     }
   }
 
