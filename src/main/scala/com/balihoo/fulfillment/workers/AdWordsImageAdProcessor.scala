@@ -16,13 +16,13 @@ class AdWordsImageAdProcessor(swfAdapter: SWFAdapter,
 
       val creator = new AdCreator(adwordsAdapter)
 
-      val imageAd = creator.getImageAd(params) match {
-        case ad:ImageAd =>
+      val aga = creator.getImageAd(params) match {
+        case ad:AdGroupAd =>
           creator.updateImageAd(ad, params)
         case _ =>
           creator.createImageAd(params)
       }
-      completeTask(String.valueOf(imageAd.getId))
+      completeTask(String.valueOf(aga.getAd.getId))
 
     } catch {
       case rateExceeded: RateExceededException =>
@@ -31,37 +31,37 @@ class AdWordsImageAdProcessor(swfAdapter: SWFAdapter,
         throw rateExceeded
       case exception: Exception =>
         throw exception
-      case _: Throwable =>
-        println(s"Caught a throwable!")
+      case throwable: Throwable =>
+        throw new Exception(throwable.getMessage)
     }
   }
 }
 
 class AdCreator(adwords:AdWordsAdapter) {
 
-  def getImageAd(params: ActivityParameters): ImageAd = {
+  def getImageAd(params: ActivityParameters): AdGroupAd = {
 
     val name = params.getRequiredParameter("name")
     val adGroupId = params.getRequiredParameter("adGroupId")
     val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
 
     val selector = new SelectorBuilder()
-      .fields("Id")
+      .fields("Id", "Url", "DisplayUrl", "Status")
       .equals("ImageCreativeName", name)
       .equals("AdGroupId", adGroupId)
       .build()
 
-    adwords.withErrorsHandled[ImageAd](context, {
+    adwords.withErrorsHandled[AdGroupAd](context, {
       val page = adwords.adGroupAdService.get(selector)
       page.getTotalNumEntries.intValue() match {
         case 0 => null
-        case 1 => page.getEntries(0).getAd.asInstanceOf[ImageAd]
+        case 1 => page.getEntries(0)
         case _ => throw new Exception(s"imageAd name $name is ambiguous in adGroup '$adGroupId'")
       }
     })
   }
 
-  def createImageAd(params:ActivityParameters): ImageAd = {
+  def createImageAd(params:ActivityParameters): AdGroupAd = {
 
     val name = params.getRequiredParameter("name")
     val url = params.getRequiredParameter("url")
@@ -90,40 +90,32 @@ class AdCreator(adwords:AdWordsAdapter) {
     operation.setOperand(aga)
     operation.setOperator(Operator.ADD)
 
-    adwords.withErrorsHandled[ImageAd](context, {
-      adwords.adGroupAdService.mutate(Array(operation)).getValue(0).getAd.asInstanceOf[ImageAd]
+    adwords.withErrorsHandled[AdGroupAd](context, {
+      adwords.adGroupAdService.mutate(Array(operation)).getValue(0)
     })
   }
 
 
-  def updateImageAd(ad:ImageAd, params:ActivityParameters): ImageAd = {
+  def updateImageAd(aga:AdGroupAd, params:ActivityParameters): AdGroupAd = {
 
     val name = params.getRequiredParameter("name")
     val adGroupId = params.getRequiredParameter("adGroupId")
 
     val context = s"updateImageAd(name='$name', adGroupId='$adGroupId', params='$params')"
 
-    for((param, value) <- params.params) {
-      param match {
-        case "url" =>
-          ad.setUrl(value)
-        case "displayUrl" =>
-          ad.setDisplayUrl(value)
-        case _ =>
-      }
-    }
+    val gad = new Ad()
+    gad.setId(aga.getAd.getId)
 
-    val aga = new AdGroupAd()
-    aga.setAd(ad)
-    aga.setAdGroupId(adGroupId.toLong)
-
+    aga.setAd(gad)
     val operation = new AdGroupAdOperation()
     operation.setOperand(aga)
-    operation.setOperator(Operator.SET)
+    operation.setOperator(Operator.REMOVE)
 
-    adwords.withErrorsHandled[ImageAd](context, {
-      adwords.adGroupAdService.mutate(Array(operation)).getValue(0).getAd.asInstanceOf[ImageAd]
+    adwords.withErrorsHandled[AdGroupAd](context, {
+      adwords.adGroupAdService.mutate(Array(operation)).getValue(0)
     })
+
+    createImageAd(params)
   }
 }
 
@@ -151,7 +143,7 @@ object test_adwordsGetAdGroupImageAd {
     adwords.setClientId("100-019-2687")
 
     val campaignParams =
-      s"""{
+      """{
        "name" : "fulfillment Campaign",
         "channel" : "DISPLAY"
       }"""
@@ -210,6 +202,47 @@ object test_adwordsAdGroupImageAd {
       }"""
 
     adcreator.createImageAd(new ActivityParameters(imageAdParams))
+
+  }
+}
+
+object test_adwordsUpdateAdGroupImageAd {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, "adwords")
+    val adwords = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adwords)
+    val acreator = new AdGroupCreator(adwords)
+    val adcreator = new AdCreator(adwords)
+
+    adwords.setValidateOnly(false)
+    adwords.setClientId("100-019-2687")
+
+    val campaignParams =
+      s"""{
+       "name" : "fulfillment Campaign",
+        "channel" : "DISPLAY"
+      }"""
+    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
+    val adgroupParams =
+      s"""{
+       "name" : "GROUP A",
+        "campaignId" : "${campaign.getId}"
+      }"""
+
+    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
+
+    val imageAdParams =
+      s"""{
+       "name" : "Another Nature",
+        "adGroupId" : "${adgroup.getId}",
+        "url" : "http://balihoo.com",
+        "displayUrl" :    "http://balihoo.com",
+        "imageUrl" : "http://lorempixel.com/300/100/nature/"
+      }"""
+
+    val ad = adcreator.getImageAd(new ActivityParameters(imageAdParams))
+
+    adcreator.updateImageAd(ad, new ActivityParameters(imageAdParams))
 
   }
 }

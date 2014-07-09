@@ -56,15 +56,22 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
       updateStatus("Polling")
       task = new ActivityTask
-      task = swfAdapter.client.pollForActivityTask(taskReq)
-      if(task.getTaskToken != null) {
-        updateStatus("Processing task..")
-        try {
-          handleTask(new ActivityParameters(task.getInput))
-        } catch {
-          case e:Exception =>
-            failTask("Exception", e.getMessage)
+      try {
+        task = swfAdapter.client.pollForActivityTask(taskReq)
+        if(task.getTaskToken != null) {
+          updateStatus("Processing task..")
+          try {
+            handleTask(new ActivityParameters(task.getInput))
+          } catch {
+            case e: Exception =>
+              failTask("Exception", e.getMessage)
+          }
         }
+      } catch {
+        case e:Exception =>
+          println("\n"+e.getMessage)
+        case t:Throwable =>
+          println("\n"+t.getMessage)
       }
     }
   }
@@ -78,8 +85,8 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
     } catch {
       case exception:Exception =>
         failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
-      case _:Throwable =>
-        failTask(s"""{"$name": "Caught a Throwable""", "caught a throwable")
+      case t:Throwable =>
+        failTask(s"""{"$name": "Caught a Throwable"}""", t.getMessage)
     }
   }
 

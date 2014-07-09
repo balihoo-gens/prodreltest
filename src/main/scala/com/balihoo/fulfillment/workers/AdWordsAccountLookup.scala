@@ -13,7 +13,7 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(creator.lookupParentAccount(params.getRequiredParameter("parent")))
+      adwordsAdapter.setClientId(creator.lookupParentAccount(params))
 
       val aname = params.getRequiredParameter("name")
       creator.getAccount(params) match {
@@ -29,8 +29,8 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
         throw rateExceeded
       case exception: Exception =>
         throw exception
-      case _: Throwable =>
-        println(s"Caught a throwable!")
+      case throwable: Throwable =>
+        throw new Exception(throwable.getMessage)
     }
   }
 
