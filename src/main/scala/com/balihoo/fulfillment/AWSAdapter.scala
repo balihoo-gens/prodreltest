@@ -6,10 +6,7 @@ import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentialsProvider}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.regions.{Regions, Region}
 
-class SWFAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonSimpleWorkflowAsyncClient](loader) {
-}
-
-class OldSWFAdapter(loader: PropertiesLoader) {
+abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassManifest](loader: PropertiesLoader) {
   val config = loader
   private val accessKey: String = config.getString("aws.accessKey")
   private val secretKey = config.getString("aws.secretKey")
@@ -27,12 +24,15 @@ class OldSWFAdapter(loader: PropertiesLoader) {
     }
   )
 
-  val client = region.createClient(
-    classOf[AmazonSimpleWorkflowAsyncClient],
+  def whichClass = classManifest[T].erasure.asInstanceOf[Class[_ <: com.amazonaws.AmazonWebServiceClient]]
+  val clientType: Class[_ <: com.amazonaws.AmazonWebServiceClient] = whichClass
+
+  val client:T = region.createClient(
+    clientType,
     new AWSCredentialsProvider() {
       def getCredentials = credentials
       def refresh() {}
     },
     new ClientConfiguration()
-  )
+  ).asInstanceOf[T]
 }
