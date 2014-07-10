@@ -4,20 +4,11 @@ import com.amazonaws.{AmazonClientException, AmazonServiceException}
 
 import scala.collection.JavaConversions._
 
-import com.amazonaws.auth.BasicAWSCredentials
+import com.balihoo.fulfillment.config.PropertiesLoader
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
 import com.amazonaws.services.dynamodbv2.model.{PutItemRequest, AttributeValue}
-import com.balihoo.fulfillment.config.PropertiesLoader
 
-class DynamoAdapter(loader: PropertiesLoader) {
-  private val accessKey: String = loader.getString("aws.accessKey")
-  private val secretKey = loader.getString("aws.secretKey")
-
-  private val credentials = new BasicAWSCredentials(accessKey, secretKey)
-  val client = new AmazonDynamoDBAsyncClient(credentials)
-
-  val config = loader
-
+class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBAsyncClient](loader) {
   def putItem(item:DynamoItem) = {
     try {
       client.putItemAsync(item.makeRequest())
