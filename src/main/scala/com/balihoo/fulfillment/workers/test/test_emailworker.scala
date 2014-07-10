@@ -1,11 +1,21 @@
 package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.config.PropertiesLoader
-import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter, SESAdapter}
+import com.balihoo.fulfillment.{
+  DynamoAdapter,
+  SWFAdapter,
+  SESAdapter
+}
+import com.amazonaws.services.simpleworkflow.model.{
+  StartWorkflowExecutionRequest,
+  TaskList,
+  WorkflowType
+}
+import scala.io.Source
 
 object test_emailworker {
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val config = PropertiesLoader(args, "sendemailworker")
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
 
     def usage() = {
@@ -19,7 +29,7 @@ object test_emailworker {
         new DynamoAdapter(config),
         new SESAdapter(config)
       )
-       println("enter the address to verify")
+      println("enter the address to verify")
       val address = readLine("verifyemail> ")
       worker.verifyAddress(address)
       println("check the email address and click the link to complete verification")
@@ -64,7 +74,29 @@ object test_emailworker {
       println(s"$res\nsent to $recipients")
     }
 
-    def submitTask()
+    def submitTask() = {
+      val swf = new SWFAdapter(config)
+      println("enter the json input filename")
+      val inputfile = readLine("inputfile> ")
+      val input = Source.fromFile(inputfile).mkString
+      swf.client.startWorkflowExecution(
+        new StartWorkflowExecutionRequest()
+          .withDomain(swf.domain)
+          .withWorkflowId("test_emailworker")
+          .withInput(input)
+          .withExecutionStartToCloseTimeout("1600")
+          .withTaskList(
+            new TaskList()
+              .withName("default_tasks")
+          )
+          .withWorkflowType(
+            new WorkflowType()
+              .withName("emailtest")
+              .withVersion("1")
+          )
+      )
+    }
+
     options("h") = ("Display Help", usage _)
     options("v") = ("Verify Email Address", verifyAddress _)
     options("s") = ("Send Email", sendEmail _)
