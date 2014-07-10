@@ -4,7 +4,6 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 
 import com.balihoo.fulfillment.config.PropertiesLoader
-import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClient
 import com.amazonaws.services.simpleemail.model.{
   VerifyEmailIdentityRequest,
@@ -16,14 +15,7 @@ import com.amazonaws.services.simpleemail.model.{
   Content
 }
 
-class SESAdapter(loader: PropertiesLoader) {
-  private val accessKey: String = loader.getString("aws.accessKey")
-  private val secretKey = loader.getString("aws.secretKey")
-
-  private val credentials = new BasicAWSCredentials(accessKey, secretKey)
-  val client = new AmazonSimpleEmailServiceAsyncClient(credentials)
-
-  val config = loader
+class SESAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonSimpleEmailServiceAsyncClient](loader) {
 
   def verifyEmailAddress(address: String): String  = {
     val request = new VerifyEmailIdentityRequest()

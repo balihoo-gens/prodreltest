@@ -5,8 +5,9 @@ import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentialsProvider}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.regions.{Regions, Region}
+import scala.reflect.{ClassTag, classTag}
 
-abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassManifest](loader: PropertiesLoader) {
+abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag](loader: PropertiesLoader) {
   val config = loader
   private val accessKey: String = config.getString("aws.accessKey")
   private val secretKey = config.getString("aws.secretKey")
@@ -24,8 +25,8 @@ abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassManif
     }
   )
 
-  def whichClass = classManifest[T].erasure.asInstanceOf[Class[_ <: com.amazonaws.AmazonWebServiceClient]]
-  val clientType: Class[_ <: com.amazonaws.AmazonWebServiceClient] = whichClass
+  //this type cannot be resolved statically by classOf[T]
+  val clientType = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[_ <: com.amazonaws.AmazonWebServiceClient]]
 
   val client:T = region.createClient(
     clientType,
