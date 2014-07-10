@@ -64,10 +64,12 @@ object test_emailworker {
       println(s"$res\nsent to $recipients")
     }
 
+    def submitTask()
     options("h") = ("Display Help", usage _)
     options("v") = ("Verify Email Address", verifyAddress _)
     options("s") = ("Send Email", sendEmail _)
     options("l") = ("List Verified Email Addresses", listAddresses _)
+    options("t") = ("submit a json email task to the decider", submitTask _)
     options("q") = ("Quit", () => println("bye"))
 
     var choice = "h"
