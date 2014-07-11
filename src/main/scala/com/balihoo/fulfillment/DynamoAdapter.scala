@@ -1,15 +1,20 @@
 package com.balihoo.fulfillment
 
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
 
 import scala.collection.JavaConversions._
 
+import com.amazonaws.auth.BasicAWSCredentials
+import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBClient, AmazonDynamoDBAsyncClient}
+import com.amazonaws.services.dynamodbv2.model._
 import com.balihoo.fulfillment.config.PropertiesLoader
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
-import com.amazonaws.services.dynamodbv2.model.{PutItemRequest, AttributeValue}
 
-class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBAsyncClient](loader) {
-  def putItem(item:DynamoItem) = {
+class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBAsyncClient](loader){
+//  val syncclient = new AmazonDynamoDBClient(credentials)
+  val mapper = new DynamoDBMapper(client)
+
+  def put(item:DynamoItem) = {
     try {
       client.putItemAsync(item.makeRequest())
     } catch {
@@ -21,19 +26,33 @@ class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBA
         println(e.getMessage)
     }
   }
+
+  def update(update:DynamoUpdate) = {
+    try {
+      client.updateItemAsync(update.makeRequest())
+    } catch {
+      case e:AmazonServiceException =>
+        println(e.getMessage)
+      case e:AmazonClientException =>
+        println(e.getMessage)
+      case e:Exception =>
+        println(e.getMessage)
+    }
+  }
+
 }
 
 class DynamoItem(table:String) {
 
-  protected var item = collection.mutable.Map[String, AttributeValue]()
+  protected val item = collection.mutable.Map[String, AttributeValue]()
 
-  def addNumber(key:String, value:String):DynamoItem = {
-    item += (key -> new AttributeValue().withN(value))
+  def addNumber(key: String, value: String): DynamoItem = {
+    item(key) = new AttributeValue().withN(value)
     this
   }
 
-  def addString(key:String, value:String):DynamoItem = {
-    item += (key -> new AttributeValue().withS(value))
+  def addString(key: String, value: String): DynamoItem = {
+    item(key) = new AttributeValue().withS(value)
     this
   }
 
@@ -41,5 +60,32 @@ class DynamoItem(table:String) {
     new PutItemRequest()
       .withTableName(table)
       .withItem(item)
+  }
+}
+
+class DynamoUpdate(table:String) {
+
+  val updateRequest = new UpdateItemRequest()
+    .withTableName(table)
+
+  def forKey(key:String, value:String) = {
+    updateRequest.setKey(Map(key -> new AttributeValue().withS(value)))
+    this
+  }
+
+  def addNumber(key:String, value:String) = {
+    updateRequest.addAttributeUpdatesEntry(key,
+      new AttributeValueUpdate(new AttributeValue().withN(value), AttributeAction.PUT))
+    this
+  }
+
+  def addString(key:String, value:String) = {
+    updateRequest.addAttributeUpdatesEntry(key,
+      new AttributeValueUpdate(new AttributeValue().withS(value), AttributeAction.PUT))
+    this
+  }
+
+  def makeRequest() = {
+    updateRequest
   }
 }

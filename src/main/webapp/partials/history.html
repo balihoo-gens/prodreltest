@@ -1,0 +1,26 @@
+<div class="panel panel-default">
+	<div class="panel-heading">
+		<a class="btn btn-default pull-right" ng-click="getHistory()">GET HISTORY</a>
+		<h1>History</h1>
+	</div>
+	<div class="panel-body">
+		<table class="table table-condensed table-hover" style="width:100%">
+			<tr>
+				<th>Id</th>
+				<th>Tags</th>
+				<th>Close Time</th>
+				<th>Status</th>
+			</tr>
+			<tr ng-repeat="ex in executions">
+				<td> <a ng-click="seeWorkflow(ex)">{{ex.workflowId}}</a>
+					<br/>{{ex.runId}}
+					<br/>
+				</td>
+				<td><div ng-repeat="tag in ex.tagList">{{tag}}</div></td>
+				<td>{{ex.closeTimestamp}}</td>
+				<td>{{ex.closeStatus}}</td>
+			</tr>
+
+		</table>
+	</div>
+</div>

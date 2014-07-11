@@ -37,7 +37,7 @@ class ActionParams(var maxRetries:Int, var delaySeconds:Int) {
 }
 
 class FulfillmentSection(val name: String
-                         ,jsonNode: JsObject) {
+                         ,val jsonNode: JsObject) {
 
   var action: ActivityType = null
   val params = collection.mutable.Map[String, Any]()
