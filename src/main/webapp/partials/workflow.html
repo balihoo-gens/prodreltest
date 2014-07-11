@@ -1,0 +1,27 @@
+<div class="panel panel-default">
+	<div class="panel-heading">
+		<h1>Workflow » {{workflow.workflowId}}</h1>
+	</div>
+	<div class="panel-body">
+		<div ng-repeat="note in workflow.notes">{{note}}</div>
+		<table class="table table-condensed table-striped" style="width:100%;">
+			<tr>
+				<th style="min-width: 120px;">Section</th>
+				<th>Notes</th>
+				<th style="min-width: 120px;">Result</th>
+				<th>Status</th>
+			</tr>
+			<tr ng-repeat="(name, section) in workflow.sections">
+				<td>{{name}}</td>
+				<td>
+					<div ng-repeat="note in section.notes">
+						{{note}}
+					</div>
+				</td>
+				</div>
+				<td>{{section.value}}</td>
+				<td>{{section.status}}</td>
+			</tr>
+		</table>
+	</div>
+</div>

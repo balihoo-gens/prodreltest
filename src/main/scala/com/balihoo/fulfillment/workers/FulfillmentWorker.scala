@@ -6,7 +6,7 @@ import java.util.UUID.randomUUID
 
 import scala.language.implicitConversions
 
-import com.balihoo.fulfillment.{DynamoAdapter, DynamoItem, SWFAdapter}
+import com.balihoo.fulfillment.{DynamoUpdate, DynamoAdapter, DynamoItem, SWFAdapter}
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
@@ -91,24 +91,23 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
   }
 
   def declareWorker() = {
-    dynamoAdapter.putItem(
+    dynamoAdapter.put(
       new DynamoItem("fulfillment_beta_worker")
         .addString("instance", instanceId)
         .addString("domain", domain)
         .addString("activityName", name)
         .addString("activityVersion", version)
-        .addString("when", dateFormat.format(new Date()))
+        .addString("start", dateFormat.format(new Date()))
     )
   }
 
   def updateStatus(status:String) = {
     updateCounter += 1
-    dynamoAdapter.putItem(
-      new DynamoItem("fulfillment_beta_workerstatus")
-        .addString("id", s"${instanceId}_$updateCounter")
-        .addString("instance", instanceId)
+    dynamoAdapter.update(
+      new DynamoUpdate("fulfillment_beta_worker")
+        .forKey("instance", instanceId)
         .addString("status", status)
-        .addString("when", dateFormat.format(new Date()))
+        .addString("last", dateFormat.format(new Date()))
     )
   }
 

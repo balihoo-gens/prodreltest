@@ -804,3 +804,7 @@ footer .container {
 .json {
 	font-family: "Ubuntu Mono", monospace;
 }
+
+.blob {
+	display:inline-block;
+}
