@@ -19,7 +19,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
   dateFormat.setTimeZone(tz)
 
-  val domain = swfAdapter.config.getString("domain")
+  val domain = swfAdapter.domain
   val name = validateSWFIdentifier(swfAdapter.config.getString("name"), 256)
   val version = validateSWFIdentifier(swfAdapter.config.getString("version"), 64)
   val taskListName = validateSWFIdentifier(name+version, 256)

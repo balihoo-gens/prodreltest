@@ -10,16 +10,9 @@ import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBClient, AmazonDynamoDBAs
 import com.amazonaws.services.dynamodbv2.model._
 import com.balihoo.fulfillment.config.PropertiesLoader
 
-class DynamoAdapter(loader: PropertiesLoader) {
-  private val accessKey: String = loader.getString("aws.accessKey")
-  private val secretKey = loader.getString("aws.secretKey")
-
-  private val credentials = new BasicAWSCredentials(accessKey, secretKey)
-  val client = new AmazonDynamoDBAsyncClient(credentials)
-  val syncclient = new AmazonDynamoDBClient(credentials)
-  val mapper = new DynamoDBMapper(syncclient)
-
-  val config = loader
+class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBAsyncClient](loader){
+//  val syncclient = new AmazonDynamoDBClient(credentials)
+  val mapper = new DynamoDBMapper(client)
 
   def put(item:DynamoItem) = {
     try {
