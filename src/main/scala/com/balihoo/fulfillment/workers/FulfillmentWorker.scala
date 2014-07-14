@@ -51,7 +51,10 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
     updateStatus("Starting")
 
-    while(true) {
+    var done = false
+    //use a future to check for a keypress to end the loop
+    future { Console.in.read } map { _ => done = true }
+    while(!done) {
       print(".")
 
       updateStatus("Polling")
