@@ -11,6 +11,9 @@ import com.balihoo.fulfillment.{DynamoUpdate, DynamoAdapter, DynamoItem, SWFAdap
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
 
+import scala.concurrent.{ future, blocking}
+import scala.concurrent.ExecutionContext.Implicits.global
+
 abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter) {
 
   val instanceId = randomUUID().toString
@@ -52,8 +55,13 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
     updateStatus("Starting")
 
     var done = false
+
     //use a future to check for a keypress to end the loop
-    future { Console.in.read } map { _ => done = true }
+    future { blocking { Console.in.read } } map { _ =>
+      updateStatus("Quiting")
+      done = true
+    }
+
     while(!done) {
       print(".")
 
