@@ -5,14 +5,12 @@ import java.util.{Date, TimeZone}
 import java.util.UUID.randomUUID
 
 import scala.language.implicitConversions
+import scala.tools.jline.console.ConsoleReader
 
 import com.balihoo.fulfillment.{DynamoUpdate, DynamoAdapter, DynamoItem, SWFAdapter}
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
-
-import scala.concurrent.{ future, blocking}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter) {
 
@@ -48,27 +46,27 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
   declareWorker()
 
+  def getch(chars: Seq[Char]): Boolean = {
+    val con = new ConsoleReader
+    (con.getInput.available > 0) &&
+      chars.foldLeft(false)( (a,b) =>
+        a || (con.readVirtualKey.toChar == b))
+  }
+
   def work() = {
 
     registerActivityType()
 
     updateStatus("Starting")
 
-    var done = false
-
-    //use a future to check for a keypress to end the loop
-    future { blocking { Console.in.read } } map { _ =>
-      updateStatus("Quiting")
-      done = true
-    }
-
-    while(!done) {
+    while(!getch(Seq('q', 'Q'))) {
       print(".")
 
       updateStatus("Polling")
       task = new ActivityTask
       try {
-        task = swfAdapter.client.pollForActivityTask(taskReq)
+        //task = swfAdapter.client.pollForActivityTask(taskReq)
+        Thread.sleep(100)
         if(task.getTaskToken != null) {
           updateStatus("Processing task..")
           try {
@@ -85,6 +83,8 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
           println("\n"+t.getMessage)
       }
     }
+    println("done")
+    updateStatus("Exiting")
   }
 
   def handleTask(params:ActivityParameters)
