@@ -5,12 +5,12 @@ import java.util.{Date, TimeZone}
 import java.util.UUID.randomUUID
 
 import scala.language.implicitConversions
-import scala.tools.jline.console.ConsoleReader
 
 import com.balihoo.fulfillment.{DynamoUpdate, DynamoAdapter, DynamoItem, SWFAdapter}
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
+import com.balihoo.fulfillment.util.Getch
 
 abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter) {
 
@@ -46,45 +46,43 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
   declareWorker()
 
-  def getch(chars: Seq[Char]): Boolean = {
-    val con = new ConsoleReader
-    (con.getInput.available > 0) &&
-      chars.foldLeft(false)( (a,b) =>
-        a || (con.readVirtualKey.toChar == b))
-  }
-
   def work() = {
 
     registerActivityType()
 
     updateStatus("Starting")
 
-    while(!getch(Seq('q', 'Q'))) {
-      print(".")
+    var done = false
+    val getch = new Getch
+    getch.addMapping(Seq("q", "Q", "Exit"), () => done = true)
 
-      updateStatus("Polling")
-      task = new ActivityTask
-      try {
-        //task = swfAdapter.client.pollForActivityTask(taskReq)
-        Thread.sleep(100)
-        if(task.getTaskToken != null) {
-          updateStatus("Processing task..")
-          try {
-            handleTask(new ActivityParameters(task.getInput))
-          } catch {
-            case e: Exception =>
-              failTask("Exception", e.getMessage)
+    getch.doWith {
+      while(!done) {
+        print(".")
+
+        updateStatus("Polling")
+        task = new ActivityTask
+        try {
+          task = swfAdapter.client.pollForActivityTask(taskReq)
+          if(task.getTaskToken != null) {
+            updateStatus("Processing task..")
+            try {
+              handleTask(new ActivityParameters(task.getInput))
+            } catch {
+              case e: Exception =>
+                failTask("Exception", e.getMessage)
+            }
           }
+        } catch {
+          case e:Exception =>
+            println("\n"+e.getMessage)
+          case t:Throwable =>
+            println("\n"+t.getMessage)
         }
-      } catch {
-        case e:Exception =>
-          println("\n"+e.getMessage)
-        case t:Throwable =>
-          println("\n"+t.getMessage)
       }
     }
-    println("done")
     updateStatus("Exiting")
+    print("Exiting...")
   }
 
   def handleTask(params:ActivityParameters)
