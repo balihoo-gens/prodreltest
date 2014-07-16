@@ -2,25 +2,41 @@
 CURDIR=$(cd $(dirname "$0"); pwd)
 ROOTDIR=$CURDIR/..
 TMPDIR=$ROOTDIR/installtmp
+JARNAME=$CURDIR/../target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar
 
-echo "clean up"
 rm -rf $TMPDIR
 mkdir -p $TMPDIR
 
-echo "create fat jar..."
+echo "creating fat jar..."
 pushd .
 cd $ROOTDIR
 sbt assembly
+RES=$?
 popd
 
-JARNAME=$CURDIR/../target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar
-if [ -e $JARNAME ]
+if [ $RES -eq 0 ]
 then
-  cp -r $ROOTDIR/config $TMPDIR
-  cp $JARNAME $TMPDIR/fulfillment.jar
-  cp $ROOTDIR/launch_fulfillment $TMPDIR
-  chmod a+x $TMPDIR/launch_fulfillment
-  tar -zcf fulfillment-$(date +%s).tar.gz $TMPDIR
+  if [ -e $JARNAME ]
+  then
+    echo "gathering configs"
+    cp -r $ROOTDIR/config $TMPDIR
+    echo "gathering fat jar"
+    cp $JARNAME $TMPDIR/fulfillment.jar
+    echo "gathering launch script"
+    cp $ROOTDIR/launch_fulfillment $TMPDIR
+    echo "setting launch script execute permissions"
+    chmod a+x $TMPDIR/launch_fulfillment
+    TARBALL=fulfillment-$(date +%s).tar.gz
+    echo "creating tarball: ${TARBALL}"
+    tar -zcf ${TARBALL} ${TMPDIR}
+    echo "cleaning up"
+    rm -rf $TMPDIR
+    echo done
+  else
+    echo "fat jar not found: $JARFILE"
+  fi
 else
-  echo "fat jar not found: $JARFILE"
+  echo "failed to create fat jar"
 fi
+
+exit ${RES}
