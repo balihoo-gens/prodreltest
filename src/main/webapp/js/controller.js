@@ -47,7 +47,14 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 		$location.path("workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(execution.runId));
 	};
 
+	$scope.statusMap = {
+		"FAILED" : "label-danger",
+		"COMPLETED" : "label-success"
+	};
 
+	$scope.figureStatusLabel = function(status) {
+		return $scope.statusMap[status];
+	};
 
 });
 
@@ -76,5 +83,24 @@ app.controller('workflowController', function($scope, $route, $http, $location) 
 			.error(function(error) {
 				       toastr.error(error.details, error.error)
 			       });
+	};
+
+	$scope.statusMap = {
+		"INCOMPLETE" : "label-info",
+		"SCHEDULED" : "label-info",
+		"STARTED" : "label-info",
+		"FAILED" : "label-warning",
+		"TIMED OUT" : "label-warning",
+		"CANCELED" : "label-warning",
+		"TERMINAL" : "label-danger",
+		"DISMISSED" : "label-primary",
+		"COMPLETE" : "label-success",
+		"CONTINGENT" : "label-default",
+		"DEFERRED" : "label-info",
+		"IMPOSSIBLE" : "label-danger"
+	};
+
+	$scope.figureStatusLabel = function(status) {
+		return $scope.statusMap[status];
 	};
 });

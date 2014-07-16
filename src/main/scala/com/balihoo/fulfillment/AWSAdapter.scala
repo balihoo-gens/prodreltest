@@ -3,12 +3,10 @@ package com.balihoo.fulfillment
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentialsProvider}
-import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.regions.{Regions, Region}
-import scala.reflect.{ClassTag, classTag}
+import scala.reflect.ClassTag
 
-abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag](loader: PropertiesLoader) {
-  val config = loader
+abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag](val config: PropertiesLoader) {
   private val accessKey: String = config.getString("aws.accessKey")
   private val secretKey = config.getString("aws.secretKey")
   private val credentials = new BasicAWSCredentials(accessKey, secretKey)

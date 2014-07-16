@@ -24,7 +24,7 @@ class ExecutionUtility(swfAdapter: SWFAdapter) {
 
   def executionHistory():List[JsValue] = {
 
-    val oldest = new Date(System.currentTimeMillis() - (7 * DAY_IN_MS))
+    val oldest = new Date(System.currentTimeMillis() - (70 * DAY_IN_MS))
     val latest = new Date(System.currentTimeMillis())
     val filter = new ExecutionTimeFilter
     filter.setOldestDate(oldest)
