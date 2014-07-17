@@ -14,7 +14,7 @@ libraryDependencies ++= Seq(
   //aws
   "com.amazonaws" % "aws-java-sdk" % "1.6.12",
   "org.scala-lang" % "scala-actors" % "2.10.2",
-  "org.scala-lang" % "jline" % "2.10.4",
+  "org.scala-lang" % "jline" % "2.10.4" % "provided",
   "org.slf4j" % "slf4j-nop" % "1.6.4",
   //joda
   "org.joda" % "joda-convert" % "1.5",
@@ -28,7 +28,6 @@ libraryDependencies ++= Seq(
   "com.google.api-ads" % "ads-lib" % "1.29.0",
   "com.google.api-ads" % "adwords-axis" % "1.29.0",
   "javax.activation" % "activation" % "1.1",
-  "javax.mail" % "mail" % "1.4",
   "com.github.scopt" %% "scopt" % "3.2.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106"
 )
