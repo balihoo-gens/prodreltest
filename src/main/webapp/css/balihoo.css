@@ -200,6 +200,11 @@ a .caption {
 	border-top-right-radius: 0;
 }
 
+.panel-heading-small {
+	padding: 7px 5px;
+	border-top-left-radius: 10px;
+	border-top-right-radius: 0;
+}
 .panel-heading h1 {
 	margin: 0 40px 0 0;
 }
@@ -219,12 +224,24 @@ a .caption {
 	border-bottom: none;
 }
 
+.panel-default > .panel-heading-small {
+	background: #59595b;
+	border-bottom: none;
+	font-size:16px;
+	color:white;
+}
+
 .panel-body {
 	padding: 20px;
 	background: #f3f3f3;
 	border-bottom-right-radius: 11px;
 }
 
+.panel-body-small {
+	padding: 10px;
+	background: #f3f3f3;
+	border-bottom-right-radius: 11px;
+}
 .panel-body.panel-gray {
 	padding-top: 0;
 	background: #59595b;
@@ -802,9 +819,18 @@ footer .container {
 }
 
 .json {
+	vertical-align:top;
 	font-family: "Ubuntu Mono", monospace;
+}
+
+.block {
+	margin-left:20px;
 }
 
 .blob {
 	display:inline-block;
+}
+
+.table.params {
+	font-size:14px;
 }

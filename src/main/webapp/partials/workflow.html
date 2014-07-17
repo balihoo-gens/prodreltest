@@ -3,25 +3,32 @@
 		<h1>Workflow » {{workflow.workflowId}}</h1>
 	</div>
 	<div class="panel-body">
-		<div ng-repeat="note in workflow.notes">{{note}}</div>
-		<table class="table table-condensed table-striped" style="width:100%;">
-			<tr>
-				<th style="min-width: 120px;">Section</th>
-				<th>Notes</th>
-				<th style="min-width: 120px;">Result</th>
-				<th>Status</th>
-			</tr>
-			<tr ng-repeat="(name, section) in workflow.sections">
-				<td>{{name}}</td>
-				<td>
-					<div ng-repeat="note in section.notes">
-						{{note}}
-					</div>
-				</td>
+		<h2 ng-show="workflow.notes">Workflow Notes</h2>
+		<p>
+			<div ng-repeat="note in workflow.notes"><div ng-bind-html="formatWhitespace(note)"></div></div>
+		</p>
+		<h2>Sections</h2>
+		<div class="panel panel-default" ng-repeat="(name, section) in workflow.sections">
+			<div class="panel-heading-small">
+				<span class="label {{figureStatusLabel(section.status)}} pull-right">{{section.status}}</span>
+				<b>{{name}}</b>
+			</div>
+			<div class="panel-body-small">
+
+				<h3 ng-show="section.notes">Notes</h3>
+				<div class="block" ng-repeat="note in section.notes">
+					<div ng-bind-html="formatWhitespace(note)"></div>
 				</div>
-				<td>{{section.value}}</td>
-				<td>{{section.status}}</td>
-			</tr>
-		</table>
+				<h3 ng-show="section.value">Result</h3>
+				<div class="block">{{section.value}}</div>
+				<h3>Parameters</h3>
+				<table class="table table-condensed table-hover block params">
+					<tr ng-repeat="(pname, param) in section.input.params">
+						<td style="width:100px"><b>{{pname}}</b></td>
+						<td><span ng-bind-html="formatParameter(param)"></span></td>
+					</tr>
+				</table>
+			</div>
+		</div>
 	</div>
 </div>
