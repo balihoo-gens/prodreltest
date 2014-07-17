@@ -116,6 +116,10 @@ app.controller('workflowController', function($scope, $route, $http, $location) 
 		return "<div class='"+classes+"'>"+contents+"</div>";
 	};
 
+	$scope.span = function(contents, classes) {
+		return "<span class='"+classes+"'>"+contents+"</span>";
+	};
+
 	$scope.jsonFormat = function(json, divclass) {
 		if(json instanceof Array) {
 			var body = "";
@@ -140,7 +144,16 @@ app.controller('workflowController', function($scope, $route, $http, $location) 
 		}
 
 		if(param instanceof Array) {
-			return "SECTIONS: "+param;
+			var body = '';
+			for(var item in param) {
+				var sectionName = param[item];
+				console.log(item);
+				console.log(sectionName);
+				if($scope.workflow.sections.hasOwnProperty(sectionName)) {
+					body += $scope.span(sectionName, "label "+$scope.figureStatusLabel($scope.workflow.sections[sectionName].status)) + "&nbsp;"
+				}
+			}
+			return body;
 		}
 
 		if(typeof param === "string") {

@@ -3,14 +3,17 @@
 		<h1>Workflow » {{workflow.workflowId}}</h1>
 	</div>
 	<div class="panel-body">
-		<h2 ng-show="workflow.notes">Workflow Notes</h2>
-		<p>
+		<h2 ng-show="workflow.notes">Notes</h2>
+		<div class="block">
 			<div ng-repeat="note in workflow.notes"><div ng-bind-html="formatWhitespace(note)"></div></div>
-		</p>
+		</div>
 		<h2>Sections</h2>
 		<div class="panel panel-default" ng-repeat="(name, section) in workflow.sections">
 			<div class="panel-heading-small">
-				<span class="label {{figureStatusLabel(section.status)}} pull-right">{{section.status}}</span>
+				<span class="pull-right">
+					{{section.input.action.name}} : {{section.input.action.version}} &nbsp;&nbsp;
+					<span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
+				</span>
 				<b>{{name}}</b>
 			</div>
 			<div class="panel-body-small">
@@ -22,7 +25,7 @@
 				<h3 ng-show="section.value">Result</h3>
 				<div class="block">{{section.value}}</div>
 				<h3>Parameters</h3>
-				<table class="table table-condensed table-hover block params">
+				<table class="table table-condensed table-hover block params" style="width:95%">
 					<tr ng-repeat="(pname, param) in section.input.params">
 						<td style="width:100px"><b>{{pname}}</b></td>
 						<td><span ng-bind-html="formatParameter(param)"></span></td>
