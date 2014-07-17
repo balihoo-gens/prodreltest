@@ -8,17 +8,19 @@
 			<tr>
 				<th>Id</th>
 				<th>Tags</th>
-				<th>Close Time</th>
+				<th>Time</th>
 				<th>Status</th>
 			</tr>
 			<tr ng-repeat="ex in executions">
-				<td> <a ng-click="seeWorkflow(ex)">{{ex.workflowId}}</a>
-					<br/>{{ex.runId}}
-					<br/>
+				<td> <a ng-click="seeWorkflow(ex)" title="{{ex.runId}}">{{ex.workflowId}}</a>
 				</td>
-				<td><div ng-repeat="tag in ex.tagList">{{tag}}</div></td>
-				<td>{{ex.closeTimestamp}}</td>
-				<td>{{ex.closeStatus}}</td>
+				<td><div ng-repeat="tag in ex.tagList"><div ng-bind-html="formatTag(tag)"></div></div></td>
+				<td>
+					Start:{{ex.startTimestamp}}
+					<br/>
+					End:{{ex.closeTimestamp}}
+				</td>
+				<td><span class="label {{figureStatusLabel(ex.closeStatus)}}">{{ex.closeStatus}}</span></td>
 			</tr>
 
 		</table>
