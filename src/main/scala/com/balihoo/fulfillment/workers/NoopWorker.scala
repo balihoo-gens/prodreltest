@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter}
+import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
 
 class NoopWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter)

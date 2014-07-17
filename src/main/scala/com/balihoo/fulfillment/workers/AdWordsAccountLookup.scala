@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.config.PropertiesLoader
-import com.balihoo.fulfillment._
+import com.balihoo.fulfillment.adapters._
 import com.google.api.ads.adwords.axis.v201402.mcm.ManagedCustomer
 
 class AdWordsAccountLookup(swfAdapter: SWFAdapter,
