@@ -65,3 +65,10 @@ Usage:
 3. Alternatively, you can use a different properties file, or look for it in a different directory:
     test_worker -p <propfile> -d <propdir>
 
+Development
+-----------
+Development information can be found on the [wiki](https://github.com/balihoo/fulfillment/wiki/Home)
+
+
+
+
