@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment
+package com.balihoo.fulfillment.adapters
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer

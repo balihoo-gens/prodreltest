@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment
+package com.balihoo.fulfillment.adapters
 
 import scala.language.implicitConversions
 
