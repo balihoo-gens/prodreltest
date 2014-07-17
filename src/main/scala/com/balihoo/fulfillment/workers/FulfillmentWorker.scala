@@ -10,6 +10,7 @@ import com.balihoo.fulfillment.{DynamoUpdate, DynamoAdapter, DynamoItem, SWFAdap
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
+import com.balihoo.fulfillment.util.Getch
 
 abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter) {
 
@@ -51,29 +52,37 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
     updateStatus("Starting")
 
-    while(true) {
-      print(".")
+    var done = false
+    val getch = new Getch
+    getch.addMapping(Seq("q", "Q", "Exit"), () => done = true)
 
-      updateStatus("Polling")
-      task = new ActivityTask
-      try {
-        task = swfAdapter.client.pollForActivityTask(taskReq)
-        if(task.getTaskToken != null) {
-          updateStatus("Processing task..")
-          try {
-            handleTask(new ActivityParameters(task.getInput))
-          } catch {
-            case e: Exception =>
-              failTask("Exception", e.getMessage)
+    getch.doWith {
+      while(!done) {
+        print(".")
+
+        updateStatus("Polling")
+        task = new ActivityTask
+        try {
+          task = swfAdapter.client.pollForActivityTask(taskReq)
+          if(task.getTaskToken != null) {
+            updateStatus("Processing task..")
+            try {
+              handleTask(new ActivityParameters(task.getInput))
+            } catch {
+              case e: Exception =>
+                failTask("Exception", e.getMessage)
+            }
           }
+        } catch {
+          case e:Exception =>
+            println("\n"+e.getMessage)
+          case t:Throwable =>
+            println("\n"+t.getMessage)
         }
-      } catch {
-        case e:Exception =>
-          println("\n"+e.getMessage)
-        case t:Throwable =>
-          println("\n"+t.getMessage)
       }
     }
+    updateStatus("Exiting")
+    print("Exiting...")
   }
 
   def handleTask(params:ActivityParameters)
