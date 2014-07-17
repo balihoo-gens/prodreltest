@@ -28,8 +28,6 @@ libraryDependencies ++= Seq(
   "com.google.api-ads" % "ads-lib" % "1.29.0",
   "com.google.api-ads" % "adwords-axis" % "1.29.0",
   "javax.activation" % "activation" % "1.1",
-  "javax.mail" % "mail" % "1.4",
-  "javax.servlet" % "javax.servlet-api" % "3.1.0" % "provided",
   "com.github.scopt" %% "scopt" % "3.2.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106"
 )
