@@ -1,4 +1,4 @@
-var app = angular.module('FulfillmentDashboard', ['ngRoute']);
+var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize']);
 
 toastr.options = {
 	"closeButton" : true,
@@ -56,6 +56,10 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 		return $scope.statusMap[status];
 	};
 
+	$scope.formatTag = function(tag) {
+		var parts = tag.split(':');
+		return "<b>"+parts[0]+"</b>&nbsp;:&nbsp;"+parts[1];
+	};
 });
 
 app.controller('workflowController', function($scope, $route, $http, $location) {
@@ -102,5 +106,58 @@ app.controller('workflowController', function($scope, $route, $http, $location) 
 
 	$scope.figureStatusLabel = function(status) {
 		return $scope.statusMap[status];
+	};
+
+	$scope.formatWhitespace = function(str) {
+		return str.replace(/\n/g, '<br/>').replace(/\t/g, '&nbsp;&nbsp;&nbsp;');
+	};
+
+	$scope.div = function(contents, classes) {
+		return "<div class='"+classes+"'>"+contents+"</div>";
+	};
+
+	$scope.jsonFormat = function(json, divclass) {
+		if(json instanceof Array) {
+			var body = "";
+			for(var item in json) {
+				body += $scope.div($scope.jsonFormat(json[item]));
+			}
+			return $scope.div(body, "block "+divclass);
+		}
+		if(json instanceof Object) {
+			var body = "";
+			for(var key in json) {
+				body += $scope.div("<span>"+key+"</span> : "+$scope.jsonFormat(json[key], "block"));
+			}
+			return $scope.div(body, "block "+divclass);
+		}
+		return $scope.div($scope.formatParameter(json), divclass);
+	};
+
+	$scope.formatParameter = function(param) {
+		if(param[0] == '{') {
+			return $scope.jsonFormat(JSON.parse(param), "json");
+		}
+
+		if(param instanceof Array) {
+			return "SECTIONS: "+param;
+		}
+
+		if(typeof param === "string") {
+			var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+
+			return param.replace(urlRegex, function (url) {
+
+				if (( url.indexOf(".jpg") > 0 ) || ( url.indexOf(".png") > 0 ) || ( url.indexOf(".gif") > 0 )) {
+					return '<img src="' + url + '">' + '<br/>' + url + '<br/>';
+				}
+				else {
+					return '<a href="' + url + '">' + url + '</a>' + '<br/>'
+				}
+			});
+		}
+
+		return param;
+
 	};
 });

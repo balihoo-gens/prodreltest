@@ -167,7 +167,7 @@ class FulfillmentSection(val name: String
   }
 
   override def toString = {
-    val paramString = "\n"+ (for((k, s) <- params) yield s"\t$k -> $s\n" ).mkString("\n")
+    val paramString = "\n"+ (for((k, s) <- params) yield s"\t$k -> $s" ).mkString("\n")
     s"""$name $status
       |  Action: $action
       |  Params: $paramString

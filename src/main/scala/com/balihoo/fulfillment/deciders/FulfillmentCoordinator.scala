@@ -114,8 +114,6 @@ class DecisionGenerator(categorized: CategorizedSections
 
     val failReasons = mutable.MutableList[String]()
 
-    sections.notes += sections.toString
-
     if(categorized.workComplete()) {
       // If we're done then let's just bail here
       val decision: Decision = new Decision
@@ -128,9 +126,7 @@ class DecisionGenerator(categorized: CategorizedSections
 
     if(categorized.impossible.length > 0) {
       var details: String = "Impossible Sections:"
-      for(section <- categorized.impossible) {
-        details += s"${section.name} ${section.notes}, "
-      }
+      details += (for(section <- categorized.impossible) yield s"${section.name} ${section.notes}").mkString(", ")
       failReasons += details
     }
 
@@ -222,23 +218,23 @@ class DecisionGenerator(categorized: CategorizedSections
       sections.notes += "Workflow FAILED:"
       if(categorized.blocked.length > 0) {
         var details: String = "Blocked Sections:"
-        for(section <- categorized.blocked) {
-          details += s"${section.name}, "
-        }
+        details += (for(section <- categorized.blocked) yield section.name).mkString(", ")
 
-        attribs.setReason("There are blocked sections and nothing is in progress!")
+        val reason = "There are blocked sections and nothing is in progress!"
+        attribs.setReason(reason)
         attribs.setDetails(details)
+        sections.notes += reason
         sections.notes += details
+
       } else {
+        var details: String = "Sections:\n"
+        details += (for((name, section) <- sections.map) yield section.toString).mkString("\n\n")
 
-        var details: String = "Sections:"
-        for((name, section) <- sections.map) {
-          details += section.toString
-        }
-
-        attribs.setReason("FAILING because progress can't be made!")
+        val reason = "FAILING because progress isn't being made!"
+        attribs.setReason(reason)
         attribs.setDetails(details)
-        sections.notes += details
+        sections.notes += reason
+        //sections.notes += details
       }
 
       decision.setFailWorkflowExecutionDecisionAttributes(attribs)

@@ -3,7 +3,7 @@ package com.balihoo.fulfillment.dashboard
 import java.text.SimpleDateFormat
 import java.util.Date
 
-import com.balihoo.fulfillment.deciders.{FulfillmentSection, SectionMap}
+import com.balihoo.fulfillment.deciders.{DecisionGenerator, CategorizedSections, FulfillmentSection, SectionMap}
 import play.api.libs.json._
 
 import scala.collection.JavaConverters._
@@ -65,6 +65,8 @@ class ExecutionUtility(swfAdapter: SWFAdapter) {
 
     val history = swfAdapter.client.getWorkflowExecutionHistory(req)
     val sectionMap = new SectionMap(history.getEvents)
+    val categorized = new CategorizedSections(sectionMap)
+    new DecisionGenerator(categorized, sectionMap).makeDecisions()
 
     val sections = collection.mutable.Map[String, JsValue]()
     for((name, section:FulfillmentSection) <- sectionMap.map) {

@@ -14,7 +14,7 @@
 			<tr ng-repeat="ex in executions">
 				<td> <a ng-click="seeWorkflow(ex)" title="{{ex.runId}}">{{ex.workflowId}}</a>
 				</td>
-				<td><div ng-repeat="tag in ex.tagList">{{tag}}</div></td>
+				<td><div ng-repeat="tag in ex.tagList"><div ng-bind-html="formatTag(tag)"></div></div></td>
 				<td>
 					Start:{{ex.startTimestamp}}
 					<br/>
