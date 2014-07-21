@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment
+package com.balihoo.fulfillment.adapters
 
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.amazonaws.auth.BasicAWSCredentials

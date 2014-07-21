@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter}
+import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient

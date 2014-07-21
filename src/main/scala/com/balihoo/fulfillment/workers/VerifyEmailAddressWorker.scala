@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter, SESAdapter}
+import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter, SESAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
 
 class VerifyEmailAddressWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapter: SESAdapter)

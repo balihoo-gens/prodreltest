@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment._
+import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.AdWordsUserInterests
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._

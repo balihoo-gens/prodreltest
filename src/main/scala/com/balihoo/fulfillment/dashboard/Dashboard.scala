@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 import javax.servlet.http.HttpServletResponse
 
 import com.amazonaws.services.simpleworkflow.model._
-import com.balihoo.fulfillment.{DynamoAdapter, SWFAdapter}
+import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder

@@ -12,7 +12,7 @@ import scala.language.implicitConversions
 import scala.collection.JavaConversions._
 import play.api.libs.json._
 
-import com.balihoo.fulfillment.{DynamoUpdate, DynamoAdapter, DynamoItem, SWFAdapter}
+import com.balihoo.fulfillment.adapters._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}

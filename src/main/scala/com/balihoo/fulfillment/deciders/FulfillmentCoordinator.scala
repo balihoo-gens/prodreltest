@@ -6,7 +6,7 @@ import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
 
-import com.balihoo.fulfillment.SWFAdapter
+import com.balihoo.fulfillment.adapters.SWFAdapter
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
