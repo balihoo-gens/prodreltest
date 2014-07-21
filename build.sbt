@@ -14,7 +14,8 @@ libraryDependencies ++= Seq(
   //aws
   "com.amazonaws" % "aws-java-sdk" % "1.6.12",
   "org.scala-lang" % "scala-actors" % "2.10.2",
-  "org.scala-lang" % "jline" % "2.10.4" % "provided",
+  //jansi is included with ivy2, but deduplicate fails so exclude it from jline explicitly
+  ("org.scala-lang" % "jline" % scalaVersion.value).exclude("org.fusesource.jansi", "jansi"),
   "org.slf4j" % "slf4j-nop" % "1.6.4",
   //joda
   "org.joda" % "joda-convert" % "1.5",
