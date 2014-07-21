@@ -6,7 +6,7 @@ import java.util.UUID.randomUUID
 
 import scala.language.implicitConversions
 
-import com.balihoo.fulfillment.{DynamoUpdate, DynamoAdapter, DynamoItem, SWFAdapter}
+import com.balihoo.fulfillment.adapters._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}

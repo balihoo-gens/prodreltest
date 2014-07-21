@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment
+package com.balihoo.fulfillment.adapters
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper
 import com.amazonaws.{AmazonClientException, AmazonServiceException}

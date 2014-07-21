@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.{
+import com.balihoo.fulfillment.adapters.{
   DynamoAdapter,
   SWFAdapter,
   SESAdapter
