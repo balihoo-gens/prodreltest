@@ -1,4 +1,9 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.test
+import com.balihoo.fulfillment.workers.{
+  EmailSender,
+  EmailAddressVerifier,
+  EmailVerifiedAddressLister
+}
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters.{
   DynamoAdapter,
@@ -10,9 +15,10 @@ import com.amazonaws.services.simpleworkflow.model.{
   TaskList,
   WorkflowType
 }
+
 import scala.io.Source
 
-object test_emailworker {
+object email {
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
     val config = PropertiesLoader(args, "sendemailworker")
@@ -24,7 +30,7 @@ object test_emailworker {
     }
 
     def verifyAddress() = {
-      val worker = new VerifyEmailAddressWorker(
+      val worker = new EmailAddressVerifier(
         new SWFAdapter(config),
         new DynamoAdapter(config),
         new SESAdapter(config)
@@ -36,7 +42,7 @@ object test_emailworker {
     }
 
     def getValidEmailList() = {
-      val worker = new ListVerifiedEmailAddressesWorker(
+      val worker = new EmailVerifiedAddressLister(
         new SWFAdapter(config),
         new DynamoAdapter(config),
         new SESAdapter(config)
@@ -51,7 +57,7 @@ object test_emailworker {
     }
 
     def sendEmail() = {
-      val worker = new SendEmailWorker(
+      val worker = new EmailSender(
         new SWFAdapter(config),
         new DynamoAdapter(config),
         new SESAdapter(config)

@@ -7,7 +7,7 @@ import com.balihoo.fulfillment.adapters.{
 }
 import com.balihoo.fulfillment.config.PropertiesLoader
 
-class ListVerifiedEmailAddressesWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapter: SESAdapter)
+class EmailVerifiedAddressLister(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapter: SESAdapter)
   extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
@@ -23,10 +23,10 @@ class ListVerifiedEmailAddressesWorker(swfAdapter: SWFAdapter, dynamoAdapter: Dy
   }
 }
 
-object listverifiedemailaddressworker {
+object emailverifiedaddresslister {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new ListVerifiedEmailAddressesWorker(
+    val config = PropertiesLoader(args, "email")
+    val worker = new EmailVerifiedAddressLister(
       new SWFAdapter(config),
       new DynamoAdapter(config),
       new SESAdapter(config)
