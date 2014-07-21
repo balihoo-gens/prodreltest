@@ -8,33 +8,36 @@ import scala.collection.JavaConversions._
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
 import com.amazonaws.services.dynamodbv2.model._
 import com.balihoo.fulfillment.config.PropertiesLoader
+import com.amazonaws.regions.{Regions, Region}
 
 class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBAsyncClient](loader){
   val mapper = new DynamoDBMapper(client)
 
   def put(item:DynamoItem) = {
+    def log(s: String) = println(s"DynamoAdapter.put: $s\n$item")
     try {
       client.putItemAsync(item.makeRequest())
     } catch {
       case e:AmazonServiceException =>
-        println(e.getMessage)
+        log(e.getMessage)
       case e:AmazonClientException =>
-        println(e.getMessage)
+        log(e.getMessage)
       case e:Exception =>
-        println(e.getMessage)
+        log(e.getMessage)
     }
   }
 
   def update(update:DynamoUpdate) = {
+    def log(s: String) = println(s"DynamoAdapter.update: $s\n$update")
     try {
       client.updateItemAsync(update.makeRequest())
     } catch {
       case e:AmazonServiceException =>
-        println(e.getMessage)
+        log(e.getMessage)
       case e:AmazonClientException =>
-        println(e.getMessage)
+        log(e.getMessage)
       case e:Exception =>
-        println(e.getMessage)
+        log(e.getMessage)
     }
   }
 
@@ -58,6 +61,10 @@ class DynamoItem(table:String) {
     new PutItemRequest()
       .withTableName(table)
       .withItem(item)
+  }
+
+  override def toString() = {
+    (for((key,value) <- item) yield s"$key: $value").mkString("DynamoItem:{", ", ", "}")
   }
 }
 

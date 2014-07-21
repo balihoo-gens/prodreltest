@@ -4,7 +4,7 @@ import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter, SESAdapter}
 
 import com.balihoo.fulfillment.config.PropertiesLoader
 
-class SendEmailWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapter: SESAdapter)
+class EmailSender(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapter: SESAdapter)
   extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
 
   override def handleTask(params: ActivityParameters) = {
@@ -26,10 +26,10 @@ class SendEmailWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesA
   }
 }
 
-object sendemailworker {
+object email_sender {
   def main(args: Array[String]) {
     val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new SendEmailWorker(new SWFAdapter(config), new DynamoAdapter(config), new SESAdapter(config))
+    val worker = new EmailSender(new SWFAdapter(config), new DynamoAdapter(config), new SESAdapter(config))
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
