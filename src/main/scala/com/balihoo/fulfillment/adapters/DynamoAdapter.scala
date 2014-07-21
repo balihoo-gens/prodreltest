@@ -1,19 +1,16 @@
 package com.balihoo.fulfillment.adapters
 
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper
+import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
 
 import scala.collection.JavaConversions._
 
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBClient, AmazonDynamoDBAsyncClient}
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
 import com.amazonaws.services.dynamodbv2.model._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.amazonaws.regions.{Regions, Region}
 
 class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBAsyncClient](loader){
-//  val syncclient = new AmazonDynamoDBClient(credentials)
-  client.setRegion(Region.getRegion(Regions.DEFAULT_REGION))
   val mapper = new DynamoDBMapper(client)
 
   def put(item:DynamoItem) = {
@@ -97,3 +94,4 @@ class DynamoUpdate(table:String) {
     updateRequest
   }
 }
+

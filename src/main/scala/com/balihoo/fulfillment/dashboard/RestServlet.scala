@@ -5,31 +5,31 @@ import scala.collection.JavaConversions._
 
 import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 
-abstract class DashServlet extends HttpServlet {
+abstract class RestServlet extends HttpServlet {
 
-  val getHandlers = collection.mutable.Map[String, (DashTransaction) => Unit]()
-  val postHandlers = collection.mutable.Map[String, (DashTransaction) => Unit]()
-  val putHandlers = collection.mutable.Map[String, (DashTransaction) => Unit]()
-  val deleteHandlers = collection.mutable.Map[String, (DashTransaction) => Unit]()
+  val getHandlers = collection.mutable.Map[String, (RestServletQuery) => Unit]()
+  val postHandlers = collection.mutable.Map[String, (RestServletQuery) => Unit]()
+  val putHandlers = collection.mutable.Map[String, (RestServletQuery) => Unit]()
+  val deleteHandlers = collection.mutable.Map[String, (RestServletQuery) => Unit]()
 
   override protected def doGet(request:HttpServletRequest
                                ,response:HttpServletResponse) = {
-    _process(getHandlers, new DashTransaction(request, response))
+    _process(getHandlers, new RestServletQuery(request, response))
   }
 
   override protected def doPost(request:HttpServletRequest
                                ,response:HttpServletResponse) = {
-    _process(postHandlers, new DashTransaction(request, response))
+    _process(postHandlers, new RestServletQuery(request, response))
   }
 
   override protected def doPut(request:HttpServletRequest
                                ,response:HttpServletResponse) = {
-    _process(putHandlers, new DashTransaction(request, response))
+    _process(putHandlers, new RestServletQuery(request, response))
   }
 
   override protected def doDelete(request:HttpServletRequest
                                ,response:HttpServletResponse) = {
-    _process(deleteHandlers, new DashTransaction(request, response))
+    _process(deleteHandlers, new RestServletQuery(request, response))
   }
 
   def _errorJson(message:String, details:String = ""): String = {
@@ -39,41 +39,41 @@ abstract class DashServlet extends HttpServlet {
     )))
   }
 
-  def _process(handlers:collection.mutable.Map[String, (DashTransaction) => Unit]
-               ,dtrans:DashTransaction) = {
+  def _process(handlers:collection.mutable.Map[String, (RestServletQuery) => Unit]
+               ,rsq:RestServletQuery) = {
 
     try {
-      handlers(dtrans.request.getRequestURI)(dtrans)
+      handlers(rsq.request.getRequestURI)(rsq)
     } catch {
       case bre:BadRequestException =>
-        dtrans.respondJson(HttpServletResponse.SC_BAD_REQUEST
+        rsq.respondJson(HttpServletResponse.SC_BAD_REQUEST
           , _errorJson(bre.getMessage))
       case nsee:NoSuchElementException =>
-        dtrans.respondJson(HttpServletResponse.SC_NOT_FOUND
+        rsq.respondJson(HttpServletResponse.SC_NOT_FOUND
           , _errorJson(nsee.getMessage))
       case e:Exception =>
-        dtrans.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
+        rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
           ,_errorJson(e.getMessage, e.getClass.toString))
     }
   }
 
-  def get(path:String, code:(DashTransaction) => Unit) = {
+  def get(path:String, code:(RestServletQuery) => Unit) = {
     getHandlers(path) = code
   }
-  def post(path:String, code:(DashTransaction) => Unit) = {
+  def post(path:String, code:(RestServletQuery) => Unit) = {
     postHandlers(path) = code
   }
-  def put(path:String, code:(DashTransaction) => Unit) = {
+  def put(path:String, code:(RestServletQuery) => Unit) = {
     putHandlers(path) = code
   }
-  def delete(path:String, code:(DashTransaction) => Unit) = {
+  def delete(path:String, code:(RestServletQuery) => Unit) = {
     deleteHandlers(path) = code
   }
 }
 
 class BadRequestException(message:String) extends Exception(message)
 
-class DashTransaction(val request:HttpServletRequest
+class RestServletQuery(val request:HttpServletRequest
                       ,val response:HttpServletResponse) {
 
   val params = collection.mutable.Map[String, String]()

@@ -4,7 +4,13 @@ import java.text.SimpleDateFormat
 import java.util.{Date, TimeZone}
 import java.util.UUID.randomUUID
 
+import com.amazonaws.services.dynamodbv2.datamodeling._
+import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
+
+import scala.sys.process._
 import scala.language.implicitConversions
+import scala.collection.JavaConversions._
+import play.api.libs.json._
 
 import com.balihoo.fulfillment.adapters._
 
@@ -16,10 +22,6 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
   val instanceId = randomUUID().toString
 
-  val tz = TimeZone.getTimeZone("UTC")
-  val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
-  dateFormat.setTimeZone(tz)
-
   val domain = swfAdapter.domain
   val name = validateSWFIdentifier(swfAdapter.config.getString("name"), 256)
   val version = validateSWFIdentifier(swfAdapter.config.getString("version"), 64)
@@ -29,6 +31,25 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
+
+//  TODO This can be used to have the worker discover the address of the ec2 instance it is running on (if it is!)
+//  This would be a nice piece of information to put into dynamo so we can log in and administer via ssh
+//  without having to look up the instance in the ec2 dashboard.
+//  val aws_ec2_identify = "curl -s http://169.254.169.254/latest/meta-data/public-hostname"
+//  val address = aws_ec2_identify.!!
+
+//  val localhostname = java.net.InetAddress.getLocalHost.getHostName
+//  println(localhostname)
+
+  val workerTable = new FulfillmentWorkerTable(dynamoAdapter)
+
+  val entry = new FulfillmentWorkerEntry
+  entry.setInstance(instanceId)
+  entry.setActivityName(name)
+  entry.setActivityVersion(version)
+  entry.setDomain(domain)
+  entry.setStatus("--")
+  entry.setStart(UTCFormatter.format(new Date()))
 
   val taskList: TaskList = new TaskList().withName(taskListName)
 
@@ -42,9 +63,10 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
   var updateCounter:Int = 0
 
+  declareWorker()
+
   var task:ActivityTask = null
 
-  declareWorker()
 
   def work() = {
 
@@ -100,24 +122,14 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
   }
 
   def declareWorker() = {
-    dynamoAdapter.put(
-      new DynamoItem("fulfillment_beta_worker")
-        .addString("instance", instanceId)
-        .addString("domain", domain)
-        .addString("activityName", name)
-        .addString("activityVersion", version)
-        .addString("start", dateFormat.format(new Date()))
-    )
+    entry.setLast(UTCFormatter.format(new Date()))
+    workerTable.insert(entry)
   }
 
   def updateStatus(status:String) = {
     updateCounter += 1
-    dynamoAdapter.update(
-      new DynamoUpdate("fulfillment_beta_worker")
-        .forKey("instance", instanceId)
-        .addString("status", status)
-        .addString("last", dateFormat.format(new Date()))
-    )
+    entry.setLast(UTCFormatter.format(new Date()))
+    workerTable.update(entry)
   }
 
   def completeTask(result:String) = {
@@ -212,3 +224,128 @@ class ActivityParameters(input:String) {
   }
 }
 
+object UTCFormatter {
+
+  val SEC_IN_MS = 1000
+  val MIN_IN_MS = SEC_IN_MS * 60
+  val HOUR_IN_MS = MIN_IN_MS * 60
+  val DAY_IN_MS = HOUR_IN_MS * 24
+
+  val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+  dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"))
+
+  def format(date:Date): String = {
+    dateFormat.format(date)
+  }
+
+}
+
+class FulfillmentWorkerTable(val dynamoAdapter:DynamoAdapter) {
+
+  def insert(entry:FulfillmentWorkerEntry) = {
+    dynamoAdapter.put(entry.getDynamoItem)
+  }
+
+  def update(entry:FulfillmentWorkerEntry) = {
+    dynamoAdapter.update(entry.getDynamoUpdate)
+  }
+
+  def get() = {
+    val scanExp:DynamoDBScanExpression = new DynamoDBScanExpression()
+
+    val oldest = UTCFormatter.format(new Date(System.currentTimeMillis() - UTCFormatter.DAY_IN_MS))
+
+    scanExp.addFilterCondition("last",
+      new Condition()
+        .withComparisonOperator(ComparisonOperator.GT)
+        .withAttributeValueList(new AttributeValue().withS(oldest)))
+
+    val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp)
+    for(worker:FulfillmentWorkerEntry <- list) {
+      println(worker.instance)
+      println(worker.last)
+    }
+
+    list.toList
+  }
+
+}
+
+@DynamoDBTable(tableName="fulfillment_worker_status")
+class FulfillmentWorkerEntry {
+  var instance:String = ""
+  var domain:String = ""
+  var activityName:String = ""
+  var activityVersion:String = ""
+  var status:String = ""
+  var start:String = ""
+  var last:String = ""
+
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "instance" -> Json.toJson(instance),
+      "domain" -> Json.toJson(domain),
+      "activityName" -> Json.toJson(activityName),
+      "activityVersion" -> Json.toJson(activityVersion),
+      "status" -> Json.toJson(status),
+      "start" -> Json.toJson(start),
+      "last" -> Json.toJson(last)))
+  }
+
+  @DynamoDBHashKey(attributeName="instance")
+  def getInstance():String = { instance }
+  def setInstance(ins:String) = { this.instance = ins }
+
+  @DynamoDBAttribute(attributeName="domain")
+  def getDomain:String = { domain }
+  def setDomain(domain:String) { this.domain = domain; }
+
+  @DynamoDBAttribute(attributeName="activityName")
+  def getActivityName:String = { activityName }
+  def setActivityName(activityName:String) { this.activityName = activityName; }
+
+  @DynamoDBAttribute(attributeName="activityVersion")
+  def getActivityVersion:String = { activityVersion }
+  def setActivityVersion(activityVersion:String) { this.activityVersion = activityVersion; }
+
+  @DynamoDBAttribute(attributeName="status")
+  def getStatus:String = { status }
+  def setStatus(status:String) { this.status = status; }
+
+  @DynamoDBAttribute(attributeName="start")
+  def getStart:String = { start }
+  def setStart(start:String) { this.start = start; }
+
+  @DynamoDBAttribute(attributeName="last")
+  def getLast:String = { last }
+  def setLast(last:String) { this.last = last; }
+
+  def getDynamoItem:DynamoItem = {
+    new DynamoItem("fulfillment_worker_status")
+      .addString("instance", instance)
+      .addString("domain", domain)
+      .addString("activityName", activityName)
+      .addString("activityVersion", activityVersion)
+      .addString("status", status)
+      .addString("start", start)
+      .addString("last", last)
+  }
+
+  def getDynamoUpdate:DynamoUpdate = {
+    new DynamoUpdate("fulfillment_worker_status")
+      .forKey("instance", instance)
+      .addString("status", status)
+      .addString("last", last)
+  }
+
+}
+
+/*
+object dynamoscantest {
+  def main(args: Array[String]) {
+    val config = PropertiesLoader(args, "adwords")
+    val da = new DynamoAdapter(config)
+    da.get()
+  }
+}
+  */
