@@ -23,13 +23,24 @@
 		<div id="wrap">
 
 			<!-- Nav bar -->
-			<nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+			<nav ng-controller="envController" class="navbar navbar-default navbar-fixed-top" role="navigation">
 				<div class="container">
 					<div class="collapse navbar-collapse navbar-ex1-collapse">
+							<div class="navbar-text pull-right" style="text-align: right;">
 
-						<h1 style="display:table-cell; vertical-align: bottom; height:100%" class="navbar-text pull-right"><a href="/">Fulfillment</a></h1>
+								<h1 style="display:table-cell; vertical-align: bottom; height:100%;"><a href="/">Fulfillment</a></h1>
+								<span title="SWF Domain">
+									<b>{{environment.domain}}</b>
+								</span>
+								&nbsp;-&nbsp;
+								<span title="AWS Region">
+									<b>{{environment.region}}</b>
+								</span>
+							</div>
 					<span class="balihoo-logo">
-						<img src="http://accounts.dev.balihoo.com/content/img/balihoo-logo.png" alt="Balihoo - Local Marketing. Automated.">
+						<a href="/">
+							<img src="/img/balihoo-beta-logo.png" alt="Balihoo - Local Marketing. Automated.">
+						</a>
 					</span>
 					</div>
 				</div>

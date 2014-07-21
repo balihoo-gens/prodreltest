@@ -133,8 +133,10 @@ class DecisionGenerator(categorized: CategorizedSections
     // Loop through the problem sections
     for(section <- categorized.failed) {
       if(section.failedCount < section.failureParams.maxRetries) {
+        val message = s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})"
+        section.notes += message
         decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
-          s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})")
+          message)
       } else {
         failReasons += s"Section $section FAILED too many times! (${section.failedCount} of ${section.failureParams.maxRetries})"
       }
@@ -142,8 +144,10 @@ class DecisionGenerator(categorized: CategorizedSections
 
     for(section <- categorized.timedout) {
       if(section.timedoutCount < section.timeoutParams.maxRetries) {
+        val message = s"Section timed out and is allowed to retry (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
+        section.notes += message
         decisions += _createTimerDecision(section.name, section.timeoutParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
-          s"Section timed out and is allowed to retry (${section.timedoutCount} of ${section.timeoutParams.maxRetries})")
+          message)
       } else {
         failReasons += s"Section $section TIMED OUT too many times! (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
       }
@@ -151,8 +155,10 @@ class DecisionGenerator(categorized: CategorizedSections
 
     for(section <- categorized.canceled) {
       if(section.canceledCount < section.cancelationParams.maxRetries) {
+        val message = s"Section was canceled and is allowed to retry (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
+        section.notes += message
         decisions += _createTimerDecision(section.name, section.cancelationParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
-          s"Section was canceled and is allowed to retry (${section.canceledCount} of ${section.cancelationParams.maxRetries})")
+          message)
       } else {
         failReasons += s"Section $section was CANCELED too many times! (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
       }
@@ -205,7 +211,7 @@ class DecisionGenerator(categorized: CategorizedSections
       decision.setScheduleActivityTaskDecisionAttributes(attribs)
       decisions += decision
 
-      sections.notes += "Scheduling work for: \n\t"+section.toString
+      sections.notes += "Scheduling work for: "+section.name
     }
 
     if(decisions.length == 0 && !categorized.hasPendingSections) {

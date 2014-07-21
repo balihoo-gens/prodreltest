@@ -1,0 +1,26 @@
+<div class="panel panel-default">
+	<div class="panel-heading">
+		<a class="btn btn-default pull-right" ng-click="getWorkers()">REFRESH</a>
+		<h1>Workers</h1>
+	</div>
+	<div class="panel-body">
+		<div ng-show="loading">
+			<img src="img/loading.gif">
+		</div>
+		<div class="panel panel-default" ng-repeat="worker in workers">
+			<div id="section_{{name}}" class="panel-heading-small">
+				<span class="pull-right">
+					<span class="label label-default">{{worker.status}}</span>
+				</span>
+				<b>{{worker.activityName}} - {{worker.activityVersion}}</b>
+			</div>
+			<div class="panel-body-small">
+				{{worker.instance}}
+				{{worker.status}}
+			</div>
+
+		</div>
+
+		</table>
+	</div>
+</div>
