@@ -26,9 +26,9 @@ class EmailSender(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapt
   }
 }
 
-object emailsender {
+object email_sender {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "email")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new EmailSender(new SWFAdapter(config), new DynamoAdapter(config), new SESAdapter(config))
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

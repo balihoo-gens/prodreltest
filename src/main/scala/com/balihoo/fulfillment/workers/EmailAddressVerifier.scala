@@ -19,9 +19,9 @@ class EmailAddressVerifier(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter,
   }
 }
 
-object emailaddressverifier {
+object email_addressverifier {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "email")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new EmailAddressVerifier(
       new SWFAdapter(config),
       new DynamoAdapter(config),

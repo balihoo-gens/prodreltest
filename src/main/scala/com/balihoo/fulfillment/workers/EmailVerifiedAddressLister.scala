@@ -23,9 +23,9 @@ class EmailVerifiedAddressLister(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
   }
 }
 
-object emailverifiedaddresslister {
+object email_verifiedaddresslister {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "email")
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new EmailVerifiedAddressLister(
       new SWFAdapter(config),
       new DynamoAdapter(config),

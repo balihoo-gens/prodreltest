@@ -21,7 +21,7 @@ import scala.io.Source
 object email {
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
-    val config = PropertiesLoader(args, "sendemailworker")
+    val config = PropertiesLoader(args, "email")
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
 
     def usage() = {
@@ -84,23 +84,33 @@ object email {
       val swf = new SWFAdapter(config)
       println("enter the json input filename")
       val inputfile = readLine("inputfile> ")
-      val input = Source.fromFile(inputfile).mkString
-      swf.client.startWorkflowExecution(
-        new StartWorkflowExecutionRequest()
-          .withDomain(swf.domain)
-          .withWorkflowId("test_emailworker")
-          .withInput(input)
-          .withExecutionStartToCloseTimeout("1600")
-          .withTaskList(
-            new TaskList()
-              .withName("default_tasks")
-          )
-          .withWorkflowType(
-            new WorkflowType()
-              .withName("emailtest")
-              .withVersion("1")
-          )
-      )
+      val input = try {
+        Source.fromFile(inputfile.trim).mkString
+      } catch {
+        case e:Exception => {
+          println(e.getMessage)
+          ""
+        }
+      }
+
+      if (input.length() > 0) {
+        swf.client.startWorkflowExecution(
+          new StartWorkflowExecutionRequest()
+            .withDomain(swf.domain)
+            .withWorkflowId("test_emailworker")
+            .withInput(input)
+            .withExecutionStartToCloseTimeout("1600")
+            .withTaskList(
+              new TaskList()
+                .withName("default_tasks")
+            )
+            .withWorkflowType(
+              new WorkflowType()
+                .withName("emailtest")
+                .withVersion("1")
+            )
+        )
+      }
     }
 
     options("h") = ("Display Help", usage _)
