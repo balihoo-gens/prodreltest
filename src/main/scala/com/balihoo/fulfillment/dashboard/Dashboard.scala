@@ -1,9 +1,9 @@
 package com.balihoo.fulfillment.dashboard
 
-import java.text.SimpleDateFormat
 import java.util.Date
 
 import com.balihoo.fulfillment.deciders.{DecisionGenerator, CategorizedSections, FulfillmentSection, SectionMap}
+import com.balihoo.fulfillment.workers.{UTCFormatter, FulfillmentWorkerTable, FulfillmentWorkerEntry}
 import play.api.libs.json._
 
 import scala.collection.JavaConverters._
@@ -17,14 +17,11 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 
-class ExecutionUtility(swfAdapter: SWFAdapter) {
-
-  val DAY_IN_MS = 1000 * 60 * 60 * 24
-  val dateFormatter = new SimpleDateFormat()
+class WorkflowInspector(swfAdapter: SWFAdapter) {
 
   def executionHistory():List[JsValue] = {
 
-    val oldest = new Date(System.currentTimeMillis() - (70 * DAY_IN_MS))
+    val oldest = new Date(System.currentTimeMillis() - (70 * UTCFormatter.DAY_IN_MS))
     val latest = new Date(System.currentTimeMillis())
     val filter = new ExecutionTimeFilter
     filter.setOldestDate(oldest)
@@ -86,37 +83,57 @@ class ExecutionUtility(swfAdapter: SWFAdapter) {
 
     top.toMap
   }
+
+  def environment() = {
+    Json.toJson(Map(
+      "domain" -> Json.toJson(swfAdapter.domain),
+      "region" -> Json.toJson(swfAdapter.region.getName)
+    ))
+  }
 }
 
 
 
-class WorkflowServlet(swfAdapter: SWFAdapter) extends DashServlet {
+class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
 
-  val domain = swfAdapter.config.getString("domain")
-  val eu = new ExecutionUtility(swfAdapter)
+  val wi = new WorkflowInspector(swfAdapter)
 
-  get("/workflow/history", (dtrans:DashTransaction) => {
-    dtrans.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(eu.executionHistory())))
+  get("/workflow/history", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(wi.executionHistory())))
   })
 
-  get("/workflow/sections", (dtrans:DashTransaction) => {
-    dtrans.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(eu.workflowSections(
-        dtrans.getRequiredParameter("runId")
-        ,dtrans.getRequiredParameter("workflowId")
+  get("/workflow/detail", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(wi.workflowSections(
+        rsq.getRequiredParameter("runId")
+        ,rsq.getRequiredParameter("workflowId")
       ))))
   })
 
+  get("/workflow/environment", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(wi.environment())))
+  })
+
 }
 
-class WorkerServlet(dynamoAdapter: DynamoAdapter) extends DashServlet {
+class WorkerServlet(dynamoAdapter:DynamoAdapter) extends RestServlet {
 
-//  get("/worker", (dtrans:DashTransaction) => {
-//    response.setContentType("application/json")
-//    response.setStatus(HttpServletResponse.SC_OK)
-//    response.getWriter.println("""{ "message" : "HELLO THERE" }""")
-//  })
+  val workerTable = new FulfillmentWorkerTable(dynamoAdapter)
+
+  get("/worker", (rsq:RestServletQuery) => {
+
+    val workers = workerTable.get()
+
+    val workerMap = collection.mutable.Map[String, JsValue]()
+    for(worker:FulfillmentWorkerEntry <- workers) {
+      workerMap(worker.getInstance()) = worker.toJson
+    }
+
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(workerMap.toMap)))
+  })
 
 }
 

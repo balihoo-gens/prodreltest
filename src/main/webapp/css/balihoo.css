@@ -51,6 +51,7 @@ a {
 	color: #333333;
 	font-weight: 700;
 	text-decoration: underline;
+	cursor:pointer;
 }
 
 a:hover, a:focus {
@@ -201,7 +202,7 @@ a .caption {
 }
 
 .panel-heading-small {
-	padding: 7px 5px;
+	padding: 8px;
 	border-top-left-radius: 10px;
 	border-top-right-radius: 0;
 }

@@ -17,10 +17,36 @@ app.config(
 				      controller : "historyController",
 				      templateUrl : "partials/history.html",
 				      reloadOnSearch: false})
+			.when("/workers", {
+				      controller : "workersController",
+				      templateUrl : "partials/workers.html",
+				      reloadOnSearch: false})
 			.otherwise({redirectTo : "/history"})
 		;
 	}
 );
+
+app.controller('envController', function($scope, $route, $http, $location) {
+
+	$scope.$on(
+		"$routeChangeSuccess",
+		function($currentRoute, $previousRoute) {
+			$scope.init();
+		}
+	);
+
+
+	$scope.init = function() {
+		$http.get('workflow/environment', {})
+			.success(function(data) {
+				         $scope.environment = data;
+			         })
+			.error(function(error) {
+				       toastr.error(error.details, error.error)
+			       });
+	};
+
+});
 
 app.controller('historyController', function($scope, $route, $http, $location) {
 
@@ -33,12 +59,15 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 
 
 	$scope.getHistory = function() {
+		$scope.loading = true;
 		var params = {};
 		$http.get('workflow/history', { params : params})
 			.success(function(data) {
+			             $scope.loading = false;
 				         $scope.executions = data;
 			         })
 			.error(function(error) {
+			           $scope.loading = false;
 				       toastr.error(error.details, error.error)
 			       });
 	};
@@ -49,7 +78,8 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 
 	$scope.statusMap = {
 		"FAILED" : "label-danger",
-		"COMPLETED" : "label-success"
+		"COMPLETED" : "label-success",
+		"TIMED_OUT" : "label-warning"
 	};
 
 	$scope.figureStatusLabel = function(status) {
@@ -62,29 +92,31 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 	};
 });
 
-app.controller('workflowController', function($scope, $route, $http, $location) {
+app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll) {
 
 	$scope.$on(
 		"$routeChangeSuccess",
 		function($currentRoute, $previousRoute) {
 			$scope.params = $route.current.params;
-			console.log($scope.params);
-			$scope.getSections($scope.params.runId, $scope.params.workflowId);
+			$scope.getWorkflow($scope.params.runId, $scope.params.workflowId);
 		}
 	);
 
 
 	$scope.workflow = {};
 
-	$scope.getSections = function(runId, workflowId) {
+	$scope.getWorkflow = function(runId, workflowId) {
+		$scope.loading = true;
 		var params = {};
 		params['runId'] = runId;
 		params['workflowId'] = workflowId;
-		$http.get('workflow/sections', { params : params})
+		$http.get('workflow/detail', { params : params})
 			.success(function(data) {
+			             $scope.loading = false;
 				         $scope.workflow = data;
 			         })
 			.error(function(error) {
+			           $scope.loading = false;
 				       toastr.error(error.details, error.error)
 			       });
 	};
@@ -135,42 +167,74 @@ app.controller('workflowController', function($scope, $route, $http, $location) 
 			}
 			return $scope.div(body, "block "+divclass);
 		}
-		return $scope.div($scope.formatParameter(json), divclass);
-	};
-
-	$scope.formatParameter = function(param) {
-		if(param[0] == '{') {
-			return $scope.jsonFormat(JSON.parse(param), "json");
+		if($scope.isString(json)) {
+			return $scope.div($scope.formatURLs(json), divclass);
 		}
 
-		if(param instanceof Array) {
-			var body = '';
-			for(var item in param) {
-				var sectionName = param[item];
-				console.log(item);
-				console.log(sectionName);
-				if($scope.workflow.sections.hasOwnProperty(sectionName)) {
-					body += $scope.span(sectionName, "label "+$scope.figureStatusLabel($scope.workflow.sections[sectionName].status)) + "&nbsp;"
-				}
+		return json;
+	};
+
+	$scope.formatJson = function(jsonString) {
+		return $scope.jsonFormat(JSON.parse(jsonString), "json");
+	};
+
+	$scope.formatURLs = function(param) {
+		var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+
+		return param.replace(urlRegex, function (url) {
+
+			if (( url.indexOf(".jpg") > 0 )
+				|| ( url.indexOf(".png") > 0 )
+				|| ( url.indexOf(".gif") > 0 )) {
+				return '<img src="'+url+'">'+'<br/>'+url+'<br/>';
 			}
-			return body;
-		}
-
-		if(typeof param === "string") {
-			var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-
-			return param.replace(urlRegex, function (url) {
-
-				if (( url.indexOf(".jpg") > 0 ) || ( url.indexOf(".png") > 0 ) || ( url.indexOf(".gif") > 0 )) {
-					return '<img src="' + url + '">' + '<br/>' + url + '<br/>';
-				}
-				else {
-					return '<a href="' + url + '">' + url + '</a>' + '<br/>'
-				}
-			});
-		}
-
-		return param;
-
+			else {
+				return '<a href="'+url+'">'+url+'</a>'+'<br/>';
+			}
+		});
 	};
+
+	$scope.isJSON = function(j) {
+		return j[0] == '{';
+	};
+
+	$scope.isArray = function(a) {
+		return a instanceof Array;
+	};
+
+	$scope.isString = function(s) {
+		return typeof s === "string";
+	};
+
+	$scope.scrollToSection = function(name) {
+		$location.hash("section_"+name);
+		$anchorScroll();
+	}
+
+});
+
+app.controller('workersController', function($scope, $route, $http, $location) {
+
+	$scope.$on(
+		"$routeChangeSuccess",
+		function($currentRoute, $previousRoute) {
+			$scope.getWorkers();
+		}
+	);
+
+
+	$scope.getWorkers = function() {
+		$scope.loading = true;
+		var params = {};
+		$http.get('worker', { params : params})
+			.success(function(data) {
+				         $scope.loading = false;
+				         $scope.workers = data;
+			         })
+			.error(function(error) {
+				       $scope.loading = false;
+				       toastr.error(error.details, error.error)
+			       });
+	};
+
 });

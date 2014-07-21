@@ -3,13 +3,16 @@
 		<h1>Workflow » {{workflow.workflowId}}</h1>
 	</div>
 	<div class="panel-body">
+		<div ng-show="loading">
+			<img src="img/loading.gif">
+		</div>
 		<h2 ng-show="workflow.notes">Notes</h2>
 		<div class="block">
 			<div ng-repeat="note in workflow.notes"><div ng-bind-html="formatWhitespace(note)"></div></div>
 		</div>
 		<h2>Sections</h2>
 		<div class="panel panel-default" ng-repeat="(name, section) in workflow.sections">
-			<div class="panel-heading-small">
+			<div id="section_{{name}}" class="panel-heading-small">
 				<span class="pull-right">
 					{{section.input.action.name}} : {{section.input.action.version}} &nbsp;&nbsp;
 					<span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
@@ -28,7 +31,16 @@
 				<table class="table table-condensed table-hover block params" style="width:95%">
 					<tr ng-repeat="(pname, param) in section.input.params">
 						<td style="width:100px"><b>{{pname}}</b></td>
-						<td><span ng-bind-html="formatParameter(param)"></span></td>
+						<td>
+							<span ng-if="isJSON(param)" ng-bind-html="formatJson(param)"></span>
+							<div ng-if="isArray(param)">
+								<span ng-repeat="item in param"><span class="label {{figureStatusLabel(workflow.sections[item].status)}}" ng-click="scrollToSection(item)">{{item}}</span>&nbsp;</span>
+							</div>
+							<div ng-if="isString(param) && ! isJSON(param)">
+								<span ng-bind-html="formatURLs(param)"></span>
+							</div>
+
+						</td>
 					</tr>
 				</table>
 			</div>
