@@ -1,75 +1,75 @@
 <html ng-app="FulfillmentDashboard">
-	<head>
-		<title>Balihoo | Fulfillment Dashboard</title>
-		<link rel="shortcut icon" href="img/favicon.ico">
-		<link href='http://fonts.googleapis.com/css?family=Open+Sans+Condensed:300,300italic,700' rel='stylesheet' type='text/css'>
-		<link href='http://fonts.googleapis.com/css?family=Ubuntu+Mono' rel='stylesheet' type='text/css'>
+    <head>
+        <title>Balihoo | Fulfillment Dashboard</title>
+        <link rel="shortcut icon" href="img/favicon.ico">
+        <link href='http://fonts.googleapis.com/css?family=Open+Sans+Condensed:300,300italic,700' rel='stylesheet' type='text/css'>
+        <link href='http://fonts.googleapis.com/css?family=Ubuntu+Mono' rel='stylesheet' type='text/css'>
 
-		<script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular.js"></script>
-		<script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular-route.js"></script>
-		<script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular-sanitize.js"></script>
-		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular-route.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular-sanitize.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 
-		<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
-		<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+        <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+        <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
 
-		<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/2.0.2/js/toastr.min.js"></script>
-		<link href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/2.0.2/css/toastr.min.css" rel="stylesheet">
+        <script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/2.0.2/js/toastr.min.js"></script>
+        <link href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/2.0.2/css/toastr.min.css" rel="stylesheet">
 
-		<link href="css/balihoo.css" rel="stylesheet">
-		<script src="js/controller.js"></script>
-	</head>
-	<body>
-		<div id="wrap">
+        <link href="css/balihoo.css" rel="stylesheet">
+        <script src="js/controller.js"></script>
+    </head>
+    <body>
+        <div id="wrap">
 
-			<!-- Nav bar -->
-			<nav ng-controller="envController" class="navbar navbar-default navbar-fixed-top" role="navigation">
-				<div class="container">
-					<div class="collapse navbar-collapse navbar-ex1-collapse">
-							<div class="navbar-text pull-right" style="text-align: right;">
+            <!-- Nav bar -->
+            <nav ng-controller="envController" class="navbar navbar-default navbar-fixed-top" role="navigation">
+                <div class="container">
+                    <div class="collapse navbar-collapse navbar-ex1-collapse">
+                        <div class="navbar-text pull-right" style="text-align: right;">
 
-								<h1 style="display:table-cell; vertical-align: bottom; height:100%;"><a href="/">Fulfillment</a></h1>
+                            <h1 style="display:table-cell; vertical-align: bottom; height:100%;"><a href="/">Fulfillment</a></h1>
 								<span title="SWF Domain">
 									<b>{{environment.domain}}</b>
 								</span>
-								&nbsp;-&nbsp;
+                            &nbsp;-&nbsp;
 								<span title="AWS Region">
 									<b>{{environment.region}}</b>
 								</span>
-							</div>
+                        </div>
 					<span class="balihoo-logo">
 						<a href="/">
-							<img src="/img/balihoo-beta-logo.png" alt="Balihoo - Local Marketing. Automated.">
-						</a>
+                            <img src="/img/balihoo-beta-logo.png" alt="Balihoo - Local Marketing. Automated.">
+                        </a>
 					</span>
-					</div>
-				</div>
-				<div class="color-bar">
-					<div class="bar-green"></div>
-					<div class="bar-cyan"></div>
-					<div class="bar-orange"></div>
-					<div class="bar-gray"></div>
-				</div>
-			</nav>
-			<!-- End nav bar -->
+                    </div>
+                </div>
+                <div class="color-bar">
+                    <div class="bar-green"></div>
+                    <div class="bar-cyan"></div>
+                    <div class="bar-orange"></div>
+                    <div class="bar-gray"></div>
+                </div>
+            </nav>
+            <!-- End nav bar -->
 
-			<!-- Body -->
-			<div class="container main-content">
-				<div ng-view></div>
-			</div>
-			<!-- End body -->
-		</div>
-		<!-- End wrapper -->
+            <!-- Body -->
+            <div class="container main-content">
+                <div ng-view></div>
+            </div>
+            <!-- End body -->
+        </div>
+        <!-- End wrapper -->
 
-		<footer>
-			<div class="color-bar">
-				<div class="bar-green"></div>
-				<div class="bar-cyan"></div>
-				<div class="bar-orange"></div>
-				<div class="bar-gray"></div>
-			</div>
-		</footer>
+        <footer>
+            <div class="color-bar">
+                <div class="bar-green"></div>
+                <div class="bar-cyan"></div>
+                <div class="bar-orange"></div>
+                <div class="bar-gray"></div>
+            </div>
+        </footer>
 
-	</body>
+    </body>
 </html>
 
