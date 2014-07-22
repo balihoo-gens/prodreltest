@@ -25,7 +25,11 @@ app.config(
 				      controller : "workersController",
 				      templateUrl : "partials/workers.html",
 				      reloadOnSearch: false})
-			.otherwise({redirectTo : "/history"})
+			.when("/start", {
+				      controller : "envController",
+				      templateUrl : "partials/start.html",
+				      reloadOnSearch: false})
+			.otherwise({redirectTo : "/start"})
 		;
 	}
 );
@@ -49,6 +53,10 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 			.error(function(error) {
 				       toastr.error(error.details, error.error)
 			       });
+	};
+
+	$scope.go = function(where) {
+		$location.path(where);
 	};
 
 });
