@@ -79,7 +79,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
     var done = false
     val getch = new Getch
-    getch.addMapping(Seq("q", "Q", "Exit"), () => done = true)
+    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("quit");done = true})
 
     getch.doWith {
       while(!done) {

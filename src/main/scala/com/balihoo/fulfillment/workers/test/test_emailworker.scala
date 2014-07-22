@@ -1,4 +1,9 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.test
+import com.balihoo.fulfillment.workers.{
+  EmailSender,
+  EmailAddressVerifier,
+  EmailVerifiedAddressLister
+}
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters.{
   DynamoAdapter,
@@ -10,12 +15,13 @@ import com.amazonaws.services.simpleworkflow.model.{
   TaskList,
   WorkflowType
 }
+
 import scala.io.Source
 
-object test_emailworker {
+object email {
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
-    val config = PropertiesLoader(args, "sendemailworker")
+    val config = PropertiesLoader(args, "email")
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
 
     def usage() = {
@@ -24,7 +30,7 @@ object test_emailworker {
     }
 
     def verifyAddress() = {
-      val worker = new VerifyEmailAddressWorker(
+      val worker = new EmailAddressVerifier(
         new SWFAdapter(config),
         new DynamoAdapter(config),
         new SESAdapter(config)
@@ -36,7 +42,7 @@ object test_emailworker {
     }
 
     def getValidEmailList() = {
-      val worker = new ListVerifiedEmailAddressesWorker(
+      val worker = new EmailVerifiedAddressLister(
         new SWFAdapter(config),
         new DynamoAdapter(config),
         new SESAdapter(config)
@@ -51,7 +57,7 @@ object test_emailworker {
     }
 
     def sendEmail() = {
-      val worker = new SendEmailWorker(
+      val worker = new EmailSender(
         new SWFAdapter(config),
         new DynamoAdapter(config),
         new SESAdapter(config)
@@ -78,23 +84,33 @@ object test_emailworker {
       val swf = new SWFAdapter(config)
       println("enter the json input filename")
       val inputfile = readLine("inputfile> ")
-      val input = Source.fromFile(inputfile).mkString
-      swf.client.startWorkflowExecution(
-        new StartWorkflowExecutionRequest()
-          .withDomain(swf.domain)
-          .withWorkflowId("test_emailworker")
-          .withInput(input)
-          .withExecutionStartToCloseTimeout("1600")
-          .withTaskList(
-            new TaskList()
-              .withName("default_tasks")
-          )
-          .withWorkflowType(
-            new WorkflowType()
-              .withName("emailtest")
-              .withVersion("1")
-          )
-      )
+      val input = try {
+        Source.fromFile(inputfile.trim).mkString
+      } catch {
+        case e:Exception => {
+          println(e.getMessage)
+          ""
+        }
+      }
+
+      if (input.length() > 0) {
+        swf.client.startWorkflowExecution(
+          new StartWorkflowExecutionRequest()
+            .withDomain(swf.domain)
+            .withWorkflowId("test_emailworker")
+            .withInput(input)
+            .withExecutionStartToCloseTimeout("1600")
+            .withTaskList(
+              new TaskList()
+                .withName("default_tasks")
+            )
+            .withWorkflowType(
+              new WorkflowType()
+                .withName("emailtest")
+                .withVersion("1")
+            )
+        )
+      }
     }
 
     options("h") = ("Display Help", usage _)
