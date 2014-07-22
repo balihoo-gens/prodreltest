@@ -11,6 +11,7 @@ import com.balihoo.fulfillment.adapters.{SWFAdapterProvider, SWFAdapter}
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.util.Getch
 
 object Constants {
   final val delimiter = "##"
