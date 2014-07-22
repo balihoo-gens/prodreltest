@@ -199,6 +199,7 @@ a .caption {
 	padding: 25px 20px;
 	border-top-left-radius: 10px;
 	border-top-right-radius: 0;
+	color:white;
 }
 
 .panel-heading-small {
@@ -223,6 +224,7 @@ a .caption {
 .panel-default > .panel-heading {
 	background: #59595b;
 	border-bottom: none;
+	color:white;
 }
 
 .panel-default > .panel-heading-small {
@@ -834,4 +836,19 @@ footer .container {
 
 .table.params {
 	font-size:14px;
+}
+
+.lightbox {
+	margin:6px;
+	padding:4px;
+	border:1px solid #bbbbbb;
+	min-width:270px;
+	min-height:70px;
+}
+
+.shadow {
+	border-radius: 0;
+	border-top-left-radius: 6px;
+	border-bottom-right-radius: 6px;
+	box-shadow: 3px 3px 3px #888888;
 }

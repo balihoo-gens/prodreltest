@@ -6,6 +6,10 @@ toastr.options = {
 	"timeOut" : "50000"
 };
 
+app.factory('environment', function() {
+	return {};
+});
+
 app.config(
 	function($routeProvider) {
 		$routeProvider
@@ -26,7 +30,7 @@ app.config(
 	}
 );
 
-app.controller('envController', function($scope, $route, $http, $location) {
+app.controller('envController', function($scope, $route, $http, $location, environment) {
 
 	$scope.$on(
 		"$routeChangeSuccess",
@@ -40,6 +44,7 @@ app.controller('envController', function($scope, $route, $http, $location) {
 		$http.get('workflow/environment', {})
 			.success(function(data) {
 				         $scope.environment = data;
+			             environment.data = data;
 			         })
 			.error(function(error) {
 				       toastr.error(error.details, error.error)
@@ -213,7 +218,9 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
 });
 
-app.controller('workersController', function($scope, $route, $http, $location) {
+app.controller('workersController', function($scope, $route, $http, $location, environment) {
+
+	$scope.showDefunct = false;
 
 	$scope.$on(
 		"$routeChangeSuccess",
@@ -230,11 +237,45 @@ app.controller('workersController', function($scope, $route, $http, $location) {
 			.success(function(data) {
 				         $scope.loading = false;
 				         $scope.workers = data;
+			             $scope.categorizeWorkers();
+			             $scope.currentDomain = environment.data.domain;
 			         })
 			.error(function(error) {
 				       $scope.loading = false;
 				       toastr.error(error.details, error.error)
 			       });
+	};
+
+	$scope.setFreshnessLabel = function(worker) {
+
+		worker.defunct = false;
+		if(worker.minutesSinceLast < 2) {
+			worker.freshness = "label-success";
+		} else if(worker.minutesSinceLast < 5) {
+			worker.freshness = "label-warning";
+		} else {
+			worker.freshness = "label-default";
+			worker.defunct = true;
+		}
+	};
+
+	$scope.categorizeWorkers = function() {
+		$scope.domains = {};
+		for(var w in $scope.workers) {
+			var worker = $scope.workers[w];
+			$scope.setFreshnessLabel(worker);
+
+			if(!$scope.domains.hasOwnProperty(worker.domain)) {
+				$scope.domains[worker.domain] = {};
+			}
+			var domain = $scope.domains[worker.domain];
+			if(!domain.hasOwnProperty(worker.activityName)) {
+				domain[worker.activityName] = [];
+			}
+
+			domain[worker.activityName].push(worker);
+
+		}
 	};
 
 });
