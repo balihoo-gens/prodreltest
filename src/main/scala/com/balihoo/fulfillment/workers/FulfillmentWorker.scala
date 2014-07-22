@@ -76,7 +76,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
     var done = false
     val getch = new Getch
-    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("quit");done = true})
+    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
 
     getch.doWith {
       while(!done) {
@@ -104,7 +104,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
       }
     }
     updateStatus("Exiting")
-    print("Exiting...")
+    print("Cleaning up...")
   }
 
   def handleTask(params:ActivityParameters)
