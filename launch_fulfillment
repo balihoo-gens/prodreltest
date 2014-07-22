@@ -2,6 +2,7 @@
 
 import sys, os
 
+
 def launch(jar, classes):
     launch = "nohup java -cp %s %s > logs/%s.log 2>&1 &"
 
@@ -11,8 +12,9 @@ def launch(jar, classes):
         print "Running", command
         os.system(command)
 
+
 if __name__ == "__main__":
-    jar = "fulfillment-assembly-1.0-SNAPSHOT.jar"
+    jar = "fulfillment.jar"
     classes = [
         'com.balihoo.fulfillment.workers.adwords_accountcreator',
         'com.balihoo.fulfillment.workers.adwords_accountlookup',
@@ -20,13 +22,16 @@ if __name__ == "__main__":
         'com.balihoo.fulfillment.workers.adwords_campaignprocessor',
         'com.balihoo.fulfillment.workers.adwords_imageadprocessor',
         'com.balihoo.fulfillment.workers.chaosworker',
-        'com.balihoo.fulfillment.workers.listverifiedemailaddressworker',
+        'com.balihoo.fulfillment.workers.email_addressverifier',
+        'com.balihoo.fulfillment.workers.email_sender',
+        'com.balihoo.fulfillment.workers.email_verifiedaddresslister',
         'com.balihoo.fulfillment.workers.noopworker',
-        'com.balihoo.fulfillment.workers.sendemailworker',
         'com.balihoo.fulfillment.workers.timezoneworker',
-        'com.balihoo.fulfillment.workers.verifyemailaddressworker',
         'com.balihoo.fulfillment.deciders.coordinator'
     ]
+
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
 
     if len(sys.argv) > 1:
         jar = sys.argv[1]
