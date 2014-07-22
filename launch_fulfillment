@@ -1,41 +1,41 @@
-# !/usr/bin/python
+#!/usr/bin/python
 
 import sys, os
 
 
 def launch(jar, classes):
-	launch = "nohup java -cp %s %s > logs/%s.log 2>&1 &"
+    launch = "nohup java -cp %s %s > logs/%s.log 2>&1 &"
 
-	for path in classes:
-		cname = path.split('.')[-1]
-		command = launch % (jar, path, cname)
-		print "Running", command
-		os.system(command)
+    for path in classes:
+        cname = path.split('.')[-1]
+        command = launch % (jar, path, cname)
+        print "Running", command
+        os.system(command)
 
 
 if __name__ == "__main__":
-	jar = "fulfillment.jar"
-	classes = [
-		'com.balihoo.fulfillment.workers.adwords_accountcreator',
-		'com.balihoo.fulfillment.workers.adwords_accountlookup',
-		'com.balihoo.fulfillment.workers.adwords_adgroupprocessor',
-		'com.balihoo.fulfillment.workers.adwords_campaignprocessor',
-		'com.balihoo.fulfillment.workers.adwords_imageadprocessor',
-		'com.balihoo.fulfillment.workers.chaosworker',
-		'com.balihoo.fulfillment.workers.email_addressverifier',
-		'com.balihoo.fulfillment.workers.email_sender',
-		'com.balihoo.fulfillment.workers.email_verifiedaddresslister',
-		'com.balihoo.fulfillment.workers.noopworker',
-		'com.balihoo.fulfillment.workers.timezoneworker',
-		'com.balihoo.fulfillment.deciders.coordinator'
-	]
+    jar = "fulfillment.jar"
+    classes = [
+        'com.balihoo.fulfillment.workers.adwords_accountcreator',
+        'com.balihoo.fulfillment.workers.adwords_accountlookup',
+        'com.balihoo.fulfillment.workers.adwords_adgroupprocessor',
+        'com.balihoo.fulfillment.workers.adwords_campaignprocessor',
+        'com.balihoo.fulfillment.workers.adwords_imageadprocessor',
+        'com.balihoo.fulfillment.workers.chaosworker',
+        'com.balihoo.fulfillment.workers.email_addressverifier',
+        'com.balihoo.fulfillment.workers.email_sender',
+        'com.balihoo.fulfillment.workers.email_verifiedaddresslister',
+        'com.balihoo.fulfillment.workers.noopworker',
+        'com.balihoo.fulfillment.workers.timezoneworker',
+        'com.balihoo.fulfillment.deciders.coordinator'
+    ]
 
-	if not os.path.exists("logs"):
-		os.makedirs("logs")
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
 
-	if len(sys.argv) > 1:
-		jar = sys.argv[1]
-		if len(sys.argv) > 2:
-			classes = sys.argv[2:]
+    if len(sys.argv) > 1:
+        jar = sys.argv[1]
+        if len(sys.argv) > 2:
+            classes = sys.argv[2:]
 
-	launch(jar, classes)
+    launch(jar, classes)
