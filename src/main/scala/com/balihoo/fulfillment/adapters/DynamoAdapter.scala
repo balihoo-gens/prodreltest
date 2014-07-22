@@ -7,10 +7,15 @@ import scala.collection.JavaConversions._
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
 import com.amazonaws.services.dynamodbv2.model._
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.config.PropertiesLoaderProvider
 import com.amazonaws.regions.{Regions, Region}
 
-class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBAsyncClient](loader){
+//for the cake pattern dependency injection
+trait DynamoAdapterProvider {
+  val dynamoAdapter: DynamoAdapter
+}
+
+abstract class DynamoAdapter extends AWSAdapter[AmazonDynamoDBAsyncClient] with PropertiesLoaderProvider {
   val mapper = new DynamoDBMapper(client)
 
   def put(item:DynamoItem) = {
@@ -40,7 +45,6 @@ class DynamoAdapter(loader: PropertiesLoader) extends AWSAdapter[AmazonDynamoDBA
         log(e.getMessage)
     }
   }
-
 }
 
 class DynamoItem(table:String) {
@@ -94,4 +98,3 @@ class DynamoUpdate(table:String) {
     updateRequest
   }
 }
-

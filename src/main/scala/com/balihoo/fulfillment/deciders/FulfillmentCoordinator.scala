@@ -6,11 +6,11 @@ import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
 
-import com.balihoo.fulfillment.adapters.SWFAdapterProvider
+import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
-import com.balihoo.fulfillment.config.PropertiesLoaderProvider
 import com.balihoo.fulfillment.util.Getch
 
 object Constants {

@@ -18,7 +18,8 @@ import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
 import com.balihoo.fulfillment.util.Getch
 
-abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter) {
+abstract class FulfillmentWorker {
+  this: SWFAdapterProvider with DynamoAdapterProvider =>
 
   val instanceId = randomUUID().toString
 
@@ -41,7 +42,10 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 //  val localhostname = java.net.InetAddress.getLocalHost.getHostName
 //  println(localhostname)
 
-  val workerTable = new FulfillmentWorkerTable(dynamoAdapter)
+  val da = dynamoAdapter
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterProvider {
+    val dynamoAdapter = da.asInstanceOf[DynamoAdapter]
+  }
 
   val entry = new FulfillmentWorkerEntry
   entry.setInstance(instanceId)
@@ -240,7 +244,8 @@ object UTCFormatter {
 
 }
 
-class FulfillmentWorkerTable(val dynamoAdapter:DynamoAdapter) {
+class FulfillmentWorkerTable {
+  this: DynamoAdapterProvider =>
 
   def insert(entry:FulfillmentWorkerEntry) = {
     dynamoAdapter.put(entry.getDynamoItem)

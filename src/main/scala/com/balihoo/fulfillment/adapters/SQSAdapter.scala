@@ -1,16 +1,13 @@
 package com.balihoo.fulfillment.adapters
 
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.config.PropertiesLoaderProvider
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.sqs.AmazonSQSClient
 
-class SQSAdapter(loader: PropertiesLoader) {
-  private val accessKey: String = loader.getString("aws.accessKey")
-  private val secretKey = loader.getString("aws.secretKey")
+//for the cake pattern dependency injection
+trait SQSAdapterProvider {
+  val sqsAdapter: SQSAdapter
+}
 
-  private val credentials = new BasicAWSCredentials(accessKey, secretKey)
-  val client = new AmazonSQSClient(credentials)
-
-  val config = loader
-
+abstract class SQSAdapter extends AWSAdapter[AmazonSQSClient] with PropertiesLoaderProvider {
 }

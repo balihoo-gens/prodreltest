@@ -11,13 +11,15 @@ import scala.collection.JavaConverters._
 import javax.servlet.http.HttpServletResponse
 
 import com.amazonaws.services.simpleworkflow.model._
-import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter}
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config._
+
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 
-class WorkflowInspector(swfAdapter: SWFAdapter) {
+class WorkflowInspector {
+  this: SWFAdapterProvider =>
 
   def executionHistory():List[JsValue] = {
 
@@ -94,9 +96,13 @@ class WorkflowInspector(swfAdapter: SWFAdapter) {
 
 
 
-class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
+class WorkflowServlet extends RestServlet {
+  this: SWFAdapterProvider =>
 
-  val wi = new WorkflowInspector(swfAdapter)
+  val swf = swfAdapter
+  val wi = new WorkflowInspector with SWFAdapterProvider {
+    val swfAdapter = swf
+  }
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
@@ -118,9 +124,13 @@ class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
 
 }
 
-class WorkerServlet(dynamoAdapter:DynamoAdapter) extends RestServlet {
+class WorkerServlet extends RestServlet {
+  this: DynamoAdapterProvider =>
 
-  val workerTable = new FulfillmentWorkerTable(dynamoAdapter)
+  val da = dynamoAdapter
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterProvider {
+    val dynamoAdapter = da
+  }
 
   get("/worker", (rsq:RestServletQuery) => {
 
@@ -139,20 +149,32 @@ class WorkerServlet(dynamoAdapter:DynamoAdapter) extends RestServlet {
 
 object dashboard {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
 
-    val swfAdapter = new SWFAdapter(config)
-    val dynamoAdapter = new DynamoAdapter(config)
+    object dashboardConfig extends PropertiesLoaderProvider {
+      val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    }
 
-    val server = new Server(config.getInt("port"))
     val context = new WebAppContext()
     context setContextPath "/"
     context.setResourceBase("src/main/webapp")
     context.setWelcomeFiles(Array[String]("index.html"))
 
-    context.addServlet(new ServletHolder(new WorkerServlet(dynamoAdapter)), "/worker/*")
-    context.addServlet(new ServletHolder(new WorkflowServlet(swfAdapter)), "/workflow/*")
+    val workerServlet = new WorkerServlet with DynamoAdapterProvider {
+      lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderProvider {
+        lazy val config = dashboardConfig.config
+      }
+    }
 
+    val workflowServlet = new WorkflowServlet with SWFAdapterProvider {
+      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderProvider {
+        lazy val config = dashboardConfig.config
+      }
+    }
+
+    context.addServlet(new ServletHolder(workerServlet), "/worker/*")
+    context.addServlet(new ServletHolder(workflowServlet), "/workflow/*")
+
+    val server = new Server(dashboardConfig.config.getInt("port"))
     server.setHandler(context)
     server.start()
     server.join()
