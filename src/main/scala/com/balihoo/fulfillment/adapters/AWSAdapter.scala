@@ -1,12 +1,17 @@
 package com.balihoo.fulfillment.adapters
 
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.config.PropertiesLoaderProvider
 import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentialsProvider}
 import com.amazonaws.regions.{Regions, Region}
 import scala.reflect.ClassTag
 
-abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag](val config: PropertiesLoader) {
+abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] {
+  this: PropertiesLoaderProvider =>
+
+  //can't have constructor code using the self type reference
+  // unless it was declared 'lazy'. If not, config is still null
+  // and will throw a NullPointerException at this time.
   private val accessKey: String = config.getString("aws.accessKey")
   private val secretKey = config.getString("aws.secretKey")
   private val credentials = new BasicAWSCredentials(accessKey, secretKey)

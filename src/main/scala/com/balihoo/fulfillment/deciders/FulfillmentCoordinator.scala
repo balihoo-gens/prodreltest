@@ -6,11 +6,11 @@ import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
 
-import com.balihoo.fulfillment.adapters.{SWFAdapterProvider, SWFAdapter}
+import com.balihoo.fulfillment.adapters.SWFAdapterProvider
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.config.PropertiesLoaderProvider
 import com.balihoo.fulfillment.util.Getch
 
 object Constants {
@@ -20,17 +20,21 @@ object Constants {
 class FulfillmentCoordinator {
   this: SWFAdapterProvider =>
 
+  //can't have constructor code using the self type reference
+  // unless it was declared 'lazy'. If not, swfAdapter is still null
+  // and will throw a NullPointerException at this time.
+  val domain = swfAdapter.config.getString("domain")
+  val taskListName = swfAdapter.config.getString("tasklist")
+
+  val taskList: TaskList = new TaskList()
+    .withName(taskListName)
+
+  val taskReq: PollForDecisionTaskRequest = new PollForDecisionTaskRequest()
+    .withDomain(domain)
+    .withTaskList(taskList)
+
+
   def coordinate() = {
-
-    val domain = swfAdapter.config.getString("domain")
-    val taskListName = swfAdapter.config.getString("tasklist")
-
-    val taskList: TaskList = new TaskList()
-      .withName(taskListName)
-
-    val taskReq: PollForDecisionTaskRequest = new PollForDecisionTaskRequest()
-      .withDomain(domain)
-      .withTaskList(taskList)
 
     var done = false
     val getch = new Getch
@@ -264,9 +268,10 @@ class DecisionGenerator(categorized: CategorizedSections
 
 object coordinator {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val fc: FulfillmentCoordinator = new FulfillmentCoordinator with SWFAdapterProvider {
-      val swfAdapter = new SWFAdapter(config)
+      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderProvider {
+        lazy val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+      }
     }
     println("Running decider")
     fc.coordinate()
