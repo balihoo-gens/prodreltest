@@ -1,13 +1,13 @@
 package com.balihoo.fulfillment.adapters
 
-import com.balihoo.fulfillment.config.PropertiesLoaderProvider
+import com.balihoo.fulfillment.config.PropertiesLoaderComponent
 import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentialsProvider}
 import com.amazonaws.regions.{Regions, Region}
 import scala.reflect.ClassTag
 
 abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] {
-  this: PropertiesLoaderProvider =>
+  this: PropertiesLoaderComponent =>
 
   //can't have constructor code using the self type reference
   // unless it was declared 'lazy'. If not, config is still null

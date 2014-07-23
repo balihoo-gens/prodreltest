@@ -1,19 +1,19 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.config.{PropertiesLoader,PropertiesLoaderComponent}
 import com.balihoo.fulfillment.adapters._
 import com.google.api.ads.adwords.axis.v201402.mcm.ManagedCustomer
 
-class AdWordsAccountLookup(swfAdapter: SWFAdapter,
-                           dynamoAdapter: DynamoAdapter,
-                           adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
+abstract class AdWordsAccountLookup extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
+  this: AdWordsAdapterComponent =>
 
-  val creator = new AccountCreator(adwordsAdapter)
+  val creator = new AccountCreator with AdWordsAdapterComponent {
+    lazy val adWordsAdapter = AdWordsAccountLookup.this.adWordsAdapter
+  }
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(creator.lookupParentAccount(params))
+      adWordsAdapter.setClientId(creator.lookupParentAccount(params))
 
       val aname = params.getRequiredParameter("name")
       creator.getAccount(params) match {
@@ -38,11 +38,13 @@ class AdWordsAccountLookup(swfAdapter: SWFAdapter,
 
 object adwords_accountlookup {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountLookup(
-      new SWFAdapter(config)
-      ,new DynamoAdapter(config)
-      ,new AdWordsAdapter(config))
+    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsAccountLookup
+      with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
+        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+      }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }

@@ -1,14 +1,11 @@
 package com.balihoo.fulfillment.workers.test
+
+import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.workers.{
   EmailSender,
   EmailAddressVerifier,
   EmailVerifiedAddressLister
-}
-import com.balihoo.fulfillment.config.PropertiesLoader
-import com.balihoo.fulfillment.adapters.{
-  DynamoAdapter,
-  SWFAdapter,
-  SESAdapter
 }
 import com.amazonaws.services.simpleworkflow.model.{
   StartWorkflowExecutionRequest,
@@ -21,7 +18,7 @@ import scala.io.Source
 object email {
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
-    val config = PropertiesLoader(args, "email")
+    val cfg = PropertiesLoader(args, "email")
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
 
     def usage() = {
@@ -30,11 +27,12 @@ object email {
     }
 
     def verifyAddress() = {
-      val worker = new EmailAddressVerifier(
-        new SWFAdapter(config),
-        new DynamoAdapter(config),
-        new SESAdapter(config)
-      )
+      val worker = new EmailAddressVerifier
+        with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
+          lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          lazy val sesAdapter = new SESAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        }
       println("enter the address to verify")
       val address = readLine("verifyemail> ")
       worker.verifyAddress(address)
@@ -42,11 +40,12 @@ object email {
     }
 
     def getValidEmailList() = {
-      val worker = new EmailVerifiedAddressLister(
-        new SWFAdapter(config),
-        new DynamoAdapter(config),
-        new SESAdapter(config)
-      )
+      val worker = new EmailVerifiedAddressLister
+        with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
+          lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          lazy val sesAdapter = new SESAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        }
       worker.listVerifiedEmailAddresses()
     }
 
@@ -57,11 +56,12 @@ object email {
     }
 
     def sendEmail() = {
-      val worker = new EmailSender(
-        new SWFAdapter(config),
-        new DynamoAdapter(config),
-        new SESAdapter(config)
-      )
+      val worker = new EmailSender
+        with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
+          lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          lazy val sesAdapter = new SESAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        }
       val from = "gens@balihoo.com"
       val subject = "This is an EmailWorker Test"
       val body = "<h1>sup<br>SUP</h1>"
@@ -81,7 +81,7 @@ object email {
     }
 
     def submitTask() = {
-      val swf = new SWFAdapter(config)
+      object swf extends SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
       println("enter the json input filename")
       val inputfile = readLine("inputfile> ")
       val input = try {

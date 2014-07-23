@@ -1,24 +1,24 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
-import com.balihoo.fulfillment.config.PropertiesLoader
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 import scala.collection.mutable
 
-class AdWordsAdGroupProcessor(swfAdapter: SWFAdapter,
-                              dynamoAdapter: DynamoAdapter,
-                              adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
+abstract class AdWordsAdGroupProcessor extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
+  this: AdWordsAdapterComponent =>
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(params.getRequiredParameter("account"))
+      adWordsAdapter.setClientId(params.getRequiredParameter("account"))
 
-      val creator = new AdGroupCreator(adwordsAdapter)
+      val creator = new AdGroupCreator with AdWordsAdapterComponent {
+        lazy val adWordsAdapter = AdWordsAdGroupProcessor.this.adWordsAdapter
+      }
 
       val adGroup = creator.getAdGroup(params) match {
         case group: AdGroup =>
@@ -41,7 +41,8 @@ class AdWordsAdGroupProcessor(swfAdapter: SWFAdapter,
   }
 }
 
-class AdGroupCreator(adwords:AdWordsAdapter) {
+abstract class AdGroupCreator {
+  this: AdWordsAdapterComponent =>
 
   def getAdGroup(params:ActivityParameters): AdGroup = {
 
@@ -55,8 +56,8 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       .equals("CampaignId", campaignId)
       .build()
 
-    adwords.withErrorsHandled[AdGroup](context, {
-      val page = adwords.adGroupService.get(selector)
+    adWordsAdapter.withErrorsHandled[AdGroup](context, {
+      val page = adWordsAdapter.adGroupService.get(selector)
       page.getTotalNumEntries.intValue() match {
         case 0 => null
         case 1 => page.getEntries(0)
@@ -71,7 +72,9 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     val campaignId = params.getRequiredParameter("campaignId")
     val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
 
-    val ccreator = new CampaignCreator(adwords)
+    val ccreator = new CampaignCreator with AdWordsAdapterComponent {
+      lazy val adWordsAdapter = AdGroupCreator.this.adWordsAdapter
+    }
     val campaign = ccreator.getCampaign(campaignId)
 
     val adGroup = new AdGroup()
@@ -81,7 +84,7 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
 
     val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
     val money = new Money()
-    money.setMicroAmount(adwords.dollarsToMicros(params.getRequiredParameter("bidDollars").toFloat))
+    money.setMicroAmount(adWordsAdapter.dollarsToMicros(params.getRequiredParameter("bidDollars").toFloat))
 
     campaign.getBiddingStrategyConfiguration.getBiddingStrategyType match {
       case BiddingStrategyType.MANUAL_CPC =>
@@ -102,8 +105,8 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     operation.setOperand(adGroup)
     operation.setOperator(Operator.ADD)
 
-    val newGroup = adwords.withErrorsHandled[AdGroup](context, {
-      adwords.adGroupService.mutate(Array(operation)).getValue(0)
+    val newGroup = adWordsAdapter.withErrorsHandled[AdGroup](context, {
+      adWordsAdapter.adGroupService.mutate(Array(operation)).getValue(0)
     })
 
     addTargeting(newGroup, params.getRequiredParameter("target"))
@@ -132,8 +135,8 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.withErrorsHandled[Any](context, {
-      adwords.adGroupCriterionService.mutate(operations.toArray)
+    adWordsAdapter.withErrorsHandled[Any](context, {
+      adWordsAdapter.adGroupCriterionService.mutate(operations.toArray)
     })
   }
 
@@ -159,8 +162,8 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.withErrorsHandled[Any](context, {
-      adwords.adGroupCriterionService.mutate(operations.toArray)
+    adWordsAdapter.withErrorsHandled[Any](context, {
+      adWordsAdapter.adGroupCriterionService.mutate(operations.toArray)
     })
   }
 
@@ -175,7 +178,7 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       .equals("AdGroupId", String.valueOf(adGroup.getId))
       .build()
 
-    val existing:AdGroupCriterionPage = adwords.adGroupCriterionService.get(existingSelector)
+    val existing:AdGroupCriterionPage = adWordsAdapter.adGroupCriterionService.get(existingSelector)
     for(page <- existing.getEntries) {
       page.getCriterion match {
         case keyword: Keyword =>
@@ -202,8 +205,8 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
       }
     }
 
-    adwords.withErrorsHandled[Any](context, {
-      adwords.adGroupCriterionService.mutate(operations.toArray)
+    adWordsAdapter.withErrorsHandled[Any](context, {
+      adWordsAdapter.adGroupCriterionService.mutate(operations.toArray)
     })
 
     addTargeting(adGroup, targetJson)
@@ -235,7 +238,7 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
         case "bidDollars" =>
           val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
           val money = new Money()
-          money.setMicroAmount(adwords.dollarsToMicros(value.toFloat))
+          money.setMicroAmount(adWordsAdapter.dollarsToMicros(value.toFloat))
 
           adGroup.getBiddingStrategyConfiguration.getBiddingStrategyType match {
             case BiddingStrategyType.MANUAL_CPC =>
@@ -262,33 +265,36 @@ class AdGroupCreator(adwords:AdWordsAdapter) {
     operation.setOperand(adGroup)
     operation.setOperator(Operator.SET)
 
-    adwords.withErrorsHandled[AdGroup](context, {
-      adwords.adGroupService.mutate(Array(operation)).getValue(0)
+    adWordsAdapter.withErrorsHandled[AdGroup](context, {
+      adWordsAdapter.adGroupService.mutate(Array(operation)).getValue(0)
     })
   }
 }
 
 object adwords_adgroupprocessor {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAdGroupProcessor(
-      new SWFAdapter(config)
-      ,new DynamoAdapter(config)
-      ,new AdWordsAdapter(config))
+    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsAdGroupProcessor
+      with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
+        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+      }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
 }
 
+/*
 object test_adwordsAdGroupCreator {
   def main(args: Array[String]) {
     val config = PropertiesLoader(args, "adwords")
-    val adwords = new AdWordsAdapter(config)
-    val ccreator = new CampaignCreator(adwords)
-    val acreator = new AdGroupCreator(adwords)
+    val adWordsAdapter = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adWordsAdapter)
+    val acreator = new AdGroupCreator(adWordsAdapter)
 
-    adwords.setValidateOnly(false)
-    adwords.setClientId("100-019-2687")
+    adWordsAdapter.setValidateOnly(false)
+    adWordsAdapter.setClientId("100-019-2687")
 
     val campaignParams =
       s"""{
@@ -322,12 +328,12 @@ object test_adwordsAdGroupCreator {
 object test_adwordsAdGroupSetInterests {
   def main(args: Array[String]) {
     val config = PropertiesLoader(args, "adwords")
-    val adwords = new AdWordsAdapter(config)
-    val ccreator = new CampaignCreator(adwords)
-    val acreator = new AdGroupCreator(adwords)
+    val adWordsAdapter = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adWordsAdapter)
+    val acreator = new AdGroupCreator(adWordsAdapter)
 
-    adwords.setValidateOnly(false)
-    adwords.setClientId("100-019-2687")
+    adWordsAdapter.setValidateOnly(false)
+    adWordsAdapter.setClientId("100-019-2687")
 
     val campaignParams =
       s"""{
@@ -352,12 +358,12 @@ object test_adwordsAdGroupSetInterests {
 object test_adwordsAdGroupSetKeywords {
   def main(args: Array[String]) {
     val config = PropertiesLoader(args, "adwords")
-    val adwords = new AdWordsAdapter(config)
-    val ccreator = new CampaignCreator(adwords)
-    val acreator = new AdGroupCreator(adwords)
+    val adWordsAdapter = new AdWordsAdapter(config)
+    val ccreator = new CampaignCreator(adWordsAdapter)
+    val acreator = new AdGroupCreator(adWordsAdapter)
 
-    adwords.setValidateOnly(false)
-    adwords.setClientId("100-019-2687")
+    adWordsAdapter.setValidateOnly(false)
+    adWordsAdapter.setClientId("100-019-2687")
 
     val campaignParams =
       s"""{
@@ -377,4 +383,4 @@ object test_adwordsAdGroupSetKeywords {
 
   }
 }
-
+*/

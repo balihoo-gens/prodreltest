@@ -18,7 +18,7 @@ object Constants {
 }
 
 class FulfillmentCoordinator {
-  this: SWFAdapterProvider =>
+  this: SWFAdapterComponent =>
 
   //can't have constructor code using the self type reference
   // unless it was declared 'lazy'. If not, swfAdapter is still null
@@ -268,8 +268,8 @@ class DecisionGenerator(categorized: CategorizedSections
 
 object coordinator {
   def main(args: Array[String]) {
-    val fc: FulfillmentCoordinator = new FulfillmentCoordinator with SWFAdapterProvider {
-      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderProvider {
+    val fc: FulfillmentCoordinator = new FulfillmentCoordinator with SWFAdapterComponent {
+      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
         lazy val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
       }
     }

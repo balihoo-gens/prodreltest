@@ -1,22 +1,22 @@
 package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 
 import scala.collection.mutable
 
-class AdWordsCampaignProcessor(swfAdapter: SWFAdapter,
-                               dynamoAdapter: DynamoAdapter,
-                               adwordsAdapter: AdWordsAdapter)
-  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
+abstract class AdWordsCampaignProcessor extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
+  this: AdWordsAdapterComponent =>
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adwordsAdapter.setClientId(params.getRequiredParameter("account"))
+      adWordsAdapter.setClientId(params.getRequiredParameter("account"))
 
-      val creator = new CampaignCreator(adwordsAdapter)
+      val creator = new CampaignCreator with AdWordsAdapterComponent {
+        lazy val adWordsAdapter = AdWordsCampaignProcessor.this.adWordsAdapter
+      }
 
       val campaign = creator.getCampaign(params) match {
         case campaign:Campaign =>
@@ -38,7 +38,9 @@ class AdWordsCampaignProcessor(swfAdapter: SWFAdapter,
     }
   }
 }
-class BudgetCreator(adwords:AdWordsAdapter) {
+
+abstract class BudgetCreator {
+  this: AdWordsAdapterComponent =>
 
   def getBudget(name: String): Budget = {
 
@@ -49,8 +51,8 @@ class BudgetCreator(adwords:AdWordsAdapter) {
       .equals("BudgetName", name)
       .build()
 
-    adwords.withErrorsHandled[Budget](context, {
-      val page = adwords.budgedService.get(selector)
+    adWordsAdapter.withErrorsHandled[Budget](context, {
+      val page = adWordsAdapter.budgedService.get(selector)
       page.getTotalNumEntries.intValue() match {
         case 0 => null
         case 1 => page.getEntries(0)
@@ -64,7 +66,7 @@ class BudgetCreator(adwords:AdWordsAdapter) {
 
     val budget = new Budget()
     val money = new Money()
-    money.setMicroAmount(adwords.dollarsToMicros(amount.toFloat))
+    money.setMicroAmount(adWordsAdapter.dollarsToMicros(amount.toFloat))
     budget.setAmount(money)
     budget.setName(name)
     budget.setDeliveryMethod(BudgetBudgetDeliveryMethod.STANDARD)
@@ -75,13 +77,14 @@ class BudgetCreator(adwords:AdWordsAdapter) {
     operation.setOperand(budget)
     operation.setOperator(Operator.ADD)
 
-    adwords.withErrorsHandled[Budget](context, {
-      adwords.budgedService.mutate(Array(operation)).getValue(0)
+    adWordsAdapter.withErrorsHandled[Budget](context, {
+      adWordsAdapter.budgedService.mutate(Array(operation)).getValue(0)
     })
   }
 }
 
-class CampaignCreator(adwords:AdWordsAdapter) {
+abstract class CampaignCreator {
+  this: AdWordsAdapterComponent =>
 
   def getCampaign(params: ActivityParameters):Campaign = {
 
@@ -95,8 +98,8 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .equals("AdvertisingChannelType", channel)
       .build()
 
-    adwords.withErrorsHandled[Campaign](context, {
-      val page = adwords.campaignService.get(selector)
+    adWordsAdapter.withErrorsHandled[Campaign](context, {
+      val page = adWordsAdapter.campaignService.get(selector)
       page.getTotalNumEntries.intValue() match {
         case 0 => null
         case 1 => page.getEntries(0)
@@ -114,8 +117,8 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .equals("Id", id)
       .build()
 
-    adwords.withErrorsHandled[Campaign](context, {
-      val page = adwords.campaignService.get(selector)
+    adWordsAdapter.withErrorsHandled[Campaign](context, {
+      val page = adWordsAdapter.campaignService.get(selector)
       page.getTotalNumEntries.intValue() match {
         case 0 => null
         case 1 => page.getEntries(0)
@@ -131,7 +134,9 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     val context = s"createCampaign(name='$name', channel='$channel')"
 
     val budgetName = s"$name Budget"
-    val budgetCreator = new BudgetCreator(adwords)
+    val budgetCreator = new BudgetCreator with AdWordsAdapterComponent {
+      lazy val adWordsAdapter = CampaignCreator.this.adWordsAdapter
+    }
     val budget:Budget = budgetCreator.getBudget(budgetName) match {
       case b:Budget => b
       case _ =>
@@ -191,8 +196,8 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     operation.setOperand(campaign)
     operation.setOperator(Operator.ADD)
 
-    val madeCampaign = adwords.withErrorsHandled[Campaign](context, {
-      adwords.campaignService.mutate(Array(operation)).getValue(0)
+    val madeCampaign = adWordsAdapter.withErrorsHandled[Campaign](context, {
+      adWordsAdapter.campaignService.mutate(Array(operation)).getValue(0)
     })
 
     setTargetZips(madeCampaign, params.getRequiredParameter("targetzips"))
@@ -224,15 +229,15 @@ class CampaignCreator(adwords:AdWordsAdapter) {
     operation.setOperand(campaign)
     operation.setOperator(Operator.SET)
 
-    adwords.withErrorsHandled[Campaign](context, {
-      adwords.campaignService.mutate(Array(operation)).getValue(0)
+    adWordsAdapter.withErrorsHandled[Campaign](context, {
+      adWordsAdapter.campaignService.mutate(Array(operation)).getValue(0)
     })
   }
 
   /**
    * This function is the result of the unfortunate fact that you can't (or at least I couldn't figure out)
    * filter by CountryCode = 'US' as you'd expect.
-   * Details here: https://developers.google.com/adwords/api/docs/appendix/selectorfields#v201402-LocationCriterionService
+   * Details here: https://developers.google.com/adWordsAdapter/api/docs/appendix/selectorfields#v201402-LocationCriterionService
    * @param locations Array[LocationCriterion]
    * @return
    */
@@ -260,7 +265,7 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .equals("CampaignId", String.valueOf(campaign.getId))
       .build()
 
-    val existingZips:CampaignCriterionPage = adwords.campaignCriterionService.get(existingSelector)
+    val existingZips:CampaignCriterionPage = adWordsAdapter.campaignCriterionService.get(existingSelector)
     for(page <- existingZips.getEntries) {
       page.getCriterion match {
         case location: Location =>
@@ -292,7 +297,7 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .build()
 
     // Make the get request.
-    val locationCriteria = ensureLocationsInUnitedStates(adwords.locationService.get(selector))
+    val locationCriteria = ensureLocationsInUnitedStates(adWordsAdapter.locationService.get(selector))
     for(loc <- locationCriteria) {
       val campaignCriterion = new CampaignCriterion()
       campaignCriterion.setCampaignId(campaign.getId)
@@ -304,8 +309,8 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.withErrorsHandled[Any](context, {
-      adwords.campaignCriterionService.mutate(operations.toArray)
+    adWordsAdapter.withErrorsHandled[Any](context, {
+      adWordsAdapter.campaignCriterionService.mutate(operations.toArray)
     })
   }
 
@@ -321,7 +326,7 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       .equals("CampaignId", String.valueOf(campaign.getId))
       .build()
 
-    val existingSchedule:CampaignCriterionPage = adwords.campaignCriterionService.get(selector)
+    val existingSchedule:CampaignCriterionPage = adWordsAdapter.campaignCriterionService.get(selector)
     for(page <- existingSchedule.getEntries) {
       page.getCriterion match {
         case adSchedule: AdSchedule =>
@@ -375,32 +380,35 @@ class CampaignCreator(adwords:AdWordsAdapter) {
       operations += operation
     }
 
-    adwords.withErrorsHandled[Any](context, {
-      adwords.campaignCriterionService.mutate(operations.toArray)
+    adWordsAdapter.withErrorsHandled[Any](context, {
+      adWordsAdapter.campaignCriterionService.mutate(operations.toArray)
     })
   }
 }
 
-object adwords_campaignprocessor {
+object adWordsAdapter_campaignprocessor {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsCampaignProcessor(
-      new SWFAdapter(config)
-      ,new DynamoAdapter(config)
-      ,new AdWordsAdapter(config))
+    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsCampaignProcessor
+      with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
+        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+      }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
 }
 
-object test_adwordsCampaignCreator {
+/*
+object test_adWordsAdapterCampaignCreator {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "adwords")
-    val adwords = new AdWordsAdapter(config)
-    val creator = new CampaignCreator(adwords)
+    val config = PropertiesLoader(args, "adWordsAdapter")
+    val adWordsAdapter = new AdWordsAdapter(config)
+    val creator = new CampaignCreator(adWordsAdapter)
 
-    adwords.setValidateOnly(false)
-    adwords.setClientId("100-019-2687")
+    adWordsAdapter.setValidateOnly(false)
+    adWordsAdapter.setClientId("100-019-2687")
 
     val campaignParams =
       s"""{
@@ -423,17 +431,17 @@ object test_adwordsCampaignCreator {
 
 }
 
-object test_adwordsLocationCriterion {
+object test_adWordsAdapterLocationCriterion {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "adwords")
-    val adwords = new AdWordsAdapter(config)
+    val config = PropertiesLoader(args, "adWordsAdapter")
+    val adWordsAdapter = new AdWordsAdapter(config)
 
-    adwords.setValidateOnly(false)
-    adwords.setClientId("100-019-2687")
+    adWordsAdapter.setValidateOnly(false)
+    adWordsAdapter.setClientId("100-019-2687")
 
     val zipString = "53001,53002,90210"
 
-    val creator = new CampaignCreator(adwords)
+    val creator = new CampaignCreator(adWordsAdapter)
     val campaignParams =
       s"""{
        "name" : "fulfillment Campaign",
@@ -445,17 +453,17 @@ object test_adwordsLocationCriterion {
   }
 }
 
-object test_adwordsSchedule {
+object test_adWordsAdapterSchedule {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "adwords")
-    val adwords = new AdWordsAdapter(config)
+    val config = PropertiesLoader(args, "adWordsAdapter")
+    val adWordsAdapter = new AdWordsAdapter(config)
 
-    adwords.setValidateOnly(false)
-    adwords.setClientId("100-019-2687")
+    adWordsAdapter.setValidateOnly(false)
+    adWordsAdapter.setClientId("100-019-2687")
 
     val scheduleString = "T,Th"
 
-    val creator = new CampaignCreator(adwords)
+    val creator = new CampaignCreator(adWordsAdapter)
     val campaignParams =
       s"""{
        "name" : "fulfillment Campaign",
@@ -467,10 +475,10 @@ object test_adwordsSchedule {
   }
 }
 
-object test_adwordsZipsByCountry {
+object test_adWordsAdapterZipsByCountry {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "adwords")
-    val adwords = new AdWordsAdapter(config)
+    val config = PropertiesLoader(args, "adWordsAdapter")
+    val adWordsAdapter = new AdWordsAdapter(config)
 
     val zipString = "55411,55450" // These match Minnesota AND the Deutschland!
     val selector = new SelectorBuilder()
@@ -489,7 +497,7 @@ object test_adwordsZipsByCountry {
       .build()
 
     // Make the get request.
-    val locationCriteria = adwords.locationService.get(selector)
+    val locationCriteria = adWordsAdapter.locationService.get(selector)
     for(loc <- locationCriteria) {
       for(ploc <- loc.getLocation.getParentLocations) {
         println("--"+ploc.getLocationName)
@@ -504,3 +512,4 @@ object test_adwordsZipsByCountry {
 
   }
 }
+*/

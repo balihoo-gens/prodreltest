@@ -19,7 +19,7 @@ import play.api.libs.json.{Json, JsObject}
 import com.balihoo.fulfillment.util.Getch
 
 abstract class FulfillmentWorker {
-  this: SWFAdapterProvider with DynamoAdapterProvider =>
+  this: SWFAdapterComponent with DynamoAdapterComponent =>
 
   val instanceId = randomUUID().toString
 
@@ -43,7 +43,7 @@ abstract class FulfillmentWorker {
 //  println(localhostname)
 
   val da = dynamoAdapter
-  val workerTable = new FulfillmentWorkerTable with DynamoAdapterProvider {
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
     val dynamoAdapter = da.asInstanceOf[DynamoAdapter]
   }
 
@@ -245,7 +245,7 @@ object UTCFormatter {
 }
 
 class FulfillmentWorkerTable {
-  this: DynamoAdapterProvider =>
+  this: DynamoAdapterComponent =>
 
   def insert(entry:FulfillmentWorkerEntry) = {
     dynamoAdapter.put(entry.getDynamoItem)

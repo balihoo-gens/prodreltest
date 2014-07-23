@@ -7,13 +7,11 @@ import com.google.api.ads.adwords.axis.v201402.cm.Operator
 import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
 
-trait AdWordsAccountCreator extends FulfillmentWorker with SWFAdapterProvider with DynamoAdapterProvider {
-  this: AdWordsAdapterProvider =>
+trait AdWordsAccountCreator extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
+  this: AdWordsAdapterComponent =>
 
-  //to distinguish from the local val/type
-  val ad = adWordsAdapter
-  val creator = new AccountCreator with AdWordsAdapterProvider {
-    lazy val adWordsAdapter = ad
+  val creator = new AccountCreator with AdWordsAdapterComponent {
+    lazy val adWordsAdapter = AdWordsAccountCreator.this.adWordsAdapter
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -40,7 +38,7 @@ trait AdWordsAccountCreator extends FulfillmentWorker with SWFAdapterProvider wi
 }
 
 class AccountCreator {
-  this: AdWordsAdapterProvider =>
+  this: AdWordsAdapterComponent =>
 
   var brandAccountCache = collection.mutable.Map[String, String]()
 
@@ -122,15 +120,12 @@ class AccountCreator {
 
 object adWords_accountcreator {
   def main(args: Array[String]) {
-    val worker = new AdWordsAccountCreator
-      with SWFAdapterProvider with DynamoAdapterProvider with AdWordsAdapterProvider {
-        trait AdWordsPropertiesLoaderProvider extends PropertiesLoaderProvider {
-          lazy val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-        }
-
-        lazy val swfAdapter = new SWFAdapter with AdWordsPropertiesLoaderProvider
-        lazy val dynamoAdapter = new DynamoAdapter with AdWordsPropertiesLoaderProvider
-        lazy val adWordsAdapter = new AdWordsAdapter with AdWordsPropertiesLoaderProvider
+    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new AdWordsAccountLookup
+      with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
+        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
@@ -139,8 +134,8 @@ object adWords_accountcreator {
 
 object test_adWordsGetSubaccounts {
   def main(args: Array[String]) {
-    val test = new TestAdWordsGetSubAccounts with AdWordsAdapterProvider {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderProvider {
+    val test = new TestAdWordsGetSubAccounts with AdWordsAdapterComponent {
+      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
         //lazy because construction init may use it
         lazy val config = PropertiesLoader(args, "adWords")
       }
@@ -149,7 +144,7 @@ object test_adWordsGetSubaccounts {
   }
 
   class TestAdWordsGetSubAccounts {
-    this: AdWordsAdapterProvider =>
+    this: AdWordsAdapterComponent =>
     def run() = {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("981-046-8123") // Dogtopia
@@ -167,8 +162,8 @@ object test_adWordsGetSubaccounts {
 
 object test_adWordsGetAccounts {
   def main(args: Array[String]) {
-    val test = new TestAdWordsGetAccounts with AdWordsAdapterProvider {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderProvider {
+    val test = new TestAdWordsGetAccounts with AdWordsAdapterComponent {
+      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
         //lazy because construction init may use it
         lazy val config = PropertiesLoader(args, "adWords")
       }
@@ -177,16 +172,14 @@ object test_adWordsGetAccounts {
   }
 
   class TestAdWordsGetAccounts {
-    this: AdWordsAdapterProvider =>
+    this: AdWordsAdapterComponent =>
 
     def run() = {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId(adWordsAdapter.baseAccountId) // Dogtopia
 
-      //to distinguish from the local val/type
-      val ad = adWordsAdapter
-      val creator = new AccountCreator with AdWordsAdapterProvider {
-        lazy val adWordsAdapter = ad
+      val creator = new AccountCreator with AdWordsAdapterComponent {
+        lazy val adWordsAdapter = TestAdWordsGetAccounts.this.adWordsAdapter
       }
 
       val accountParams =
@@ -206,8 +199,8 @@ object test_adWordsGetAccounts {
 
 object test_adWordsAccountCreator {
   def main(args: Array[String]) {
-    val test = new TestAdWordsAccountCreator with AdWordsAdapterProvider {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderProvider {
+    val test = new TestAdWordsAccountCreator with AdWordsAdapterComponent {
+      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
         //lazy because construction init may use it
         lazy val config = PropertiesLoader(args, "adWords")
       }
@@ -216,16 +209,14 @@ object test_adWordsAccountCreator {
   }
 
   class TestAdWordsAccountCreator {
-    this: AdWordsAdapterProvider =>
+    this: AdWordsAdapterComponent =>
 
     def run() = {
        //    adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("981-046-8123") // Dogtopia
 
-      //to distinguish from the local val/type
-      val ad = adWordsAdapter
-      val creator = new AccountCreator with AdWordsAdapterProvider {
-        lazy val adWordsAdapter = ad
+      val creator = new AccountCreator with AdWordsAdapterComponent {
+        lazy val adWordsAdapter = TestAdWordsAccountCreator.this.adWordsAdapter
       }
 
       val accountParams =

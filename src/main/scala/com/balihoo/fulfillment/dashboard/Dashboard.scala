@@ -19,7 +19,7 @@ import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 
 class WorkflowInspector {
-  this: SWFAdapterProvider =>
+  this: SWFAdapterComponent =>
 
   def executionHistory():List[JsValue] = {
 
@@ -97,10 +97,10 @@ class WorkflowInspector {
 
 
 class WorkflowServlet extends RestServlet {
-  this: SWFAdapterProvider =>
+  this: SWFAdapterComponent =>
 
   val swf = swfAdapter
-  val wi = new WorkflowInspector with SWFAdapterProvider {
+  val wi = new WorkflowInspector with SWFAdapterComponent {
     val swfAdapter = swf
   }
 
@@ -125,10 +125,10 @@ class WorkflowServlet extends RestServlet {
 }
 
 class WorkerServlet extends RestServlet {
-  this: DynamoAdapterProvider =>
+  this: DynamoAdapterComponent =>
 
   val da = dynamoAdapter
-  val workerTable = new FulfillmentWorkerTable with DynamoAdapterProvider {
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
     val dynamoAdapter = da
   }
 
@@ -150,7 +150,7 @@ class WorkerServlet extends RestServlet {
 object dashboard {
   def main(args: Array[String]) {
 
-    object dashboardConfig extends PropertiesLoaderProvider {
+    object dashboardConfig extends PropertiesLoaderComponent {
       val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     }
 
@@ -159,14 +159,14 @@ object dashboard {
     context.setResourceBase("src/main/webapp")
     context.setWelcomeFiles(Array[String]("index.html"))
 
-    val workerServlet = new WorkerServlet with DynamoAdapterProvider {
-      lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderProvider {
+    val workerServlet = new WorkerServlet with DynamoAdapterComponent {
+      lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent {
         lazy val config = dashboardConfig.config
       }
     }
 
-    val workflowServlet = new WorkflowServlet with SWFAdapterProvider {
-      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderProvider {
+    val workflowServlet = new WorkflowServlet with SWFAdapterComponent {
+      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
         lazy val config = dashboardConfig.config
       }
     }

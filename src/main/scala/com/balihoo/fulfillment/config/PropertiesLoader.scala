@@ -6,7 +6,7 @@ import java.io.{File, FileInputStream, InputStream}
 import scopt._
 
 //for the cake pattern dependency injection
-trait PropertiesLoaderProvider {
+trait PropertiesLoaderComponent {
   val config: PropertiesLoader
 }
 

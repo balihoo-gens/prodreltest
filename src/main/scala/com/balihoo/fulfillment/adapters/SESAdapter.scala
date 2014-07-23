@@ -3,7 +3,7 @@ package com.balihoo.fulfillment.adapters
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 
-import com.balihoo.fulfillment.config.PropertiesLoaderProvider
+import com.balihoo.fulfillment.config.PropertiesLoaderComponent
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClient
 import com.amazonaws.services.simpleemail.model.{
   VerifyEmailIdentityRequest,
@@ -15,11 +15,11 @@ import com.amazonaws.services.simpleemail.model.{
   Content
 }
 
-trait SESAdapterProvider {
+trait SESAdapterComponent {
   val sesAdapter: SESAdapter
 }
 
-abstract class SESAdapter extends AWSAdapter[AmazonSimpleEmailServiceAsyncClient] with PropertiesLoaderProvider {
+abstract class SESAdapter extends AWSAdapter[AmazonSimpleEmailServiceAsyncClient] with PropertiesLoaderComponent {
 
   def verifyEmailAddress(address: String): String  = {
     val request = new VerifyEmailIdentityRequest()

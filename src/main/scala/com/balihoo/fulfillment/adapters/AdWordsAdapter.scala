@@ -2,7 +2,7 @@ package com.balihoo.fulfillment.adapters
 
 import scala.language.implicitConversions
 
-import com.balihoo.fulfillment.config.PropertiesLoaderProvider
+import com.balihoo.fulfillment.config.PropertiesLoaderComponent
 import com.google.api.ads.adwords.lib.client.AdWordsSession
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.ads.common.lib.auth.OfflineCredentials.Api
@@ -16,12 +16,12 @@ import scala.collection.mutable
 //typical cake would nest the adapter inside the provider
 // but that causes issues here for nested injection, i.e.
 // where we pass components from the outer cake into an inner cake
-trait AdWordsAdapterProvider {
+trait AdWordsAdapterComponent {
   val adWordsAdapter: AdWordsAdapter
 }
 
 class AdWordsAdapter {
-  this: PropertiesLoaderProvider =>
+  this: PropertiesLoaderComponent =>
 
   private val configuration:Configuration = new BaseConfiguration()
   configuration.addProperty("api.adwords.refreshToken", config.getString("refreshToken"))
