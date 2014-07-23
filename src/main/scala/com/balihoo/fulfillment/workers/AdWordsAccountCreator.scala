@@ -121,7 +121,7 @@ class AccountCreator {
 object adwords_accountcreator {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountLookup
+    val worker = new AdWordsAccountCreator
       with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
         lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
         lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
