@@ -150,9 +150,7 @@ class WorkerServlet extends RestServlet {
 object dashboard {
   def main(args: Array[String]) {
 
-    object dashboardConfig extends PropertiesLoaderComponent {
-      val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    }
+    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
 
     val context = new WebAppContext()
     context setContextPath "/"
@@ -161,20 +159,20 @@ object dashboard {
 
     val workerServlet = new WorkerServlet with DynamoAdapterComponent {
       lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent {
-        lazy val config = dashboardConfig.config
+        lazy val config = cfg
       }
     }
 
     val workflowServlet = new WorkflowServlet with SWFAdapterComponent {
       lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
-        lazy val config = dashboardConfig.config
+        lazy val config = cfg
       }
     }
 
     context.addServlet(new ServletHolder(workerServlet), "/worker/*")
     context.addServlet(new ServletHolder(workflowServlet), "/workflow/*")
 
-    val server = new Server(dashboardConfig.config.getInt("port"))
+    val server = new Server(cfg.getInt("port"))
     server.setHandler(context)
     server.start()
     server.join()
