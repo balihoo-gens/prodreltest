@@ -36,11 +36,13 @@ abstract class FulfillmentWorker {
 //  TODO This can be used to have the worker discover the address of the ec2 instance it is running on (if it is!)
 //  This would be a nice piece of information to put into dynamo so we can log in and administer via ssh
 //  without having to look up the instance in the ec2 dashboard.
-//  val aws_ec2_identify = "curl -s http://169.254.169.254/latest/meta-data/public-hostname"
-//  val address = aws_ec2_identify.!!
-
-//  val localhostname = java.net.InetAddress.getLocalHost.getHostName
-//  println(localhostname)
+  val hostAddress = sys.env.get("EC2_HOME") match {
+    case Some(s:String) =>
+      val aws_ec2_identify = "curl -s http://169.254.169.254/latest/meta-data/public-hostname"
+      aws_ec2_identify.!!
+    case None =>
+      java.net.InetAddress.getLocalHost.getHostName
+  }
 
   val da = dynamoAdapter
   val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
@@ -49,6 +51,7 @@ abstract class FulfillmentWorker {
 
   val entry = new FulfillmentWorkerEntry
   entry.setInstance(instanceId)
+  entry.setHostAddress(hostAddress)
   entry.setActivityName(name)
   entry.setActivityVersion(version)
   entry.setDomain(domain)
@@ -133,6 +136,7 @@ abstract class FulfillmentWorker {
   def updateStatus(status:String) = {
     updateCounter += 1
     entry.setLast(UTCFormatter.format(new Date()))
+    entry.setStatus(status)
     workerTable.update(entry)
   }
 
@@ -265,10 +269,11 @@ class FulfillmentWorkerTable {
         .withComparisonOperator(ComparisonOperator.GT)
         .withAttributeValueList(new AttributeValue().withS(oldest)))
 
+    val now = new Date()
+
     val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp)
     for(worker:FulfillmentWorkerEntry <- list) {
-      println(worker.instance)
-      println(worker.last)
+      worker.minutesSinceLast = (now.getTime - UTCFormatter.dateFormat.parse(worker.last).getTime) / UTCFormatter.MIN_IN_MS
     }
 
     list.toList
@@ -279,6 +284,7 @@ class FulfillmentWorkerTable {
 @DynamoDBTable(tableName="fulfillment_worker_status")
 class FulfillmentWorkerEntry {
   var instance:String = ""
+  var hostAddress:String = ""
   var domain:String = ""
   var activityName:String = ""
   var activityVersion:String = ""
@@ -286,20 +292,30 @@ class FulfillmentWorkerEntry {
   var start:String = ""
   var last:String = ""
 
+  var minutesSinceLast:Long = 0
+
   def toJson:JsValue = {
     Json.toJson(Map(
       "instance" -> Json.toJson(instance),
+      "hostAddress" -> Json.toJson(hostAddress),
       "domain" -> Json.toJson(domain),
       "activityName" -> Json.toJson(activityName),
       "activityVersion" -> Json.toJson(activityVersion),
       "status" -> Json.toJson(status),
       "start" -> Json.toJson(start),
-      "last" -> Json.toJson(last)))
+      "last" -> Json.toJson(last),
+      "minutesSinceLast" -> Json.toJson(minutesSinceLast)
+    ))
+
   }
 
   @DynamoDBHashKey(attributeName="instance")
   def getInstance():String = { instance }
   def setInstance(ins:String) = { this.instance = ins }
+
+  @DynamoDBHashKey(attributeName="hostAddress")
+  def getHostAddress:String = { hostAddress }
+  def setHostAddress(ha:String) = { this.hostAddress = ha }
 
   @DynamoDBAttribute(attributeName="domain")
   def getDomain:String = { domain }
@@ -328,6 +344,7 @@ class FulfillmentWorkerEntry {
   def getDynamoItem:DynamoItem = {
     new DynamoItem("fulfillment_worker_status")
       .addString("instance", instance)
+      .addString("hostAddress", hostAddress)
       .addString("domain", domain)
       .addString("activityName", activityName)
       .addString("activityVersion", activityVersion)
@@ -345,12 +362,3 @@ class FulfillmentWorkerEntry {
 
 }
 
-/*
-object dynamoscantest {
-  def main(args: Array[String]) {
-    val config = PropertiesLoader(args, "adwords")
-    val da = new DynamoAdapter(config)
-    da.get()
-  }
-}
-  */

@@ -1,31 +1,31 @@
 <div class="panel panel-default">
-	<div class="panel-heading">
-		<a class="btn btn-default pull-right" ng-click="getHistory()">REFRESH</a>
-		<h1>History</h1>
-	</div>
-	<div class="panel-body">
-		<div ng-show="loading">
-			<img src="img/loading.gif">
-		</div>
-		<table class="table table-condensed table-hover params" style="width:100%">
-			<tr>
-				<th>Id</th>
-				<th>Tags</th>
-				<th>Time</th>
-				<th>Status</th>
-			</tr>
-			<tr ng-repeat="ex in executions">
-				<td> <a ng-click="seeWorkflow(ex)" title="{{ex.runId}}">{{ex.workflowId}}</a>
-				</td>
-				<td><div ng-repeat="tag in ex.tagList"><div ng-bind-html="formatTag(tag)"></div></div></td>
-				<td>
-					Start:{{ex.startTimestamp}}
-					<br/>
-					End:{{ex.closeTimestamp}}
-				</td>
-				<td><span class="label {{figureStatusLabel(ex.closeStatus)}}">{{ex.closeStatus}}</span></td>
-			</tr>
+    <div class="panel-heading">
+        <a class="btn btn-default pull-right" ng-click="getHistory()">REFRESH</a>
+        <h1>History</h1>
+    </div>
+    <div class="panel-body">
+        <div ng-show="loading">
+            <img src="img/loading.gif">
+        </div>
+        <table class="table table-condensed table-hover params" style="width:100%">
+            <tr>
+                <th>Id</th>
+                <th>Tags</th>
+                <th>Time</th>
+                <th>Status</th>
+            </tr>
+            <tr ng-repeat="ex in executions">
+                <td> <a ng-click="seeWorkflow(ex)" title="{{ex.runId}}">{{ex.workflowId}}</a>
+                </td>
+                <td><div ng-repeat="tag in ex.tagList"><div ng-bind-html="formatTag(tag)"></div></div></td>
+                <td>
+                    Start:{{ex.startTimestamp}}
+                    <br/>
+                    End:{{ex.closeTimestamp}}
+                </td>
+                <td><span class="label {{figureStatusLabel(ex.closeStatus)}}">{{ex.closeStatus}}</span></td>
+            </tr>
 
-		</table>
-	</div>
+        </table>
+    </div>
 </div>
