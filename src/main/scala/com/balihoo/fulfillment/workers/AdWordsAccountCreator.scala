@@ -118,7 +118,7 @@ class AccountCreator {
   }
 }
 
-object adWords_accountcreator {
+object adWordsAccountCreator {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAccountLookup
@@ -129,104 +129,6 @@ object adWords_accountcreator {
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
-  }
-}
-
-object test_adWordsGetSubaccounts {
-  def main(args: Array[String]) {
-    val test = new TestAdWordsGetSubAccounts with AdWordsAdapterComponent {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
-        //lazy because construction init may use it
-        lazy val config = PropertiesLoader(args, "adWords")
-      }
-    }
-    test.run
-  }
-
-  class TestAdWordsGetSubAccounts {
-    this: AdWordsAdapterComponent =>
-    def run() = {
-      adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("981-046-8123") // Dogtopia
-      val ss = new SelectorBuilder().fields("Login", "CustomerId", "Name").build()
-
-      val page:ManagedCustomerPage = adWordsAdapter.managedCustomerService.get(ss)
-
-      for((m:ManagedCustomer) <- page.getEntries) {
-        println(m.getCustomerId)
-        println(m.getName)
-      }
-    }
-  }
-}
-
-object test_adWordsGetAccounts {
-  def main(args: Array[String]) {
-    val test = new TestAdWordsGetAccounts with AdWordsAdapterComponent {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
-        //lazy because construction init may use it
-        lazy val config = PropertiesLoader(args, "adWords")
-      }
-    }
-    test.run
-  }
-
-  class TestAdWordsGetAccounts {
-    this: AdWordsAdapterComponent =>
-
-    def run() = {
-      adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId(adWordsAdapter.baseAccountId) // Dogtopia
-
-      val creator = new AccountCreator with AdWordsAdapterComponent {
-        lazy val adWordsAdapter = TestAdWordsGetAccounts.this.adWordsAdapter
-      }
-
-      val accountParams =
-        s"""{
-         "parent" : "brand-demo"
-        }"""
-
-      val m:ManagedCustomer = creator.getManagerAccount(new ActivityParameters(accountParams))
-      println(m.getCustomerId)
-      println(m.getName)
-      println(m.getCompanyName)
-      println(m.getCurrencyCode)
-      println(m.getCanManageClients)
-    }
-  }
-}
-
-object test_adWordsAccountCreator {
-  def main(args: Array[String]) {
-    val test = new TestAdWordsAccountCreator with AdWordsAdapterComponent {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
-        //lazy because construction init may use it
-        lazy val config = PropertiesLoader(args, "adWords")
-      }
-    }
-    test.run
-  }
-
-  class TestAdWordsAccountCreator {
-    this: AdWordsAdapterComponent =>
-
-    def run() = {
-       //    adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("981-046-8123") // Dogtopia
-
-      val creator = new AccountCreator with AdWordsAdapterComponent {
-        lazy val adWordsAdapter = TestAdWordsAccountCreator.this.adWordsAdapter
-      }
-
-      val accountParams =
-        s"""{
-         "name" : "test campaign",
-          "currencyCode" : "USD",
-          "timeZone" : "America/Boise"
-        }"""
-      val newId = creator.createAccount(new ActivityParameters(accountParams))
-    }
   }
 }
 
