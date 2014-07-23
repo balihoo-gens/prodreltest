@@ -10,7 +10,7 @@ import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 object test_adwordsAdGroupCreator {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
     val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
@@ -50,7 +50,7 @@ object test_adwordsAdGroupCreator {
 
 object test_adwordsAdGroupSetInterests {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
     val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
@@ -81,7 +81,7 @@ object test_adwordsAdGroupSetInterests {
 
 object test_adwordsAdGroupSetKeywords {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
     val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }

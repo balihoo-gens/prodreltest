@@ -8,7 +8,7 @@ import com.google.api.ads.adwords.axis.v201402.cm._
 
 object test_adWordsAdapterGetAdGroupImageAd {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
     val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
@@ -45,7 +45,7 @@ object test_adWordsAdapterGetAdGroupImageAd {
 
 object test_adWordsAdapterAdGroupImageAd {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
     val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
@@ -85,7 +85,7 @@ object test_adWordsAdapterAdGroupImageAd {
 
 object test_adWordsAdapterUpdateAdGroupImageAd {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
     val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }

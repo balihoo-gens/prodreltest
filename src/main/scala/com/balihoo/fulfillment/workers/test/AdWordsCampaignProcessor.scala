@@ -10,7 +10,7 @@ import scala.collection.mutable
 
 object test_adWordsAdapterCampaignCreator {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val creator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
 
@@ -41,7 +41,7 @@ object test_adWordsAdapterCampaignCreator {
 
 object test_adWordsAdapterLocationCriterion {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val creator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
 
@@ -64,7 +64,7 @@ object test_adWordsAdapterLocationCriterion {
 
 object test_adWordsAdapterSchedule {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
     val creator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
 
@@ -87,7 +87,7 @@ object test_adWordsAdapterSchedule {
 
 object test_adWordsAdapterZipsByCountry {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adWordsAdapter")
+    val cfg = PropertiesLoader(args, "adwords")
     val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
 
     val zipString = "55411,55450" // These match Minnesota AND the Deutschland!
