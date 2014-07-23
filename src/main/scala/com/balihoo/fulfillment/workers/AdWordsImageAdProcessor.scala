@@ -120,7 +120,7 @@ abstract class AdCreator {
   }
 }
 
-object adWordsAdapter_imageadprocessor {
+object adwords_imageadprocessor {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsImageAdProcessor

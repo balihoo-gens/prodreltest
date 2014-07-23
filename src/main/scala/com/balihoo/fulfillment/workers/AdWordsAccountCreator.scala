@@ -118,7 +118,7 @@ class AccountCreator {
   }
 }
 
-object adWordsAccountCreator {
+object adwords_accountcreator {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAccountLookup

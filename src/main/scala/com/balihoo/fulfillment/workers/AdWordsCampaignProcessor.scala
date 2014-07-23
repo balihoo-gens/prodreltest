@@ -386,7 +386,7 @@ abstract class CampaignCreator {
   }
 }
 
-object adWordsAdapter_campaignprocessor {
+object adwords_campaignprocessor {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsCampaignProcessor
