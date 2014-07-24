@@ -17,7 +17,7 @@ import scala.collection.mutable
 // but that causes issues here for nested injection, i.e.
 // where we pass components from the outer cake into an inner cake
 trait AdWordsAdapterComponent {
-  val adWordsAdapter: AdWordsAdapter
+  def adWordsAdapter: AdWordsAdapter
 }
 
 class AdWordsAdapter {

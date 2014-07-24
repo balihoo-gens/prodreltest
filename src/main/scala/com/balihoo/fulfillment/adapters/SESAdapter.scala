@@ -16,7 +16,7 @@ import com.amazonaws.services.simpleemail.model.{
 }
 
 trait SESAdapterComponent {
-  val sesAdapter: SESAdapter
+  def sesAdapter: SESAdapter
 }
 
 abstract class SESAdapter extends AWSAdapter[AmazonSimpleEmailServiceAsyncClient] with PropertiesLoaderComponent {

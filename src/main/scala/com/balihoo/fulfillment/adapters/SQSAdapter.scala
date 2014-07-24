@@ -6,7 +6,7 @@ import com.amazonaws.services.sqs.AmazonSQSClient
 
 //for the cake pattern dependency injection
 trait SQSAdapterComponent {
-  val sqsAdapter: SQSAdapter
+  def sqsAdapter: SQSAdapter
 }
 
 abstract class SQSAdapter extends AWSAdapter[AmazonSQSClient] with PropertiesLoaderComponent {

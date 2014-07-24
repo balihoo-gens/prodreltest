@@ -5,7 +5,7 @@ import com.balihoo.fulfillment.config.PropertiesLoaderComponent
 
 //for the cake pattern dependency injection
 trait SWFAdapterComponent {
-  val swfAdapter: SWFAdapter
+  def swfAdapter: SWFAdapter
 }
 
 abstract class SWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncClient] with PropertiesLoaderComponent {

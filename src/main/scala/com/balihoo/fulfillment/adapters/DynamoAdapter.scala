@@ -12,7 +12,7 @@ import com.amazonaws.regions.{Regions, Region}
 
 //for the cake pattern dependency injection
 trait DynamoAdapterComponent {
-  val dynamoAdapter: DynamoAdapter
+  def dynamoAdapter: DynamoAdapter
 }
 
 abstract class DynamoAdapter extends AWSAdapter[AmazonDynamoDBAsyncClient] with PropertiesLoaderComponent {

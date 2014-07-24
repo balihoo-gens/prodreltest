@@ -7,7 +7,7 @@ import scopt._
 
 //for the cake pattern dependency injection
 trait PropertiesLoaderComponent {
-  val config: PropertiesLoader
+  def config: PropertiesLoader
 }
 
 class PropertiesLoader(propertiesFileName: String, propertiesDir: String = "") {
