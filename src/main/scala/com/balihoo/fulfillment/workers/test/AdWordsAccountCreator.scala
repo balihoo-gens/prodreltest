@@ -14,7 +14,7 @@ object test_adWordsGetSubaccounts {
     val test = new TestAdWordsGetSubAccounts with AdWordsAdapterComponent {
       val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
         //lazy because construction init may use it
-        lazy val config = PropertiesLoader(args, "adWords")
+        def config = PropertiesLoader(args, "adWords")
       }
     }
     test.run
@@ -42,7 +42,7 @@ object test_adWordsGetAccounts {
     val test = new TestAdWordsGetAccounts with AdWordsAdapterComponent {
       val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
         //lazy because construction init may use it
-        lazy val config = PropertiesLoader(args, "adWords")
+        def config = PropertiesLoader(args, "adWords")
       }
     }
     test.run
@@ -56,7 +56,7 @@ object test_adWordsGetAccounts {
       adWordsAdapter.setClientId(adWordsAdapter.baseAccountId) // Dogtopia
 
       val creator = new AccountCreator with AdWordsAdapterComponent {
-        lazy val adWordsAdapter = TestAdWordsGetAccounts.this.adWordsAdapter
+        def adWordsAdapter = TestAdWordsGetAccounts.this.adWordsAdapter
       }
 
       val accountParams =
@@ -79,7 +79,7 @@ object test_adWordsAccountCreator {
     val test = new TestAdWordsAccountCreator with AdWordsAdapterComponent {
       val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
         //lazy because construction init may use it
-        lazy val config = PropertiesLoader(args, "adWords")
+        def config = PropertiesLoader(args, "adWords")
       }
     }
     test.run
@@ -93,7 +93,7 @@ object test_adWordsAccountCreator {
       adWordsAdapter.setClientId("981-046-8123") // Dogtopia
 
       val creator = new AccountCreator with AdWordsAdapterComponent {
-        lazy val adWordsAdapter = TestAdWordsAccountCreator.this.adWordsAdapter
+        def adWordsAdapter = TestAdWordsAccountCreator.this.adWordsAdapter
       }
 
       val accountParams =

@@ -15,8 +15,8 @@ object noopworker {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new NoopWorker
       with SWFAdapterComponent with DynamoAdapterComponent {
-        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
+        def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

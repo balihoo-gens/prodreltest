@@ -11,7 +11,7 @@ trait AdWordsAccountCreator extends FulfillmentWorker with SWFAdapterComponent w
   this: AdWordsAdapterComponent =>
 
   val creator = new AccountCreator with AdWordsAdapterComponent {
-    lazy val adWordsAdapter = AdWordsAccountCreator.this.adWordsAdapter
+    def adWordsAdapter = AdWordsAccountCreator.this.adWordsAdapter
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -123,9 +123,9 @@ object adwords_accountcreator {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAccountCreator
       with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
-        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
+        def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
+        def adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { def config = cfg }
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

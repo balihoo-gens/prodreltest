@@ -29,9 +29,9 @@ object email {
     def verifyAddress() = {
       val worker = new EmailAddressVerifier
         with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-          lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-          lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-          lazy val sesAdapter = new SESAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
+          def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
+          def sesAdapter = new SESAdapter with PropertiesLoaderComponent { def config = cfg }
         }
       println("enter the address to verify")
       val address = readLine("verifyemail> ")
@@ -42,9 +42,9 @@ object email {
     def getValidEmailList() = {
       val worker = new EmailVerifiedAddressLister
         with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-          lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-          lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-          lazy val sesAdapter = new SESAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
+          def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
+          def sesAdapter = new SESAdapter with PropertiesLoaderComponent { def config = cfg }
         }
       worker.listVerifiedEmailAddresses()
     }
@@ -58,9 +58,9 @@ object email {
     def sendEmail() = {
       val worker = new EmailSender
         with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-          lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-          lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-          lazy val sesAdapter = new SESAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+          def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
+          def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
+          def sesAdapter = new SESAdapter with PropertiesLoaderComponent { def config = cfg }
         }
       val from = "gens@balihoo.com"
       val subject = "This is an EmailWorker Test"
@@ -81,7 +81,7 @@ object email {
     }
 
     def submitTask() = {
-      object swf extends SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+      object swf extends SWFAdapter with PropertiesLoaderComponent { def config = cfg }
       println("enter the json input filename")
       val inputfile = readLine("inputfile> ")
       val input = try {

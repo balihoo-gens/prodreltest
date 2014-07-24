@@ -8,7 +8,7 @@ abstract class AdWordsAccountLookup extends FulfillmentWorker with SWFAdapterCom
   this: AdWordsAdapterComponent =>
 
   val creator = new AccountCreator with AdWordsAdapterComponent {
-    lazy val adWordsAdapter = AdWordsAccountLookup.this.adWordsAdapter
+    def adWordsAdapter = AdWordsAccountLookup.this.adWordsAdapter
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -41,9 +41,9 @@ object adwords_accountlookup {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAccountLookup
       with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
-        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
+        def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
+        def adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { def config = cfg }
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

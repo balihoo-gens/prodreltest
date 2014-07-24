@@ -158,14 +158,14 @@ object dashboard {
     context.setWelcomeFiles(Array[String]("index.html"))
 
     val workerServlet = new WorkerServlet with DynamoAdapterComponent {
-      lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent {
-        lazy val config = cfg
+      def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent {
+        def config = cfg
       }
     }
 
     val workflowServlet = new WorkflowServlet with SWFAdapterComponent {
-      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
-        lazy val config = cfg
+      def swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
+        def config = cfg
       }
     }
 
