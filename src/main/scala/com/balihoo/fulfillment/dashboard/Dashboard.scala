@@ -66,20 +66,17 @@ class WorkflowInspector(swfAdapter: SWFAdapter) {
     new DecisionGenerator(categorized, sectionMap).makeDecisions()
 
     val sections = collection.mutable.Map[String, JsValue]()
-    for((name, section:FulfillmentSection) <- sectionMap.map) {
-      sections(name) = Json.toJson(Map(
-        "status" -> Json.toJson(section.status.toString),
-        "notes" -> Json.toJson(section.notes),
-        "value" -> Json.toJson(section.value),
-        "input" -> Json.toJson(section.jsonNode)
-      ))
-
+    for((name, section:FulfillmentSection) <- sectionMap.nameToSection) {
+      sections(name) = section.toJson
     }
 
-    top("notes") = Json.toJson(sectionMap.notes.toList)
+    val jtimeline = Json.toJson(for(entry <- sectionMap.timeline) yield entry.toJson)
+
+    top("timeline") = jtimeline
     top("sections") = Json.toJson(sections.toMap)
     top("workflowId") = Json.toJson(workflowId)
     top("runId") = Json.toJson(runId)
+    top("input") = Json.toJson(history.getEvents.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
 
     top.toMap
   }

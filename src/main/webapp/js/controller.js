@@ -142,15 +142,24 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "TIMED OUT" : "label-warning",
         "CANCELED" : "label-warning",
         "TERMINAL" : "label-danger",
-        "DISMISSED" : "label-primary",
         "COMPLETE" : "label-success",
         "CONTINGENT" : "label-default",
         "DEFERRED" : "label-info",
         "IMPOSSIBLE" : "label-danger"
     };
 
+    $scope.timelineMap = {
+        "ERROR" : "timeline-ERROR",
+        "SUCCESS" : "timeline-SUCCESS",
+        "WARNING" : "timeline-WARNING"
+    };
+
     $scope.figureStatusLabel = function(status) {
         return $scope.statusMap[status];
+    };
+
+    $scope.figureTimelineStyle = function(eventType) {
+        return $scope.timelineMap[eventType];
     };
 
     $scope.formatWhitespace = function(str) {
@@ -176,7 +185,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         if(json instanceof Object) {
             var body = "";
             for(var key in json) {
-                body += $scope.div("<span>"+key+"</span> : "+$scope.jsonFormat(json[key], "block"));
+                body += $scope.div("<span><b>"+key+"</b></span> : "+$scope.jsonFormat(json[key], "block"));
             }
             return $scope.div(body, "block "+divclass);
         }
@@ -189,6 +198,10 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
     $scope.formatJson = function(jsonString) {
         return $scope.jsonFormat(JSON.parse(jsonString), "json");
+    };
+
+    $scope.formatJsonBasic = function(jsonString) {
+        return JSON.stringify(JSON.parse(jsonString), undefined, 4);
     };
 
     $scope.formatURLs = function(param) {
@@ -222,7 +235,11 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     $scope.scrollToSection = function(name) {
         $location.hash("section_"+name);
         $anchorScroll();
-    }
+    };
+
+    $("#rawInputToggle").click(function() {
+        $('#rawInput').slideToggle()
+    });
 
 });
 
