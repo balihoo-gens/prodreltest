@@ -24,8 +24,8 @@ object chaosworker {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new ChaosWorker
       with SWFAdapterComponent with DynamoAdapterComponent {
-        def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
-        def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

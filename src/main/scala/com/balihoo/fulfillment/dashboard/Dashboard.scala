@@ -99,9 +99,8 @@ class WorkflowInspector {
 class WorkflowServlet extends RestServlet {
   this: SWFAdapterComponent =>
 
-  val swf = swfAdapter
   val wi = new WorkflowInspector with SWFAdapterComponent {
-    val swfAdapter = swf
+    def swfAdapter = WorkflowServlet.this.swfAdapter
   }
 
   get("/workflow/history", (rsq:RestServletQuery) => {
@@ -129,7 +128,7 @@ class WorkerServlet extends RestServlet {
 
   val da = dynamoAdapter
   val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
-    val dynamoAdapter = da
+    def dynamoAdapter = da
   }
 
   get("/worker", (rsq:RestServletQuery) => {
@@ -158,15 +157,11 @@ object dashboard {
     context.setWelcomeFiles(Array[String]("index.html"))
 
     val workerServlet = new WorkerServlet with DynamoAdapterComponent {
-      def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent {
-        def config = cfg
-      }
+      def dynamoAdapter = DynamoAdapter(cfg)
     }
 
     val workflowServlet = new WorkflowServlet with SWFAdapterComponent {
-      def swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
-        def config = cfg
-      }
+      def swfAdapter = SWFAdapter(cfg)
     }
 
     context.addServlet(new ServletHolder(workerServlet), "/worker/*")

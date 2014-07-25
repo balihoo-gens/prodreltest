@@ -44,9 +44,8 @@ abstract class FulfillmentWorker {
       java.net.InetAddress.getLocalHost.getHostName
   }
 
-  val da = dynamoAdapter
   val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
-    val dynamoAdapter = da.asInstanceOf[DynamoAdapter]
+    def dynamoAdapter = FulfillmentWorker.this.dynamoAdapter
   }
 
   val entry = new FulfillmentWorkerEntry

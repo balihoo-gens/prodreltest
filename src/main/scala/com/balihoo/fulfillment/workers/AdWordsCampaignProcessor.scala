@@ -391,9 +391,9 @@ object adwords_campaignprocessor {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsCampaignProcessor
       with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
-        def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
-        def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
-        def adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { def config = cfg }
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
+        def adWordsAdapter = AdWordsAdapter(cfg)
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

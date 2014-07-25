@@ -2,7 +2,7 @@ package com.balihoo.fulfillment.adapters
 
 import scala.language.implicitConversions
 
-import com.balihoo.fulfillment.config.PropertiesLoaderComponent
+import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.lib.client.AdWordsSession
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.ads.common.lib.auth.OfflineCredentials.Api
@@ -108,6 +108,12 @@ class AdWordsAdapter {
 
   def addOrSet(operatorId:Long): Operator = {
     if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
+  }
+}
+
+object AdWordsAdapter {
+  def apply(cfg: PropertiesLoader) = {
+    new AdWordsAdapter with PropertiesLoaderComponent { def config = cfg }
   }
 }
 

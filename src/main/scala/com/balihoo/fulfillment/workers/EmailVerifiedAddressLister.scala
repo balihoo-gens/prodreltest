@@ -24,9 +24,9 @@ object email_verifiedaddresslister {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new EmailVerifiedAddressLister
       with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-        def swfAdapter = new SWFAdapter with PropertiesLoaderComponent { def config = cfg }
-        def dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
-        def sesAdapter = new SESAdapter with PropertiesLoaderComponent { def config = cfg }
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
+        def sesAdapter = SESAdapter(cfg)
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

@@ -269,9 +269,7 @@ class DecisionGenerator(categorized: CategorizedSections
 object coordinator {
   def main(args: Array[String]) {
     val fc: FulfillmentCoordinator = new FulfillmentCoordinator with SWFAdapterComponent {
-      def swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
-        def config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-      }
+      def swfAdapter = SWFAdapter(PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$")))
     }
     println("Running decider")
     fc.coordinate()

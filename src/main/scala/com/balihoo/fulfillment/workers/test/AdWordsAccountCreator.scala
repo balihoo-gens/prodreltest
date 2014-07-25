@@ -12,10 +12,7 @@ import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, Managed
 object test_adWordsGetSubaccounts {
   def main(args: Array[String]) {
     val test = new TestAdWordsGetSubAccounts with AdWordsAdapterComponent {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
-        //lazy because construction init may use it
-        def config = PropertiesLoader(args, "adWords")
-      }
+      def adWordsAdapter = AdWordsAdapter(PropertiesLoader(args, "adWords"))
     }
     test.run
   }
@@ -40,10 +37,7 @@ object test_adWordsGetSubaccounts {
 object test_adWordsGetAccounts {
   def main(args: Array[String]) {
     val test = new TestAdWordsGetAccounts with AdWordsAdapterComponent {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
-        //lazy because construction init may use it
-        def config = PropertiesLoader(args, "adWords")
-      }
+      def adWordsAdapter = AdWordsAdapter(PropertiesLoader(args, "adWords"))
     }
     test.run
   }
@@ -77,10 +71,7 @@ object test_adWordsGetAccounts {
 object test_adWordsAccountCreator {
   def main(args: Array[String]) {
     val test = new TestAdWordsAccountCreator with AdWordsAdapterComponent {
-      val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent {
-        //lazy because construction init may use it
-        def config = PropertiesLoader(args, "adWords")
-      }
+      def adWordsAdapter = AdWordsAdapter(PropertiesLoader(args, "adWords"))
     }
     test.run
   }
