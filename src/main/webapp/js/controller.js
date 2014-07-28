@@ -17,6 +17,10 @@ app.config(
                       controller : "workflowController",
                       templateUrl : "partials/workflow.html",
                       reloadOnSearch: false})
+            .when("/workflow/initiate", {
+                      controller : "workflowInitiationController",
+                      templateUrl : "partials/workflowInitiate.html",
+                      reloadOnSearch: false})
             .when("/history", {
                       controller : "historyController",
                       templateUrl : "partials/history.html",
@@ -92,11 +96,23 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     $scope.statusMap = {
         "FAILED" : "label-danger",
         "COMPLETED" : "label-success",
-        "TIMED_OUT" : "label-warning"
+        "TIMED_OUT" : "label-warning",
+        "TERMINATED" : "label-danger"
     };
 
     $scope.figureStatusLabel = function(status) {
+        if(status == null) {
+            return "label-default";
+        }
         return $scope.statusMap[status];
+    };
+
+    $scope.formatStatus = function(closeStatus) {
+        if(closeStatus == null) {
+            return "ACTIVE";
+        }
+
+        return closeStatus;
     };
 
     $scope.formatTag = function(tag) {
@@ -301,6 +317,40 @@ app.controller('workersController', function($scope, $route, $http, $location, e
             domain[worker.activityName].push(worker);
 
         }
+    };
+
+});
+
+app.controller('workflowInitiationController', function($scope, $route, $http) {
+
+    $scope.loading = false;
+    $scope.tags = [ { text: 'Dashboard:Initiated'}];
+
+    $scope.initiateWorkflow = function() {
+        $scope.loading = true;
+        var params = {};
+        params['id'] = $scope.workflowId;
+        params['input'] = $scope.inputJson;
+
+        var mtags = [];
+        for(var i in $scope.tags) {
+            var t = $scope.tags[i];
+            mtags.push(t.text);
+        }
+        params['tags'] = mtags.join(",");
+        $http.get('workflow/initiate', { params : params})
+            .success(function(data) {
+                         $scope.loading = false;
+                         $scope.runId = data;
+                     })
+            .error(function(error) {
+                       $scope.loading = false;
+                       toastr.error(error.details, error.error)
+                   });
+    };
+
+    $scope.addLabel = function() {
+      $scope.tags.push({text : ""});
     };
 
 });

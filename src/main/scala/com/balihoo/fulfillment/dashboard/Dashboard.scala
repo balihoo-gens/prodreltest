@@ -17,35 +17,62 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 
+class WorkflowInitiator(swfAdapter: SWFAdapter) {
+
+  def initate(id:String, input:String, tags:List[String]): String = {
+    Json.parse(input)
+    val executionRequest = new StartWorkflowExecutionRequest()
+    executionRequest.setDomain(swfAdapter.config.getString("domain"))
+    executionRequest.setWorkflowId(id)
+    executionRequest.setInput(input)
+    executionRequest.setTagList(tags.asJavaCollection)
+    executionRequest.setWorkflowType(new WorkflowType().withName("generic").withVersion("1"))
+    executionRequest.setTaskList(new TaskList().withName("generic1"))
+    swfAdapter.client.startWorkflowExecution(executionRequest).getRunId
+  }
+}
+
 class WorkflowInspector(swfAdapter: SWFAdapter) {
+
+  def infoToJson(info: WorkflowExecutionInfo): JsValue = {
+    Json.toJson(Map(
+      "workflowId" -> Json.toJson(info.getExecution.getWorkflowId),
+      "runId" -> Json.toJson(info.getExecution.getRunId),
+      "closeStatus" -> Json.toJson(info.getCloseStatus),
+      "closeTimestamp" -> Json.toJson(if(info.getCloseTimestamp != null) info.getCloseTimestamp.toString else "--"),
+      "startTimestamp" -> Json.toJson(info.getStartTimestamp.toString),
+      "tagList" -> Json.toJson(info.getTagList.asScala)
+    ))
+  }
 
   def executionHistory():List[JsValue] = {
 
     val oldest = new Date(System.currentTimeMillis() - (70 * UTCFormatter.DAY_IN_MS))
-    val latest = new Date(System.currentTimeMillis())
+    val latest = new Date(System.currentTimeMillis() + (10 * UTCFormatter.DAY_IN_MS))
     val filter = new ExecutionTimeFilter
     filter.setOldestDate(oldest)
     filter.setLatestDate(latest)
 
-    val lreq = new ListClosedWorkflowExecutionsRequest()
-    lreq.setDomain(swfAdapter.config.getString("domain"))
-//    lreq.setReverseOrder(true)
-    lreq.setStartTimeFilter(filter)
-    val infos = swfAdapter.client.listClosedWorkflowExecutions(lreq)
+    val infos = new collection.mutable.MutableList[JsValue]()
+    val oreq = new ListOpenWorkflowExecutionsRequest()
+    oreq.setDomain(swfAdapter.config.getString("domain"))
+    oreq.setStartTimeFilter(filter)
+    val open = swfAdapter.client.listOpenWorkflowExecutions(oreq)
 
-    val m = new collection.mutable.MutableList[JsValue]()
-    for(info:WorkflowExecutionInfo <- infos.getExecutionInfos.asScala) {
-      m += Json.toJson(Map(
-        "workflowId" -> Json.toJson(info.getExecution.getWorkflowId),
-        "runId" -> Json.toJson(info.getExecution.getRunId),
-        "closeStatus" -> Json.toJson(info.getCloseStatus),
-        "closeTimestamp" -> Json.toJson(info.getCloseTimestamp.toString),
-        "startTimestamp" -> Json.toJson(info.getStartTimestamp.toString),
-        "tagList" -> Json.toJson(info.getTagList.asScala)
-       ))
+    for(info:WorkflowExecutionInfo <- open.getExecutionInfos.asScala) {
+      infos += infoToJson(info)
     }
 
-    m.toList
+    val creq = new ListClosedWorkflowExecutionsRequest()
+    creq.setDomain(swfAdapter.config.getString("domain"))
+    creq.setStartTimeFilter(filter)
+    val closed = swfAdapter.client.listClosedWorkflowExecutions(creq)
+
+    for(info:WorkflowExecutionInfo <- closed.getExecutionInfos.asScala) {
+      infos += infoToJson(info)
+    }
+
+    infos.toList
   }
 
 
@@ -94,6 +121,7 @@ class WorkflowInspector(swfAdapter: SWFAdapter) {
 class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
 
   val wi = new WorkflowInspector(swfAdapter)
+  val wfi = new WorkflowInitiator(swfAdapter)
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
@@ -111,6 +139,15 @@ class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
   get("/workflow/environment", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
       ,Json.stringify(Json.toJson(wi.environment())))
+  })
+
+  get("/workflow/initiate", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(wfi.initate(
+        rsq.getRequiredParameter("id"),
+        rsq.getRequiredParameter("input"),
+        rsq.getOptionalParameter("tags", "").split(",").toList
+      ))))
   })
 
 }

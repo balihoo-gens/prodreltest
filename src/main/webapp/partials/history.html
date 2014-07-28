@@ -23,7 +23,7 @@
                     <br/>
                     End:{{ex.closeTimestamp}}
                 </td>
-                <td><span class="label {{figureStatusLabel(ex.closeStatus)}}">{{ex.closeStatus}}</span></td>
+                <td><span class="label {{figureStatusLabel(ex.closeStatus)}}" ng-bind-html="formatStatus(ex.closeStatus)"></span></td>
             </tr>
 
         </table>
