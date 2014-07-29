@@ -100,7 +100,7 @@ class WorkflowInspector {
       sections(name) = section.toJson
     }
 
-    val jtimeline = Json.toJson(for(entry <- sectionMap.timeline) yield entry.toJson)
+    val jtimeline = Json.toJson(for(entry <- sectionMap.timeline.events) yield entry.toJson)
 
     top("timeline") = jtimeline
     top("sections") = Json.toJson(sections.toMap)

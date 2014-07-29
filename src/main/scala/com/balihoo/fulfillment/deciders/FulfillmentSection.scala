@@ -46,6 +46,26 @@ class TimelineEvent(val eventType:TimelineEventType.Value, val message:String, v
   }
 }
 
+class Timeline {
+  val events = mutable.MutableList[TimelineEvent]()
+
+  def error(message:String, when:Date = null) = {
+    events += new TimelineEvent(TimelineEventType.ERROR, message, when)
+  }
+
+  def warning(message:String, when:Date = null) = {
+    events += new TimelineEvent(TimelineEventType.WARNING, message, when)
+  }
+
+  def note(message:String, when:Date = null) = {
+    events += new TimelineEvent(TimelineEventType.NOTE, message, when)
+  }
+
+  def success(message:String, when:Date = null) = {
+    events += new TimelineEvent(TimelineEventType.SUCCESS, message, when)
+  }
+}
+
 class FulfillmentSection(val name: String
                          ,val jsonNode: JsObject
                          ,val creationDate:Date) {
@@ -53,7 +73,7 @@ class FulfillmentSection(val name: String
   var action: ActivityType = null
   val params = collection.mutable.Map[String, Any]()
   val prereqs = mutable.MutableList[String]()
-  val timeline = mutable.MutableList[TimelineEvent]()
+  val timeline = new Timeline //mutable.MutableList[TimelineEvent]()
   var value: String = ""
 
   var status = SectionStatus.INCOMPLETE
@@ -93,7 +113,7 @@ class FulfillmentSection(val name: String
             case jStr: JsString =>
               params(jk) = jv.as[String]
             case _ =>
-              timelineError(s"Parameter '$jk' is of type '${jv.getClass.toString}'. This is not a valid type.", creationDate)
+              timeline.error(s"Parameter '$jk' is of type '${jv.getClass.toString}'. This is not a valid type.", creationDate)
           }
         }
 
@@ -108,7 +128,7 @@ class FulfillmentSection(val name: String
         essential = value.as[Boolean]
 
       case _ =>
-        timelineWarning(s"Section input '$key' unhandled!", creationDate)
+        timeline.warning(s"Section input '$key' unhandled!", creationDate)
     }
   }
 
@@ -143,36 +163,36 @@ class FulfillmentSection(val name: String
   def setStarted(when:Date) = {
     startedCount += 1
     status = SectionStatus.STARTED
-    timelineNote("Started", when)
+    timeline.note("Started", when)
   }
 
   def setScheduled(when:Date) = {
     scheduledCount += 1
     status = SectionStatus.SCHEDULED
-    timelineNote("Scheduled", when)
+    timeline.note("Scheduled", when)
   }
 
   def setCompleted(result:String, when:Date) = {
     status = SectionStatus.COMPLETE
-    timelineNote("Completed", when)
+    timeline.note("Completed", when)
     value = result
   }
 
   def setFailed(reason:String, details:String, when:Date) = {
     failedCount += 1
-    timelineWarning(s"Failed because:$reason $details", when)
+    timeline.warning(s"Failed because:$reason $details", when)
     status = if(failedCount > failureParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.FAILED
   }
 
   def setCanceled(details:String, when:Date) = {
     canceledCount += 1
-    timelineWarning(s"Canceled because: $details", when)
+    timeline.warning(s"Canceled because: $details", when)
     status = if(canceledCount > cancelationParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.CANCELED
   }
 
   def setTimedOut(when:Date) = {
     timedoutCount += 1
-    timelineWarning("Timed out!", when)
+    timeline.warning("Timed out!", when)
     status = if(timedoutCount > timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
   }
 
@@ -195,22 +215,6 @@ class FulfillmentSection(val name: String
     s"$name${Constants.delimiter}${action.getName}${Constants.delimiter}"+timestamp
   }
 
-  def timelineError(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.ERROR, message, when)
-  }
-
-  def timelineWarning(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.WARNING, message, when)
-  }
-
-  def timelineNote(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.NOTE, message, when)
-  }
-
-  def timelineSuccess(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.SUCCESS, message, when)
-  }
-
   override def toString = {
     Json.stringify(toJson)
   }
@@ -227,7 +231,7 @@ class FulfillmentSection(val name: String
       }
     }
 
-    val jtimeline = Json.toJson(for(entry <- timeline) yield entry.toJson)
+    val jtimeline = Json.toJson(for(entry <- timeline.events) yield entry.toJson)
 
     Json.toJson(Map(
       "status" -> Json.toJson(status.toString),
@@ -253,7 +257,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   val registry = collection.mutable.Map[java.lang.Long, String]()
   val nameToSection = collection.mutable.Map[String, FulfillmentSection]()
-  val timeline = mutable.MutableList[TimelineEvent]()
+  val timeline = new Timeline //mutable.MutableList[TimelineEvent]()
   val timers = collection.mutable.Map[String, String]()
 
   try {
@@ -298,7 +302,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     case e:NoSuchElementException =>
       throw e
     case e:Exception =>
-      timelineError(e.getMessage, new Date())
+      timeline.error(e.getMessage, new Date())
   }
 
   /**
@@ -312,13 +316,13 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
         if(prereq == name) {
           section.status = SectionStatus.IMPOSSIBLE
           val ception = s"Fulfillment is impossible! $name has a self-referential prereq!"
-          section.timelineError(ception, when)
+          section.timeline.error(ception, when)
           throw new Exception(ception)
         }
         if(!hasSection(prereq)) {
           section.status = SectionStatus.IMPOSSIBLE
           val ception = s"Fulfillment is impossible! Prereq ($prereq) for $name does not exist!"
-          section.timelineError(ception, when)
+          section.timeline.error(ception, when)
           throw new Exception(ception)
         }
       }
@@ -326,7 +330,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
         if(pname == name) {
           section.status = SectionStatus.IMPOSSIBLE
           val ception = s"Fulfillment is impossible! $name has a self-referential parameter!"
-          section.timelineError(ception, when)
+          section.timeline.error(ception, when)
           throw new Exception(ception)
         }
         param match {
@@ -335,7 +339,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
               if(!hasSection(sectionRef.name)) {
                 section.status = SectionStatus.IMPOSSIBLE
                 val ception = s"Fulfillment is impossible! Param ($pname -> ${sectionRef.name}) for $name does not exist!"
-                section.timelineError(ception, when)
+                section.timeline.error(ception, when)
                 throw new Exception(ception)
               }
             }
@@ -345,7 +349,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     }
 
     if(0 == essentialCount) {
-      timelineWarning("No essential sections!", when)
+      timeline.warning("No essential sections!", when)
     }
   }
 
@@ -421,7 +425,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   protected def processWorkflowExecutionSignaled(event: HistoryEvent) = {
     val attribs = event.getWorkflowExecutionSignaledEventAttributes
-    timelineNote(s"Received signal ${attribs.getSignalName} ${attribs.getInput}", event.getEventTimestamp)
+    timeline.note(s"Received signal ${attribs.getSignalName} ${attribs.getInput}", event.getEventTimestamp)
   }
 
   protected def processTimerStarted(event: HistoryEvent) = {
@@ -436,7 +440,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     val section = getSectionByName(sectionName)
 
     if(section.status == SectionStatus.DEFERRED) {
-      section.timelineError(s"$sectionName is already DEFERRED!!", event.getEventTimestamp)
+      section.timeline.error(s"$sectionName is already DEFERRED!!", event.getEventTimestamp)
     }
 
     section.status = SectionStatus.DEFERRED
@@ -452,22 +456,6 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     val status = SectionStatus.withName(timerParams.value("status").as[String])
 
     getSectionByName(sectionName).status = status
-  }
-
-  def timelineError(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.ERROR, message, when)
-  }
-
-  def timelineWarning(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.WARNING, message, when)
-  }
-
-  def timelineNote(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.NOTE, message, when)
-  }
-
-  def timelineSuccess(message:String, when:Date = null) = {
-    timeline += new TimelineEvent(TimelineEventType.SUCCESS, message, when)
   }
 
   override def toString = {
@@ -546,11 +534,10 @@ class SectionReferences(sectionNames:List[String]) {
       }
     }
 
-    map.timelineError("Tried to get value from referenced sections and no value was available! "
-      +toString())
+    val gripe = "Tried to get value from referenced sections and no value was available! "+toString()
+    map.timeline.error(gripe)
 
-    throw new Exception("Tried to get value from referenced sections and no value was available! "
-      +toString())
+    throw new Exception(gripe)
   }
 
   override def toString: String = s"sections($sectionNames)"

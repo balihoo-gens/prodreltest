@@ -77,7 +77,7 @@ class CategorizedSections(sections: SectionMap) {
           // println("Section is complete")
         case _ =>
           // Anything other than complete is BLOCKING our progress
-          section.timelineWarning(s"Waiting for prereq $prereq (${referencedSection.status})")
+          section.timeline.warning(s"Waiting for prereq $prereq (${referencedSection.status})")
           prereqsReady = false
       }
     }

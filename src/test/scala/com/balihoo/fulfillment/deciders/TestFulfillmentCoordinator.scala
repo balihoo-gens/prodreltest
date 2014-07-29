@@ -75,7 +75,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       section.status mustEqual SectionStatus.withName("INCOMPLETE")
 
-      section.timeline(0).message mustEqual "Section input 'totally unhandled' unhandled!"
+      section.timeline.events(0).message mustEqual "Section input 'totally unhandled' unhandled!"
     }
 
     "handle status changes" in {
@@ -135,11 +135,11 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       section.setFailed("reasons", "terrible reasons", new Date())
       section.status mustEqual SectionStatus.FAILED
-      section.timeline.last.message mustEqual "Failed because:reasons terrible reasons"
+      section.timeline.events.last.message mustEqual "Failed because:reasons terrible reasons"
 
       section.setFailed("reasons", "more terrible reasons", new Date())
       section.status mustEqual SectionStatus.TERMINAL
-      section.timeline.last.message mustEqual "Failed because:reasons more terrible reasons"
+      section.timeline.events.last.message mustEqual "Failed because:reasons more terrible reasons"
     }
   }
 
@@ -282,7 +282,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.nameToSection.size mustEqual 3
 
-      map.timeline(0).message mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+      map.timeline.events(0).message mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }
   }
 }
