@@ -6,9 +6,14 @@
         <div ng-show="loading">
             <img src="img/loading.gif">
         </div>
-        <h2 ng-show="workflow.notes">Notes</h2>
+        <span id="rawInputToggle" class="pull-right muted label">Show Input</span>
+        <pre class="initiallyHidden" id="rawInput" ng-bind-html="formatJsonBasic(workflow.input)"></pre>
+        <h2 ng-show="workflow.timeline">Timeline</h2>
         <div class="block">
-            <div ng-repeat="note in workflow.notes"><div ng-bind-html="formatWhitespace(note)"></div></div>
+            <div ng-repeat="event in workflow.timeline">
+                <span class="pull-right muted">{{event.when}}</span>
+                <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatWhitespace(event.message)"></span>
+            </div>
         </div>
         <h2>Sections</h2>
         <div class="panel panel-default" ng-repeat="(name, section) in workflow.sections">
@@ -17,24 +22,30 @@
 					{{section.input.action.name}} : {{section.input.action.version}} &nbsp;&nbsp;
 					<span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
 				</span>
+                <img width="20" height="20" src="img/star_gold_256.png" style="margin-bottom:4px;margin-right:4px;" title="This section MUST be successful!!" ng-show="section.essential">
                 <b>{{name}}</b>
             </div>
             <div class="panel-body-small">
 
-                <h3 ng-show="section.notes">Notes</h3>
-                <div class="block" ng-repeat="note in section.notes">
-                    <div ng-bind-html="formatWhitespace(note)"></div>
+                <div class="blob" style="width:60%; margin-bottom:20px;">
+                    <h3 ng-show="section.timeline">Timeline</h3>
+                    <div class="block" ng-repeat="event in section.timeline">
+                        <span class="pull-right muted">{{event.when}}</span>
+                        <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatWhitespace(event.message)"></span>
+                    </div>
                 </div>
-                <h3 ng-show="section.value">Result</h3>
-                <div class="block">{{section.value}}</div>
+                <div class="blob block" style="width:30%; margin-bottom:20px;">
+                    <h3 ng-show="section.value">Result</h3>
+                    <div class="block">{{section.value}}</div>
+                </div>
                 <h3>Parameters</h3>
                 <table class="table table-condensed table-hover block params" style="width:95%">
-                    <tr ng-repeat="(pname, param) in section.input.params">
+                    <tr ng-repeat="(pname, param) in section.params">
                         <td style="width:100px"><b>{{pname}}</b></td>
                         <td>
                             <span ng-if="isJSON(param)" ng-bind-html="formatJson(param)"></span>
                             <div ng-if="isArray(param)">
-                                <span ng-repeat="item in param"><span class="label {{figureStatusLabel(workflow.sections[item].status)}}" ng-click="scrollToSection(item)">{{item}}</span>&nbsp;</span>
+                                <span ng-repeat="item in param"><span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}</span>&nbsp;</span>
                             </div>
                             <div ng-if="isString(param) && ! isJSON(param)">
                                 <span ng-bind-html="formatURLs(param)"></span>

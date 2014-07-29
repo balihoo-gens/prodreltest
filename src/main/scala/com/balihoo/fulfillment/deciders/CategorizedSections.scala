@@ -14,15 +14,19 @@ class CategorizedSections(sections: SectionMap) {
   val failed = mutable.MutableList[FulfillmentSection]()
   val canceled = mutable.MutableList[FulfillmentSection]()
   val contingent = mutable.MutableList[FulfillmentSection]()
-  val dismissed = mutable.MutableList[FulfillmentSection]()
   val terminal = mutable.MutableList[FulfillmentSection]()
   val ready = mutable.MutableList[FulfillmentSection]()
   val impossible = mutable.MutableList[FulfillmentSection]()
 
-  for((name, section) <- sections.map) {
+  var essentialComplete = 0
+  var essentialTotal = 0
+
+  for((name, section) <- sections.nameToSection) {
+    if(section.essential) { essentialTotal += 1 }
     section.status match {
       case SectionStatus.COMPLETE =>
         complete += section
+        if(section.essential) { essentialComplete += 1 }
       case SectionStatus.SCHEDULED =>
         inprogress += section
       case SectionStatus.STARTED =>
@@ -39,8 +43,6 @@ class CategorizedSections(sections: SectionMap) {
         deferred += section
       case SectionStatus.TERMINAL =>
         terminal += section
-      case SectionStatus.DISMISSED =>
-        dismissed += section
       case SectionStatus.INCOMPLETE =>
         categorizeIncompleteSection(section)
       case SectionStatus.IMPOSSIBLE =>
@@ -60,8 +62,8 @@ class CategorizedSections(sections: SectionMap) {
     var paramsReady: Boolean = true
     for((name, value) <- section.params) {
       value match {
-        case sectionReference: SectionReference =>
-          paramsReady &= sectionReference.resolved(sections)
+        case sectionReferences: SectionReferences =>
+          paramsReady &= sectionReferences.resolved(sections)
         case _ =>
           // non-reference params are automatically ready..
       }
@@ -69,13 +71,13 @@ class CategorizedSections(sections: SectionMap) {
 
     var prereqsReady: Boolean = true
     for(prereq: String <- section.prereqs) {
-      val referencedSection: FulfillmentSection = sections.map(prereq)
+      val referencedSection: FulfillmentSection = sections.nameToSection(prereq)
       referencedSection.status match {
         case SectionStatus.COMPLETE =>
           // println("Section is complete")
         case _ =>
           // Anything other than complete is BLOCKING our progress
-          section.notes += s"Waiting for prereq $prereq (${referencedSection.status})"
+          section.timeline.warning(s"Waiting for prereq $prereq (${referencedSection.status})")
           prereqsReady = false
       }
     }
@@ -90,7 +92,14 @@ class CategorizedSections(sections: SectionMap) {
   }
 
   def workComplete() : Boolean = {
-    sections.map.size == (complete.length + contingent.length + dismissed.length)
+    essentialTotal match {
+      case 0 =>
+        // No essential sections.. we just want everything complete or contingent
+        sections.nameToSection.size == (complete.length + contingent.length)
+      case _ =>
+        // If there are essential sections.. they MUST ALL be COMPLETE
+        essentialComplete == essentialTotal
+    }
   }
 
   def hasPendingSections: Boolean = {
