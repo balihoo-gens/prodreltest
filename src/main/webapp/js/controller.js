@@ -67,9 +67,19 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 app.controller('historyController', function($scope, $route, $http, $location) {
 
+
+
     $scope.$on(
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
+            var start = $('#startDate');
+            start.datetimepicker();
+            start.data("DateTimePicker").setDate(new Date(new Date().setDate(new Date().getDate()-14)));
+
+            var end = $('#endDate');
+            end.datetimepicker();
+            end.data("DateTimePicker").setDate(new Date());
+
             $scope.getHistory();
         }
     );
@@ -78,6 +88,8 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     $scope.getHistory = function() {
         $scope.loading = true;
         var params = {};
+        params['startDate'] = moment($('#startDate').data("DateTimePicker").getDate()).utc().format('YYYY-MM-DDTHH:mm:ss')+"Z";
+        params['endDate'] = moment($('#endDate').data("DateTimePicker").getDate()).utc().format('YYYY-MM-DDTHH:mm:ss')+"Z";
         $http.get('workflow/history', { params : params})
             .success(function(data) {
                          $scope.loading = false;

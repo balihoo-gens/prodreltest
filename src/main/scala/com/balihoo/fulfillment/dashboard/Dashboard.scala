@@ -45,10 +45,10 @@ class WorkflowInspector(swfAdapter: SWFAdapter) {
     ))
   }
 
-  def executionHistory():List[JsValue] = {
+  def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
 
-    val oldest = new Date(System.currentTimeMillis() - (70 * UTCFormatter.DAY_IN_MS))
-    val latest = new Date(System.currentTimeMillis() + (10 * UTCFormatter.DAY_IN_MS))
+//    val oldest = new Date(System.currentTimeMillis() - (70 * UTCFormatter.DAY_IN_MS))
+//    val latest = new Date(System.currentTimeMillis() + (10 * UTCFormatter.DAY_IN_MS))
     val filter = new ExecutionTimeFilter
     filter.setOldestDate(oldest)
     filter.setLatestDate(latest)
@@ -125,7 +125,10 @@ class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(wi.executionHistory())))
+      ,Json.stringify(Json.toJson(wi.executionHistory(
+          UTCFormatter.dateFormat.parse(rsq.getRequiredParameter("startDate")),
+          UTCFormatter.dateFormat.parse(rsq.getRequiredParameter("endDate"))
+      ))))
   })
 
   get("/workflow/detail", (rsq:RestServletQuery) => {
