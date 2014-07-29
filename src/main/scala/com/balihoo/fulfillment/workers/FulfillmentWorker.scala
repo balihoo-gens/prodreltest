@@ -18,7 +18,8 @@ import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
 import com.balihoo.fulfillment.util.Getch
 
-abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter) {
+abstract class FulfillmentWorker {
+  this: SWFAdapterComponent with DynamoAdapterComponent =>
 
   val instanceId = randomUUID().toString
 
@@ -43,7 +44,9 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
       java.net.InetAddress.getLocalHost.getHostName
   }
 
-  val workerTable = new FulfillmentWorkerTable(dynamoAdapter)
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
+    def dynamoAdapter = FulfillmentWorker.this.dynamoAdapter
+  }
 
   val entry = new FulfillmentWorkerEntry
   entry.setInstance(instanceId)
@@ -79,7 +82,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
 
     var done = false
     val getch = new Getch
-    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("quit");done = true})
+    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
 
     getch.doWith {
       while(!done) {
@@ -107,7 +110,7 @@ abstract class FulfillmentWorker(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAd
       }
     }
     updateStatus("Exiting")
-    print("Exiting...")
+    print("Cleaning up...")
   }
 
   def handleTask(params:ActivityParameters)
@@ -244,7 +247,8 @@ object UTCFormatter {
 
 }
 
-class FulfillmentWorkerTable(val dynamoAdapter:DynamoAdapter) {
+class FulfillmentWorkerTable {
+  this: DynamoAdapterComponent =>
 
   def insert(entry:FulfillmentWorkerEntry) = {
     dynamoAdapter.put(entry.getDynamoItem)

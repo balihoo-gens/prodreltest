@@ -5,6 +5,11 @@ import org.apache.commons.configuration.PropertiesConfiguration
 import java.io.{File, FileInputStream, InputStream}
 import scopt._
 
+//for the cake pattern dependency injection
+trait PropertiesLoaderComponent {
+  def config: PropertiesLoader
+}
+
 class PropertiesLoader(propertiesFileName: String, propertiesDir: String = "") {
 
   private val prop: PropertiesConfiguration = new PropertiesConfiguration()

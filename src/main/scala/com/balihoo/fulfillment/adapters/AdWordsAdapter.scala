@@ -2,7 +2,7 @@ package com.balihoo.fulfillment.adapters
 
 import scala.language.implicitConversions
 
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.lib.client.AdWordsSession
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.ads.common.lib.auth.OfflineCredentials.Api
@@ -13,15 +13,22 @@ import com.google.api.ads.adwords.axis.v201402.cm._
 import com.google.api.ads.adwords.axis.v201402.mcm._
 import scala.collection.mutable
 
-class AdWordsAdapter(loader: PropertiesLoader) {
-  val config = loader
+//typical cake would nest the adapter inside the provider
+// but that causes issues here for nested injection, i.e.
+// where we pass components from the outer cake into an inner cake
+trait AdWordsAdapterComponent {
+  def adWordsAdapter: AdWordsAdapter
+}
+
+class AdWordsAdapter {
+  this: PropertiesLoaderComponent =>
 
   private val configuration:Configuration = new BaseConfiguration()
-  configuration.addProperty("api.adwords.refreshToken", loader.getString("refreshToken"))
-  configuration.addProperty("api.adwords.clientId", loader.getString("clientId"))
-  configuration.addProperty("api.adwords.clientSecret", loader.getString("clientSecret"))
+  configuration.addProperty("api.adwords.refreshToken", config.getString("refreshToken"))
+  configuration.addProperty("api.adwords.clientId", config.getString("clientId"))
+  configuration.addProperty("api.adwords.clientSecret", config.getString("clientSecret"))
 
-  val baseAccountId = loader.getString("baseAccountId")
+  val baseAccountId = config.getString("baseAccountId")
 
   // Generate a refreshable OAuth2 credential similar to a ClientLogin token
   // and can be used in place of a service account.
@@ -34,7 +41,7 @@ class AdWordsAdapter(loader: PropertiesLoader) {
   // Construct an AdWordsSession.
   private val session:AdWordsSession = new AdWordsSession.Builder()
     .withOAuth2Credential(oAuth2Credential)
-    .withDeveloperToken(loader.getString("developerToken"))
+    .withDeveloperToken(config.getString("developerToken"))
     .withUserAgent("Balihoo_Fulfillment")
     .enableReportMoneyInMicros()
     .build()
@@ -101,6 +108,12 @@ class AdWordsAdapter(loader: PropertiesLoader) {
 
   def addOrSet(operatorId:Long): Operator = {
     if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
+  }
+}
+
+object AdWordsAdapter {
+  def apply(cfg: PropertiesLoader) = {
+    new AdWordsAdapter with PropertiesLoaderComponent { def config = cfg }
   }
 }
 

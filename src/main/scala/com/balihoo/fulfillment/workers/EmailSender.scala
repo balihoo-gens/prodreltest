@@ -1,11 +1,10 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter, SESAdapter}
+import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config._
 
-import com.balihoo.fulfillment.config.PropertiesLoader
-
-class EmailSender(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapter: SESAdapter)
-  extends FulfillmentWorker(swfAdapter, dynamoAdapter) {
+abstract class EmailSender extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
+  this: SESAdapterComponent =>
 
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
@@ -28,8 +27,13 @@ class EmailSender(swfAdapter: SWFAdapter, dynamoAdapter: DynamoAdapter, sesAdapt
 
 object email_sender {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new EmailSender(new SWFAdapter(config), new DynamoAdapter(config), new SESAdapter(config))
+    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val worker = new EmailSender
+      with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
+        def sesAdapter = SESAdapter(cfg)
+      }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
