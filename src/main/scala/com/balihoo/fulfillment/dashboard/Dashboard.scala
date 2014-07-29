@@ -11,13 +11,15 @@ import scala.collection.JavaConverters._
 import javax.servlet.http.HttpServletResponse
 
 import com.amazonaws.services.simpleworkflow.model._
-import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter}
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config._
+
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 
-class WorkflowInitiator(swfAdapter: SWFAdapter) {
+class WorkflowInitiator {
+  this: SWFAdapterComponent =>
 
   def initate(id:String, input:String, tags:List[String]): String = {
     Json.parse(input)
@@ -32,7 +34,8 @@ class WorkflowInitiator(swfAdapter: SWFAdapter) {
   }
 }
 
-class WorkflowInspector(swfAdapter: SWFAdapter) {
+class WorkflowInspector {
+  this: SWFAdapterComponent =>
 
   def infoToJson(info: WorkflowExecutionInfo): JsValue = {
     Json.toJson(Map(
@@ -118,10 +121,15 @@ class WorkflowInspector(swfAdapter: SWFAdapter) {
 
 
 
-class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
+class WorkflowServlet extends RestServlet {
+  this: SWFAdapterComponent =>
 
-  val wi = new WorkflowInspector(swfAdapter)
-  val wfi = new WorkflowInitiator(swfAdapter)
+  val wi = new WorkflowInspector with SWFAdapterComponent {
+    def swfAdapter = WorkflowServlet.this.swfAdapter
+  }
+  val wfi = new WorkflowInitiator with SWFAdapterComponent {
+    def swfAdapter = WorkflowServlet.this.swfAdapter
+  }
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
@@ -155,9 +163,13 @@ class WorkflowServlet(swfAdapter: SWFAdapter) extends RestServlet {
 
 }
 
-class WorkerServlet(dynamoAdapter:DynamoAdapter) extends RestServlet {
+class WorkerServlet extends RestServlet {
+  this: DynamoAdapterComponent =>
 
-  val workerTable = new FulfillmentWorkerTable(dynamoAdapter)
+  val da = dynamoAdapter
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
+    def dynamoAdapter = da
+  }
 
   get("/worker", (rsq:RestServletQuery) => {
 
@@ -176,20 +188,26 @@ class WorkerServlet(dynamoAdapter:DynamoAdapter) extends RestServlet {
 
 object dashboard {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
 
-    val swfAdapter = new SWFAdapter(config)
-    val dynamoAdapter = new DynamoAdapter(config)
+    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
 
-    val server = new Server(config.getInt("port"))
     val context = new WebAppContext()
     context setContextPath "/"
     context.setResourceBase("src/main/webapp")
     context.setWelcomeFiles(Array[String]("index.html"))
 
-    context.addServlet(new ServletHolder(new WorkerServlet(dynamoAdapter)), "/worker/*")
-    context.addServlet(new ServletHolder(new WorkflowServlet(swfAdapter)), "/workflow/*")
+    val workerServlet = new WorkerServlet with DynamoAdapterComponent {
+      def dynamoAdapter = DynamoAdapter(cfg)
+    }
 
+    val workflowServlet = new WorkflowServlet with SWFAdapterComponent {
+      def swfAdapter = SWFAdapter(cfg)
+    }
+
+    context.addServlet(new ServletHolder(workerServlet), "/worker/*")
+    context.addServlet(new ServletHolder(workflowServlet), "/workflow/*")
+
+    val server = new Server(cfg.getInt("port"))
     server.setHandler(context)
     server.start()
     server.join()

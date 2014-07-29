@@ -6,18 +6,23 @@ import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
 
-import com.balihoo.fulfillment.adapters.SWFAdapter
+import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.util.Getch
 
 object Constants {
   final val delimiter = "##"
 }
 
-class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
+class FulfillmentCoordinator {
+  this: SWFAdapterComponent =>
 
+  //can't have constructor code using the self type reference
+  // unless it was declared 'lazy'. If not, swfAdapter is still null
+  // and will throw a NullPointerException at this time.
   val domain = swfAdapter.config.getString("domain")
   val taskListName = swfAdapter.config.getString("tasklist")
 
@@ -30,31 +35,38 @@ class FulfillmentCoordinator(swfAdapter: SWFAdapter) {
 
   def coordinate() = {
 
-    while(true) {
-      print(".")
-      try {
-        val task: DecisionTask = swfAdapter.client.pollForDecisionTask(taskReq)
+    var done = false
+    val getch = new Getch
+    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
 
-        if(task.getTaskToken != null) {
+    getch.doWith {
+      while(!done) {
+        print(".")
+        try {
+          val task: DecisionTask = swfAdapter.client.pollForDecisionTask(taskReq)
 
-          val sections = new SectionMap(task.getEvents)
-          val categorized = new CategorizedSections(sections)
-          val decisions = new DecisionGenerator(categorized, sections).makeDecisions()
+          if(task.getTaskToken != null) {
 
-          val response: RespondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest
-          response.setTaskToken(task.getTaskToken)
-          response.setDecisions(asJavaCollection(decisions))
-          swfAdapter.client.respondDecisionTaskCompleted(response)
+            val sections = new SectionMap(task.getEvents)
+            val categorized = new CategorizedSections(sections)
+            val decisions = new DecisionGenerator(categorized, sections).makeDecisions()
+
+            val response: RespondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest
+            response.setTaskToken(task.getTaskToken)
+            response.setDecisions(asJavaCollection(decisions))
+            swfAdapter.client.respondDecisionTaskCompleted(response)
+          }
+        } catch {
+          case se: java.net.SocketException =>
+          // these happen.. no biggie.
+          case e: Exception =>
+            println("\n" + e.getMessage)
+          case t: Throwable =>
+            println("\n" + t.getMessage)
         }
-      } catch {
-        case se: java.net.SocketException =>
-        // these happen.. no biggie.
-        case e: Exception =>
-          println("\n" + e.getMessage)
-        case t: Throwable =>
-          println("\n" + t.getMessage)
       }
     }
+    print("Cleaning up...")
   }
 }
 
@@ -259,8 +271,9 @@ class DecisionGenerator(categorized: CategorizedSections
 
 object coordinator {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val fc: FulfillmentCoordinator = new FulfillmentCoordinator(new SWFAdapter(config))
+    val fc: FulfillmentCoordinator = new FulfillmentCoordinator with SWFAdapterComponent {
+      def swfAdapter = SWFAdapter(PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$")))
+    }
     println("Running decider")
     fc.coordinate()
   }
