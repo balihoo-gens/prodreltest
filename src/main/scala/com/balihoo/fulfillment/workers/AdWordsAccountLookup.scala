@@ -4,12 +4,11 @@ import com.balihoo.fulfillment.config.{PropertiesLoader,PropertiesLoaderComponen
 import com.balihoo.fulfillment.adapters._
 import com.google.api.ads.adwords.axis.v201402.mcm.ManagedCustomer
 
-abstract class AdWordsAccountLookup extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
-  this: AdWordsAdapterComponent =>
-
-  val creator = new AccountCreator with AdWordsAdapterComponent {
-    def adWordsAdapter = AdWordsAccountLookup.this.adWordsAdapter
-  }
+abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
+  this: AdWordsAdapterComponent
+    with SWFAdapterComponent
+    with DynamoAdapterComponent
+    with AccountCreatorComponent =>
 
   override def handleTask(params: ActivityParameters) = {
     try {
@@ -33,18 +32,31 @@ abstract class AdWordsAccountLookup extends FulfillmentWorker with SWFAdapterCom
         throw new Exception(throwable.getMessage)
     }
   }
+}
 
+class AdWordsAccountLookup(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+  extends AbstractAdWordsAccountLookup
+  with SWFAdapterComponent
+  with DynamoAdapterComponent
+  with AdWordsAdapterComponent
+  with AccountCreatorComponent {
+    //don't put this in the creator method to avoid a new one from
+    //being created on every call.
+    val _creator = new AccountCreator(awa)
+    def swfAdapter = swf
+    def dynamoAdapter = dyn
+    def adWordsAdapter = awa
+    def creator = _creator
 }
 
 object adwords_accountlookup {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountLookup
-      with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
-        def swfAdapter = SWFAdapter(cfg)
-        def dynamoAdapter = DynamoAdapter(cfg)
-        def adWordsAdapter = AdWordsAdapter(cfg)
-      }
+    val worker = new AdWordsAccountLookup(
+      new SWFAdapter(cfg),
+      new DynamoAdapter(cfg),
+      new AdWordsAdapter(cfg)
+    )
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
