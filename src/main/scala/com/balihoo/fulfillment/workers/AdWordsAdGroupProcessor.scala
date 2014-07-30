@@ -290,6 +290,7 @@ trait AdGroupCreatorComponent {
 
   class AdGroupCreator(awa: AdWordsAdapter)
     extends AbstractAdGroupCreator
+    with CampaignCreatorComponent
     with AdWordsAdapterComponent {
       def adWordsAdapter = awa
   }
