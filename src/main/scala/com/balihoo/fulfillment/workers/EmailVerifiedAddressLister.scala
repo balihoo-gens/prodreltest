@@ -3,8 +3,10 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 
-abstract class EmailVerifiedAddressLister extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
-  this: SESAdapterComponent =>
+abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
+  this: SESAdapterComponent
+    with SWFAdapterComponent
+    with DynamoAdapterComponent =>
 
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
@@ -19,16 +21,25 @@ abstract class EmailVerifiedAddressLister extends FulfillmentWorker with SWFAdap
   }
 }
 
+class EmailVerifiedAddressLister(swf: SWFAdapter, dyn: DynamoAdapter, ses: SESAdapter)
+  extends AbstractEmailVerifiedAddressLister
+  with SWFAdapterComponent
+  with DynamoAdapterComponent
+  with SESAdapterComponent {
+    def swfAdapter = swf
+    def dynamoAdapter = dyn
+    def sesAdapter = ses
+}
+
 object email_verifiedaddresslister {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new EmailVerifiedAddressLister
-      with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-        def swfAdapter = SWFAdapter(cfg)
-        def dynamoAdapter = DynamoAdapter(cfg)
-        def sesAdapter = SESAdapter(cfg)
-      }
-    println(s"Running ${getClass.getSimpleName}")
+    val worker = new EmailVerifiedAddressLister (
+      new SWFAdapter(cfg),
+      new DynamoAdapter(cfg),
+      new SESAdapter(cfg)
+    )
+     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
 }

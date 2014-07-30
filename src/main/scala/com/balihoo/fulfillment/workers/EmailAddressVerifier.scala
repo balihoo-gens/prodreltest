@@ -3,8 +3,10 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 
-abstract class AbstractEmailAddressVerifier extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
-  this: SESAdapterComponent =>
+abstract class AbstractEmailAddressVerifier extends FulfillmentWorker {
+  this: SESAdapterComponent
+    with SWFAdapterComponent
+    with DynamoAdapterComponent =>
 
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
