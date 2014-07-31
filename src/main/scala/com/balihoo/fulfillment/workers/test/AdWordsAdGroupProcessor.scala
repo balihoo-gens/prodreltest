@@ -9,7 +9,7 @@ import com.google.api.ads.adwords.axis.v201402.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 abstract class AdGroupTest(cfg: PropertiesLoader)
-    extends AdWordsAdapter
+    extends AdWordsAdapterComponent
       with CampaignCreatorComponent
       with AdGroupCreatorComponent {
     private val _awa = new AdWordsAdapter(cfg)
@@ -18,6 +18,8 @@ abstract class AdGroupTest(cfg: PropertiesLoader)
     private val _ac = new AdGroupCreator(adWordsAdapter)
     def campaignCreator = _cc
     def adGroupCreator = _ac
+
+    def run: Unit
 }
 
 object test_adwordsAdGroupCreator {
@@ -29,33 +31,34 @@ object test_adwordsAdGroupCreator {
 
   class TestAdGroupCreator(cfg: PropertiesLoader) extends AdGroupTest(cfg) {
 
-    adWordsAdapter.setValidateOnly(false)
-    adWordsAdapter.setClientId("100-019-2687")
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
 
-    val campaignParams =
-      s"""{
-       "name" : "fulfillment Campaign",
-        "channel" : "DISPLAY"
-      }"""
-    val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val campaignParams =
+        s"""{
+         "name" : "fulfillment Campaign",
+          "channel" : "DISPLAY"
+        }"""
+      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
 
-    val target =
-      """{\"focus\" : \"interests\",\"interests\" : [\"Beauty & Fitness\",\"Books & Literature\"]}"""
+      val target =
+        """{\"focus\" : \"interests\",\"interests\" : [\"Beauty & Fitness\",\"Books & Literature\"]}"""
 
-    val adGroupParams =
-      s"""{
-       "name" : "CPM AdGroup",
-       "status" : "ENABLED",
-        "campaignId" : "${campaign.getId}",
-        "bidDollars" : "6.6",
-        "target" : "$target"
-      }"""
+      val adGroupParams =
+        s"""{
+         "name" : "CPM AdGroup",
+         "status" : "ENABLED",
+          "campaignId" : "${campaign.getId}",
+          "bidDollars" : "6.6",
+          "target" : "$target"
+        }"""
 
-    val adGroup = adGroupCreator.getAdGroup(new ActivityParameters(adGroupParams))
-    val newAdgroup = adGroupCreator.updateAdGroup(adGroup, new ActivityParameters(adGroupParams))
+      val adGroup = adGroupCreator.getAdGroup(new ActivityParameters(adGroupParams))
+      val newAdgroup = adGroupCreator.updateAdGroup(adGroup, new ActivityParameters(adGroupParams))
 
-    println(newAdgroup.getId)
-
+      println(newAdgroup.getId)
+    }
   }
 }
 
@@ -63,29 +66,32 @@ object test_adwordsAdGroupSetInterests {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, "adwords")
     val test = new TestAdGroupSetInterests(cfg)
+    test.run
   }
 
   class TestAdGroupSetInterests(cfg: PropertiesLoader) extends AdGroupTest(cfg) {
 
-    adWordsAdapter.setValidateOnly(false)
-    adWordsAdapter.setClientId("100-019-2687")
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
 
-    val campaignParams =
-      s"""{
-       "name" : "fulfillment campaign",
-        "channel" : "DISPLAY"
-      }"""
-    val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val campaignParams =
+        s"""{
+         "name" : "fulfillment campaign",
+          "channel" : "DISPLAY"
+        }"""
+      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
 
-    val adgroupParams =
-      s"""{
-       "name" : "GROUP A",
-        "campaignId" : "${campaign.getId}"
-      }"""
+      val adgroupParams =
+        s"""{
+         "name" : "GROUP A",
+          "campaignId" : "${campaign.getId}"
+        }"""
 
-    val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
-    adGroupCreator.addUserInterests(adgroup, Array("Vehicle Shows", "Livestock"))
+      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
+      adGroupCreator.addUserInterests(adgroup, Array("Vehicle Shows", "Livestock"))
 
+    }
   }
 }
 
@@ -93,28 +99,30 @@ object test_adwordsAdGroupSetKeywords {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, "adwords")
     val test = new TestAdGroupSetKeywords(cfg)
+    test.run
   }
 
   class TestAdGroupSetKeywords(cfg: PropertiesLoader) extends AdGroupTest(cfg) {
 
-    adWordsAdapter.setValidateOnly(false)
-    adWordsAdapter.setClientId("100-019-2687")
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
 
-    val campaignParams =
-      s"""{
-       "name" : "fulfillment campaign",
-        "channel" : "DISPLAY"
-      }"""
-    val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
-    val adgroupParams =
-      s"""{
-       "name" : "GROUP A",
-        "campaignId" : "${campaign.getId}"
-      }"""
+      val campaignParams =
+        s"""{
+         "name" : "fulfillment campaign",
+          "channel" : "DISPLAY"
+        }"""
+      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val adgroupParams =
+        s"""{
+         "name" : "GROUP A",
+          "campaignId" : "${campaign.getId}"
+        }"""
 
-    val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
+      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
-    adGroupCreator.addKeywords(adgroup, Array("tuna", "dressage", "aluminum"))
-
+      adGroupCreator.addKeywords(adgroup, Array("tuna", "dressage", "aluminum"))
+    }
   }
 }
