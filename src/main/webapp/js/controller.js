@@ -1,3 +1,11 @@
+Object.size = function(obj) {
+    var size = 0, key;
+    for (key in obj) {
+        if (obj.hasOwnProperty(key)) size++;
+    }
+    return size;
+};
+
 var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize']);
 
 toastr.options = {
@@ -144,8 +152,6 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     );
 
 
-    $scope.editable = false;
-    $scope.edited = false;
     $scope.workflow = {};
 
     $scope.getWorkflow = function(runId, workflowId) {
@@ -168,9 +174,9 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     $scope.updateWorkflow = function() {
         $scope.loading = true;
         var params = {};
-        params['runId'] = runId;
-        params['workflowId'] = workflowId;
-        params['input'] = assembleUpdates();
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
+        params['input'] = $scope.assembleUpdates();
         $http.get('workflow/update', { params : params})
             .success(function(data) {
                          $scope.loading = false;
@@ -185,7 +191,8 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.prepWorkflow = function() {
-        $scope.editable = $scope.workflow.resolution == "IN PROGRESS";
+        $scope.workflow.editable = $scope.workflow.resolution == "IN PROGRESS";
+        $scope.workflow.edited = false;
 
         for(var s in $scope.workflow.sections) {
             var section = $scope.workflow.sections[s];
@@ -200,7 +207,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
                     "name" : pname,
                     "edited" : false,
                     "editing" : false,
-                    "editable" : $scope.editable && section.fixable,
+                    "editable" : $scope.workflow.editable && section.fixable,
                     "isJson" : $scope.isJSON(param),
                     "isArray" : $scope.isArray(param),
                     "isString" : $scope.isString(param)
@@ -216,17 +223,46 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
     $scope.finishEditing = function(param) {
         param.editing = false;
-        param.edited = param.original == param.value;
-        $scope.edited = true;
+        param.edited = param.original != param.value;
+        $scope.workflow.edited = true;
     };
 
     $scope.assembleUpdates = function() {
-        var updates = {}
+        var updates = {};
 
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            var paramUpdates = {};
+            for (pname in section.params) {
+                var param = section.params[pname];
+                if(param.edited) {
+                    paramUpdates[pname] = param.value;
+                }
+            }
+            if(Object.size(paramUpdates)) {
+                updates[sname] = { params : paramUpdates };
+            }
+        }
+
+        return updates;
     };
 
     $scope.addSection = function(s) {
         s.push('');
+    };
+
+    $scope.cancelWorkflowUpdate = function() {
+
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            for (pname in section.params) {
+                var param = section.params[pname];
+                param.value = param.original;
+                param.edited = false;
+            }
+        }
+
+        $scope.workflow.edited = false;
     };
 
     $scope.workflowStatusMap = {

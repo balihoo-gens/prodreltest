@@ -459,30 +459,30 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     attribs.getSignalName match {
       case "sectionUpdates" =>
         timeline.note(s"Processing Section Updates!", event.getEventTimestamp)
-        val updates = Json.parse(attribs.getInput).as[JsArray]
-        for(iupdate:JsValue <- updates.value) {
+        val updates = Json.parse(attribs.getInput).as[JsObject]
+        for((sectionName, iupdate:JsValue) <- updates.fields) {
           val update = iupdate.as[JsObject]
-          val sectionName = update.value("section").as[String]
           val section = nameToSection(sectionName)
-          for((updateType, body:JsValue) <- update.fields)
-              updateType match {
-                case "params" =>
-                  timeline.note(s"Updating params", event.getEventTimestamp)
-                  section.jsonInitParams(body.as[JsObject])
-                case "status" =>
-                  timeline.note(s"Updating status", event.getEventTimestamp)
-                  section.status = SectionStatus.withName(body.as[String])
-                case "essential" =>
-                  timeline.note(s"Updating essential", event.getEventTimestamp)
-                  section.essential = body.as[Boolean]
-                case "action" =>
-                  timeline.note(s"Updating action", event.getEventTimestamp)
-                  section.jsonInitAction(body.as[JsObject])
-                case "prereqs" =>
-                  timeline.note(s"Updating prereqs", event.getEventTimestamp)
-                  section.jsonInitPrereqs(body.as[JsArray])
-                case _ =>
+          for((updateType, body:JsValue) <- update.fields) {
+            updateType match {
+              case "params" =>
+                timeline.note(s"Updating params", event.getEventTimestamp)
+                section.jsonInitParams(body.as[JsObject])
+              case "status" =>
+                timeline.note(s"Updating status", event.getEventTimestamp)
+                section.status = SectionStatus.withName(body.as[String])
+              case "essential" =>
+                timeline.note(s"Updating essential", event.getEventTimestamp)
+                section.essential = body.as[Boolean]
+              case "action" =>
+                timeline.note(s"Updating action", event.getEventTimestamp)
+                section.jsonInitAction(body.as[JsObject])
+              case "prereqs" =>
+                timeline.note(s"Updating prereqs", event.getEventTimestamp)
+                section.jsonInitPrereqs(body.as[JsArray])
+              case _ =>
             }
+          }
         }
       case _ =>
         timeline.warning(s"Unhandled signal ${attribs.getSignalName} ${attribs.getInput}", event.getEventTimestamp)

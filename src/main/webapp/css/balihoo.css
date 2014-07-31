@@ -862,6 +862,14 @@ footer .container {
     color: #59595B;
 }
 
+.muted.red:hover {
+    color: #aa1111;
+}
+
+.muted.green:hover {
+    color: #11aa11;
+}
+
 .timeline {
     color:#428bca;
 }

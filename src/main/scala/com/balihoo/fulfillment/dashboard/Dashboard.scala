@@ -45,7 +45,7 @@ class WorkflowUpdater {
     req.setSignalName("sectionUpdates")
     req.setInput(input)
 
-    swfAdapter.client.signalWorkflowExecutionAsync(req)
+    swfAdapter.client.signalWorkflowExecution(req)
 
     "success"
   }
