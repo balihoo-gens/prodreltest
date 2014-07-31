@@ -9,9 +9,9 @@ import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
 
 
-object test_adWordsGetSubaccounts {
+object adWordsGetSubaccounts {
   def main(args: Array[String]) {
-    val test = new TestAdWordsGetSubAccounts(new AdWordsAdapter(PropertiesLoader(args, "adWords")))
+    val test = new TestAdWordsGetSubAccounts(new AdWordsAdapter(PropertiesLoader(args, "adwords_accountcreator")))
     test.run
   }
 
@@ -32,9 +32,9 @@ object test_adWordsGetSubaccounts {
   }
 }
 
-object test_adWordsGetAccounts {
+object adWordsGetAccounts {
   def main(args: Array[String]) {
-    val test = new TestAdWordsGetAccounts(new AdWordsAdapter(PropertiesLoader(args, "adWords")))
+    val test = new TestAdWordsGetAccounts(new AdWordsAdapter(PropertiesLoader(args, "adwords_accountcreator")))
     test.run
   }
 
@@ -64,9 +64,9 @@ object test_adWordsGetAccounts {
   }
 }
 
-object test_adWordsAccountCreator {
+object adWordsAccountCreator {
   def main(args: Array[String]) {
-    val test = new TestAdWordsAccountCreator(new AdWordsAdapter(PropertiesLoader(args, "adWords")))
+    val test = new TestAdWordsAccountCreator(new AdWordsAdapter(PropertiesLoader(args, "adwords_accountcreator")))
     test.run
   }
 

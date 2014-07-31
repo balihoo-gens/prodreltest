@@ -22,9 +22,9 @@ abstract class AdGroupTest(cfg: PropertiesLoader)
     def run: Unit
 }
 
-object test_adwordsAdGroupCreator {
+object adwordsAdGroupCreator {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_adgroupprocessor")
     val test = new TestAdGroupCreator(cfg)
     test.run
   }
@@ -62,9 +62,9 @@ object test_adwordsAdGroupCreator {
   }
 }
 
-object test_adwordsAdGroupSetInterests {
+object adwordsAdGroupSetInterests {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_adgroupprocessor")
     val test = new TestAdGroupSetInterests(cfg)
     test.run
   }
@@ -95,9 +95,9 @@ object test_adwordsAdGroupSetInterests {
   }
 }
 
-object test_adwordsAdGroupSetKeywords {
+object adwordsAdGroupSetKeywords {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_adgroupprocessor")
     val test = new TestAdGroupSetKeywords(cfg)
     test.run
   }

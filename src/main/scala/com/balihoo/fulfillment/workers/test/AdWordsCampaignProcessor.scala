@@ -19,9 +19,9 @@ abstract class CampaignTest(cfg: PropertiesLoader)
     def run: Unit
 }
 
-object test_adWordsCampaignCreator {
+object adWordsCampaignCreator {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_campaignprocessor")
     val test = new TestCampaignCreator(cfg)
     test.run
   }
@@ -51,9 +51,9 @@ object test_adWordsCampaignCreator {
   }
 }
 
-object test_adWordsLocationCriterion {
+object adWordsLocationCriterion {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_campaignprocessor")
     val test = new TestLocationCriterion(cfg)
     test.run
   }
@@ -77,9 +77,9 @@ object test_adWordsLocationCriterion {
   }
 }
 
-object test_adWordsSchedule {
+object adWordsSchedule {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_campaignprocessor")
     val test = new TestSchedule(cfg)
     test.run
   }
@@ -103,9 +103,9 @@ object test_adWordsSchedule {
   }
 }
 
-object test_adWordsZipsByCountry {
+object adWordsZipsByCountry {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_campaignprocessor")
     val test = new TestZipsByCountry(cfg)
     test.run
   }

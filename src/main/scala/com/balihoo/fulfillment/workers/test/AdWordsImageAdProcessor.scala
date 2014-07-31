@@ -23,9 +23,9 @@ abstract class ImageAdTest(cfg: PropertiesLoader)
     def run: Unit
 }
 
-object test_adWordsGetAdGroupImageAd {
+object adWordsGetAdGroupImageAd {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_imageadprocessor")
     val test = new TestGetAdGroupImageAd(cfg)
     test.run
   }
@@ -61,9 +61,9 @@ object test_adWordsGetAdGroupImageAd {
   }
 }
 
-object test_adWordsAdGroupImageAd {
+object adWordsAdGroupImageAd {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_imageadprocessor")
     val test = new TestAdGroupImageAd(cfg)
     test.run
   }
@@ -101,9 +101,9 @@ object test_adWordsAdGroupImageAd {
   }
 }
 
-object test_adWordsUpdateAdGroupImageAd {
+object adWordsUpdateAdGroupImageAd {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, "adwords")
+    val cfg = PropertiesLoader(args, "adwords_imageadprocessor")
     val test = new TestUpdateAdGroupImageAd(cfg)
     test.run
   }
