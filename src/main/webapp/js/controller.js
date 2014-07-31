@@ -114,14 +114,14 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 
     $scope.figureStatusLabel = function(status) {
         if(status == null) {
-            return "label-default";
+            return "label-info";
         }
         return $scope.statusMap[status];
     };
 
     $scope.formatStatus = function(closeStatus) {
         if(closeStatus == null) {
-            return "ACTIVE";
+            return "IN PROGRESS";
         }
 
         return closeStatus;
@@ -144,6 +144,8 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     );
 
 
+    $scope.editable = false;
+    $scope.edited = false;
     $scope.workflow = {};
 
     $scope.getWorkflow = function(runId, workflowId) {
@@ -155,11 +157,85 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             .success(function(data) {
                          $scope.loading = false;
                          $scope.workflow = data;
+                         $scope.prepWorkflow();
                      })
             .error(function(error) {
                        $scope.loading = false;
                        toastr.error(error.details, error.error)
                    });
+    };
+
+    $scope.updateWorkflow = function() {
+        $scope.loading = true;
+        var params = {};
+        params['runId'] = runId;
+        params['workflowId'] = workflowId;
+        params['input'] = assembleUpdates();
+        $http.get('workflow/update', { params : params})
+            .success(function(data) {
+                         $scope.loading = false;
+                         $scope.workflow = data;
+                         $scope.prepWorkflow();
+                     })
+            .error(function(error) {
+                       $scope.loading = false;
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
+    $scope.prepWorkflow = function() {
+        $scope.editable = $scope.workflow.resolution == "IN PROGRESS";
+
+        for(var s in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[s];
+            for(pname in section.params) {
+                var param = section.params[pname];
+                if($scope.isJSON(param)) {
+                    param = $scope.formatJsonBasic(param);
+                }
+                section.params[pname] = {
+                    "original" : param,
+                    "value" : param,
+                    "name" : pname,
+                    "edited" : false,
+                    "editing" : false,
+                    "editable" : $scope.editable && section.fixable,
+                    "isJson" : $scope.isJSON(param),
+                    "isArray" : $scope.isArray(param),
+                    "isString" : $scope.isString(param)
+                }
+            }
+        }
+    };
+
+    $scope.cancelEdit = function(param) {
+        param.value = param.original;
+        param.editing = false;
+    };
+
+    $scope.finishEditing = function(param) {
+        param.editing = false;
+        param.edited = param.original == param.value;
+        $scope.edited = true;
+    };
+
+    $scope.assembleUpdates = function() {
+        var updates = {}
+
+    };
+
+    $scope.addSection = function(s) {
+        s.push('');
+    };
+
+    $scope.workflowStatusMap = {
+        "IN PROGRESS" : "label-info",
+        "CANCELLED" : "label-warning",
+        "FAILED" : "label-danger",
+        "TIMED OUT" : "label-danger",
+        "TERMINATED" : "label-danger",
+        "COMPLETED" : "label-success"
     };
 
     $scope.statusMap = {
@@ -180,6 +256,10 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "ERROR" : "timeline-ERROR",
         "SUCCESS" : "timeline-SUCCESS",
         "WARNING" : "timeline-WARNING"
+    };
+
+    $scope.figureWorkflowStatusLabel = function(status) {
+        return $scope.workflowStatusMap[status];
     };
 
     $scope.figureStatusLabel = function(status) {
@@ -229,6 +309,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.formatJsonBasic = function(jsonString) {
+        if(undefined == jsonString) { return jsonString; }
         return JSON.stringify(JSON.parse(jsonString), undefined, 4);
     };
 

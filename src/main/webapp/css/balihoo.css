@@ -884,3 +884,7 @@ footer .container {
 .initiallyHidden {
     display: none;
 }
+
+.action {
+    cursor: pointer;
+}
