@@ -12,10 +12,10 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adWordsAdapter.setClientId(creator.lookupParentAccount(params))
+      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
       val aname = params.getRequiredParameter("name")
-      creator.getAccount(params) match {
+      accountCreator.getAccount(params) match {
         case existing:ManagedCustomer =>
           completeTask(String.valueOf(existing.getCustomerId))
         case _ =>
@@ -40,13 +40,13 @@ class AdWordsAccountLookup(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdap
   with DynamoAdapterComponent
   with AdWordsAdapterComponent
   with AccountCreatorComponent {
-    //don't put this in the creator method to avoid a new one from
+    //don't put this in the accountCreator method to avoid a new one from
     //being created on every call.
-    val _creator = new AccountCreator(awa)
+    val _accountCreator = new AccountCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa
-    def creator = _creator
+    def accountCreator = _accountCreator
 }
 
 object adwords_accountlookup {

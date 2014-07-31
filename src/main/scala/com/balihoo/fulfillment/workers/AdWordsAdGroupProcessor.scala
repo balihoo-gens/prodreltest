@@ -19,11 +19,11 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
     try {
       adWordsAdapter.setClientId(params.getRequiredParameter("account"))
 
-      val adGroup = creator.getAdGroup(params) match {
+      val adGroup = adGroupCreator.getAdGroup(params) match {
         case group: AdGroup =>
-          creator.updateAdGroup(group, params)
+          adGroupCreator.updateAdGroup(group, params)
         case _ =>
-          creator.createAdGroup(params)
+          adGroupCreator.createAdGroup(params)
       }
 
       completeTask(String.valueOf(adGroup.getId))
@@ -46,17 +46,17 @@ class AdWordsAdGroupProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsA
   with DynamoAdapterComponent
   with AdWordsAdapterComponent
   with AdGroupCreatorComponent {
-    //don't put this in the creator method to avoid a new one from
+    //don't put this in the adGroupCreator method to avoid a new one from
     //being created on every call.
-    val _creator = new AdGroupCreator(awa)
+    val _adGroupCreator = new AdGroupCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa
-    def creator = _creator
+    def adGroupCreator = _adGroupCreator
 }
 
 trait AdGroupCreatorComponent {
-  def creator: AbstractAdGroupCreator with AdWordsAdapterComponent
+  def adGroupCreator: AbstractAdGroupCreator with AdWordsAdapterComponent
 
   abstract class AbstractAdGroupCreator {
     this: AdWordsAdapterComponent
@@ -293,6 +293,9 @@ trait AdGroupCreatorComponent {
     with CampaignCreatorComponent
     with AdWordsAdapterComponent {
       def adWordsAdapter = awa
+      private val _campaignCreator = new CampaignCreator(adWordsAdapter)
+      //this is a getter method, not a creator, so no new in here.
+      def campaignCreator = _campaignCreator
   }
 }
 

@@ -18,12 +18,12 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adWordsAdapter.setClientId(creator.lookupParentAccount(params))
+      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
-      val account = creator.getAccount(params) match {
+      val account = accountCreator.getAccount(params) match {
         case account:ManagedCustomer => account
         case _ =>
-          creator.createAccount(params)
+          accountCreator.createAccount(params)
       }
       completeTask(String.valueOf(account.getCustomerId))
     } catch {
@@ -49,17 +49,17 @@ class AdWordsAccountCreator(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAda
   with DynamoAdapterComponent
   with AdWordsAdapterComponent
   with AccountCreatorComponent {
-    //don't put this in the creator method to avoid a new one from
+    //don't put this in the accountCreator method to avoid a new one from
     //being created on every call.
-    val _creator = new AccountCreator(awa)
+    val _accountCreator = new AccountCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa
-    def creator = _creator
+    def accountCreator = _accountCreator
 }
 
 trait AccountCreatorComponent {
-  def creator: AccountCreator with AdWordsAdapterComponent
+  def accountCreator: AccountCreator with AdWordsAdapterComponent
 
   abstract class AbstractAccountCreator {
     this: AdWordsAdapterComponent =>
