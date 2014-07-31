@@ -18,10 +18,6 @@ import scala.io.Source
 object email {
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
-    val cfg = PropertiesLoader(args, "email")
-    val swfAdapter = new SWFAdapter(cfg)
-    val dynamoAdapter = new DynamoAdapter(cfg)
-    val sesAdapter = new SESAdapter(cfg)
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
 
     def usage() = {
@@ -30,7 +26,12 @@ object email {
     }
 
     def verifyAddress() = {
-      val worker = new EmailAddressVerifier(swfAdapter, dynamoAdapter, sesAdapter)
+      val cfg = PropertiesLoader(args, "email_addressverifier")
+      val worker = new EmailAddressVerifier(
+        new SWFAdapter(cfg),
+        new DynamoAdapter(cfg),
+        new SESAdapter(cfg)
+      )
       println("enter the address to verify")
       val address = readLine("verifyemail> ")
       worker.verifyAddress(address)
@@ -38,7 +39,12 @@ object email {
     }
 
     def getValidEmailList() = {
-      val worker = new EmailVerifiedAddressLister(swfAdapter, dynamoAdapter, sesAdapter)
+      val cfg = PropertiesLoader(args, "email_verifiedaddresslister")
+      val worker = new EmailVerifiedAddressLister(
+        new SWFAdapter(cfg),
+        new DynamoAdapter(cfg),
+        new SESAdapter(cfg)
+      )
       worker.listVerifiedEmailAddresses()
     }
 
@@ -49,7 +55,12 @@ object email {
     }
 
     def sendEmail() = {
-      val worker = new EmailSender(swfAdapter, dynamoAdapter, sesAdapter)
+      val cfg = PropertiesLoader(args, "email_sender")
+      val worker = new EmailSender(
+        new SWFAdapter(cfg),
+        new DynamoAdapter(cfg),
+        new SESAdapter(cfg)
+      )
       val from = "gens@balihoo.com"
       val subject = "This is an EmailWorker Test"
       val body = "<h1>sup<br>SUP</h1>"
@@ -81,6 +92,8 @@ object email {
       }
 
       if (input.length() > 0) {
+        val cfg = PropertiesLoader(args, "email_sender")
+        val swfAdapter = new SWFAdapter(cfg)
         swfAdapter.client.startWorkflowExecution(
           new StartWorkflowExecutionRequest()
             .withDomain(swfAdapter.domain)

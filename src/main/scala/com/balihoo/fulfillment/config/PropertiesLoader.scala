@@ -31,14 +31,14 @@ class PropertiesLoader(propertiesFileName: String, propertiesDir: String = "") {
   def getInt(propName: String) : Int = {
     val propVal: String = prop.getString(propName)
     if (propVal == null)
-      throw new Exception("required config value " + propName + " not found or blank")
+      throw new Exception(s"required config value '$propName' not found or blank in $propertiesFileName")
     Integer.parseInt(propVal)
   }
 
   def getString(propName: String) : String = {
     val propVal: String = prop.getString(propName)
     if (propVal == null)
-      throw new Exception("required config value " + propName + " not found or blank")
+      throw new Exception(s"required config value '$propName' not found or blank in $propertiesFileName")
     propVal
   }
 }
