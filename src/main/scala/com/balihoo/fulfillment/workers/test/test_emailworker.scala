@@ -19,6 +19,9 @@ object email {
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
     val cfg = PropertiesLoader(args, "email")
+    val swfAdapter = new SWFAdapter(cfg)
+    val dynamoAdapter = new DynamoAdapter(cfg)
+    val sesAdapter = new SESAdapter(cfg)
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
 
     def usage() = {
@@ -27,12 +30,7 @@ object email {
     }
 
     def verifyAddress() = {
-      val worker = new EmailAddressVerifier
-        with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-          def swfAdapter = SWFAdapter(cfg)
-          def dynamoAdapter = DynamoAdapter(cfg)
-          def sesAdapter = SESAdapter(cfg)
-        }
+      val worker = new EmailAddressVerifier(swfAdapter, dynamoAdapter, sesAdapter)
       println("enter the address to verify")
       val address = readLine("verifyemail> ")
       worker.verifyAddress(address)
@@ -40,12 +38,7 @@ object email {
     }
 
     def getValidEmailList() = {
-      val worker = new EmailVerifiedAddressLister
-        with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-          def swfAdapter = SWFAdapter(cfg)
-          def dynamoAdapter = DynamoAdapter(cfg)
-          def sesAdapter = SESAdapter(cfg)
-        }
+      val worker = new EmailVerifiedAddressLister(swfAdapter, dynamoAdapter, sesAdapter)
       worker.listVerifiedEmailAddresses()
     }
 
@@ -56,12 +49,7 @@ object email {
     }
 
     def sendEmail() = {
-      val worker = new EmailSender
-        with SWFAdapterComponent with DynamoAdapterComponent with SESAdapterComponent {
-          def swfAdapter = SWFAdapter(cfg)
-          def dynamoAdapter = DynamoAdapter(cfg)
-          def sesAdapter = SESAdapter(cfg)
-        }
+      val worker = new EmailSender(swfAdapter, dynamoAdapter, sesAdapter)
       val from = "gens@balihoo.com"
       val subject = "This is an EmailWorker Test"
       val body = "<h1>sup<br>SUP</h1>"
@@ -81,7 +69,6 @@ object email {
     }
 
     def submitTask() = {
-      object swf extends SWFAdapter with PropertiesLoaderComponent { def config = cfg }
       println("enter the json input filename")
       val inputfile = readLine("inputfile> ")
       val input = try {
@@ -94,9 +81,9 @@ object email {
       }
 
       if (input.length() > 0) {
-        swf.client.startWorkflowExecution(
+        swfAdapter.client.startWorkflowExecution(
           new StartWorkflowExecutionRequest()
-            .withDomain(swf.domain)
+            .withDomain(swfAdapter.domain)
             .withWorkflowId("test_emailworker")
             .withInput(input)
             .withExecutionStartToCloseTimeout("1600")

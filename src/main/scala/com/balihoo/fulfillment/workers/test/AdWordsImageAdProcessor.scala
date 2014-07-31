@@ -6,121 +6,139 @@ import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 
-object test_adWordsAdapterGetAdGroupImageAd {
+abstract class ImageAdTest(cfg: PropertiesLoader)
+    extends AdWordsAdapterComponent
+      with CampaignCreatorComponent
+      with AdGroupCreatorComponent
+      with AdCreatorComponent {
+    private val _awa = new AdWordsAdapter(cfg)
+    def adWordsAdapter = _awa
+    private val _cc = new CampaignCreator(adWordsAdapter)
+    private val _ac = new AdGroupCreator(adWordsAdapter)
+    private val _adc = new AdCreator(adWordsAdapter)
+    def campaignCreator = _cc
+    def adGroupCreator = _ac
+    def adCreator = _adc
+
+    def run: Unit
+}
+
+object test_adWordsGetAdGroupImageAd {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, "adwords")
-    val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
-    val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
-    val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
-    val adcreator = new AdCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
+    val test = new TestGetAdGroupImageAd(cfg)
+    test.run
+  }
 
-    val adWordsAdapter = awa
-    adWordsAdapter.setValidateOnly(false)
-    adWordsAdapter.setClientId("100-019-2687")
+  class TestGetAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
 
-    val campaignParams =
-      """{
-       "name" : "fulfillment Campaign",
-        "channel" : "DISPLAY"
-      }"""
-    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
-    val adgroupParams =
-      s"""{
-       "name" : "GROUP A",
-        "campaignId" : "${campaign.getId}"
-      }"""
+      val campaignParams =
+        """{
+         "name" : "fulfillment Campaign",
+          "channel" : "DISPLAY"
+        }"""
+      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val adgroupParams =
+        s"""{
+         "name" : "GROUP A",
+          "campaignId" : "${campaign.getId}"
+        }"""
 
-    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
+      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
-    val imageAdParams =
-      s"""{
-       "name" : "Another Nature",
-        "adGroupId" : "${adgroup.getId}"
-      }"""
-    val ad = adcreator.getImageAd(new ActivityParameters(imageAdParams))
+      val imageAdParams =
+        s"""{
+         "name" : "Another Nature",
+          "adGroupId" : "${adgroup.getId}"
+        }"""
+      val ad = adCreator.getImageAd(new ActivityParameters(imageAdParams))
 
-    println(ad.toString)
+      println(ad.toString)
+    }
   }
 }
 
-object test_adWordsAdapterAdGroupImageAd {
+object test_adWordsAdGroupImageAd {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, "adwords")
-    val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
-    val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
-    val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
-    val adcreator = new AdCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
+    val test = new TestAdGroupImageAd(cfg)
+    test.run
+  }
 
-    val adWordsAdapter = awa
-    adWordsAdapter.setValidateOnly(false)
-    adWordsAdapter.setClientId("100-019-2687")
+  class TestAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
 
-    val campaignParams =
-      s"""{
-       "name" : "fulfillment Campaign",
-        "channel" : "DISPLAY"
-      }"""
-    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
-    val adgroupParams =
-      s"""{
-       "name" : "GROUP A",
-        "campaignId" : "${campaign.getId}"
-      }"""
+      val campaignParams =
+        s"""{
+         "name" : "fulfillment Campaign",
+          "channel" : "DISPLAY"
+        }"""
+      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val adgroupParams =
+        s"""{
+         "name" : "GROUP A",
+          "campaignId" : "${campaign.getId}"
+        }"""
 
-    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
+      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
-    val imageAdParams =
-      s"""{
-       "name" : "Another Nature",
-        "adGroupId" : "${adgroup.getId}",
-        "url" : "http://balihoo.com",
-        "displayUrl" :    "http://balihoo.com",
-        "imageUrl" : "http://lorempixel.com/300/100/nature/"
-      }"""
+      val imageAdParams =
+        s"""{
+         "name" : "Another Nature",
+          "adGroupId" : "${adgroup.getId}",
+          "url" : "http://balihoo.com",
+          "displayUrl" :    "http://balihoo.com",
+          "imageUrl" : "http://lorempixel.com/300/100/nature/"
+        }"""
 
-    adcreator.createImageAd(new ActivityParameters(imageAdParams))
-
+      adCreator.createImageAd(new ActivityParameters(imageAdParams))
+    }
   }
 }
 
-object test_adWordsAdapterUpdateAdGroupImageAd {
+object test_adWordsUpdateAdGroupImageAd {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, "adwords")
-    val awa = new AdWordsAdapter with PropertiesLoaderComponent { val config = cfg }
-    val ccreator = new CampaignCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
-    val acreator = new AdGroupCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
-    val adcreator = new AdCreator with AdWordsAdapterComponent { val adWordsAdapter = awa }
+    val test = new TestUpdateAdGroupImageAd(cfg)
+    test.run
+  }
 
-    val adWordsAdapter = awa
-    adWordsAdapter.setValidateOnly(false)
-    adWordsAdapter.setClientId("100-019-2687")
+  class TestUpdateAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
 
-    val campaignParams =
-      s"""{
-       "name" : "fulfillment Campaign",
-        "channel" : "DISPLAY"
-      }"""
-    val campaign = ccreator.getCampaign(new ActivityParameters(campaignParams))
-    val adgroupParams =
-      s"""{
-       "name" : "GROUP A",
-        "campaignId" : "${campaign.getId}"
-      }"""
+      val campaignParams =
+        s"""{
+         "name" : "fulfillment Campaign",
+          "channel" : "DISPLAY"
+        }"""
+      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val adgroupParams =
+        s"""{
+         "name" : "GROUP A",
+          "campaignId" : "${campaign.getId}"
+        }"""
 
-    val adgroup = acreator.getAdGroup(new ActivityParameters(adgroupParams))
+      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
-    val imageAdParams =
-      s"""{
-       "name" : "Another Nature",
-        "adGroupId" : "${adgroup.getId}",
-        "url" : "http://balihoo.com",
-        "displayUrl" :    "http://balihoo.com",
-        "imageUrl" : "http://lorempixel.com/300/100/nature/"
-      }"""
+      val imageAdParams =
+        s"""{
+         "name" : "Another Nature",
+          "adGroupId" : "${adgroup.getId}",
+          "url" : "http://balihoo.com",
+          "displayUrl" :    "http://balihoo.com",
+          "imageUrl" : "http://lorempixel.com/300/100/nature/"
+        }"""
 
-    val ad = adcreator.getImageAd(new ActivityParameters(imageAdParams))
+      val ad = adCreator.getImageAd(new ActivityParameters(imageAdParams))
 
-    adcreator.updateImageAd(ad, new ActivityParameters(imageAdParams))
-
+      adCreator.updateImageAd(ad, new ActivityParameters(imageAdParams))
+    }
   }
 }
