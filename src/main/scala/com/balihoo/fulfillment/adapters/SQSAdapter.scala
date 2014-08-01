@@ -6,15 +6,13 @@ import com.amazonaws.services.sqs.AmazonSQSClient
 
 //for the cake pattern dependency injection
 trait SQSAdapterComponent {
-  def sqsAdapter: SQSAdapter with PropertiesLoaderComponent
+  def sqsAdapter: AbstractSQSAdapter with PropertiesLoaderComponent
 }
 
-abstract class SQSAdapter extends AWSAdapter[AmazonSQSClient] {
+abstract class AbstractSQSAdapter extends AWSAdapter[AmazonSQSClient] {
   this: PropertiesLoaderComponent =>
 }
 
-object SQSAdapter {
-  def apply(cfg: PropertiesLoader) = {
-    new SQSAdapter with PropertiesLoaderComponent { def config = cfg }
-  }
+class SQSAdapter(cfg: PropertiesLoader) extends AbstractSQSAdapter with PropertiesLoaderComponent {
+  def config = cfg
 }

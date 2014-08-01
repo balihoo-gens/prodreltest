@@ -16,10 +16,10 @@ import com.amazonaws.services.simpleemail.model.{
 }
 
 trait SESAdapterComponent {
-  def sesAdapter: SESAdapter with PropertiesLoaderComponent
+  def sesAdapter: AbstractSESAdapter with PropertiesLoaderComponent
 }
 
-abstract class SESAdapter extends AWSAdapter[AmazonSimpleEmailServiceAsyncClient] {
+abstract class AbstractSESAdapter extends AWSAdapter[AmazonSimpleEmailServiceAsyncClient] {
   this: PropertiesLoaderComponent =>
 
   def verifyEmailAddress(address: String): String  = {
@@ -51,8 +51,6 @@ abstract class SESAdapter extends AWSAdapter[AmazonSimpleEmailServiceAsyncClient
   }
 }
 
-object SESAdapter {
-  def apply(cfg: PropertiesLoader) = {
-    new SESAdapter with PropertiesLoaderComponent { def config = cfg }
-  }
+class SESAdapter(cfg: PropertiesLoader) extends AbstractSESAdapter with PropertiesLoaderComponent {
+  def config = cfg
 }

@@ -17,10 +17,10 @@ import scala.collection.mutable
 // but that causes issues here for nested injection, i.e.
 // where we pass components from the outer cake into an inner cake
 trait AdWordsAdapterComponent {
-  def adWordsAdapter: AdWordsAdapter
+  def adWordsAdapter: AbstractAdWordsAdapter
 }
 
-class AdWordsAdapter {
+abstract class AbstractAdWordsAdapter {
   this: PropertiesLoaderComponent =>
 
   private val configuration:Configuration = new BaseConfiguration()
@@ -111,10 +111,11 @@ class AdWordsAdapter {
   }
 }
 
-object AdWordsAdapter {
-  def apply(cfg: PropertiesLoader) = {
-    new AdWordsAdapter with PropertiesLoaderComponent { def config = cfg }
-  }
+class AdWordsAdapter(cfg: PropertiesLoader)
+  extends AbstractAdWordsAdapter
+  with PropertiesLoaderComponent {
+
+  def config = cfg
 }
 
 class RateExceededException(e:RateExceededError) extends Exception {

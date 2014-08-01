@@ -17,7 +17,7 @@ object Constants {
   final val delimiter = "##"
 }
 
-class FulfillmentCoordinator {
+abstract class AbstractFulfillmentCoordinator {
   this: SWFAdapterComponent =>
 
   //can't have constructor code using the self type reference
@@ -269,11 +269,17 @@ class DecisionGenerator(categorized: CategorizedSections
   }
 }
 
+class FulfillmentCoordinator(swf: SWFAdapter)
+  extends AbstractFulfillmentCoordinator
+  with SWFAdapterComponent {
+    def swfAdapter = swf
+}
+
 object coordinator {
   def main(args: Array[String]) {
-    val fc: FulfillmentCoordinator = new FulfillmentCoordinator with SWFAdapterComponent {
-      def swfAdapter = SWFAdapter(PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$")))
-    }
+    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+    val swf = new SWFAdapter(config)
+    val fc = new FulfillmentCoordinator(swf)
     println("Running decider")
     fc.coordinate()
   }
