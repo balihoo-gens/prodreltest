@@ -12,7 +12,8 @@ import java.util
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.client.utils.URLEncodedUtils
 
-abstract class TimeZoneWorker extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
+abstract class AbstractTimeZoneWorker extends FulfillmentWorker {
+ this: SWFAdapterComponent with DynamoAdapterComponent =>
 
   val url = swfAdapter.config.getString("geonames.url")
   val username = swfAdapter.config.getString("geonames.user")
@@ -462,14 +463,21 @@ abstract class TimeZoneWorker extends FulfillmentWorker with SWFAdapterComponent
 
 }
 
+class TimeZoneWorker(swf: SWFAdapter, dyn: DynamoAdapter)
+  extends AbstractTimeZoneWorker
+  with SWFAdapterComponent
+  with DynamoAdapterComponent {
+    def swfAdapter = swf
+    def dynamoAdapter = dyn
+}
+
 object timezoneworker {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new TimeZoneWorker
-      with SWFAdapterComponent with DynamoAdapterComponent {
-        def swfAdapter = SWFAdapter(cfg)
-        def dynamoAdapter = DynamoAdapter(cfg)
-      }
+    val worker = new TimeZoneWorker(
+      new SWFAdapter(cfg),
+      new DynamoAdapter(cfg)
+    )
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }

@@ -18,141 +18,156 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 
-class WorkflowInitiator {
-  this: SWFAdapterComponent =>
+trait WorkflowInitiatorComponent {
+  def workflowInitiator: WorkflowInitiator with SWFAdapterComponent
 
-  def initate(id:String, input:String, tags:List[String]): String = {
-    Json.parse(input)
-    val executionRequest = new StartWorkflowExecutionRequest()
-    executionRequest.setDomain(swfAdapter.config.getString("domain"))
-    executionRequest.setWorkflowId(id)
-    executionRequest.setInput(input)
-    executionRequest.setTagList(tags.asJavaCollection)
-    executionRequest.setWorkflowType(new WorkflowType().withName("generic").withVersion("1"))
-    executionRequest.setTaskList(new TaskList().withName("generic1"))
-    swfAdapter.client.startWorkflowExecution(executionRequest).getRunId
+  class AbstractWorkflowInitiator {
+    this: SWFAdapterComponent =>
+
+    def initate(id:String, input:String, tags:List[String]): String = {
+      Json.parse(input)
+      val executionRequest = new StartWorkflowExecutionRequest()
+      executionRequest.setDomain(swfAdapter.config.getString("domain"))
+      executionRequest.setWorkflowId(id)
+      executionRequest.setInput(input)
+      executionRequest.setTagList(tags.asJavaCollection)
+      executionRequest.setWorkflowType(new WorkflowType().withName("generic").withVersion("1"))
+      executionRequest.setTaskList(new TaskList().withName("generic1"))
+      swfAdapter.client.startWorkflowExecution(executionRequest).getRunId
+    }
+  }
+
+  class WorkflowInitiator(swf: SWFAdapter) extends AbstractWorkflowInitiator with SWFAdapterComponent {
+    def swfAdapter = swf
   }
 }
 
-class WorkflowUpdater {
-  this: SWFAdapterComponent =>
+trait WorkflowUpdaterComponent {
+  def workflowUpdater: WorkflowUpdater with SWFAdapterComponent
 
-  def update(runId:String, workflowId:String, input:String) = {
-    val req = new SignalWorkflowExecutionRequest()
-    req.setDomain(swfAdapter.config.getString("domain"))
-    req.setRunId(runId)
-    req.setWorkflowId(workflowId)
-    req.setSignalName("sectionUpdates")
-    req.setInput(input)
+  class AbstractWorkflowUpdater {
+    this: SWFAdapterComponent =>
 
-    swfAdapter.client.signalWorkflowExecution(req)
+    def update(runId:String, workflowId:String, input:String) = {
+      val req = new SignalWorkflowExecutionRequest()
+      req.setDomain(swfAdapter.config.getString("domain"))
+      req.setRunId(runId)
+      req.setWorkflowId(workflowId)
+      req.setSignalName("sectionUpdates")
+      req.setInput(input)
 
-    "success"
-  }
-}
+      swfAdapter.client.signalWorkflowExecution(req)
 
-class WorkflowInspector {
-  this: SWFAdapterComponent =>
-
-  def infoToJson(info: WorkflowExecutionInfo): JsValue = {
-    Json.toJson(Map(
-      "workflowId" -> Json.toJson(info.getExecution.getWorkflowId),
-      "runId" -> Json.toJson(info.getExecution.getRunId),
-      "closeStatus" -> Json.toJson(info.getCloseStatus),
-      "closeTimestamp" -> Json.toJson(if(info.getCloseTimestamp != null) info.getCloseTimestamp.toString else "--"),
-      "startTimestamp" -> Json.toJson(info.getStartTimestamp.toString),
-      "tagList" -> Json.toJson(info.getTagList.asScala)
-    ))
-  }
-
-  def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
-
-    val filter = new ExecutionTimeFilter
-    filter.setOldestDate(oldest)
-    filter.setLatestDate(latest)
-
-    val infos = new collection.mutable.MutableList[JsValue]()
-    val oreq = new ListOpenWorkflowExecutionsRequest()
-    oreq.setDomain(swfAdapter.config.getString("domain"))
-    oreq.setStartTimeFilter(filter)
-    val open = swfAdapter.client.listOpenWorkflowExecutions(oreq)
-
-    for(info:WorkflowExecutionInfo <- open.getExecutionInfos.asScala) {
-      infos += infoToJson(info)
+      "success"
     }
-
-    val creq = new ListClosedWorkflowExecutionsRequest()
-    creq.setDomain(swfAdapter.config.getString("domain"))
-    creq.setStartTimeFilter(filter)
-    val closed = swfAdapter.client.listClosedWorkflowExecutions(creq)
-
-    for(info:WorkflowExecutionInfo <- closed.getExecutionInfos.asScala) {
-      infos += infoToJson(info)
-    }
-
-    infos.toList
   }
 
-
-  def workflowSections(runId:String, workflowId:String):Map[String, JsValue] = {
-
-    val top = collection.mutable.Map[String, JsValue]()
-
-    val exec = new WorkflowExecution
-    exec.setRunId(runId)
-    exec.setWorkflowId(workflowId)
-    val req = new GetWorkflowExecutionHistoryRequest()
-    req.setDomain(swfAdapter.config.getString("domain"))
-    req.setExecution(exec)
-
-    val history = swfAdapter.client.getWorkflowExecutionHistory(req)
-    val sectionMap = new SectionMap(history.getEvents)
-    val categorized = new CategorizedSections(sectionMap)
-    new DecisionGenerator(categorized, sectionMap).makeDecisions()
-
-    val sections = collection.mutable.Map[String, JsValue]()
-    for((name, section:FulfillmentSection) <- sectionMap.nameToSection) {
-      sections(name) = section.toJson
-    }
-
-    val jtimeline = Json.toJson(for(entry <- sectionMap.timeline.events) yield entry.toJson)
-
-    top("timeline") = jtimeline
-    top("sections") = Json.toJson(sections.toMap)
-    top("workflowId") = Json.toJson(workflowId)
-    top("runId") = Json.toJson(runId)
-    top("input") = Json.toJson(history.getEvents.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
-    top("resolution") = Json.toJson(sectionMap.resolution)
-
-    top.toMap
-  }
-
-  def environment() = {
-    Json.toJson(Map(
-      "domain" -> Json.toJson(swfAdapter.domain),
-      "region" -> Json.toJson(swfAdapter.region.getName)
-    ))
+  class WorkflowUpdater(swf: SWFAdapter) extends AbstractWorkflowUpdater with SWFAdapterComponent {
+    def swfAdapter = swf
   }
 }
 
 
+trait WorkflowInspectorComponent {
+  def workflowInspector: WorkflowInspector with SWFAdapterComponent
 
-class WorkflowServlet extends RestServlet {
-  this: SWFAdapterComponent =>
+  class AbstractWorkflowInspector {
+    this: SWFAdapterComponent =>
 
-  val wi = new WorkflowInspector with SWFAdapterComponent {
-    def swfAdapter = WorkflowServlet.this.swfAdapter
+    def infoToJson(info: WorkflowExecutionInfo): JsValue = {
+      Json.toJson(Map(
+        "workflowId" -> Json.toJson(info.getExecution.getWorkflowId),
+        "runId" -> Json.toJson(info.getExecution.getRunId),
+        "closeStatus" -> Json.toJson(info.getCloseStatus),
+        "closeTimestamp" -> Json.toJson(if(info.getCloseTimestamp != null) info.getCloseTimestamp.toString else "--"),
+        "startTimestamp" -> Json.toJson(info.getStartTimestamp.toString),
+        "tagList" -> Json.toJson(info.getTagList.asScala)
+      ))
+    }
+
+    def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
+      val filter = new ExecutionTimeFilter
+      filter.setOldestDate(oldest)
+      filter.setLatestDate(latest)
+
+      val infos = new collection.mutable.MutableList[JsValue]()
+      val oreq = new ListOpenWorkflowExecutionsRequest()
+      oreq.setDomain(swfAdapter.config.getString("domain"))
+      oreq.setStartTimeFilter(filter)
+      val open = swfAdapter.client.listOpenWorkflowExecutions(oreq)
+
+      for(info:WorkflowExecutionInfo <- open.getExecutionInfos.asScala) {
+        infos += infoToJson(info)
+      }
+
+      val creq = new ListClosedWorkflowExecutionsRequest()
+      creq.setDomain(swfAdapter.config.getString("domain"))
+      creq.setStartTimeFilter(filter)
+      val closed = swfAdapter.client.listClosedWorkflowExecutions(creq)
+
+      for(info:WorkflowExecutionInfo <- closed.getExecutionInfos.asScala) {
+        infos += infoToJson(info)
+      }
+
+      infos.toList
+    }
+
+
+    def workflowSections(runId:String, workflowId:String):Map[String, JsValue] = {
+
+      val top = collection.mutable.Map[String, JsValue]()
+
+      val exec = new WorkflowExecution
+      exec.setRunId(runId)
+      exec.setWorkflowId(workflowId)
+      val req = new GetWorkflowExecutionHistoryRequest()
+      req.setDomain(swfAdapter.config.getString("domain"))
+      req.setExecution(exec)
+
+      val history = swfAdapter.client.getWorkflowExecutionHistory(req)
+      val sectionMap = new SectionMap(history.getEvents)
+      val categorized = new CategorizedSections(sectionMap)
+      new DecisionGenerator(categorized, sectionMap).makeDecisions()
+
+      val sections = collection.mutable.Map[String, JsValue]()
+      for((name, section:FulfillmentSection) <- sectionMap.nameToSection) {
+        sections(name) = section.toJson
+      }
+
+      val jtimeline = Json.toJson(for(entry <- sectionMap.timeline.events) yield entry.toJson)
+
+      top("timeline") = jtimeline
+      top("sections") = Json.toJson(sections.toMap)
+      top("workflowId") = Json.toJson(workflowId)
+      top("runId") = Json.toJson(runId)
+      top("input") = Json.toJson(history.getEvents.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
+      top("resolution") = Json.toJson(sectionMap.resolution)
+
+      top.toMap
+    }
+
+    def environment() = {
+      Json.toJson(Map(
+        "domain" -> Json.toJson(swfAdapter.domain),
+        "region" -> Json.toJson(swfAdapter.region.getName)
+      ))
+    }
   }
-  val wfi = new WorkflowInitiator with SWFAdapterComponent {
-    def swfAdapter = WorkflowServlet.this.swfAdapter
+
+  class WorkflowInspector(swf: SWFAdapter) extends AbstractWorkflowInspector with SWFAdapterComponent {
+    def swfAdapter = swf
   }
-  val wfu = new WorkflowUpdater with SWFAdapterComponent {
-    def swfAdapter = WorkflowServlet.this.swfAdapter
-  }
+}
+
+class AbstractWorkflowServlet extends RestServlet {
+  this: SWFAdapterComponent
+    with WorkflowInspectorComponent
+    with WorkflowInitiatorComponent
+    with WorkflowUpdaterComponent =>
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(wi.executionHistory(
+      ,Json.stringify(Json.toJson(workflowInspector.executionHistory(
           UTCFormatter.dateFormat.parse(rsq.getRequiredParameter("startDate")),
           UTCFormatter.dateFormat.parse(rsq.getRequiredParameter("endDate"))
       ))))
@@ -160,7 +175,7 @@ class WorkflowServlet extends RestServlet {
 
   get("/workflow/detail", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(wi.workflowSections(
+      ,Json.stringify(Json.toJson(workflowInspector.workflowSections(
         rsq.getRequiredParameter("runId")
         ,rsq.getRequiredParameter("workflowId")
       ))))
@@ -168,7 +183,7 @@ class WorkflowServlet extends RestServlet {
 
   get("/workflow/update", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(wfu.update(
+      ,Json.stringify(Json.toJson(workflowUpdater.update(
         rsq.getRequiredParameter("runId")
         ,rsq.getRequiredParameter("workflowId")
         ,rsq.getRequiredParameter("input")
@@ -177,12 +192,12 @@ class WorkflowServlet extends RestServlet {
 
   get("/workflow/environment", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(wi.environment())))
+      ,Json.stringify(Json.toJson(workflowInspector.environment())))
   })
 
   get("/workflow/initiate", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(wfi.initate(
+      ,Json.stringify(Json.toJson(workflowInitiator.initate(
         rsq.getRequiredParameter("id"),
         rsq.getRequiredParameter("input"),
         rsq.getOptionalParameter("tags", "").split(",").toList
@@ -191,7 +206,22 @@ class WorkflowServlet extends RestServlet {
 
 }
 
-class WorkerServlet extends RestServlet {
+class WorkflowServlet(swf: SWFAdapter)
+  extends AbstractWorkflowServlet
+    with WorkflowInspectorComponent
+    with WorkflowInitiatorComponent
+    with WorkflowUpdaterComponent
+    with SWFAdapterComponent {
+  private val _inspector = new WorkflowInspector(swf)
+  private val _initiator = new WorkflowInitiator(swf)
+  private val _updater = new WorkflowUpdater(swf)
+  def swfAdapter = swf
+  def workflowInspector = _inspector
+  def workflowInitiator = _initiator
+  def workflowUpdater = _updater
+}
+
+class AbstractWorkerServlet extends RestServlet {
   this: DynamoAdapterComponent =>
 
   val da = dynamoAdapter
@@ -214,6 +244,10 @@ class WorkerServlet extends RestServlet {
 
 }
 
+class WorkerServlet(dyn: DynamoAdapter) extends AbstractWorkerServlet with DynamoAdapterComponent {
+  def dynamoAdapter = dyn
+}
+
 object dashboard {
   def main(args: Array[String]) {
 
@@ -224,13 +258,8 @@ object dashboard {
     context.setResourceBase("src/main/webapp")
     context.setWelcomeFiles(Array[String]("index.html"))
 
-    val workerServlet = new WorkerServlet with DynamoAdapterComponent {
-      def dynamoAdapter = DynamoAdapter(cfg)
-    }
-
-    val workflowServlet = new WorkflowServlet with SWFAdapterComponent {
-      def swfAdapter = SWFAdapter(cfg)
-    }
+    val workerServlet = new WorkerServlet(new DynamoAdapter(cfg))
+    val workflowServlet = new WorkflowServlet(new SWFAdapter(cfg))
 
     context.addServlet(new ServletHolder(workerServlet), "/worker/*")
     context.addServlet(new ServletHolder(workflowServlet), "/workflow/*")

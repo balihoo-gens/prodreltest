@@ -12,10 +12,10 @@ import com.amazonaws.regions.{Regions, Region}
 
 //for the cake pattern dependency injection
 trait DynamoAdapterComponent {
-  def dynamoAdapter: DynamoAdapter with PropertiesLoaderComponent
+  def dynamoAdapter: AbstractDynamoAdapter with PropertiesLoaderComponent
 }
 
-abstract class DynamoAdapter extends AWSAdapter[AmazonDynamoDBAsyncClient] {
+abstract class AbstractDynamoAdapter extends AWSAdapter[AmazonDynamoDBAsyncClient] {
   this: PropertiesLoaderComponent =>
   val mapper = new DynamoDBMapper(client)
 
@@ -46,6 +46,13 @@ abstract class DynamoAdapter extends AWSAdapter[AmazonDynamoDBAsyncClient] {
         log(e.getMessage)
     }
   }
+}
+
+class DynamoAdapter(cfg: PropertiesLoader)
+  extends AbstractDynamoAdapter
+  with PropertiesLoaderComponent {
+
+  def config = cfg
 }
 
 class DynamoItem(table:String) {
@@ -100,8 +107,3 @@ class DynamoUpdate(table:String) {
   }
 }
 
-object DynamoAdapter {
-  def apply(cfg: PropertiesLoader) = {
-    new DynamoAdapter with PropertiesLoaderComponent { def config = cfg }
-  }
-}

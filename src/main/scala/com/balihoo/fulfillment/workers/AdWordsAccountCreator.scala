@@ -7,21 +7,23 @@ import com.google.api.ads.adwords.axis.v201402.cm.Operator
 import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
 
-trait AdWordsAccountCreator extends FulfillmentWorker with SWFAdapterComponent with DynamoAdapterComponent {
-  this: AdWordsAdapterComponent =>
-
-  val creator = new AccountCreator with AdWordsAdapterComponent {
-    def adWordsAdapter = AdWordsAccountCreator.this.adWordsAdapter
-  }
+/*
+ * this is the dependency-injectable class containing all functionality
+ */
+abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
+  this: AdWordsAdapterComponent
+    with SWFAdapterComponent
+    with DynamoAdapterComponent
+    with AccountCreatorComponent =>
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      adWordsAdapter.setClientId(creator.lookupParentAccount(params))
+      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
-      val account = creator.getAccount(params) match {
+      val account = accountCreator.getAccount(params) match {
         case account:ManagedCustomer => account
         case _ =>
-          creator.createAccount(params)
+          accountCreator.createAccount(params)
       }
       completeTask(String.valueOf(account.getCustomerId))
     } catch {
@@ -37,98 +39,125 @@ trait AdWordsAccountCreator extends FulfillmentWorker with SWFAdapterComponent w
   }
 }
 
-class AccountCreator {
-  this: AdWordsAdapterComponent =>
+/*
+ * this is a specific implementation of the default (i.e. not test) AdWordsAccoutnCreator
+ * providing the adapter instances here allows reuse.
+ */
+class AdWordsAccountCreator(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+  extends AbstractAdWordsAccountCreator
+  with SWFAdapterComponent
+  with DynamoAdapterComponent
+  with AdWordsAdapterComponent
+  with AccountCreatorComponent {
+    //don't put this in the accountCreator method to avoid a new one from
+    //being created on every call.
+    val _accountCreator = new AccountCreator(awa)
+    def swfAdapter = swf
+    def dynamoAdapter = dyn
+    def adWordsAdapter = awa
+    def accountCreator = _accountCreator
+}
 
-  var brandAccountCache = collection.mutable.Map[String, String]()
+trait AccountCreatorComponent {
+  def accountCreator: AccountCreator with AdWordsAdapterComponent
 
-  def getManagerAccount(params:ActivityParameters):ManagedCustomer = {
-    val parent = params.getRequiredParameter("parent")
-    val context = s"getManagerAccount(parent='$parent')"
+  abstract class AbstractAccountCreator {
+    this: AdWordsAdapterComponent =>
 
-    val selector = new SelectorBuilder()
-      .fields("CustomerId", "Name", "CanManageClients")
-      .equals("Name", parent)
-      .equals("CanManageClients", "true")
-      .build()
+    var brandAccountCache = collection.mutable.Map[String, String]()
 
-    _getAccount(selector, parent, context)
-  }
+    def getManagerAccount(params:ActivityParameters):ManagedCustomer = {
+      val parent = params.getRequiredParameter("parent")
+      val context = s"getManagerAccount(parent='$parent')"
 
-  def getAccount(params:ActivityParameters):ManagedCustomer = {
-    val name = params.getRequiredParameter("name")
-    val context = s"getAccount(name='$name')"
+      val selector = new SelectorBuilder()
+        .fields("CustomerId", "Name", "CanManageClients")
+        .equals("Name", parent)
+        .equals("CanManageClients", "true")
+        .build()
 
-    val selector = new SelectorBuilder()
-      .fields("CustomerId")
-      .equals("Name", name)
-      .build()
+      _getAccount(selector, parent, context)
+    }
 
-    _getAccount(selector, name, context)
-  }
+    def getAccount(params:ActivityParameters):ManagedCustomer = {
+      val name = params.getRequiredParameter("name")
+      val context = s"getAccount(name='$name')"
 
-  protected def _getAccount(selector:Selector, name:String, context:String):ManagedCustomer = {
+      val selector = new SelectorBuilder()
+        .fields("CustomerId")
+        .equals("Name", name)
+        .build()
 
-    adWordsAdapter.withErrorsHandled[ManagedCustomer](context, {
-      val page = adWordsAdapter.managedCustomerService.get(selector)
-      page.getTotalNumEntries.intValue() match {
-        case 0 => null
-        case 1 => page.getEntries(0)
-        case _ => throw new Exception(s"Account name $name is ambiguous!")
-      }
-    })
-  }
+      _getAccount(selector, name, context)
+    }
 
-  def createAccount(params:ActivityParameters):ManagedCustomer = {
+    protected def _getAccount(selector:Selector, name:String, context:String):ManagedCustomer = {
 
-    val name = params.getRequiredParameter("name")
-    val currencyCode = params.getRequiredParameter("currencyCode")
-    val timeZone = params.getRequiredParameter("timeZone")
-    val context = s"createAccount(name='$name', currencyCode='$currencyCode', timeZone='$timeZone')"
-
-    val customer:ManagedCustomer = new ManagedCustomer()
-    customer.setName(name)
-    customer.setCurrencyCode(currencyCode)
-    customer.setDateTimeZone(timeZone)
-
-    val operation:ManagedCustomerOperation = new ManagedCustomerOperation()
-    operation.setOperand(customer)
-    operation.setOperator(Operator.ADD)
-
-    adWordsAdapter.withErrorsHandled[ManagedCustomer](context, {
-      adWordsAdapter.managedCustomerService.mutate(Array(operation)).getValue(0)
-    })
-  }
-
-  def lookupParentAccount(params:ActivityParameters):String = {
-    val parentName = params.getRequiredParameter("parent")
-    brandAccountCache.contains(parentName) match {
-      case true =>
-        brandAccountCache(parentName)
-      case false =>
-        adWordsAdapter.setClientId(adWordsAdapter.baseAccountId)
-        getManagerAccount(params) match {
-          case existing: ManagedCustomer =>
-            brandAccountCache += (parentName -> String.valueOf(existing.getCustomerId))
-            String.valueOf(existing.getCustomerId)
-          case _ =>
-            throw new Exception(s"No brand account with name '$parentName' was found!")
+      adWordsAdapter.withErrorsHandled[ManagedCustomer](context, {
+        val page = adWordsAdapter.managedCustomerService.get(selector)
+        page.getTotalNumEntries.intValue() match {
+          case 0 => null
+          case 1 => page.getEntries(0)
+          case _ => throw new Exception(s"Account name $name is ambiguous!")
         }
+      })
+    }
+
+    def createAccount(params:ActivityParameters):ManagedCustomer = {
+
+      val name = params.getRequiredParameter("name")
+      val currencyCode = params.getRequiredParameter("currencyCode")
+      val timeZone = params.getRequiredParameter("timeZone")
+      val context = s"createAccount(name='$name', currencyCode='$currencyCode', timeZone='$timeZone')"
+
+      val customer:ManagedCustomer = new ManagedCustomer()
+      customer.setName(name)
+      customer.setCurrencyCode(currencyCode)
+      customer.setDateTimeZone(timeZone)
+
+      val operation:ManagedCustomerOperation = new ManagedCustomerOperation()
+      operation.setOperand(customer)
+      operation.setOperator(Operator.ADD)
+
+      adWordsAdapter.withErrorsHandled[ManagedCustomer](context, {
+        adWordsAdapter.managedCustomerService.mutate(Array(operation)).getValue(0)
+      })
+    }
+
+    def lookupParentAccount(params:ActivityParameters):String = {
+      val parentName = params.getRequiredParameter("parent")
+      brandAccountCache.contains(parentName) match {
+        case true =>
+          brandAccountCache(parentName)
+        case false =>
+          adWordsAdapter.setClientId(adWordsAdapter.baseAccountId)
+          getManagerAccount(params) match {
+            case existing: ManagedCustomer =>
+              brandAccountCache += (parentName -> String.valueOf(existing.getCustomerId))
+              String.valueOf(existing.getCustomerId)
+            case _ =>
+              throw new Exception(s"No brand account with name '$parentName' was found!")
+          }
+      }
     }
   }
+
+  class AccountCreator(awa: AdWordsAdapter)
+    extends AbstractAccountCreator
+    with AdWordsAdapterComponent {
+      def adWordsAdapter = awa
+  }
 }
+
 
 object adwords_accountcreator {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountCreator
-      with SWFAdapterComponent
-      with DynamoAdapterComponent
-      with AdWordsAdapterComponent {
-        def swfAdapter = SWFAdapter(cfg)
-        def dynamoAdapter = DynamoAdapter(cfg)
-        def adWordsAdapter = AdWordsAdapter(cfg)
-      }
+    val worker = new AdWordsAccountCreator(
+      new SWFAdapter(cfg),
+      new DynamoAdapter(cfg),
+      new AdWordsAdapter(cfg)
+    )
     println(s"Running ${getClass.getSimpleName}")
     worker.work()
   }
