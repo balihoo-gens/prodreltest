@@ -33,7 +33,6 @@ class FulfillmentCoordinator {
     .withDomain(domain)
     .withTaskList(taskList)
 
-
   def coordinate() = {
 
     var done = false
@@ -51,8 +50,6 @@ class FulfillmentCoordinator {
             val sections = new SectionMap(task.getEvents)
             val categorized = new CategorizedSections(sections)
             val decisions = new DecisionGenerator(categorized, sections).makeDecisions()
-
-            println(sections.notes.mkString("\n"))
 
             val response: RespondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest
             response.setTaskToken(task.getTaskToken)
@@ -88,12 +85,12 @@ class DecisionGenerator(categorized: CategorizedSections
 
     for((name, value) <- section.params) {
       value match {
-        case sectionReference: SectionReference =>
-          params(name) = sectionReference.getValue(sections)
+        case sectionReferences: SectionReferences =>
+          params(name) = sectionReferences.getValue(sections)
         case v: String =>
           params(name) = v
         case _ =>
-          sections.notes += s"Parameter $name doesn't have a recognizable value $value"
+          sections.timeline.warning(s"Parameter '$name' doesn't have a recognizable value '$value'", null)
       }
     }
 
@@ -132,14 +129,14 @@ class DecisionGenerator(categorized: CategorizedSections
       val decision: Decision = new Decision
       decision.setDecisionType(DecisionType.CompleteWorkflowExecution)
       decisions += decision
-      sections.notes += "Workflow Complete!!!"
+      sections.timeline.success("Workflow Complete!!!")
       return decisions
 
     }
 
     if(categorized.impossible.length > 0) {
-      var details: String = "Impossible Sections:"
-      details += (for(section <- categorized.impossible) yield s"${section.name} ${section.notes}").mkString(", ")
+      var details: String = "Impossible Sections:\n\t"
+      details += (for(section <- categorized.impossible) yield s"${section.name}").mkString(", ")
       failReasons += details
     }
 
@@ -147,33 +144,40 @@ class DecisionGenerator(categorized: CategorizedSections
     for(section <- categorized.failed) {
       if(section.failedCount < section.failureParams.maxRetries) {
         val message = s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})"
-        section.notes += message
+        section.timeline.warning(message)
         decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
           message)
       } else {
-        failReasons += s"Section $section FAILED too many times! (${section.failedCount} of ${section.failureParams.maxRetries})"
+
+        val message = s"Section $section FAILED too many times! (${section.failedCount} of ${section.failureParams.maxRetries})"
+        section.timeline.error(message)
+        failReasons += message
       }
     }
 
     for(section <- categorized.timedout) {
       if(section.timedoutCount < section.timeoutParams.maxRetries) {
         val message = s"Section timed out and is allowed to retry (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
-        section.notes += message
+        section.timeline.warning(message)
         decisions += _createTimerDecision(section.name, section.timeoutParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
           message)
       } else {
-        failReasons += s"Section $section TIMED OUT too many times! (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
+        val message =  s"Section $section TIMED OUT too many times! (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
+        section.timeline.error(message)
+        failReasons += message
       }
     }
 
     for(section <- categorized.canceled) {
       if(section.canceledCount < section.cancelationParams.maxRetries) {
         val message = s"Section was canceled and is allowed to retry (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
-        section.notes += message
+        section.timeline.warning(message)
         decisions += _createTimerDecision(section.name, section.cancelationParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
           message)
       } else {
-        failReasons += s"Section $section was CANCELED too many times! (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
+        val message = s"Section $section was CANCELED too many times! (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
+        section.timeline.error(message)
+        failReasons += message
       }
     }
 
@@ -184,8 +188,7 @@ class DecisionGenerator(categorized: CategorizedSections
       val decision: Decision = new Decision
       decision.setDecisionType(DecisionType.FailWorkflowExecution)
 
-      var details: String = "Failed Sections:"
-      details += failReasons.mkString("", "\n\t", "\n")
+      val details: String = failReasons.mkString("Failed Sections:\n\t", "\n\t", "\n")
 
       // TODO. We should cancel the in-progress sections as BEST as we can
       val attribs: FailWorkflowExecutionDecisionAttributes = new FailWorkflowExecutionDecisionAttributes
@@ -196,7 +199,7 @@ class DecisionGenerator(categorized: CategorizedSections
 
       decisions += decision
 
-      sections.notes += "FAILING!! "+details
+      sections.timeline.error("Workflow FAILED "+details)
 
       return decisions
     }
@@ -224,7 +227,7 @@ class DecisionGenerator(categorized: CategorizedSections
       decision.setScheduleActivityTaskDecisionAttributes(attribs)
       decisions += decision
 
-      sections.notes += "Scheduling work for: "+section.name
+      sections.timeline.note("Scheduling work for: "+section.name)
     }
 
     if(decisions.length == 0 && !categorized.hasPendingSections) {
@@ -234,25 +237,25 @@ class DecisionGenerator(categorized: CategorizedSections
       decision.setDecisionType(DecisionType.FailWorkflowExecution)
       val attribs = new FailWorkflowExecutionDecisionAttributes
 
-      sections.notes += "Workflow FAILED:"
+      sections.timeline.error("Workflow FAILED")
       if(categorized.blocked.length > 0) {
-        var details: String = "Blocked Sections:"
-        details += (for(section <- categorized.blocked) yield section.name).mkString(", ")
+        var details: String = "Blocked Sections:\n\t"
+        details += (for(section <- categorized.blocked) yield section.name).mkString("\n\t")
 
         val reason = "There are blocked sections and nothing is in progress!"
         attribs.setReason(reason)
         attribs.setDetails(details)
-        sections.notes += reason
-        sections.notes += details
+        sections.timeline.error(reason)
+        sections.timeline.error(details)
 
       } else {
-        var details: String = "Sections:\n"
-        details += (for((name, section) <- sections.map) yield section.toString).mkString("\n\n")
+        var details: String = "Sections:\n\t"
+        details += (for((name, section) <- sections.nameToSection) yield section.toString).mkString("\n\t")
 
-        val reason = "FAILING because progress isn't being made!"
+        val reason = "Progress isn't being made!"
         attribs.setReason(reason)
         attribs.setDetails(details)
-        sections.notes += reason
+        sections.timeline.error(reason)
         //sections.notes += details
       }
 
@@ -269,9 +272,7 @@ class DecisionGenerator(categorized: CategorizedSections
 object coordinator {
   def main(args: Array[String]) {
     val fc: FulfillmentCoordinator = new FulfillmentCoordinator with SWFAdapterComponent {
-      lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent {
-        lazy val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-      }
+      def swfAdapter = SWFAdapter(PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$")))
     }
     println("Running decider")
     fc.coordinate()

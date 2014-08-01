@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.deciders
 
+import java.util.Date
+
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.specs2.runner._
@@ -46,7 +48,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
 
       val jso = json.as[JsObject].value("cake").as[JsObject]
-      val section = new FulfillmentSection("test section", jso)
+      val section = new FulfillmentSection("test section", jso, new Date())
 
       section.name mustEqual "test section"
       section.prereqs(0) mustEqual "heat_oven"
@@ -67,13 +69,13 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       section.startToCloseTimeout mustEqual "tuna sandwich"
 
-      section.params("cake_batter").asInstanceOf[SectionReference].sections(0) mustEqual "batter"
+      section.params("cake_batter").asInstanceOf[SectionReferences].sections(0).name mustEqual "batter"
       section.params("cake_pan").asInstanceOf[String] mustEqual "9\" x 11\""
       section.params("bake_time").asInstanceOf[String] mustEqual "40"
 
       section.status mustEqual SectionStatus.withName("INCOMPLETE")
 
-      section.notes(0) mustEqual "Section totally unhandled unhandled!"
+      section.timeline.events(0).message mustEqual "Section input 'totally unhandled' unhandled!"
     }
 
     "handle status changes" in {
@@ -101,43 +103,43 @@ class TestFulfillmentCoordinator extends Specification with Mockito
          "status" : "INCOMPLETE"
 	      }""").as[JsObject]
 
-      val section = new FulfillmentSection("sectionName", json)
+      val section = new FulfillmentSection("sectionName", json, new Date())
 
       section.status mustEqual SectionStatus.INCOMPLETE
 
       section.startedCount mustEqual 0
-      section.setStarted()
+      section.setStarted(new Date())
 
       section.status mustEqual SectionStatus.STARTED
 
       section.startedCount mustEqual 1
 
-      section.setStarted()
-      section.setStarted()
+      section.setStarted(new Date())
+      section.setStarted(new Date())
 
       section.startedCount mustEqual 3
       section.status mustEqual SectionStatus.STARTED
 
-      section.setScheduled()
+      section.setScheduled(new Date())
       section.status mustEqual SectionStatus.SCHEDULED
 
       section.scheduledCount mustEqual 1
       section.startedCount mustEqual 3 // STILL 3
 
-      section.setCompleted("awesome results")
+      section.setCompleted("awesome results", new Date())
 
       section.value mustEqual "awesome results"
       section.scheduledCount mustEqual 1 // STILL 1
       section.startedCount mustEqual 3 // STILL 3
       section.status mustEqual SectionStatus.COMPLETE
 
-      section.setFailed("reasons", "terrible reasons")
+      section.setFailed("reasons", "terrible reasons", new Date())
       section.status mustEqual SectionStatus.FAILED
-      section.notes.last mustEqual "terrible reasons"
+      section.timeline.events.last.message mustEqual "Failed because:reasons terrible reasons"
 
-      section.setFailed("reasons", "more terrible reasons")
+      section.setFailed("reasons", "more terrible reasons", new Date())
       section.status mustEqual SectionStatus.TERMINAL
-      section.notes.last mustEqual "more terrible reasons"
+      section.timeline.events.last.message mustEqual "Failed because:reasons more terrible reasons"
     }
   }
 
@@ -208,7 +210,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.getClass mustEqual classOf[SectionMap]
 
-      map.map.size mustEqual 3
+      map.nameToSection.size mustEqual 3
 
     }
 
@@ -278,9 +280,9 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.getClass mustEqual classOf[SectionMap]
 
-      map.map.size mustEqual 3
+      map.nameToSection.size mustEqual 3
 
-      map.notes(0) mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+      map.timeline.events(0).message mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }
   }
 }

@@ -15,7 +15,7 @@ abstract class AdWordsCampaignProcessor extends FulfillmentWorker with SWFAdapte
       adWordsAdapter.setClientId(params.getRequiredParameter("account"))
 
       val creator = new CampaignCreator with AdWordsAdapterComponent {
-        lazy val adWordsAdapter = AdWordsCampaignProcessor.this.adWordsAdapter
+        def adWordsAdapter = AdWordsCampaignProcessor.this.adWordsAdapter
       }
 
       val campaign = creator.getCampaign(params) match {
@@ -135,7 +135,7 @@ abstract class CampaignCreator {
 
     val budgetName = s"$name Budget"
     val budgetCreator = new BudgetCreator with AdWordsAdapterComponent {
-      lazy val adWordsAdapter = CampaignCreator.this.adWordsAdapter
+      def adWordsAdapter = CampaignCreator.this.adWordsAdapter
     }
     val budget:Budget = budgetCreator.getBudget(budgetName) match {
       case b:Budget => b
@@ -391,9 +391,9 @@ object adwords_campaignprocessor {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsCampaignProcessor
       with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
-        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
+        def adWordsAdapter = AdWordsAdapter(cfg)
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

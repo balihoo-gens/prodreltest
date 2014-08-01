@@ -17,7 +17,7 @@ abstract class AdWordsAdGroupProcessor extends FulfillmentWorker with SWFAdapter
       adWordsAdapter.setClientId(params.getRequiredParameter("account"))
 
       val creator = new AdGroupCreator with AdWordsAdapterComponent {
-        lazy val adWordsAdapter = AdWordsAdGroupProcessor.this.adWordsAdapter
+        def adWordsAdapter = AdWordsAdGroupProcessor.this.adWordsAdapter
       }
 
       val adGroup = creator.getAdGroup(params) match {
@@ -73,7 +73,7 @@ abstract class AdGroupCreator {
     val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
 
     val ccreator = new CampaignCreator with AdWordsAdapterComponent {
-      lazy val adWordsAdapter = AdGroupCreator.this.adWordsAdapter
+      def adWordsAdapter = AdGroupCreator.this.adWordsAdapter
     }
     val campaign = ccreator.getCampaign(campaignId)
 
@@ -276,9 +276,9 @@ object adwords_adgroupprocessor {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsAdGroupProcessor
       with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
-        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
+        def adWordsAdapter = AdWordsAdapter(cfg)
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

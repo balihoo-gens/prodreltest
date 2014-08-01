@@ -13,7 +13,7 @@ abstract class AdWordsImageAdProcessor extends FulfillmentWorker with SWFAdapter
       adWordsAdapter.setClientId(params.getRequiredParameter("account"))
 
       val creator = new AdCreator with AdWordsAdapterComponent {
-        lazy val adWordsAdapter = AdWordsImageAdProcessor.this.adWordsAdapter
+        def adWordsAdapter = AdWordsImageAdProcessor.this.adWordsAdapter
       }
 
       val aga = creator.getImageAd(params) match {
@@ -125,9 +125,9 @@ object adwords_imageadprocessor {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new AdWordsImageAdProcessor
       with SWFAdapterComponent with DynamoAdapterComponent with AdWordsAdapterComponent {
-        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val adWordsAdapter = new AdWordsAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
+        def adWordsAdapter = AdWordsAdapter(cfg)
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

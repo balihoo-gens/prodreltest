@@ -492,8 +492,8 @@ ul.list-group {
     top: 0;
     min-width: 135px;
     margin-left: -1px;
-    padding: 50px 0 0;
-    background: transparent;
+    /*padding: 50px 0 0;*/
+    /*background: transparent;*/
     border-top: none;
 }
 
@@ -832,6 +832,7 @@ footer .container {
 
 .blob {
     display:inline-block;
+    vertical-align: top;
 }
 
 .table.params {
@@ -841,7 +842,7 @@ footer .container {
 .lightbox {
     margin:6px;
     padding:4px;
-    border:1px solid #bbbbbb;
+    border:1px solid #BBBBBB;
     min-width:270px;
     min-height:70px;
 }
@@ -851,4 +852,35 @@ footer .container {
     border-top-left-radius: 6px;
     border-bottom-right-radius: 6px;
     box-shadow: 3px 3px 3px #888888;
+}
+
+.muted {
+    color: #BBBBBB;
+}
+
+.muted:hover {
+    color: #59595B;
+}
+
+.timeline {
+    color:#428bca;
+}
+
+.timeline-ERROR {
+    color:#D9534F;
+    font-weight:bold;
+}
+
+.timeline-SUCCESS {
+    color:#5CB85C;
+    font-weight:bold;
+}
+
+.timeline-WARNING {
+    color:#f0ad4e;
+    font-weight:bold;
+}
+
+.initiallyHidden {
+    display: none;
 }

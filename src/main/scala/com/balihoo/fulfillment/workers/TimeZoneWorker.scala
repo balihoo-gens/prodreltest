@@ -467,8 +467,8 @@ object timezoneworker {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
     val worker = new TimeZoneWorker
       with SWFAdapterComponent with DynamoAdapterComponent {
-        lazy val swfAdapter = new SWFAdapter with PropertiesLoaderComponent { lazy val config = cfg }
-        lazy val dynamoAdapter = new DynamoAdapter with PropertiesLoaderComponent { lazy val config = cfg }
+        def swfAdapter = SWFAdapter(cfg)
+        def dynamoAdapter = DynamoAdapter(cfg)
       }
     println(s"Running ${getClass.getSimpleName}")
     worker.work()

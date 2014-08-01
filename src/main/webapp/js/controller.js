@@ -17,6 +17,10 @@ app.config(
                       controller : "workflowController",
                       templateUrl : "partials/workflow.html",
                       reloadOnSearch: false})
+            .when("/workflow/initiate", {
+                      controller : "workflowInitiationController",
+                      templateUrl : "partials/workflowInitiate.html",
+                      reloadOnSearch: false})
             .when("/history", {
                       controller : "historyController",
                       templateUrl : "partials/history.html",
@@ -63,9 +67,19 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 app.controller('historyController', function($scope, $route, $http, $location) {
 
+
+
     $scope.$on(
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
+            var start = $('#startDate');
+            start.datetimepicker();
+            start.data("DateTimePicker").setDate(new Date(new Date().setDate(new Date().getDate()-14)));
+
+            var end = $('#endDate');
+            end.datetimepicker();
+            end.data("DateTimePicker").setDate(new Date());
+
             $scope.getHistory();
         }
     );
@@ -74,6 +88,8 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     $scope.getHistory = function() {
         $scope.loading = true;
         var params = {};
+        params['startDate'] = moment($('#startDate').data("DateTimePicker").getDate()).utc().format('YYYY-MM-DDTHH:mm:ss')+"Z";
+        params['endDate'] = moment($('#endDate').data("DateTimePicker").getDate()).utc().format('YYYY-MM-DDTHH:mm:ss')+"Z";
         $http.get('workflow/history', { params : params})
             .success(function(data) {
                          $scope.loading = false;
@@ -92,11 +108,23 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     $scope.statusMap = {
         "FAILED" : "label-danger",
         "COMPLETED" : "label-success",
-        "TIMED_OUT" : "label-warning"
+        "TIMED_OUT" : "label-warning",
+        "TERMINATED" : "label-danger"
     };
 
     $scope.figureStatusLabel = function(status) {
+        if(status == null) {
+            return "label-default";
+        }
         return $scope.statusMap[status];
+    };
+
+    $scope.formatStatus = function(closeStatus) {
+        if(closeStatus == null) {
+            return "ACTIVE";
+        }
+
+        return closeStatus;
     };
 
     $scope.formatTag = function(tag) {
@@ -142,15 +170,24 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "TIMED OUT" : "label-warning",
         "CANCELED" : "label-warning",
         "TERMINAL" : "label-danger",
-        "DISMISSED" : "label-primary",
         "COMPLETE" : "label-success",
         "CONTINGENT" : "label-default",
         "DEFERRED" : "label-info",
         "IMPOSSIBLE" : "label-danger"
     };
 
+    $scope.timelineMap = {
+        "ERROR" : "timeline-ERROR",
+        "SUCCESS" : "timeline-SUCCESS",
+        "WARNING" : "timeline-WARNING"
+    };
+
     $scope.figureStatusLabel = function(status) {
         return $scope.statusMap[status];
+    };
+
+    $scope.figureTimelineStyle = function(eventType) {
+        return $scope.timelineMap[eventType];
     };
 
     $scope.formatWhitespace = function(str) {
@@ -176,7 +213,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         if(json instanceof Object) {
             var body = "";
             for(var key in json) {
-                body += $scope.div("<span>"+key+"</span> : "+$scope.jsonFormat(json[key], "block"));
+                body += $scope.div("<span><b>"+key+"</b></span> : "+$scope.jsonFormat(json[key], "block"));
             }
             return $scope.div(body, "block "+divclass);
         }
@@ -189,6 +226,10 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
     $scope.formatJson = function(jsonString) {
         return $scope.jsonFormat(JSON.parse(jsonString), "json");
+    };
+
+    $scope.formatJsonBasic = function(jsonString) {
+        return JSON.stringify(JSON.parse(jsonString), undefined, 4);
     };
 
     $scope.formatURLs = function(param) {
@@ -222,7 +263,11 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     $scope.scrollToSection = function(name) {
         $location.hash("section_"+name);
         $anchorScroll();
-    }
+    };
+
+    $("#rawInputToggle").click(function() {
+        $('#rawInput').slideToggle()
+    });
 
 });
 
@@ -284,6 +329,40 @@ app.controller('workersController', function($scope, $route, $http, $location, e
             domain[worker.activityName].push(worker);
 
         }
+    };
+
+});
+
+app.controller('workflowInitiationController', function($scope, $route, $http) {
+
+    $scope.loading = false;
+    $scope.tags = [ { text: 'Dashboard:Initiated'}];
+
+    $scope.initiateWorkflow = function() {
+        $scope.loading = true;
+        var params = {};
+        params['id'] = $scope.workflowId;
+        params['input'] = $scope.inputJson;
+
+        var mtags = [];
+        for(var i in $scope.tags) {
+            var t = $scope.tags[i];
+            mtags.push(t.text);
+        }
+        params['tags'] = mtags.join(",");
+        $http.get('workflow/initiate', { params : params})
+            .success(function(data) {
+                         $scope.loading = false;
+                         $scope.runId = data;
+                     })
+            .error(function(error) {
+                       $scope.loading = false;
+                       toastr.error(error.details, error.error)
+                   });
+    };
+
+    $scope.addLabel = function() {
+      $scope.tags.push({text : ""});
     };
 
 });
