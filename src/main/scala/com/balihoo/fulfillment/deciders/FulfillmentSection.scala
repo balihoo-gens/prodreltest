@@ -518,7 +518,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     val status = SectionStatus.withName(timerParams.value("status").as[String])
 
     val section = getSectionByName(sectionName)
-    section.timeline.note(s"Timer for section '$sectionName' fired. Setting status to ${status.toString}")
+    section.timeline.note(s"Timer for section '$sectionName' fired. Setting status to ${status.toString}", event.getEventTimestamp)
 
     getSectionByName(sectionName).status = status
   }

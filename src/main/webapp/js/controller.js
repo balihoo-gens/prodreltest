@@ -240,7 +240,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
                 }
             }
             if(Object.size(paramUpdates)) {
-                updates[sname] = { params : paramUpdates };
+                updates[sname] = { params : paramUpdates, status : "INCOMPLETE" };
             }
         }
 
