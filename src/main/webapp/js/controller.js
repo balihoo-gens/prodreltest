@@ -191,7 +191,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.prepWorkflow = function() {
-        $scope.workflow.editable = $scope.workflow.resolution == "IN PROGRESS";
+        $scope.workflow.editable = $scope.workflow.resolution == "IN PROGRESS" || $scope.workflow.resolution == "BLOCKED";
         $scope.workflow.edited = false;
 
         for(var s in $scope.workflow.sections) {
@@ -267,6 +267,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
     $scope.workflowStatusMap = {
         "IN PROGRESS" : "label-info",
+        "BLOCKED" : "label-warning",
         "CANCELLED" : "label-warning",
         "FAILED" : "label-danger",
         "TIMED OUT" : "label-danger",
@@ -307,7 +308,18 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.formatWhitespace = function(str) {
-        return str.replace(/\n/g, '<br/>').replace(/\t/g, '&nbsp;&nbsp;&nbsp;');
+
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+            "\n" : '<br/>',
+            "\t" : '&nbsp;&nbsp;&nbsp;'
+          };
+
+        return str.replace(/[&<>"'\n\t]/g, function(m) { return map[m]; });
     };
 
     $scope.div = function(contents, classes) {

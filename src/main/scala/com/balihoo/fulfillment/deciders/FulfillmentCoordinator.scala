@@ -35,6 +35,8 @@ abstract class AbstractFulfillmentCoordinator {
 
   def coordinate() = {
 
+    println(s"$domain $taskListName")
+
     var done = false
     val getch = new Getch
     getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
