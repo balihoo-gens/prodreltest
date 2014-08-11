@@ -11,12 +11,18 @@ abstract class AbstractChaosWorker extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
     val rand = new Random()
 
-    if(rand.nextBoolean()) {
-      completeTask("Complete!!!")
-    } else if(rand.nextBoolean()) {
-      cancelTask("Cancelling!!!")
+    val failActual = rand.nextFloat() * 100
+    val cancelActual = rand.nextFloat() * 100
+
+    val failChances = params.getOptionalParameter("chanceToFail", "50").toFloat
+    val cancelChances = params.getOptionalParameter("chanceToCancel", "50").toFloat
+
+    if(failActual < failChances) {
+      failTask("Chaos ensued!", s"Failing because $failActual < $failChances")
+    } else if(cancelActual < cancelChances) {
+      cancelTask(s"I don't feel like processing this right now $cancelActual < $cancelChances")
     } else {
-      failTask("Failing!!", "For reasons..")
+      completeTask("Everything went better than expected!")
     }
   }
 }

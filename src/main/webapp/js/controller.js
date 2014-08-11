@@ -1,3 +1,11 @@
+Object.size = function(obj) {
+    var size = 0, key;
+    for (key in obj) {
+        if (obj.hasOwnProperty(key)) size++;
+    }
+    return size;
+};
+
 var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize']);
 
 toastr.options = {
@@ -114,14 +122,14 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 
     $scope.figureStatusLabel = function(status) {
         if(status == null) {
-            return "label-default";
+            return "label-info";
         }
         return $scope.statusMap[status];
     };
 
     $scope.formatStatus = function(closeStatus) {
         if(closeStatus == null) {
-            return "ACTIVE";
+            return "IN PROGRESS";
         }
 
         return closeStatus;
@@ -155,11 +163,116 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             .success(function(data) {
                          $scope.loading = false;
                          $scope.workflow = data;
+                         $scope.prepWorkflow();
                      })
             .error(function(error) {
                        $scope.loading = false;
                        toastr.error(error.details, error.error)
                    });
+    };
+
+    $scope.updateWorkflow = function() {
+        $scope.loading = true;
+        var params = {};
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
+        params['input'] = $scope.assembleUpdates();
+        $http.get('workflow/update', { params : params})
+            .success(function(data) {
+                         $scope.loading = false;
+                         $scope.workflow = data;
+                         $scope.prepWorkflow();
+                     })
+            .error(function(error) {
+                       $scope.loading = false;
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
+    $scope.prepWorkflow = function() {
+        $scope.workflow.editable = $scope.workflow.resolution == "IN PROGRESS" || $scope.workflow.resolution == "BLOCKED";
+        $scope.workflow.edited = false;
+
+        for(var s in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[s];
+            for(pname in section.params) {
+                var param = section.params[pname];
+                if($scope.isJSON(param)) {
+                    param = $scope.formatJsonBasic(param);
+                }
+                section.params[pname] = {
+                    "original" : param,
+                    "value" : param,
+                    "name" : pname,
+                    "edited" : false,
+                    "editing" : false,
+                    "editable" : $scope.workflow.editable && section.fixable,
+                    "isJson" : $scope.isJSON(param),
+                    "isArray" : $scope.isArray(param),
+                    "isString" : $scope.isString(param)
+                }
+            }
+        }
+    };
+
+    $scope.cancelEdit = function(param) {
+        param.value = param.original;
+        param.editing = false;
+    };
+
+    $scope.finishEditing = function(param) {
+        param.editing = false;
+        param.edited = param.original != param.value;
+        $scope.workflow.edited = true;
+    };
+
+    $scope.assembleUpdates = function() {
+        var updates = {};
+
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            var paramUpdates = {};
+            for (pname in section.params) {
+                var param = section.params[pname];
+                if(param.edited) {
+                    paramUpdates[pname] = param.value;
+                }
+            }
+            if(Object.size(paramUpdates)) {
+                updates[sname] = { params : paramUpdates, status : "INCOMPLETE" };
+            }
+        }
+
+        return updates;
+    };
+
+    $scope.addSection = function(s) {
+        s.push('');
+    };
+
+    $scope.cancelWorkflowUpdate = function() {
+
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            for (pname in section.params) {
+                var param = section.params[pname];
+                param.value = param.original;
+                param.edited = false;
+            }
+        }
+
+        $scope.workflow.edited = false;
+    };
+
+    $scope.workflowStatusMap = {
+        "IN PROGRESS" : "label-info",
+        "BLOCKED" : "label-warning",
+        "CANCELLED" : "label-warning",
+        "FAILED" : "label-danger",
+        "TIMED OUT" : "label-danger",
+        "TERMINATED" : "label-danger",
+        "COMPLETED" : "label-success"
     };
 
     $scope.statusMap = {
@@ -182,6 +295,10 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "WARNING" : "timeline-WARNING"
     };
 
+    $scope.figureWorkflowStatusLabel = function(status) {
+        return $scope.workflowStatusMap[status];
+    };
+
     $scope.figureStatusLabel = function(status) {
         return $scope.statusMap[status];
     };
@@ -191,7 +308,18 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.formatWhitespace = function(str) {
-        return str.replace(/\n/g, '<br/>').replace(/\t/g, '&nbsp;&nbsp;&nbsp;');
+
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+            "\n" : '<br/>',
+            "\t" : '&nbsp;&nbsp;&nbsp;'
+          };
+
+        return str.replace(/[&<>"'\n\t]/g, function(m) { return map[m]; });
     };
 
     $scope.div = function(contents, classes) {
@@ -229,6 +357,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.formatJsonBasic = function(jsonString) {
+        if(undefined == jsonString) { return jsonString; }
         return JSON.stringify(JSON.parse(jsonString), undefined, 4);
     };
 

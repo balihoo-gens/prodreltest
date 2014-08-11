@@ -52,9 +52,13 @@ abstract class RestServlet extends HttpServlet {
         rsq.respondJson(HttpServletResponse.SC_NOT_FOUND
           , _errorJson(nsee.getMessage))
       case npe:NullPointerException =>
+//        println(npe.getMessage)
+//        npe.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
           ,_errorJson(npe.getMessage))
       case e:Exception =>
+//        println(e.getMessage)
+//        println(e.getStackTrace)
         rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
           ,_errorJson(e.getMessage, e.getClass.toString))
     }

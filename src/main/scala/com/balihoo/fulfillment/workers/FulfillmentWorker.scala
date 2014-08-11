@@ -63,6 +63,8 @@ abstract class FulfillmentWorker {
     .withDomain(domain)
     .withTaskList(taskList)
 
+  println(s"$name $domain $taskListName")
+
   var completedTasks:Int = 0
   var failedTasks:Int = 0
   var canceledTasks:Int = 0

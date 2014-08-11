@@ -1,5 +1,8 @@
 <div class="panel panel-default">
     <div class="panel-heading">
+				<span class="pull-right">
+					<h1 style="display:table-cell;vertical-align: middle"><span class="label {{figureWorkflowStatusLabel(workflow.resolution)}}">{{workflow.resolution}}</span></h1>
+				</span>
         <h1>Workflow » {{workflow.workflowId}}</h1>
     </div>
     <div class="panel-body">
@@ -40,15 +43,47 @@
                 </div>
                 <h3>Parameters</h3>
                 <table class="table table-condensed table-hover block params" style="width:95%">
-                    <tr ng-repeat="(pname, param) in section.params">
+                    <tr ng-repeat="(pname, param) in section.params" ng-class="{info : param.edited}">
                         <td style="width:100px"><b>{{pname}}</b></td>
                         <td>
-                            <span ng-if="isJSON(param)" ng-bind-html="formatJson(param)"></span>
-                            <div ng-if="isArray(param)">
-                                <span ng-repeat="item in param"><span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}</span>&nbsp;</span>
-                            </div>
-                            <div ng-if="isString(param) && ! isJSON(param)">
-                                <span ng-bind-html="formatURLs(param)"></span>
+                            <span ng-if="!param.editing && param.editable" class="pull-right action">
+                                <span class="glyphicon glyphicon-pencil muted action" ng-click="param.editing = true"></span>
+                            </span>
+                            <span ng-if="param.editing" class="pull-right" style="vertical-align: middle">
+                                    <span class="glyphicon glyphicon-remove muted red action" ng-click="cancelEdit(param)"></span>
+                                    <span class="glyphicon glyphicon-ok muted green action" ng-click="finishEditing(param)"></span>
+                            </span>
+
+                            <div style="width:92%">
+                                <div ng-if="param.isJson">
+                                <span ng-if="!param.editing">
+                                    <span ng-bind-html="formatJson(param.value)"></span>
+                                </span>
+                                <span ng-if="param.editing">
+                                        <textarea rows="15" class="form-control" ng-model="param.value"></textarea>
+                                </span>
+                                </div>
+
+                                <div ng-if="param.isArray">
+                                <span ng-if="!param.editing">
+                                    <span ng-repeat="item in param.value"><span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}</span>&nbsp;</span>
+                                </span>
+                                <span ng-if="param.editing">
+                                    <select ng-repeat="item in param.value" ng-model="item">
+                                        <option ng-repeat="(sectionName, otherSection) in workflow.sections" ng-selected="sectionName == item.name">{{sectionName}}</option>
+                                    </select>
+                                    <span class="glyphicon glyphicon-plus muted action" ng-click="addSection(param.value)"></span>
+                                </span>
+                                </div>
+
+                                <div ng-if="param.isString && !param.isJson">
+                                <span ng-if="!param.editing">
+                                    <span ng-bind-html="formatURLs(param.value)"></span>
+                                </span>
+                                <span ng-if="param.editing">
+                                        <input type="text" class="form-control" ng-model="param.value">
+                                </span>
+                                </div>
                             </div>
 
                         </td>
@@ -56,5 +91,12 @@
                 </table>
             </div>
         </div>
+        <span ng-if="workflow.edited" class="pull-right" style="vertical-align: middle">
+            <h2>
+                Post updates to fulfillment?&nbsp;
+                <span class="glyphicon glyphicon-remove muted red action" ng-click="cancelWorkflowUpdate()"></span>
+                <span class="glyphicon glyphicon-ok muted green action" ng-click="updateWorkflow()"></span>
+            </h2>
+        </span>
     </div>
 </div>

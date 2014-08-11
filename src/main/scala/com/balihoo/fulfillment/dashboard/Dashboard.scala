@@ -42,6 +42,32 @@ trait WorkflowInitiatorComponent {
   }
 }
 
+trait WorkflowUpdaterComponent {
+  def workflowUpdater: WorkflowUpdater with SWFAdapterComponent
+
+  class AbstractWorkflowUpdater {
+    this: SWFAdapterComponent =>
+
+    def update(runId:String, workflowId:String, input:String) = {
+      val req = new SignalWorkflowExecutionRequest()
+      req.setDomain(swfAdapter.config.getString("domain"))
+      req.setRunId(runId)
+      req.setWorkflowId(workflowId)
+      req.setSignalName("sectionUpdates")
+      req.setInput(input)
+
+      swfAdapter.client.signalWorkflowExecution(req)
+
+      "success"
+    }
+  }
+
+  class WorkflowUpdater(swf: SWFAdapter) extends AbstractWorkflowUpdater with SWFAdapterComponent {
+    def swfAdapter = swf
+  }
+}
+
+
 trait WorkflowInspectorComponent {
   def workflowInspector: WorkflowInspector with SWFAdapterComponent
 
@@ -60,9 +86,6 @@ trait WorkflowInspectorComponent {
     }
 
     def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
-
-  //    val oldest = new Date(System.currentTimeMillis() - (70 * UTCFormatter.DAY_IN_MS))
-  //    val latest = new Date(System.currentTimeMillis() + (10 * UTCFormatter.DAY_IN_MS))
       val filter = new ExecutionTimeFilter
       filter.setOldestDate(oldest)
       filter.setLatestDate(latest)
@@ -118,6 +141,7 @@ trait WorkflowInspectorComponent {
       top("workflowId") = Json.toJson(workflowId)
       top("runId") = Json.toJson(runId)
       top("input") = Json.toJson(history.getEvents.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
+      top("resolution") = Json.toJson(sectionMap.resolution)
 
       top.toMap
     }
@@ -135,11 +159,11 @@ trait WorkflowInspectorComponent {
   }
 }
 
-
 class AbstractWorkflowServlet extends RestServlet {
   this: SWFAdapterComponent
     with WorkflowInspectorComponent
-    with WorkflowInitiatorComponent =>
+    with WorkflowInitiatorComponent
+    with WorkflowUpdaterComponent =>
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
@@ -154,6 +178,15 @@ class AbstractWorkflowServlet extends RestServlet {
       ,Json.stringify(Json.toJson(workflowInspector.workflowSections(
         rsq.getRequiredParameter("runId")
         ,rsq.getRequiredParameter("workflowId")
+      ))))
+  })
+
+  get("/workflow/update", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(workflowUpdater.update(
+        rsq.getRequiredParameter("runId")
+        ,rsq.getRequiredParameter("workflowId")
+        ,rsq.getRequiredParameter("input")
       ))))
   })
 
@@ -177,12 +210,15 @@ class WorkflowServlet(swf: SWFAdapter)
   extends AbstractWorkflowServlet
     with WorkflowInspectorComponent
     with WorkflowInitiatorComponent
+    with WorkflowUpdaterComponent
     with SWFAdapterComponent {
   private val _inspector = new WorkflowInspector(swf)
   private val _initiator = new WorkflowInitiator(swf)
+  private val _updater = new WorkflowUpdater(swf)
   def swfAdapter = swf
   def workflowInspector = _inspector
   def workflowInitiator = _initiator
+  def workflowUpdater = _updater
 }
 
 class AbstractWorkerServlet extends RestServlet {
