@@ -48,7 +48,7 @@ class AdWordsTextAdProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAd
   with TextAdCreatorComponent {
     //don't put this in the creator method to avoid a new one from
     //being created on every call.
-    val _creator = new AdCreator(awa)
+    lazy val _creator = new AdCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa

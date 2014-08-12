@@ -55,7 +55,7 @@ class AdWordsAccountCreator(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAda
   with AccountCreatorComponent {
     //don't put this in the accountCreator method to avoid a new one from
     //being created on every call.
-    val _accountCreator = new AccountCreator(awa)
+    lazy val _accountCreator = new AccountCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa

@@ -52,7 +52,7 @@ class AdWordsAdGroupProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsA
   with AdGroupCreatorComponent {
     //don't put this in the adGroupCreator method to avoid a new one from
     //being created on every call.
-    val _adGroupCreator = new AdGroupCreator(awa)
+    lazy val _adGroupCreator = new AdGroupCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa
