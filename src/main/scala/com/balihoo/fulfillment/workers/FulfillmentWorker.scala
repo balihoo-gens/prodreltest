@@ -33,9 +33,6 @@ abstract class FulfillmentWorker {
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
-//  TODO This can be used to have the worker discover the address of the ec2 instance it is running on (if it is!)
-//  This would be a nice piece of information to put into dynamo so we can log in and administer via ssh
-//  without having to look up the instance in the ec2 dashboard.
   val hostAddress = sys.env.get("EC2_HOME") match {
     case Some(s:String) =>
       val aws_ec2_identify = "curl -s http://169.254.169.254/latest/meta-data/public-hostname"
@@ -53,6 +50,7 @@ abstract class FulfillmentWorker {
   entry.setHostAddress(hostAddress)
   entry.setActivityName(name)
   entry.setActivityVersion(version)
+  entry.setSpecification(getSpecification.toString)
   entry.setDomain(domain)
   entry.setStatus("--")
   entry.setStart(UTCFormatter.format(new Date()))
@@ -82,6 +80,8 @@ abstract class FulfillmentWorker {
 
     updateStatus("Starting")
 
+    val specification = getSpecification
+
     var done = false
     val getch = new Getch
     getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
@@ -97,7 +97,7 @@ abstract class FulfillmentWorker {
           if(task.getTaskToken != null) {
             updateStatus("Processing task..")
             try {
-              handleTask(new ActivityParameters(task.getInput))
+              handleTask(specification.getParameters(task.getInput))
             } catch {
               case e: Exception =>
                 failTask("Exception", e.getMessage)
@@ -114,6 +114,8 @@ abstract class FulfillmentWorker {
     updateStatus("Exiting")
     print("Cleaning up...")
   }
+
+  def getSpecification: ActivitySpecification
 
   def handleTask(params:ActivityParameters)
 
@@ -209,27 +211,71 @@ abstract class FulfillmentWorker {
 
 }
 
-class ActivityParameters(input:String) {
-  val inputObject:JsObject = Json.parse(input).as[JsObject]
-  val params:Map[String, String] = (for((key, value) <- inputObject.fields) yield key -> value.as[String]).toMap
+class ActivityParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true) {
+  var value:String = null
+  var valueSet:Boolean = false
 
-  def hasParameter(param:String) = {
+  def setValue(v:String) = {
+    valueSet = true
+    value = v
+  }
+
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "name" -> Json.toJson(name),
+      "type" -> Json.toJson(ptype),
+      "description" -> Json.toJson(description),
+      "required" -> Json.toJson(required)
+    ))
+  }
+}
+
+class ActivitySpecification(val params:List[ActivityParameter]) {
+
+  val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
+
+  def getSpecification:JsValue = {
+    Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap)
+  }
+
+  override def toString:String = {
+    Json.stringify(getSpecification)
+  }
+
+  def getParameters(input:String):ActivityParameters = {
+    val inputObject:JsObject = Json.parse(input).as[JsObject]
+    for((name, value) <- inputObject.fields) {
+      if(paramsMap contains name) {
+        paramsMap(name).setValue(value.as[String])
+      }
+    }
+    for(param <- params) {
+      if(param.required && !param.valueSet) {
+        throw new Exception(s"input parameter '$param.name' is REQUIRED!")
+      }
+    }
+
+    new ActivityParameters(
+      (for((name, param) <- paramsMap if param.valueSet) yield param.name -> param.value).toMap)
+  }
+
+}
+
+class ActivityParameters(val params:Map[String,String]) {
+
+  def has(param:String):Boolean = {
     params contains param
   }
 
-  def getRequiredParameter(param:String):String = {
-    if(!(params contains param)) {
-      throw new Exception(s"input parameter '$param' is REQUIRED! '$input' doesn't contain '$param'")
-    }
+  def apply(param:String):String = {
     params(param)
   }
 
-  def getOptionalParameter(param:String, default:String):String = {
-    params.getOrElse(param, default)
-  }
-
-  override def toString = {
-    input
+  def getOrElse(param:String, default:String):String = {
+    if(has(param)) {
+      params(param)
+    }
+    default
   }
 }
 
@@ -289,6 +335,7 @@ class FulfillmentWorkerEntry {
   var domain:String = ""
   var activityName:String = ""
   var activityVersion:String = ""
+  var specification:String = ""
   var status:String = ""
   var start:String = ""
   var last:String = ""
@@ -302,6 +349,7 @@ class FulfillmentWorkerEntry {
       "domain" -> Json.toJson(domain),
       "activityName" -> Json.toJson(activityName),
       "activityVersion" -> Json.toJson(activityVersion),
+      "specification" -> Json.toJson(specification),
       "status" -> Json.toJson(status),
       "start" -> Json.toJson(start),
       "last" -> Json.toJson(last),
@@ -330,6 +378,10 @@ class FulfillmentWorkerEntry {
   def getActivityVersion:String = { activityVersion }
   def setActivityVersion(activityVersion:String) { this.activityVersion = activityVersion; }
 
+  @DynamoDBAttribute(attributeName="specification")
+  def getSpecification:String = { specification }
+  def setSpecification(specification:String) { this.specification = specification; }
+
   @DynamoDBAttribute(attributeName="status")
   def getStatus:String = { status }
   def setStatus(status:String) { this.status = status; }
@@ -349,6 +401,7 @@ class FulfillmentWorkerEntry {
       .addString("domain", domain)
       .addString("activityName", activityName)
       .addString("activityVersion", activityVersion)
+      .addString("specification", specification)
       .addString("status", status)
       .addString("start", start)
       .addString("last", last)

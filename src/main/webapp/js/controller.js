@@ -18,6 +18,108 @@ app.factory('environment', function() {
     return {};
 });
 
+app.factory('formatUtil', function() {
+
+    function _formatWhitespace(str) {
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+            "\n": '<br/>',
+            "\t": '&nbsp;&nbsp;&nbsp;'
+        };
+
+        return str.replace(/[&<>"'\n\t]/g, function (m) {
+            return map[m];
+        });
+    }
+
+    function _div(contents, classes) {
+        return "<div class='" + classes + "'>" + contents + "</div>";
+    }
+
+    function _span(contents, classes) {
+        return "<span class='" + classes + "'>" + contents + "</span>";
+    }
+
+    function _jsonFormat(json, divclass) {
+        if (json instanceof Array) {
+            var body = "";
+            for (var item in json) {
+                body += _div(_jsonFormat(json[item]));
+            }
+            return _div(body, "block " + divclass);
+        }
+        if (json instanceof Object) {
+            var body = "";
+            for (var key in json) {
+                body += _div("<span><b>" + key + "</b></span> : " + _jsonFormat(json[key], "block"));
+            }
+            return _div(body, "block " + divclass);
+        }
+        if (_isString(json)) {
+            return _div(_formatURLs(json), divclass);
+        }
+
+        return json;
+    }
+
+    function _formatJson(jsonString) {
+        return _jsonFormat(JSON.parse(jsonString), "json");
+    }
+
+    function _formatJsonBasic(jsonString) {
+        if (undefined == jsonString) {
+            return jsonString;
+        }
+        return JSON.stringify(JSON.parse(jsonString), undefined, 4);
+    }
+
+    function _formatURLs(param) {
+        var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+
+        return param.replace(urlRegex, function (url) {
+
+            if (( url.indexOf(".jpg") > 0 )
+                || ( url.indexOf(".png") > 0 )
+                || ( url.indexOf(".gif") > 0 )) {
+                return '<img src="' + url + '">' + '<br/>' + url + '<br/>';
+            }
+            else {
+                return '<a href="' + url + '">' + url + '</a>' + '<br/>';
+            }
+        });
+    }
+
+    function _isJSON(j) {
+        return j[0] == '{';
+    }
+
+    function _isArray(a) {
+        return a instanceof Array;
+    }
+
+    function _isString(s) {
+        return typeof s === "string";
+    }
+
+    return {
+        formatWhitespace: _formatWhitespace,
+        div: _div,
+        span: _span,
+        jsonFormat: _jsonFormat,
+        formatJson: _formatJson,
+        formatJsonBasic: _formatJsonBasic,
+        formatURLs: _formatURLs,
+        isJSON: _isJSON,
+        isArray: _isArray,
+        isString: _isString
+    }
+
+});
+
 app.config(
     function($routeProvider) {
         $routeProvider
@@ -74,8 +176,6 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 });
 
 app.controller('historyController', function($scope, $route, $http, $location) {
-
-
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -141,7 +241,9 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     };
 });
 
-app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll) {
+app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil) {
+
+    $scope.formatUtil = formatUtil;
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -198,8 +300,8 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             var section = $scope.workflow.sections[s];
             for(pname in section.params) {
                 var param = section.params[pname];
-                if($scope.isJSON(param)) {
-                    param = $scope.formatJsonBasic(param);
+                if(formatUtil.isJSON(param)) {
+                    param = formatUtil.formatJsonBasic(param);
                 }
                 section.params[pname] = {
                     "original" : param,
@@ -208,9 +310,9 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
                     "edited" : false,
                     "editing" : false,
                     "editable" : $scope.workflow.editable && section.fixable,
-                    "isJson" : $scope.isJSON(param),
-                    "isArray" : $scope.isArray(param),
-                    "isString" : $scope.isString(param)
+                    "isJson" : formatUtil.isJSON(param),
+                    "isArray" : formatUtil.isArray(param),
+                    "isString" : formatUtil.isString(param)
                 }
             }
         }
@@ -307,88 +409,6 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         return $scope.timelineMap[eventType];
     };
 
-    $scope.formatWhitespace = function(str) {
-
-        var map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;',
-            "\n" : '<br/>',
-            "\t" : '&nbsp;&nbsp;&nbsp;'
-          };
-
-        return str.replace(/[&<>"'\n\t]/g, function(m) { return map[m]; });
-    };
-
-    $scope.div = function(contents, classes) {
-        return "<div class='"+classes+"'>"+contents+"</div>";
-    };
-
-    $scope.span = function(contents, classes) {
-        return "<span class='"+classes+"'>"+contents+"</span>";
-    };
-
-    $scope.jsonFormat = function(json, divclass) {
-        if(json instanceof Array) {
-            var body = "";
-            for(var item in json) {
-                body += $scope.div($scope.jsonFormat(json[item]));
-            }
-            return $scope.div(body, "block "+divclass);
-        }
-        if(json instanceof Object) {
-            var body = "";
-            for(var key in json) {
-                body += $scope.div("<span><b>"+key+"</b></span> : "+$scope.jsonFormat(json[key], "block"));
-            }
-            return $scope.div(body, "block "+divclass);
-        }
-        if($scope.isString(json)) {
-            return $scope.div($scope.formatURLs(json), divclass);
-        }
-
-        return json;
-    };
-
-    $scope.formatJson = function(jsonString) {
-        return $scope.jsonFormat(JSON.parse(jsonString), "json");
-    };
-
-    $scope.formatJsonBasic = function(jsonString) {
-        if(undefined == jsonString) { return jsonString; }
-        return JSON.stringify(JSON.parse(jsonString), undefined, 4);
-    };
-
-    $scope.formatURLs = function(param) {
-        var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-
-        return param.replace(urlRegex, function (url) {
-
-            if (( url.indexOf(".jpg") > 0 )
-                || ( url.indexOf(".png") > 0 )
-                || ( url.indexOf(".gif") > 0 )) {
-                return '<img src="'+url+'">'+'<br/>'+url+'<br/>';
-            }
-            else {
-                return '<a href="'+url+'">'+url+'</a>'+'<br/>';
-            }
-        });
-    };
-
-    $scope.isJSON = function(j) {
-        return j[0] == '{';
-    };
-
-    $scope.isArray = function(a) {
-        return a instanceof Array;
-    };
-
-    $scope.isString = function(s) {
-        return typeof s === "string";
-    };
-
     $scope.scrollToSection = function(name) {
         $location.hash("section_"+name);
         $anchorScroll();
@@ -400,9 +420,10 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
 });
 
-app.controller('workersController', function($scope, $route, $http, $location, environment) {
+app.controller('workersController', function($scope, $route, $http, $location, environment, formatUtil) {
 
     $scope.showDefunct = false;
+    $scope.formatUtil = formatUtil;
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -445,6 +466,10 @@ app.controller('workersController', function($scope, $route, $http, $location, e
         $scope.domains = {};
         for(var w in $scope.workers) {
             var worker = $scope.workers[w];
+            if(formatUtil.isJSON(worker.specification)) {
+                worker.specification = JSON.parse(worker.specification);
+            }
+
             $scope.setFreshnessLabel(worker);
 
             if(!$scope.domains.hasOwnProperty(worker.domain)) {

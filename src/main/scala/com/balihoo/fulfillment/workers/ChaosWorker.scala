@@ -8,14 +8,21 @@ abstract class AbstractChaosWorker extends FulfillmentWorker {
  this: SWFAdapterComponent
    with DynamoAdapterComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    new ActivitySpecification(List(
+      new ActivityParameter("chanceToFail", "float", "0-100 Chance to Fail"),
+      new ActivityParameter("chanceToCancel", "float", "0-100 Chance to Cancel")
+    ))
+  }
+
   override def handleTask(params: ActivityParameters) = {
     val rand = new Random()
 
     val failActual = rand.nextFloat() * 100
     val cancelActual = rand.nextFloat() * 100
 
-    val failChances = params.getOptionalParameter("chanceToFail", "50").toFloat
-    val cancelChances = params.getOptionalParameter("chanceToCancel", "50").toFloat
+    val failChances = params("chanceToFail").toFloat
+    val cancelChances = params("chanceToCancel").toFloat
 
     if(failActual < failChances) {
       failTask("Chaos ensued!", s"Failing because $failActual < $failChances")

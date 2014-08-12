@@ -8,16 +8,26 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
     with SWFAdapterComponent
     with DynamoAdapterComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    new ActivitySpecification(List(
+      new ActivityParameter("from", "string", ""),
+      new ActivityParameter("recipients", "string", "Comma separated list of email addresses"),
+      new ActivityParameter("subject", "string", ""),
+      new ActivityParameter("body", "string", ""),
+      new ActivityParameter("type", "html|normal", "")
+    ))
+  }
+
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
       sendEmail(
-        params.getRequiredParameter("from"),
-        params.getRequiredParameter("recipients").split(",").toList,
-        params.getRequiredParameter("subject"),
-        params.getRequiredParameter("body"),
-        params.getRequiredParameter("type") == "html"
+        params("from"),
+        params("recipients").split(",").toList,
+        params("subject"),
+        params("body"),
+        params("type") == "html"
       ).toString
     }
   }

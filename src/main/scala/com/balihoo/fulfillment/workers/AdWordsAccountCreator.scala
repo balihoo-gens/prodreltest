@@ -16,6 +16,10 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
     with DynamoAdapterComponent
     with AccountCreatorComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    accountCreator.getSpecification
+  }
+
   override def handleTask(params: ActivityParameters) = {
     try {
       adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
@@ -66,8 +70,17 @@ trait AccountCreatorComponent {
 
     var brandAccountCache = collection.mutable.Map[String, String]()
 
+    def getSpecification: ActivitySpecification = {
+      new ActivitySpecification(List(
+        new ActivityParameter("parent", "int", "Parent AdWords account ID"),
+        new ActivityParameter("name", "string", "Name of this Account"),
+        new ActivityParameter("currencyCode", "string", "Usually US. https://developers.google.com/adwords/api/docs/appendix/currencycodes "),
+        new ActivityParameter("timeZone", "string", "https://developers.google.com/adwords/api/docs/appendix/timezones")
+      ))
+    }
+
     def getManagerAccount(params:ActivityParameters):ManagedCustomer = {
-      val parent = params.getRequiredParameter("parent")
+      val parent = params("parent")
       val context = s"getManagerAccount(parent='$parent')"
 
       val selector = new SelectorBuilder()
@@ -80,7 +93,7 @@ trait AccountCreatorComponent {
     }
 
     def getAccount(params:ActivityParameters):ManagedCustomer = {
-      val name = params.getRequiredParameter("name")
+      val name = params("name")
       val context = s"getAccount(name='$name')"
 
       val selector = new SelectorBuilder()
@@ -105,9 +118,9 @@ trait AccountCreatorComponent {
 
     def createAccount(params:ActivityParameters):ManagedCustomer = {
 
-      val name = params.getRequiredParameter("name")
-      val currencyCode = params.getRequiredParameter("currencyCode")
-      val timeZone = params.getRequiredParameter("timeZone")
+      val name = params("name")
+      val currencyCode = params("currencyCode")
+      val timeZone = params("timeZone")
       val context = s"createAccount(name='$name', currencyCode='$currencyCode', timeZone='$timeZone')"
 
       val customer:ManagedCustomer = new ManagedCustomer()
@@ -125,7 +138,7 @@ trait AccountCreatorComponent {
     }
 
     def lookupParentAccount(params:ActivityParameters):String = {
-      val parentName = params.getRequiredParameter("parent")
+      val parentName = params("parent")
       brandAccountCache.contains(parentName) match {
         case true =>
           brandAccountCache(parentName)

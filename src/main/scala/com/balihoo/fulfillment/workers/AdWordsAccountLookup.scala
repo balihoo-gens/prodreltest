@@ -10,11 +10,18 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
     with DynamoAdapterComponent
     with AccountCreatorComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    new ActivitySpecification(List(
+      new ActivityParameter("parent", "int", "Brand AdWords account ID"),
+      new ActivityParameter("name", "string", "Name of the Account")
+    ))
+  }
+
   override def handleTask(params: ActivityParameters) = {
     try {
       adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
-      val aname = params.getRequiredParameter("name")
+      val aname = params("name")
       accountCreator.getAccount(params) match {
         case existing:ManagedCustomer =>
           completeTask(String.valueOf(existing.getCustomerId))

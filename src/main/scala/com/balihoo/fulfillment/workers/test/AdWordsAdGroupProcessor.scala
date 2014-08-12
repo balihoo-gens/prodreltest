@@ -35,27 +35,26 @@ object adwordsAdGroupCreator {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams =
-        s"""{
-         "name" : "fulfillment Campaign",
-          "channel" : "DISPLAY"
-        }"""
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val campaign = campaignCreator.getCampaign(new ActivityParameters(Map(
+        "name" -> "fulfillment Campaign",
+        "channel" -> "DISPLAY"
+
+      )))
 
       val target =
         """{\"focus\" : \"interests\",\"interests\" : [\"Beauty & Fitness\",\"Books & Literature\"]}"""
 
-      val adGroupParams =
-        s"""{
-         "name" : "CPM AdGroup",
-         "status" : "ENABLED",
-          "campaignId" : "${campaign.getId}",
-          "bidDollars" : "6.6",
-          "target" : "$target"
-        }"""
+      val groupParams = new ActivityParameters(Map(
+        "name" -> "CPM AdGroup",
+        "status" -> "ENABLED",
+        "campaignId" -> s"${campaign.getId}",
+        "bidDollars" -> "6.6",
+        "target" -> target
 
-      val adGroup = adGroupCreator.getAdGroup(new ActivityParameters(adGroupParams))
-      val newAdgroup = adGroupCreator.updateAdGroup(adGroup, new ActivityParameters(adGroupParams))
+      ))
+
+      val adGroup = adGroupCreator.getAdGroup(groupParams)
+      val newAdgroup = adGroupCreator.updateAdGroup(adGroup, groupParams)
 
       println(newAdgroup.getId)
     }
@@ -75,20 +74,19 @@ object adwordsAdGroupSetInterests {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams =
-        s"""{
-         "name" : "fulfillment campaign",
-          "channel" : "DISPLAY"
-        }"""
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val campaignParams = new ActivityParameters(Map(
+        "name" -> "fulfillment campaign",
+      "channel" -> "DISPLAY"
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
 
-      val adgroupParams =
-        s"""{
-         "name" : "GROUP A",
-          "campaignId" : "${campaign.getId}"
-        }"""
+      val adgroupParams = new ActivityParameters(Map(
+        "name" -> "GROUP A",
+        "campaignId" -> s"${campaign.getId}"
 
-      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
+      ))
+
+      val adgroup = adGroupCreator.getAdGroup(adgroupParams)
       adGroupCreator.addUserInterests(adgroup, Array("Vehicle Shows", "Livestock"))
 
     }
@@ -108,19 +106,18 @@ object adwordsAdGroupSetKeywords {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams =
-        s"""{
-         "name" : "fulfillment campaign",
-          "channel" : "DISPLAY"
-        }"""
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
-      val adgroupParams =
-        s"""{
-         "name" : "GROUP A",
-          "campaignId" : "${campaign.getId}"
-        }"""
+      val campaignParams = new ActivityParameters(Map(
+        "name" -> "fulfillment campaign",
+        "channel" -> "DISPLAY"
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
 
-      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
+      val adgroupParams = new ActivityParameters(Map(
+        "name" -> "GROUP A",
+        "campaignId" -> s"${campaign.getId}"
+
+      ))
+      val adgroup = adGroupCreator.getAdGroup(adgroupParams)
 
       adGroupCreator.addKeywords(adgroup, Array("tuna", "dressage", "aluminum"))
     }

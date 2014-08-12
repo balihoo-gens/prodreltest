@@ -8,11 +8,17 @@ abstract class AbstractEmailAddressVerifier extends FulfillmentWorker {
     with SWFAdapterComponent
     with DynamoAdapterComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    new ActivitySpecification(List(
+      new ActivityParameter("address", "email address", "Address to be verified with SES")
+    ))
+  }
+
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
-      verifyAddress(params.getRequiredParameter("address"))
+      verifyAddress(params("address"))
     }
   }
 
