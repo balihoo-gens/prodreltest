@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+import packager
+import sys, os
+
+def main(args):
+    thisdir = os.path.dirname(os.path.realpath(__file__))
+    rootdir = os.path.join(thisdir, "..")
+
+    logger = Splogger(
+    ret = subprocess.call(cmd, shell=True)
+    if check_aws_requirements():
+        gather_files():
+
+if __name__ == "__main__":
+    main(sys.argv)
