@@ -1,15 +1,14 @@
 #!/usr/bin/env python
-import packager
+from packager import Packager
 import sys, os
 
 def main(args):
     thisdir = os.path.dirname(os.path.realpath(__file__))
+    #assume this script resides one dir below the fulfillment root
     rootdir = os.path.join(thisdir, "..")
 
-    logger = Splogger(
-    ret = subprocess.call(cmd, shell=True)
-    if check_aws_requirements():
-        gather_files():
+    p = Packager(rootdir)
+    p.package()
 
 if __name__ == "__main__":
     main(sys.argv)
