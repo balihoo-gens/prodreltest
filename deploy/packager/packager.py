@@ -5,7 +5,11 @@ import shutil
 import time
 from splogger import Splogger
 
+
 class Packager:
+    """ Packages up everything needed for deployment
+        into a directory, ready to be sync-ed to S3
+    """
     def __init__(self, rootdir, unattended=False, log_filename="/var/log/balihoo/fulfillment/packup.log"):
         self._rootdir = rootdir
         self._log = Splogger(log_filename)
@@ -45,7 +49,7 @@ class Packager:
     def verify_env_var(self, var):
         if var not in os.environ:
             if self._unattended:
-                self.error("AWS CLI tools not found")
+                self.error(var + " not found in env.")
                 return False
 
             print(var + " not found in env. Please enter it now")
@@ -83,8 +87,11 @@ class Packager:
             stderr=subprocess.PIPE)
         return jarname
 
-    def build_tarball(self, jarname):
-        tmpdir = os.path.join(self._rootdir, "installtmp")
+    def package(self):
+        """ returns the path of the dir to be
+            sync-ed to the S3 bucket
+        """
+        tmpdir = os.path.join(self._rootdir, "deployments/%s" % (datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S.%f"))
         if os.path.isdir(tmpdir):
             shutil.rmtree(tmpdir)
         os.makedirs(tmpdir)
@@ -93,6 +100,7 @@ class Packager:
         shutil.copytree(cfgsrc, cfgdst)
 
         self.info("gathering fat jar")
+        jarname = self.assemble_fat_jar()
         #cp $JARNAME $TMPDIR/fulfillment.jar
         shutil.copy(jarname, tmpdir)
 
@@ -107,31 +115,4 @@ class Packager:
         os.chmod(launchfile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
                              stat.S_IRGRP |                stat.S_IXGRP |
                              stat.S_IROTH |                stat.S_IXOTH )
-
-        tarball = "fulfillment-%d" % (int(time.time()))
-        self.info("creating application tarball: " + tarball)
-        #tar -zcf ${TARBALL} ${TMPDIR}
-        shutil.make_archive(tarball, "gztar", tmpdir)
-
-    def upload_tarball(self, tarname):
-        #aws s3 cp s3://balihoo.dev.fulfillment/\\${APPFILE} . >> \\${LOGFILE} 2>&1\n",
-        pass
-
-    def generate_template(self, tar_s3url):
-        pass
-
-    def upload(self, template_name):
-        pass
-
-    def package(self):
-        jarname = self.assemble_fat_jar()
-        tarname = self.build_tarball(jarname)
-        template_location = ""
-        if (self.check_aws_requirements()):
-            tar_s3url = self.upload_tarball(tarname)
-            template_name = self.generate_template(tar_s3url)
-            template_location = self.upload(template_name)
-        else:
-            template_location = self.generate_template(tar_s3url)
-
-        self.info("Cloudformation template located at: %s" % (template_location,))
+        return tmpdir
