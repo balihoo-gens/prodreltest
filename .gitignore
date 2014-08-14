@@ -29,7 +29,10 @@ atlassian-ide-plugin.xml
 *.iml
 
 # Python
-.pyc
+*.pyc
+
+# archives
+*.tar.*
 
 #vi
 *.swp

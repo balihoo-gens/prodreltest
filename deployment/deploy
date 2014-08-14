@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+from deployment import Deployment
+import sys, os
+import argparse
+
+def main():
+    parser = argparse.ArgumentParser("Deploy the Fulfillment application to AWS Cloud Formation")
+    thisdir = os.path.dirname(os.path.realpath(__file__))
+    rootdir = os.path.abspath(os.path.join(thisdir, ".."))
+    template_path = os.path.join(thisdir, "scripts/aws_template.json")
+    parser.add_argument('-d','--rootdir', help='the project root', default=rootdir)
+    parser.add_argument('-l','--logfile', help='the log file', default='="/var/log/balihoo/fulfillment/deployment.log')
+    parser.add_argument('--s3bucket', help='the S3 bucket to use', default='balihoo.dev.fulfillment')
+    parser.add_argument('--s3dir', help='the S3 sub dir to use (skips packaging and upload)')
+    parser.add_argument('--template', help='the template to use for stack creation', default=template_path)
+    parser.add_argument('--pkgdir', help='path of the package to use (skips packaging)')
+    parser.add_argument('--nocf', help='do not create a cloud formation stack', action='store_true')
+    parser.add_argument('--noupload', help='do not upload to S3', action='store_true')
+
+    args = parser.parse_args()
+
+    pkgdir = args.pkgdir
+    s3dir = args.s3dir
+
+    d = Deployment(args.logfile)
+    if not (pkgdir or s3dir):
+        pkgdir = d.package(args.rootdir)
+    if not (s3dir or args.noupload):
+        s3dir = d.upload(pkgdir, args.s3bucket)
+    if not args.nocf:
+        d.create_stack(s3dir, args.template)
+
+if __name__ == "__main__":
+    main()
