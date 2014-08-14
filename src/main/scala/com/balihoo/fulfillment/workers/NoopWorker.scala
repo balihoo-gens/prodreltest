@@ -7,6 +7,10 @@ abstract class AbstractNoopWorker extends FulfillmentWorker {
  this: SWFAdapterComponent
    with DynamoAdapterComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    new ActivitySpecification(List())
+  }
+
   override def handleTask(task: ActivityParameters) = {
     completeTask("""{"-NOOP-" : "true"}""")
   }

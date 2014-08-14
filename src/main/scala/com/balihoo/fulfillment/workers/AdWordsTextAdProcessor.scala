@@ -5,11 +5,11 @@ import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 
-abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
+abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
   this: AdWordsAdapterComponent
    with SWFAdapterComponent
    with DynamoAdapterComponent
-   with ImageAdCreatorComponent =>
+   with TextAdCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
     adCreator.getSpecification
@@ -19,13 +19,13 @@ abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
     try {
       adWordsAdapter.setClientId(params("account"))
 
-      val imageAd = adCreator.getImageAd(params) match {
-        case ad:ImageAd =>
-          adCreator.updateImageAd(ad, params)
+      val textAd = adCreator.getTextAd(params) match {
+        case ad:TextAd =>
+          adCreator.updateTextAd(ad, params)
         case _ =>
-          adCreator.createImageAd(params)
+          adCreator.createTextAd(params)
       }
-      completeTask(String.valueOf(imageAd.getId))
+      completeTask(String.valueOf(textAd.getId))
 
     } catch {
       case rateExceeded: RateExceededException =>
@@ -40,12 +40,12 @@ abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
   }
 }
 
-class AdWordsImageAdProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
-  extends AbstractAdWordsImageAdProcessor
+class AdWordsTextAdProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+  extends AbstractAdWordsTextAdProcessor
   with SWFAdapterComponent
   with DynamoAdapterComponent
   with AdWordsAdapterComponent
-  with ImageAdCreatorComponent {
+  with TextAdCreatorComponent {
     //don't put this in the creator method to avoid a new one from
     //being created on every call.
     lazy val _creator = new AdCreator(awa)
@@ -55,7 +55,7 @@ class AdWordsImageAdProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsA
     def adCreator = _creator
 }
 
-trait ImageAdCreatorComponent {
+trait TextAdCreatorComponent {
   def adCreator: AbstractAdCreator with AdWordsAdapterComponent
 
   abstract class AbstractAdCreator {
@@ -64,64 +64,62 @@ trait ImageAdCreatorComponent {
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
         new ActivityParameter("account", "int", "Participant AdWords account ID"),
-        new ActivityParameter("name", "string", "Name of this ad (used to reference the ad later)"),
         new ActivityParameter("adGroupId", "int", "AdWords AdGroup ID"),
+        new ActivityParameter("headline", "string", "Headline of the ad"),
+        new ActivityParameter("description1", "string", "First line of ad text"),
+        new ActivityParameter("description2", "string", "Second line of ad text"),
         new ActivityParameter("url", "string", "Landing page URL"),
-        new ActivityParameter("displayUrl", "string", "Visible Ad URL"),
-        new ActivityParameter("imageUrl", "string", "URL Location of image data for this ad")
+        new ActivityParameter("displayUrl", "string", "Visible Ad URL")
       ))
     }
 
-    def getImageAd(params: ActivityParameters): ImageAd = {
+    def getTextAd(params: ActivityParameters): TextAd = {
 
-      val name = params("name")
+      val name = params("headline")
       val adGroupId = params("adGroupId")
-      val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
+      val context = s"getTextAd(name='$name', adGroup='$adGroupId')"
 
       val selector = new SelectorBuilder()
         .fields("Id", "Url", "DisplayUrl", "Status")
-        .equals("ImageCreativeName", name)
+        .equals("TextCreativeName", name)
         .equals("AdGroupId", adGroupId)
         .build()
 
-      adWordsAdapter.withErrorsHandled[ImageAd](context, {
+      adWordsAdapter.withErrorsHandled[TextAd](context, {
         val page = adWordsAdapter.adGroupAdService.get(selector)
         page.getTotalNumEntries.intValue() match {
           case 0 => null
-          case 1 => page.getEntries(0).getAd.asInstanceOf[ImageAd]
-          case _ => throw new Exception(s"imageAd name $name is ambiguous in adGroup '$adGroupId'")
+          case 1 => page.getEntries(0).getAd.asInstanceOf[TextAd]
+          case _ => throw new Exception(s"textAd name $name is ambiguous in adGroup '$adGroupId'")
         }
       })
     }
 
-    def newImageAd(params:ActivityParameters): ImageAd = {
+    def newTextAd(params:ActivityParameters): TextAd = {
 
-      val name = params("name")
-      val url = params("url")
+      val headline = params("headline")
+      val desc1 = params("description1")
+      val desc2 = params("description2")
       val displayUrl = params("displayUrl")
-      val imageUrl = params("imageUrl")
+      val url = params("url")
 
-      val image = new Image()
-      image.setData(
-        com.google.api.ads.common.lib.utils.Media.getMediaDataFromUrl(imageUrl))
-      image.setType(MediaMediaType.IMAGE)
+      val tad = new TextAd()
+      tad.setHeadline(headline)
+      tad.setDescription1(desc1)
+      tad.setDescription2(desc2)
+      tad.setDisplayUrl(displayUrl)
+      tad.setUrl(url)
 
-      val ad = new ImageAd()
-      ad.setImage(image)
-      ad.setName(name)
-      ad.setDisplayUrl(displayUrl)
-      ad.setUrl(url)
-
-      ad
+      tad
     }
 
-    def createImageAd(params:ActivityParameters): ImageAd = {
-      _add(newImageAd(params), params)
+    def createTextAd(params:ActivityParameters): TextAd = {
+      _add(newTextAd(params), params)
     }
 
-    def updateImageAd(existingAd:ImageAd, params:ActivityParameters): ImageAd = {
+    def updateTextAd(existingAd:TextAd, params:ActivityParameters): TextAd = {
 
-      val newAd = newImageAd(params)
+      val newAd = newTextAd(params)
 
       if(newAd.equals(existingAd)) {
         // The existing add is exactly the same..
@@ -132,35 +130,34 @@ trait ImageAdCreatorComponent {
       _add(newAd, params)
 
       newAd
-
     }
 
-    def _add(iad:ImageAd, params:ActivityParameters):ImageAd = {
+    def _add(tad:TextAd, params:ActivityParameters):TextAd = {
       val aga = new AdGroupAd()
-      aga.setAd(iad)
+      aga.setAd(tad)
       aga.setAdGroupId(params("adGroupId").toLong)
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)
       operation.setOperator(Operator.ADD)
 
-      val context = s"Adding a Image Ad $params"
+      val context = s"Adding a Text Ad $params"
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
-      }).getAd.asInstanceOf[ImageAd]
+      }).getAd.asInstanceOf[TextAd]
     }
 
-    def _remove(iad:ImageAd, params:ActivityParameters) = {
+    def _remove(tad:TextAd, params:ActivityParameters) = {
       val aga = new AdGroupAd()
-      aga.setAd(iad)
+      aga.setAd(tad)
       aga.setAdGroupId(params("adGroupId").toLong)
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)
       operation.setOperator(Operator.REMOVE)
 
-      val context = s"Removing a Image Ad $params"
+      val context = s"Removing a Text Ad $params"
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
@@ -175,10 +172,10 @@ trait ImageAdCreatorComponent {
   }
 }
 
-object adwords_imageadprocessor {
+object adwords_textadprocessor {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsImageAdProcessor(
+    val worker = new AdWordsTextAdProcessor(
       new SWFAdapter(cfg),
       new DynamoAdapter(cfg),
       new AdWordsAdapter(cfg)

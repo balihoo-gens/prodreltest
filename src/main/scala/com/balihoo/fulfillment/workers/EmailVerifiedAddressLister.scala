@@ -8,6 +8,10 @@ abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
     with SWFAdapterComponent
     with DynamoAdapterComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    new ActivitySpecification(List())
+  }
+
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 

@@ -10,7 +10,7 @@ abstract class ImageAdTest(cfg: PropertiesLoader)
     extends AdWordsAdapterComponent
       with CampaignCreatorComponent
       with AdGroupCreatorComponent
-      with AdCreatorComponent {
+      with ImageAdCreatorComponent {
     private val _awa = new AdWordsAdapter(cfg)
     def adWordsAdapter = _awa
     private val _cc = new CampaignCreator(adWordsAdapter)
@@ -35,26 +35,21 @@ object adWordsGetAdGroupImageAd {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams =
-        """{
-         "name" : "fulfillment Campaign",
-          "channel" : "DISPLAY"
-        }"""
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
-      val adgroupParams =
-        s"""{
-         "name" : "GROUP A",
-          "campaignId" : "${campaign.getId}"
-        }"""
+      val campaignParams = new ActivityParameters(Map(
+         "name" -> "fulfillment Campaign",
+          "channel" -> "DISPLAY"
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
+      val adgroupParams = new ActivityParameters(Map(
+          "campaignId" -> "${campaign.getId}"
+      ))
+      val adgroup = adGroupCreator.getAdGroup(adgroupParams)
 
-      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
-
-      val imageAdParams =
-        s"""{
-         "name" : "Another Nature",
-          "adGroupId" : "${adgroup.getId}"
-        }"""
-      val ad = adCreator.getImageAd(new ActivityParameters(imageAdParams))
+      val imageAdParams = new ActivityParameters(Map(
+         "name" -> "Another Nature",
+          "adGroupId" -> "${adgroup.getId}"
+      ))
+      val ad = adCreator.getImageAd(imageAdParams)
 
       println(ad.toString)
     }
@@ -73,28 +68,24 @@ object adWordsAdGroupImageAd {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams =
-        s"""{
-         "name" : "fulfillment Campaign",
-          "channel" : "DISPLAY"
-        }"""
+      val campaignParams = Map(
+         "name" -> "fulfillment Campaign",
+          "channel" -> "DISPLAY"
+      )
       val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
-      val adgroupParams =
-        s"""{
-         "name" : "GROUP A",
-          "campaignId" : "${campaign.getId}"
-        }"""
-
+      val adgroupParams = Map(
+         "name" -> "GROUP A",
+          "campaignId" -> "${campaign.getId}"
+      )
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
-      val imageAdParams =
-        s"""{
-         "name" : "Another Nature",
-          "adGroupId" : "${adgroup.getId}",
-          "url" : "http://balihoo.com",
-          "displayUrl" :    "http://balihoo.com",
-          "imageUrl" : "http://lorempixel.com/300/100/nature/"
-        }"""
+      val imageAdParams = Map(
+         "name" -> "Another Nature",
+          "adGroupId" -> "${adgroup.getId}",
+          "url" -> "http://balihoo.com",
+          "displayUrl" ->    "http://balihoo.com",
+          "imageUrl" -> "http://lorempixel.com/300/100/nature/"
+      )
 
       adCreator.createImageAd(new ActivityParameters(imageAdParams))
     }
@@ -113,28 +104,25 @@ object adWordsUpdateAdGroupImageAd {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams =
-        s"""{
-         "name" : "fulfillment Campaign",
-          "channel" : "DISPLAY"
-        }"""
+      val campaignParams = Map(
+         "name" -> "fulfillment Campaign",
+          "channel" -> "DISPLAY"
+        )
       val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
-      val adgroupParams =
-        s"""{
-         "name" : "GROUP A",
-          "campaignId" : "${campaign.getId}"
-        }"""
+      val adgroupParams = Map(
+         "name" -> "GROUP A",
+          "campaignId" -> s"${campaign.getId}"
+        )
 
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
-      val imageAdParams =
-        s"""{
-         "name" : "Another Nature",
-          "adGroupId" : "${adgroup.getId}",
-          "url" : "http://balihoo.com",
-          "displayUrl" :    "http://balihoo.com",
-          "imageUrl" : "http://lorempixel.com/300/100/nature/"
-        }"""
+      val imageAdParams = Map(
+         "name" -> "Another Nature",
+          "adGroupId" -> "${adgroup.getId}",
+          "url" -> "http://balihoo.com",
+          "displayUrl" ->    "http://balihoo.com",
+          "imageUrl" -> "http://lorempixel.com/300/100/nature/"
+        )
 
       val ad = adCreator.getImageAd(new ActivityParameters(imageAdParams))
 

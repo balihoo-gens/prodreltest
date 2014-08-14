@@ -10,12 +10,12 @@
             <img src="img/loading.gif">
         </div>
         <span id="rawInputToggle" class="pull-right muted label">Show Input</span>
-        <pre class="initiallyHidden" id="rawInput" ng-bind-html="formatJsonBasic(workflow.input)"></pre>
+        <pre class="initiallyHidden" id="rawInput" ng-bind-html="formatUtil.formatJsonBasic(workflow.input)"></pre>
         <h2 ng-show="workflow.timeline">Timeline</h2>
         <div class="block">
             <div ng-repeat="event in workflow.timeline">
                 <span class="pull-right muted">{{event.when}}</span>
-                <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatWhitespace(event.message)"></span>
+                <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
             </div>
         </div>
         <h2>Sections</h2>
@@ -34,7 +34,7 @@
                     <h3 ng-show="section.timeline">Timeline</h3>
                     <div class="block" ng-repeat="event in section.timeline">
                         <span class="pull-right muted">{{event.when}}</span>
-                        <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatWhitespace(event.message)"></span>
+                        <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
                     </div>
                 </div>
                 <div class="blob block" style="width:30%; margin-bottom:20px;">
@@ -57,7 +57,7 @@
                             <div style="width:92%">
                                 <div ng-if="param.isJson">
                                 <span ng-if="!param.editing">
-                                    <span ng-bind-html="formatJson(param.value)"></span>
+                                    <span ng-bind-html="formatUtil.formatJson(param.value)"></span>
                                 </span>
                                 <span ng-if="param.editing">
                                         <textarea rows="15" class="form-control" ng-model="param.value"></textarea>
@@ -78,7 +78,7 @@
 
                                 <div ng-if="param.isString && !param.isJson">
                                 <span ng-if="!param.editing">
-                                    <span ng-bind-html="formatURLs(param.value)"></span>
+                                    <span ng-bind-html="formatUtil.formatURLs(param.value)"></span>
                                 </span>
                                 <span ng-if="param.editing">
                                         <input type="text" class="form-control" ng-model="param.value">

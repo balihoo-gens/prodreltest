@@ -27,6 +27,19 @@
                         <tr>
                             <td>Started</td><td>{{worker.start}}</td>
                         </tr>
+                        <tr ng-show="worker.specification">
+                            <td>Params</td>
+                            <td>
+                                <div ng-repeat="(name, param) in worker.specification">
+                                    <b>{{param.name}}</b><br/>
+                                    <div class="block">
+                                        <div ng-show="!param.required"><i>OPTIONAL</i></div>
+                                        Type:&nbsp;&nbsp;{{param.type}}<br/>
+                                        Description:&nbsp;&nbsp;{{param.description}}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                     </table>
                 </div>
             </div>
