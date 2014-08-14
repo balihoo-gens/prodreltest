@@ -128,8 +128,8 @@ trait CampaignCreatorComponent {
         new ActivityParameter("name", "string", "Name of the Campaign"),
         new ActivityParameter("channel", "SEARCH|DISPLAY|SHOPPING", "The advertising channel"),
         new ActivityParameter("budget", "float", "The monthly budget"),
-        new ActivityParameter("status", "ACTIVE|PAUSED|DELETED", ""),
-        new ActivityParameter("startDate", "YYYYMMDD", ""),
+        new ActivityParameter("status", "ACTIVE|PAUSED|DELETED", "Always ACTIVE on Campaign creation", false),
+        new ActivityParameter("startDate", "YYYYMMDD", "Ignored on update."),
         new ActivityParameter("endDate", "YYYMMDD", ""),
         new ActivityParameter("targetzips", "string", "Comma separated list of zip codes"),
         new ActivityParameter("adschedule", "string", "M,T,W,Th,F,S,Su")

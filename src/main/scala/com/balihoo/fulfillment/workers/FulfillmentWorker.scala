@@ -212,13 +212,7 @@ abstract class FulfillmentWorker {
 }
 
 class ActivityParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true) {
-  var value:String = null
-  var valueSet:Boolean = false
-
-  def setValue(v:String) = {
-    valueSet = true
-    value = v
-  }
+  var value:Option[String] = None
 
   def toJson:JsValue = {
     Json.toJson(Map(
@@ -246,17 +240,17 @@ class ActivitySpecification(val params:List[ActivityParameter]) {
     val inputObject:JsObject = Json.parse(input).as[JsObject]
     for((name, value) <- inputObject.fields) {
       if(paramsMap contains name) {
-        paramsMap(name).setValue(value.as[String])
+        paramsMap(name).value = Some(value.as[String])
       }
     }
     for(param <- params) {
-      if(param.required && !param.valueSet) {
-        throw new Exception(s"input parameter '$param.name' is REQUIRED!")
+      if(param.required && param.value.isEmpty) {
+        throw new Exception(s"input parameter '${param.name}' is REQUIRED!")
       }
     }
 
     new ActivityParameters(
-      (for((name, param) <- paramsMap if param.valueSet) yield param.name -> param.value).toMap)
+      (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap)
   }
 
 }
@@ -273,7 +267,7 @@ class ActivityParameters(val params:Map[String,String]) {
 
   def getOrElse(param:String, default:String):String = {
     if(has(param)) {
-      params(param)
+      return params(param)
     }
     default
   }
