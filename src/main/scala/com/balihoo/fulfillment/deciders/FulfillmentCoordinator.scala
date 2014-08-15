@@ -2,9 +2,11 @@ package com.balihoo.fulfillment.deciders
 
 import java.util.UUID.randomUUID
 
+import org.joda.time.{Seconds, DateTime}
+
 import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
-import scala.collection.mutable
+import scala.collection.mutable.{Map, MutableList}
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
@@ -81,7 +83,7 @@ class DecisionGenerator(categorized: CategorizedSections
   protected def gatherParameters(section: FulfillmentSection
                                 ,sections: SectionMap) = {
 
-    val params = collection.mutable.Map[String, String]()
+    val params = Map[String, String]()
 
     for((name, value) <- section.params) {
       value match {
@@ -103,7 +105,7 @@ class DecisionGenerator(categorized: CategorizedSections
     val decision: Decision = new Decision
     decision.setDecisionType(DecisionType.StartTimer)
 
-    val timerParams = collection.mutable.Map[String, String]()
+    val timerParams = Map[String, String]()
     timerParams("section") = name
     timerParams("status") = status
     timerParams("reason") = reason
@@ -118,11 +120,11 @@ class DecisionGenerator(categorized: CategorizedSections
     decision
   }
 
-  def makeDecisions(): collection.mutable.MutableList[Decision] = {
+  def makeDecisions(): MutableList[Decision] = {
 
-    val decisions = new collection.mutable.MutableList[Decision]()
+    val decisions = new MutableList[Decision]()
 
-    val failReasons = mutable.MutableList[String]()
+    val failReasons = MutableList[String]()
 
     if(categorized.workComplete()) {
       // If we're done then let's just bail here
@@ -205,29 +207,12 @@ class DecisionGenerator(categorized: CategorizedSections
     }
 
     for(section <- categorized.ready) {
-      val params = gatherParameters(section, sections)
-
-      val decision: Decision = new Decision
-      decision.setDecisionType(DecisionType.ScheduleActivityTask)
-
-      val taskList = new TaskList
-      taskList.setName(section.action.getName+section.action.getVersion)
-
-      val attribs: ScheduleActivityTaskDecisionAttributes = new ScheduleActivityTaskDecisionAttributes
-      attribs.setActivityType(section.action)
-      attribs.setInput(params)
-      attribs.setTaskList(taskList)
-      attribs.setActivityId(section.getActivityId)
-
-      if(section.startToCloseTimeout.nonEmpty) attribs.setStartToCloseTimeout(section.startToCloseTimeout)
-      if(section.scheduleToStartTimeout.nonEmpty) attribs.setScheduleToStartTimeout(section.scheduleToStartTimeout)
-      if(section.scheduleToCloseTimeout.nonEmpty) attribs.setScheduleToCloseTimeout(section.scheduleToCloseTimeout)
-      if(section.heartbeatTimeout.nonEmpty) attribs.setHeartbeatTimeout(section.heartbeatTimeout)
-
-      decision.setScheduleActivityTaskDecisionAttributes(attribs)
-      decisions += decision
-
-      sections.timeline.note("Scheduling work for: "+section.name)
+      val delaySeconds = calculateWaitSeconds(section)
+      // Does this task need to be delayed until the waitUntil time?
+      if (delaySeconds > 0)
+        decisions += waitDecision(section, delaySeconds)
+      else
+        decisions += triggerWorkerDecision(section)
     }
 
     if(decisions.length == 0 && !categorized.hasPendingSections) {
@@ -266,6 +251,68 @@ class DecisionGenerator(categorized: CategorizedSections
     }
 
     decisions
+  }
+
+  /**
+   * Calculates the proper wait time for a task.  If waitUntil is null or in the past, the wait time is zero.
+   * @param section the section describing the task
+   * @return the wait time in seconds
+   */
+  private def calculateWaitSeconds(section: FulfillmentSection): Int = {
+    if (null == section.waitUntil) {
+      0
+    } else {
+      // If the timer fires a fraction of a second early, we'll waste resources creating additional timers until the
+      // wait time has fully elapsed.  Add one second to the delay to prevent this.
+      val delaySeconds: Int = Seconds.secondsBetween(DateTime.now, section.waitUntil).getSeconds + 1
+
+      // Don't return a negative number.  The timer wouldn't like that.
+      Math.max(0, delaySeconds)
+    }
+  }
+
+  /**
+   * Creates a timer decision to delay the execution of the worker.
+   * @param section the section describing the activity
+   * @param waitSeconds the number of seconds the timer should wait
+   * @return the decision
+   */
+  private def waitDecision(section: FulfillmentSection, waitSeconds: Int): Decision = {
+    val message = s"Section is deferred until ${section.waitUntil}"
+    section.timeline.note(message)
+    _createTimerDecision(section.name, waitSeconds, SectionStatus.INCOMPLETE.toString, message)
+  }
+
+  /**
+   * Creates a decision to trigger a worker.
+   * @param section the section describing the activity
+   * @return the decision
+   */
+  private def triggerWorkerDecision(section: FulfillmentSection): Decision = {
+    val params = gatherParameters(section, sections)
+
+    val decision: Decision = new Decision
+    decision.setDecisionType(DecisionType.ScheduleActivityTask)
+
+    val taskList = new TaskList
+    taskList.setName(section.action.getName+section.action.getVersion)
+
+    val attribs: ScheduleActivityTaskDecisionAttributes = new ScheduleActivityTaskDecisionAttributes
+    attribs.setActivityType(section.action)
+    attribs.setInput(params)
+    attribs.setTaskList(taskList)
+    attribs.setActivityId(section.getActivityId)
+
+    if(section.startToCloseTimeout.nonEmpty) attribs.setStartToCloseTimeout(section.startToCloseTimeout)
+    if(section.scheduleToStartTimeout.nonEmpty) attribs.setScheduleToStartTimeout(section.scheduleToStartTimeout)
+    if(section.scheduleToCloseTimeout.nonEmpty) attribs.setScheduleToCloseTimeout(section.scheduleToCloseTimeout)
+    if(section.heartbeatTimeout.nonEmpty) attribs.setHeartbeatTimeout(section.heartbeatTimeout)
+
+    decision.setScheduleActivityTaskDecisionAttributes(attribs)
+
+    sections.timeline.note("Scheduling work for: "+section.name)
+
+    decision
   }
 }
 

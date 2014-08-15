@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.deciders
 import java.util.Date
 
 import com.balihoo.fulfillment.workers.UTCFormatter
+import org.joda.time.DateTime
 
 import scala.collection.convert.wrapAsScala._
 import com.amazonaws.services.simpleworkflow.model._
@@ -95,6 +96,8 @@ class FulfillmentSection(val name: String
   var scheduleToCloseTimeout = ""
   var heartbeatTimeout = ""
 
+  var waitUntil: DateTime = null
+
   for((key, value) <- jsonNode.fields) {
     key match {
       case "action" =>
@@ -126,6 +129,9 @@ class FulfillmentSection(val name: String
 
       case "essential" =>
         essential = value.as[Boolean]
+
+      case "waitUntil" =>
+        waitUntil = new DateTime(value.as[String])
 
       case _ =>
         timeline.warning(s"Section input '$key' unhandled!", creationDate)

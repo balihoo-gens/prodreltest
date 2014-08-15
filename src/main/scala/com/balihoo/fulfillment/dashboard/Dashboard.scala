@@ -31,8 +31,9 @@ trait WorkflowInitiatorComponent {
       executionRequest.setWorkflowId(id)
       executionRequest.setInput(input)
       executionRequest.setTagList(tags.asJavaCollection)
-      executionRequest.setWorkflowType(new WorkflowType().withName("generic").withVersion("1"))
-      executionRequest.setTaskList(new TaskList().withName("generic1"))
+      executionRequest.setWorkflowType(new WorkflowType().withName(swfAdapter.config.getString("workflowType"))
+        .withVersion(swfAdapter.config.getString("workflowVersion")))
+      executionRequest.setTaskList(new TaskList().withName(swfAdapter.config.getString("taskList")))
       swfAdapter.client.startWorkflowExecution(executionRequest).getRunId
     }
   }

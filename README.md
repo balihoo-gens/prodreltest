@@ -16,12 +16,22 @@ Building
 SBT should take care of most of the dependencies for you; check build.sbt to see what is used
 You will also need a number of properties which are set in the config directory.
 Some of the property files include a .private file for settings that do not belong in source control:
-1. aws.properties.private contains two keys:
+1. awskeys.properties.private contains two keys:
   * ```aws.accessKey=<your key>```
   * ```aws.secretKey=<your secret key>```
 2. aws.properties.private
   * ```domain=fauxfillment```
   * ```region=us-west-2```
+  * ```workflowType=generic```
+  * ```workflowVersion=2```
+  * ```taskList=default_tasks```
+3. ftp_account.properties.private
+  Add FTP credentials for each destination using this format.  Each destination is represented using a config key.
+  Replace <configKey> in each line with the config key (e.g. localFtpHost or brandXFtpHost).
+  * ```<configKey>FtpHost=<hostname>```
+  * ```<configKey>FtpUsername=<username>```
+  * ```<configKey>FtpPassword=<password>```
+
 
 Deployment
 --------

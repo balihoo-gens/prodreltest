@@ -8,7 +8,12 @@ version := "1.0-SNAPSHOT"
 
 scalaVersion := "2.10.2"
 
-resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/"
+resolvers ++= Seq(
+  "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
+  "Internal Snapshot Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/snapshots/",
+  "Internal Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/internal/"
+)
+
 
 libraryDependencies ++= Seq(
   //aws
@@ -26,6 +31,7 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.4",
   "commons-configuration" % "commons-configuration" % "1.10",
   "commons-beanutils" % "commons-beanutils" % "1.9.2",
+  "com.balihoo.commons" % "commons-client" % "14.15-SNAPSHOT",
   "com.google.api-ads" % "ads-lib" % "1.29.0",
   "com.google.api-ads" % "adwords-axis" % "1.29.0",
   "javax.activation" % "activation" % "1.1",
