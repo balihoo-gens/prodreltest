@@ -271,6 +271,10 @@ class ActivityParameters(val params:Map[String,String]) {
     }
     default
   }
+
+  override def toString:String = {
+    params.toString()
+  }
 }
 
 object UTCFormatter {

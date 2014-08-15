@@ -73,7 +73,7 @@ trait AdGroupCreatorComponent {
         new ActivityParameter("campaignId", "int", "AdWords Campaign ID"),
         new ActivityParameter("bidDollars", "float", "Landing page URL"),
         new ActivityParameter("status", "ENABLED|PAUSED|DELETED", ""),
-        new ActivityParameter("target", "JSON", "Mysterious and magical Form Builder output!")
+        new ActivityParameter("target", "JSON", "Mysterious and magical Form Builder output!", false)
       ))
     }
 
@@ -318,7 +318,7 @@ trait AdGroupCreatorComponent {
 object adwords_adgroupprocessor {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountLookup(
+    val worker = new AdWordsAdGroupProcessor(
       new SWFAdapter(cfg),
       new DynamoAdapter(cfg),
       new AdWordsAdapter(cfg)

@@ -79,7 +79,7 @@ trait ImageAdCreatorComponent {
       val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
 
       val selector = new SelectorBuilder()
-        .fields("Id", "Url", "DisplayUrl", "Status")
+        .fields("Id", "Url", "DisplayUrl", "Status", "MediaId", "ImageCreativeName")
         .equals("ImageCreativeName", name)
         .equals("AdGroupId", adGroupId)
         .build()

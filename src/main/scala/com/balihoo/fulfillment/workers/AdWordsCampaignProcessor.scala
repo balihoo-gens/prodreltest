@@ -130,7 +130,7 @@ trait CampaignCreatorComponent {
         new ActivityParameter("budget", "float", "The monthly budget"),
         new ActivityParameter("status", "ACTIVE|PAUSED|DELETED", "Always ACTIVE on Campaign creation", false),
         new ActivityParameter("startDate", "YYYYMMDD", "Ignored on update."),
-        new ActivityParameter("endDate", "YYYMMDD", ""),
+        new ActivityParameter("endDate", "YYYYMMDD", ""),
         new ActivityParameter("targetzips", "string", "Comma separated list of zip codes"),
         new ActivityParameter("adschedule", "string", "M,T,W,Th,F,S,Su")
       ))
