@@ -6,7 +6,8 @@ import org.joda.time.{Seconds, DateTime}
 
 import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
-import scala.collection.mutable.{Map, MutableList}
+import scala.collection.mutable.MutableList
+import scala.collection.mutable
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
@@ -83,7 +84,7 @@ class DecisionGenerator(categorized: CategorizedSections
   protected def gatherParameters(section: FulfillmentSection
                                 ,sections: SectionMap) = {
 
-    val params = Map[String, String]()
+    val params = mutable.Map[String, String]()
 
     for((name, value) <- section.params) {
       value match {
@@ -105,7 +106,7 @@ class DecisionGenerator(categorized: CategorizedSections
     val decision: Decision = new Decision
     decision.setDecisionType(DecisionType.StartTimer)
 
-    val timerParams = Map[String, String]()
+    val timerParams = mutable.Map[String, String]()
     timerParams("section") = name
     timerParams("status") = status
     timerParams("reason") = reason
@@ -254,20 +255,14 @@ class DecisionGenerator(categorized: CategorizedSections
   }
 
   /**
-   * Calculates the proper wait time for a task.  If waitUntil is null or in the past, the wait time is zero.
+   * Calculates the proper wait time for a task.  If there is no waitUntil value, the wait time will be zero.
    * @param section the section describing the task
    * @return the wait time in seconds
    */
   private def calculateWaitSeconds(section: FulfillmentSection): Int = {
-    if (null == section.waitUntil) {
-      0
-    } else {
-      // If the timer fires a fraction of a second early, we'll waste resources creating additional timers until the
-      // wait time has fully elapsed.  Add one second to the delay to prevent this.
-      val delaySeconds: Int = Seconds.secondsBetween(DateTime.now, section.waitUntil).getSeconds + 1
-
-      // Don't return a negative number.  The timer wouldn't like that.
-      Math.max(0, delaySeconds)
+    section.waitUntil match {
+      case Some(d) => Seconds.secondsBetween(DateTime.now, d).getSeconds
+      case _ => 0
     }
   }
 
@@ -278,7 +273,7 @@ class DecisionGenerator(categorized: CategorizedSections
    * @return the decision
    */
   private def waitDecision(section: FulfillmentSection, waitSeconds: Int): Decision = {
-    val message = s"Section is deferred until ${section.waitUntil}"
+    val message = s"Section is deferred until ${section.waitUntil.get}"
     section.timeline.note(message)
     _createTimerDecision(section.name, waitSeconds, SectionStatus.INCOMPLETE.toString, message)
   }

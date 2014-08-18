@@ -33,7 +33,7 @@ class FTPUploadValidatorWorker(swf: SWFAdapter, dyn: DynamoAdapter, cfg: Propert
   with PropertiesLoaderComponent {
     def swfAdapter = swf
     def dynamoAdapter = dyn
-    def config = cfg;
+    def config = cfg
 }
 
 object ftpuploadvalidatorworker {

@@ -22,9 +22,8 @@ Some of the property files include a .private file for settings that do not belo
 2. aws.properties.private
   * ```domain=fauxfillment```
   * ```region=us-west-2```
-  * ```workflowType=generic```
-  * ```workflowVersion=2```
-  * ```taskList=default_tasks```
+  * ```name=generic```
+  * ```version=2```
 3. ftp_account.properties.private
   Add FTP credentials for each destination using this format.  Each destination is represented using a config key.
   Replace <configKey> in each line with the config key (e.g. localFtpHost or brandXFtpHost).

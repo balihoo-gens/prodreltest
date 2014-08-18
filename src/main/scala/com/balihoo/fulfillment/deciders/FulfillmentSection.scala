@@ -96,7 +96,7 @@ class FulfillmentSection(val name: String
   var scheduleToCloseTimeout = ""
   var heartbeatTimeout = ""
 
-  var waitUntil: DateTime = null
+  var waitUntil: Option[DateTime] = None
 
   for((key, value) <- jsonNode.fields) {
     key match {
@@ -131,7 +131,7 @@ class FulfillmentSection(val name: String
         essential = value.as[Boolean]
 
       case "waitUntil" =>
-        waitUntil = new DateTime(value.as[String])
+        waitUntil = Some(new DateTime(value.as[String]))
 
       case _ =>
         timeline.warning(s"Section input '$key' unhandled!", creationDate)

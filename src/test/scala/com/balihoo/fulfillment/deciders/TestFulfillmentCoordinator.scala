@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.deciders
 
 import java.util.Date
+import org.joda.time.DateTime
 
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -43,6 +44,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 				              "bake_time" : "40" },
          "prereqs" : ["heat_oven"],
          "status" : "INCOMPLETE",
+         "waitUntil" : "2093-07-04T16:04:00-06",
          "totally unhandled" : "stuff"
 	      }}""")
 
@@ -68,6 +70,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.startedCount mustEqual 0
 
       section.startToCloseTimeout mustEqual "tuna sandwich"
+      section.waitUntil.get mustEqual new DateTime("2093-07-04T16:04:00-06")
 
       section.params("cake_batter").asInstanceOf[SectionReferences].sections(0).name mustEqual "batter"
       section.params("cake_pan").asInstanceOf[String] mustEqual "9\" x 11\""
@@ -283,6 +286,60 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       map.nameToSection.size mustEqual 3
 
       map.timeline.events(0).message mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+    }
+  }
+
+  "DecisionGenerator" should {
+    def makeDecisions(waitUntil: Option[DateTime]) = {
+      val waitUntilString = waitUntil match {
+        case Some(d) => "\"waitUntil\" : \"" + d + "\","
+        case _ => ""
+      }
+
+      val json = """{
+         "do something neat" : {
+         "action" : { "name" : "best action ever",
+                      "version" : "1"
+                    },
+         "params" : {},
+         "prereqs" : [],""" +
+         waitUntilString +
+         """"status" : "INCOMPLETE"
+	      }}"""
+
+      var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
+
+      val event:HistoryEvent = new HistoryEvent
+      val eventAttribs = new WorkflowExecutionStartedEventAttributes
+      event.setEventType(EventType.WorkflowExecutionStarted)
+      eventAttribs.setInput(json)
+      event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
+      events += event
+
+      val sections = new SectionMap(mutableSeqAsJavaList(events))
+      val categorized = new CategorizedSections(sections)
+      val generator = new DecisionGenerator(categorized, sections)
+      generator.makeDecisions()
+    }
+
+    "schedule work when there's no waitUntil" in {
+      val decisions = makeDecisions(None)
+      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+    }
+
+    "schedule work when waitUntil is in the past" in {
+      val decisions = makeDecisions(Some(DateTime.now.minusDays(1)))
+      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+    }
+
+    "schedule work when waitUntil is now" in {
+      val decisions = makeDecisions(Some(DateTime.now))
+      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+    }
+
+    "start a timer when waitUntil is in the future" in {
+      val decisions = makeDecisions(Some(DateTime.now.plusDays(1)))
+      decisions(0).getDecisionType mustEqual(DecisionType.StartTimer.toString)
     }
   }
 }
