@@ -133,7 +133,11 @@ class DecisionGenerator(categorized: CategorizedSections
       decisions += decision
       sections.timeline.success("Workflow Complete!!!")
       return decisions
+    }
 
+    if(sections.terminal()) {
+      sections.timeline.error(s"Workflow is TERMINAL (${sections.resolution})")
+      return decisions
     }
 
     if(categorized.impossible.length > 0) {

@@ -31,6 +31,8 @@ app.factory('formatUtil', function() {
             "\t": '&nbsp;&nbsp;&nbsp;'
         };
 
+        if(str == undefined) { return "---"; }
+
         return str.replace(/[&<>"'\n\t]/g, function (m) {
             return map[m];
         });
@@ -81,6 +83,33 @@ app.factory('formatUtil', function() {
         return JSON.stringify(jsonString, undefined, 4);
     }
 
+    function _indent(n) {
+        return Array(n).join('\t');
+    }
+
+    function _formatJsonlike(str) {
+        if (undefined == str) {
+            return str;
+        }
+        var out = "";
+        var indent = 0;
+        for (var i = 0, len = str.length; i < len; i++) {
+            var c = str[i];
+            if(c == '{') {
+                c += " ";
+                out += "\n" + _indent(indent);
+                indent++;
+            }
+            if(c == '}') {
+                indent--;
+            }
+
+            out += c;
+        }
+
+        return _formatWhitespace(out);
+    }
+
     function _formatURLs(param) {
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
 
@@ -116,6 +145,7 @@ app.factory('formatUtil', function() {
         jsonFormat: _jsonFormat,
         formatJson: _formatJson,
         formatJsonBasic: _formatJsonBasic,
+        formatJsonlike: _formatJsonlike,
         formatURLs: _formatURLs,
         isJSON: _isJSON,
         isArray: _isArray,
@@ -163,6 +193,7 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 
     $scope.init = function() {
+        if(environment.data) { return; }
         $http.get('workflow/environment', {})
             .success(function(data) {
                          $scope.environment = data;
@@ -454,6 +485,9 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         $('#rawInput').slideToggle()
     });
 
+    $("#historyViewToggle").click(function() {
+        $('#historyView').slideToggle()
+    });
 });
 
 app.controller('workersController', function($scope, $route, $http, $location, environment, formatUtil) {

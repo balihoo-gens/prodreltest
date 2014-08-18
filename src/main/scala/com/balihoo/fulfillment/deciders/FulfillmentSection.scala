@@ -557,6 +557,13 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     resolution = "COMPLETED"
   }
 
+  def terminal():Boolean = {
+    resolution == "CANCELLED" ||
+      resolution == "TIMED OUT" ||
+      resolution == "TERMINATED" ||
+      resolution == "FAILED"
+  }
+
   override def toString = {
     (for((k, s) <- nameToSection) yield s"$k\t${s.status.toString}").mkString("\n")
   }

@@ -152,8 +152,11 @@ trait ImageAdCreatorComponent {
     }
 
     def _remove(iad:ImageAd, params:ActivityParameters) = {
+      val ad = new Ad()
+      ad.setId(iad.getId)
+
       val aga = new AdGroupAd()
-      aga.setAd(iad)
+      aga.setAd(ad)
       aga.setAdGroupId(params("adGroupId").toLong)
 
       val operation = new AdGroupAdOperation()

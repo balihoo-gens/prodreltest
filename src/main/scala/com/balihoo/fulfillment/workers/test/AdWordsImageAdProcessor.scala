@@ -41,13 +41,14 @@ object adWordsGetAdGroupImageAd {
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
       val adgroupParams = new ActivityParameters(Map(
-          "campaignId" -> "${campaign.getId}"
+          "name" -> "GROUP A",
+          "campaignId" -> s"${campaign.getId}"
       ))
       val adgroup = adGroupCreator.getAdGroup(adgroupParams)
 
       val imageAdParams = new ActivityParameters(Map(
          "name" -> "Another Nature",
-          "adGroupId" -> "${adgroup.getId}"
+          "adGroupId" -> s"${adgroup.getId}"
       ))
       val ad = adCreator.getImageAd(imageAdParams)
 
@@ -75,13 +76,13 @@ object adWordsAdGroupImageAd {
       val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
       val adgroupParams = Map(
          "name" -> "GROUP A",
-          "campaignId" -> "${campaign.getId}"
+          "campaignId" -> s"${campaign.getId}"
       )
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
       val imageAdParams = Map(
-         "name" -> "Another Nature",
-          "adGroupId" -> "${adgroup.getId}",
+         "name" -> "Majestic",
+          "adGroupId" -> s"${adgroup.getId}",
           "url" -> "http://balihoo.com",
           "displayUrl" ->    "http://balihoo.com",
           "imageUrl" -> "http://lorempixel.com/300/100/nature/"
@@ -117,8 +118,8 @@ object adWordsUpdateAdGroupImageAd {
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
       val imageAdParams = Map(
-         "name" -> "Another Nature",
-          "adGroupId" -> "${adgroup.getId}",
+         "name" -> "Majestic",
+          "adGroupId" -> s"${adgroup.getId}",
           "url" -> "http://balihoo.com",
           "displayUrl" ->    "http://balihoo.com",
           "imageUrl" -> "http://lorempixel.com/300/100/nature/"

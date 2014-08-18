@@ -13,6 +13,15 @@
         </div>
         <span id="rawInputToggle" class="pull-right muted label">Show Input</span>
         <pre class="initiallyHidden" id="rawInput" ng-bind-html="formatUtil.formatJsonBasic(workflow.input)"></pre>
+        <span id="historyViewToggle" class="pull-right muted label">Show History</span>
+        <div id="historyView" class="initiallyHidden">
+            <br/>
+            <div ng-repeat="event in workflow.history">
+                <span class="pull-right muted">{{event.timestamp}}</span>
+                <span class="label label-default" title="{{event.id}}">{{event.type}}</span>
+                <pre ng-bind-html="formatUtil.formatJsonlike(event.attributes)"></pre>
+            </div>
+        </div>
         <h2 ng-show="workflow.timeline">Timeline</h2>
         <div class="block">
             <div ng-repeat="event in workflow.timeline">
