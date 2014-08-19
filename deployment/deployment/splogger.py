@@ -1,11 +1,12 @@
-from inspect import currentframe, getframeinfo,getouterframes
+from inspect import currentframe, getframeinfo, getouterframes
 from collections import OrderedDict
+from copy import deepcopy
 import json
 import datetime
 import os, sys
 
 class Splogger:
-    def __init__(self, filename=None, system=None, component=None, additional_fields={}, indirection=0):
+    def __init__(self, filename=None, system=None, component=None, additional_fields=None, indirection=0):
         #if you call 'log' directly, we're 2 frames removed from the call you want to log
         #  -> if the called wrapped the log file, they should add 1 to indirection to log the right call
         self._indirection = indirection + 2
@@ -13,13 +14,16 @@ class Splogger:
         #system and component
         self._system = system
         self._component = component
-        self._additional_fields = additional_fields
-
+        self._additional_fields = deepcopy(additional_fields) if additional_fields else {}
+        self._loglevels = ["DEBUG","INFO","WARN","ERROR","EXCEPTION"]
         self._filename = filename
         if filename:
             if not self.verify_filename(filename):
                 self._filename = "/tmp/splogger_defaut.log"
                 self.exception("unable to open log file %s" % (filename,))
+
+    def add_loglevel(level):
+        self._loglevels.append(str(level).upper())
 
     def verify_filename(self, filename):
         try:
@@ -91,7 +95,7 @@ class Splogger:
         with self.increased_indirection():
             self.log("EXCEPTION", event)
 
-    def log(self, level, event, additional_fields={}):
+    def log(self, level, event, additional_fields=None
         """ logs in splunk compliant format
         DEBUG level for application debugging
         INFO level for symantic logging
@@ -100,23 +104,24 @@ class Splogger:
         EXCEPTION level for errors that are safely handled by the system
         """
 
-        level = level.upper()
-        if level not in ["DEBUG","INFO","WARN","ERROR","EXCEPTION"]:
+        level = str(level).upper()
+        if level not in self._loglevels:
             self.log("EXCEPTION", "unconventional log level %s:" % (level,))
         ci = self.caller_info()
 
+        additional_fields = deepcopy(additional_fields) if addional_fields else {}
         entry = OrderedDict()
         entry["time"] = str(datetime.datetime.now())
-        entry["level"] = level.upper()
-        entry["event"] = event.replace("\n", " ")
+        entry["level"] = level
+        entry["event"] = str(event).replace("\n", " ")
         entry["file"] = ci.filename if ci else "unknown"
         entry["line"] = ci.lineno if ci else "unknown"
         if self._system: entry["system"] = self._system
         if self._component: entry["component"] = self._component
         for (k,v) in self._additional_fields.iteritems():
-            entry[k] = v.replace("\n", " ")
+            entry[k] = str(v).replace("\n", " ")
         for (k,v) in additional_fields.iteritems():
-            entry[k] = v.replace("\n", " ")
+            entry[k] = str(v).replace("\n", " ")
         json_str_entry = "%s\n" % (json.dumps(entry),)
         if self._filename:
             with open(self._filename, "a") as f:

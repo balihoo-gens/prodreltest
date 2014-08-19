@@ -48,7 +48,7 @@
     },
 
     "S3BucketURL" : {
-      "Description" : "URL of the S3 bucket to install from",
+      "Description" : "URL of the S3 bucket containing the app installation",
       "Type" : "String"
     }
   },
