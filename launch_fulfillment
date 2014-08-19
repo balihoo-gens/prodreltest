@@ -10,10 +10,9 @@ if __name__ == "__main__":
     jar = os.path.join(thisdir, "target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar")
     parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
-    parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/launcher.log')
     args = parser.parse_args()
 
-    launcher = Launcher(args.jarname, args.logfile)
+    launcher = Launcher(args.jarname)
     if len(args.classes):
         launcher.launch(classes)
     else:

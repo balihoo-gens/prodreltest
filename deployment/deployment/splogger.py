@@ -108,15 +108,15 @@ class Splogger:
         entry = OrderedDict()
         entry["time"] = str(datetime.datetime.now())
         entry["level"] = level.upper()
-        entry["event"] = event
+        entry["event"] = event.replace("\n", " ")
         entry["file"] = ci.filename if ci else "unknown"
         entry["line"] = ci.lineno if ci else "unknown"
         if self._system: entry["system"] = self._system
         if self._component: entry["component"] = self._component
         for (k,v) in self._additional_fields.iteritems():
-            entry[k] = v
+            entry[k] = v.replace("\n", " ")
         for (k,v) in additional_fields.iteritems():
-            entry[k] = v
+            entry[k] = v.replace("\n", " ")
         json_str_entry = "%s\n" % (json.dumps(entry),)
         if self._filename:
             with open(self._filename, "a") as f:

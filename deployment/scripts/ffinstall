@@ -1,14 +1,31 @@
 #!/usr/bin/env python
-splogger import Splogger
+from splogger import Splogger
 from launcher import Launcher
 import sys, os
 import argparse
 
-def main():
-    logfile="/var/log/balihoo/fulfillment/launcher.log"
-    launcher = Launcher("fulfillment.jar", logfile)
-    classes = arg.classes if len(arg.classes) > 0 else None
-    launcher.launch(classes)
+def launch(args):
+    splogger = Splogger(args.logfile)
+    launcher = Launcher(args.jarname, splogger)
+    if len(args.classes):
+        launcher.launch(classes)
+    else:
+        launcher.launch()
+
+def install_deps(args):
+    # TODO: install splunk
+    pass
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser("Launch the Fulfillment application")
+    thisdir = os.path.dirname(os.path.realpath(__file__))
+    jar = os.path.join(thisdir, "fulfillment.jar")
+    parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
+    parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
+    parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/launcher.log')
+    parser.add_argument('--aws-access-key', help='the AWS access key')
+    parser.add_argument('--aws-secret-key', help='the AWS secret key')
+    args = parser.parse_args()
+
+    install_deps(args)
+    launch(args)
