@@ -127,7 +127,7 @@ app.factory('formatUtil', function() {
     }
 
     function _isJSON(j) {
-        return j[0] == '{';
+        return j[0] == '{' || j[0] == '[';
     }
 
     function _isArray(a) {
@@ -539,6 +539,10 @@ app.controller('workersController', function($scope, $route, $http, $location, e
             worker.showFormatted = true;
             if(formatUtil.isJSON(worker.specification)) {
                 worker.specification = JSON.parse(worker.specification);
+            }
+
+            if(formatUtil.isJSON(worker.resolutionHistory)) {
+                worker.resolutionHistory = JSON.parse(worker.resolutionHistory);
             }
 
             $scope.setFreshnessLabel(worker);

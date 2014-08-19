@@ -133,7 +133,7 @@ trait CampaignCreatorComponent {
         new ActivityParameter("endDate", "YYYYMMDD", ""),
         new ActivityParameter("targetzips", "string", "Comma separated list of zip codes"),
         new ActivityParameter("adschedule", "string", "M,T,W,Th,F,S,Su")
-      ))
+      ), new ActivityResult("int", "AdWords Campaign ID"))
     }
 
     def getCampaign(params: ActivityParameters):Campaign = {

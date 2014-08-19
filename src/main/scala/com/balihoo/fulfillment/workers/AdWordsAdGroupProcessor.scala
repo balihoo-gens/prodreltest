@@ -74,7 +74,7 @@ trait AdGroupCreatorComponent {
         new ActivityParameter("bidDollars", "float", "Landing page URL"),
         new ActivityParameter("status", "ENABLED|PAUSED|DELETED", ""),
         new ActivityParameter("target", "JSON", "Mysterious and magical Form Builder output!", false)
-      ))
+      ), new ActivityResult("int", "AdGroup ID"))
     }
 
     def getAdGroup(params:ActivityParameters): AdGroup = {

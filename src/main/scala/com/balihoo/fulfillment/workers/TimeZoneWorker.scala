@@ -432,7 +432,7 @@ abstract class AbstractTimeZoneWorker extends FulfillmentWorker {
     new ActivitySpecification(List(
       new ActivityParameter("lat", "float", ""),
       new ActivityParameter("lon", "float", "")
-    ))
+    ), new ActivityResult("string", "Timezone like (America/Denver)"))
   }
 
   override def handleTask(params: ActivityParameters) = {

@@ -70,7 +70,7 @@ trait TextAdCreatorComponent {
         new ActivityParameter("description2", "string", "Second line of ad text"),
         new ActivityParameter("url", "string", "Landing page URL"),
         new ActivityParameter("displayUrl", "string", "Visible Ad URL")
-      ))
+      ), new ActivityResult("int", "TextAd ID"))
     }
 
     def getTextAd(params: ActivityParameters): TextAd = {

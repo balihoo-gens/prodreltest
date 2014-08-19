@@ -9,7 +9,7 @@ abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
     with DynamoAdapterComponent =>
 
   override def getSpecification: ActivitySpecification = {
-    new ActivitySpecification(List())
+    new ActivitySpecification(List(), new ActivityResult("JSON", "Comma separated list of email addresses"))
   }
 
   override def handleTask(params: ActivityParameters) = {

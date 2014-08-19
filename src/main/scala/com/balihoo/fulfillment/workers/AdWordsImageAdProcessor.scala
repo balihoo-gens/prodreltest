@@ -69,7 +69,7 @@ trait ImageAdCreatorComponent {
         new ActivityParameter("url", "string", "Landing page URL"),
         new ActivityParameter("displayUrl", "string", "Visible Ad URL"),
         new ActivityParameter("imageUrl", "string", "URL Location of image data for this ad")
-      ))
+      ), new ActivityResult("int", "ImageAd ID"))
     }
 
     def getImageAd(params: ActivityParameters): ImageAd = {
