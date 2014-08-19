@@ -95,7 +95,7 @@ class Splogger:
         with self.increased_indirection():
             self.log("EXCEPTION", event)
 
-    def log(self, level, event, additional_fields=None
+    def log(self, level, event, additional_fields=None):
         """ logs in splunk compliant format
         DEBUG level for application debugging
         INFO level for symantic logging
@@ -109,7 +109,7 @@ class Splogger:
             self.log("EXCEPTION", "unconventional log level %s:" % (level,))
         ci = self.caller_info()
 
-        additional_fields = deepcopy(additional_fields) if addional_fields else {}
+        additional_fields = deepcopy(additional_fields) if additional_fields else {}
         entry = OrderedDict()
         entry["time"] = str(datetime.datetime.now())
         entry["level"] = level
