@@ -47,23 +47,21 @@ class Packager:
 
         self.info("gathering fat jar")
         jarname = self.assemble_fat_jar()
-        #cp $JARNAME $TMPDIR/fulfillment.jar
         shutil.copy(jarname, os.path.join(tmpdir, "fulfillment.jar"))
 
         self.info("gathering launch script")
-        #cp $ROOTDIR/launch_fulfillment $TMPDIR
         launchfile = os.path.join(self._rootdir, "launcher.py")
         shutil.copy(launchfile, tmpdir)
 
-        self.info("gathering install script and deps")
-        #cp $ROOTDIR/launch_fulfillment $TMPDIR
-        installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall")
-        shutil.copy(installscript, tmpdir)
+        self.info("gathering install splogger")
         splogger = os.path.join(self._rootdir, "deployment/deployment/splogger.py")
         shutil.copy(splogger, tmpdir)
 
+        self.info("gathering install script and deps")
+        installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall")
+        shutil.copy(installscript, tmpdir)
+
         self.info("setting launch script execute permissions")
-        #chmod a+x $TMPDIR/launch_fulfillment
         launchfile = os.path.join(tmpdir, "ffinstall")
         os.chmod(launchfile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
                              stat.S_IRGRP |                stat.S_IXGRP |
