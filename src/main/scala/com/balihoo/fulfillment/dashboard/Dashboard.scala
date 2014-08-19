@@ -87,154 +87,65 @@ trait WorkflowInspectorComponent {
     }
 
     /**
-     * This function is a bummer. I don't see any other way.
+     * This function is still a bummer.
      * @param event: HistoryEvent
      * @return String
      */
     def _getEventAttribs(event:HistoryEvent):String = {
 
-      if(event.getWorkflowExecutionStartedEventAttributes != null) {
-        return event.getWorkflowExecutionStartedEventAttributes.toString
+      for(f <- List(event.getWorkflowExecutionStartedEventAttributes _
+        ,event.getWorkflowExecutionCompletedEventAttributes _
+        ,event.getCompleteWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionFailedEventAttributes _
+        ,event.getFailWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionTimedOutEventAttributes _
+        ,event.getWorkflowExecutionCanceledEventAttributes _
+        ,event.getCancelWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionContinuedAsNewEventAttributes _
+        ,event.getContinueAsNewWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionTerminatedEventAttributes _
+        ,event.getWorkflowExecutionCancelRequestedEventAttributes _
+        ,event.getDecisionTaskScheduledEventAttributes _
+        ,event.getDecisionTaskStartedEventAttributes _
+        ,event.getDecisionTaskCompletedEventAttributes _
+        ,event.getDecisionTaskTimedOutEventAttributes _
+        ,event.getActivityTaskScheduledEventAttributes _
+        ,event.getActivityTaskStartedEventAttributes _
+        ,event.getActivityTaskCompletedEventAttributes _
+        ,event.getActivityTaskFailedEventAttributes _
+        ,event.getActivityTaskTimedOutEventAttributes _
+        ,event.getActivityTaskCanceledEventAttributes _
+        ,event.getActivityTaskCancelRequestedEventAttributes _
+        ,event.getWorkflowExecutionSignaledEventAttributes _
+        ,event.getMarkerRecordedEventAttributes _
+        ,event.getRecordMarkerFailedEventAttributes _
+        ,event.getTimerStartedEventAttributes _
+        ,event.getTimerFiredEventAttributes _
+        ,event.getTimerCanceledEventAttributes _
+        ,event.getStartChildWorkflowExecutionInitiatedEventAttributes _
+        ,event.getChildWorkflowExecutionStartedEventAttributes _
+        ,event.getChildWorkflowExecutionCompletedEventAttributes _
+        ,event.getChildWorkflowExecutionFailedEventAttributes _
+        ,event.getChildWorkflowExecutionTimedOutEventAttributes _
+        ,event.getChildWorkflowExecutionCanceledEventAttributes _
+        ,event.getChildWorkflowExecutionTerminatedEventAttributes _
+        ,event.getSignalExternalWorkflowExecutionInitiatedEventAttributes _
+        ,event.getExternalWorkflowExecutionSignaledEventAttributes _
+        ,event.getSignalExternalWorkflowExecutionFailedEventAttributes _
+        ,event.getExternalWorkflowExecutionCancelRequestedEventAttributes _
+        ,event.getRequestCancelExternalWorkflowExecutionInitiatedEventAttributes _
+        ,event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes _
+        ,event.getScheduleActivityTaskFailedEventAttributes _
+        ,event.getRequestCancelActivityTaskFailedEventAttributes _
+        ,event.getStartTimerFailedEventAttributes _
+        ,event.getCancelTimerFailedEventAttributes _
+        ,event.getStartChildWorkflowExecutionFailedEventAttributes _
+      )) {
+        f() match {
+          case o:AnyRef => return o.toString
+          case _ =>
+        }
       }
-      if(event.getWorkflowExecutionCompletedEventAttributes != null) {
-        return event.getWorkflowExecutionCompletedEventAttributes.toString
-      }
-      if(event.getCompleteWorkflowExecutionFailedEventAttributes != null) {
-        return event.getCompleteWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getWorkflowExecutionFailedEventAttributes != null) {
-        return event.getWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getFailWorkflowExecutionFailedEventAttributes != null) {
-        return event.getFailWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getWorkflowExecutionTimedOutEventAttributes != null) {
-        return event.getWorkflowExecutionTimedOutEventAttributes.toString
-      }
-      if(event.getWorkflowExecutionCanceledEventAttributes != null) {
-        return event.getWorkflowExecutionCanceledEventAttributes.toString
-      }
-      if(event.getCancelWorkflowExecutionFailedEventAttributes != null) {
-        return event.getCancelWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getWorkflowExecutionContinuedAsNewEventAttributes != null) {
-        return event.getWorkflowExecutionContinuedAsNewEventAttributes.toString
-      }
-      if(event.getContinueAsNewWorkflowExecutionFailedEventAttributes != null) {
-        return event.getContinueAsNewWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getWorkflowExecutionTerminatedEventAttributes != null) {
-        return event.getWorkflowExecutionTerminatedEventAttributes.toString
-      }
-      if(event.getWorkflowExecutionCancelRequestedEventAttributes != null) {
-        return event.getWorkflowExecutionCancelRequestedEventAttributes.toString
-      }
-      if(event.getDecisionTaskScheduledEventAttributes != null) {
-        return event.getDecisionTaskScheduledEventAttributes.toString
-      }
-      if(event.getDecisionTaskStartedEventAttributes != null) {
-        return event.getDecisionTaskStartedEventAttributes.toString
-      }
-      if(event.getDecisionTaskCompletedEventAttributes != null) {
-        return event.getDecisionTaskCompletedEventAttributes.toString
-      }
-      if(event.getDecisionTaskTimedOutEventAttributes != null) {
-        return event.getDecisionTaskTimedOutEventAttributes.toString
-      }
-      if(event.getActivityTaskScheduledEventAttributes != null) {
-        return event.getActivityTaskScheduledEventAttributes.toString
-      }
-      if(event.getActivityTaskStartedEventAttributes != null) {
-        return event.getActivityTaskStartedEventAttributes.toString
-      }
-      if(event.getActivityTaskCompletedEventAttributes != null) {
-        return event.getActivityTaskCompletedEventAttributes.toString
-      }
-      if(event.getActivityTaskFailedEventAttributes != null) {
-        return event.getActivityTaskFailedEventAttributes.toString
-      }
-      if(event.getActivityTaskTimedOutEventAttributes != null) {
-        return event.getActivityTaskTimedOutEventAttributes.toString
-      }
-      if(event.getActivityTaskCanceledEventAttributes != null) {
-        return event.getActivityTaskCanceledEventAttributes.toString
-      }
-      if(event.getActivityTaskCancelRequestedEventAttributes != null) {
-        return event.getActivityTaskCancelRequestedEventAttributes.toString
-      }
-      if(event.getWorkflowExecutionSignaledEventAttributes != null) {
-        return event.getWorkflowExecutionSignaledEventAttributes.toString
-      }
-      if(event.getMarkerRecordedEventAttributes != null) {
-        return event.getMarkerRecordedEventAttributes.toString
-      }
-      if(event.getRecordMarkerFailedEventAttributes != null) {
-        return event.getRecordMarkerFailedEventAttributes.toString
-      }
-      if(event.getTimerStartedEventAttributes != null) {
-        return event.getTimerStartedEventAttributes.toString
-      }
-      if(event.getTimerFiredEventAttributes != null) {
-        return event.getTimerFiredEventAttributes.toString
-      }
-      if(event.getTimerCanceledEventAttributes != null) {
-        return event.getTimerCanceledEventAttributes.toString
-      }
-      if(event.getStartChildWorkflowExecutionInitiatedEventAttributes != null) {
-        return event.getStartChildWorkflowExecutionInitiatedEventAttributes.toString
-      }
-      if(event.getChildWorkflowExecutionStartedEventAttributes != null) {
-        return event.getChildWorkflowExecutionStartedEventAttributes.toString
-      }
-      if(event.getChildWorkflowExecutionCompletedEventAttributes != null) {
-        return event.getChildWorkflowExecutionCompletedEventAttributes.toString
-      }
-      if(event.getChildWorkflowExecutionFailedEventAttributes != null) {
-        return event.getChildWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getChildWorkflowExecutionTimedOutEventAttributes != null) {
-        return event.getChildWorkflowExecutionTimedOutEventAttributes.toString
-      }
-      if(event.getChildWorkflowExecutionCanceledEventAttributes != null) {
-        return event.getChildWorkflowExecutionCanceledEventAttributes.toString
-      }
-      if(event.getChildWorkflowExecutionTerminatedEventAttributes != null) {
-        return event.getChildWorkflowExecutionTerminatedEventAttributes.toString
-      }
-      if(event.getSignalExternalWorkflowExecutionInitiatedEventAttributes != null) {
-        return event.getSignalExternalWorkflowExecutionInitiatedEventAttributes.toString
-      }
-      if(event.getExternalWorkflowExecutionSignaledEventAttributes != null) {
-        return event.getExternalWorkflowExecutionSignaledEventAttributes.toString
-      }
-      if(event.getSignalExternalWorkflowExecutionFailedEventAttributes != null) {
-        return event.getSignalExternalWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getExternalWorkflowExecutionCancelRequestedEventAttributes != null) {
-        return event.getExternalWorkflowExecutionCancelRequestedEventAttributes.toString
-      }
-      if(event.getRequestCancelExternalWorkflowExecutionInitiatedEventAttributes != null) {
-        return event.getRequestCancelExternalWorkflowExecutionInitiatedEventAttributes.toString
-      }
-      if(event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes != null) {
-        return event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes.toString
-      }
-      if(event.getScheduleActivityTaskFailedEventAttributes != null) {
-        return event.getScheduleActivityTaskFailedEventAttributes.toString
-      }
-      if(event.getRequestCancelActivityTaskFailedEventAttributes != null) {
-        return event.getRequestCancelActivityTaskFailedEventAttributes.toString
-      }
-      if(event.getStartTimerFailedEventAttributes != null) {
-        return event.getStartTimerFailedEventAttributes.toString
-      }
-      if(event.getCancelTimerFailedEventAttributes != null) {
-        return event.getCancelTimerFailedEventAttributes.toString
-      }
-      if(event.getStartChildWorkflowExecutionFailedEventAttributes != null) {
-        return event.getStartChildWorkflowExecutionFailedEventAttributes.toString
-      }
-
       "Unknown event type!"
     }
 

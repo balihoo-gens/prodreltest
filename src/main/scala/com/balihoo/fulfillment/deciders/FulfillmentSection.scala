@@ -558,10 +558,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
   }
 
   def terminal():Boolean = {
-    resolution == "CANCELLED" ||
-      resolution == "TIMED OUT" ||
-      resolution == "TERMINATED" ||
-      resolution == "FAILED"
+    List("CANCELLED", "TIMED OUT", "TERMINATED", "FAILED").contains(resolution)
   }
 
   override def toString = {
