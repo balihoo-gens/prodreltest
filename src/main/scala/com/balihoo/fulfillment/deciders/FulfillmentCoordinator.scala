@@ -268,8 +268,7 @@ class DecisionGenerator(categorized: CategorizedSections
    * @return the decision
    */
   private def waitDecision(section: FulfillmentSection, waitSeconds: Int): Decision = {
-    val message = s"Section is deferred until ${section.waitUntil.get}"
-    section.timeline.note(message)
+    val message = s"Deferred until ${section.waitUntil.get}"
     _createTimerDecision(section.name, waitSeconds, SectionStatus.INCOMPLETE.toString, message)
   }
 

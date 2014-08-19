@@ -514,6 +514,9 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
       section.timeline.error(s"$sectionName is already DEFERRED!!", event.getEventTimestamp)
     }
 
+    val reason = timerParams.value("reason").as[String]
+    section.timeline.note(reason, event.getEventTimestamp)
+
     section.status = SectionStatus.DEFERRED
   }
 
