@@ -7,6 +7,7 @@ import java.util.UUID.randomUUID
 import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
 
+import scala.collection.mutable
 import scala.sys.process._
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
@@ -45,6 +46,8 @@ abstract class FulfillmentWorker {
     def dynamoAdapter = FulfillmentWorker.this.dynamoAdapter
   }
 
+  val taskResolutions = new mutable.Queue[TaskResolution]()
+
   val entry = new FulfillmentWorkerEntry
   entry.setInstance(instanceId)
   entry.setHostAddress(hostAddress)
@@ -53,6 +56,7 @@ abstract class FulfillmentWorker {
   entry.setSpecification(getSpecification.toString)
   entry.setDomain(domain)
   entry.setStatus("--")
+  entry.setResolutionHistory("[]")
   entry.setStart(UTCFormatter.format(new Date()))
 
   val taskList: TaskList = new TaskList().withName(taskListName)
@@ -143,13 +147,27 @@ abstract class FulfillmentWorker {
     workerTable.update(entry)
   }
 
+  private def _resolveTask(resolution:TaskResolution) = {
+    if(taskResolutions.size == 20) {
+      taskResolutions.dequeue()
+    }
+    taskResolutions.enqueue(resolution)
+    updateCounter += 1
+    entry.setLast(UTCFormatter.format(new Date()))
+    entry.setStatus(resolution.resolution)
+    entry.setResolutionHistory(Json.stringify(
+      Json.toJson(for(res <- taskResolutions) yield res.toJson)
+    ))
+    workerTable.update(entry)
+  }
+
   def completeTask(result:String) = {
     completedTasks += 1
     val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
     response.setTaskToken(task.getTaskToken)
     response.setResult(result)
     swfAdapter.client.respondActivityTaskCompleted(response)
-    updateStatus(s"Completed Task")
+    _resolveTask(new TaskResolution("Completed", result))
   }
 
   def failTask(reason:String, details:String) = {
@@ -159,7 +177,7 @@ abstract class FulfillmentWorker {
     response.setReason(reason)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskFailed(response)
-    updateStatus(s"Failed Task: $reason $details")
+    _resolveTask(new TaskResolution("Failed", s"$reason $details"))
   }
 
   def cancelTask(details:String) = {
@@ -168,7 +186,7 @@ abstract class FulfillmentWorker {
     response.setTaskToken(task.getTaskToken)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskCanceled(response)
-    updateStatus(s"Cancel Task: $details")
+    _resolveTask(new TaskResolution("Canceled", details))
   }
 
   def registerActivityType() = {
@@ -208,7 +226,27 @@ abstract class FulfillmentWorker {
 
     ident
   }
+}
 
+class TaskResolution(val resolution:String, val details:String) {
+  val when = UTCFormatter.format(new Date())
+
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "resolution" -> Json.toJson(resolution),
+      "when" -> Json.toJson(when),
+      "details" -> Json.toJson(details)
+    ))
+  }
+}
+
+class ActivityResult(val rtype:String, description:String) {
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "type" -> Json.toJson(rtype),
+      "description" -> Json.toJson(description)
+    ))
+  }
 }
 
 class ActivityParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true) {
@@ -224,12 +262,15 @@ class ActivityParameter(val name:String, val ptype:String, val description:Strin
   }
 }
 
-class ActivitySpecification(val params:List[ActivityParameter]) {
+class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult) {
 
   val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
 
   def getSpecification:JsValue = {
-    Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap)
+    Json.toJson(Map(
+      "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
+      "result" -> result.toJson
+    ))
   }
 
   override def toString:String = {
@@ -270,6 +311,10 @@ class ActivityParameters(val params:Map[String,String]) {
       return params(param)
     }
     default
+  }
+
+  override def toString:String = {
+    params.toString()
   }
 }
 
@@ -331,6 +376,7 @@ class FulfillmentWorkerEntry {
   var activityVersion:String = ""
   var specification:String = ""
   var status:String = ""
+  var resolutionHistory:String = ""
   var start:String = ""
   var last:String = ""
 
@@ -345,6 +391,7 @@ class FulfillmentWorkerEntry {
       "activityVersion" -> Json.toJson(activityVersion),
       "specification" -> Json.toJson(specification),
       "status" -> Json.toJson(status),
+      "resolutionHistory" -> Json.toJson(resolutionHistory),
       "start" -> Json.toJson(start),
       "last" -> Json.toJson(last),
       "minutesSinceLast" -> Json.toJson(minutesSinceLast)
@@ -380,6 +427,10 @@ class FulfillmentWorkerEntry {
   def getStatus:String = { status }
   def setStatus(status:String) { this.status = status; }
 
+  @DynamoDBAttribute(attributeName="resolutionHistory")
+  def getResolutionHistory:String = { resolutionHistory }
+  def setResolutionHistory(resolutionHistory:String) { this.resolutionHistory = resolutionHistory; }
+
   @DynamoDBAttribute(attributeName="start")
   def getStart:String = { start }
   def setStart(start:String) { this.start = start; }
@@ -397,6 +448,7 @@ class FulfillmentWorkerEntry {
       .addString("activityVersion", activityVersion)
       .addString("specification", specification)
       .addString("status", status)
+      .addString("resolutionHistory", resolutionHistory)
       .addString("start", start)
       .addString("last", last)
   }
@@ -405,6 +457,7 @@ class FulfillmentWorkerEntry {
     new DynamoUpdate("fulfillment_worker_status")
       .forKey("instance", instance)
       .addString("status", status)
+      .addString("resolutionHistory", resolutionHistory)
       .addString("last", last)
   }
 

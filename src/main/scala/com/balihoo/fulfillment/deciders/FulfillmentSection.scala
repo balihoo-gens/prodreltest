@@ -458,7 +458,6 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
     attribs.getSignalName match {
       case "sectionUpdates" =>
-        timeline.note(s"Processing Section Updates!", event.getEventTimestamp)
         val updates = Json.parse(attribs.getInput).as[JsObject]
         for((sectionName, iupdate:JsValue) <- updates.fields) {
           val update = iupdate.as[JsObject]
@@ -466,19 +465,24 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
           for((updateType, body:JsValue) <- update.fields) {
             updateType match {
               case "params" =>
-                timeline.note(s"Updating params", event.getEventTimestamp)
+                val pupdate = Json.stringify(body)
+                section.timeline.note(s"Updating params: $pupdate", event.getEventTimestamp)
                 section.jsonInitParams(body.as[JsObject])
               case "status" =>
-                timeline.note(s"Updating status", event.getEventTimestamp)
-                section.status = SectionStatus.withName(body.as[String])
+                val supdate = body.as[String]
+                section.timeline.note(s"Updating status: ${section.status} -> $supdate", event.getEventTimestamp)
+                section.status = SectionStatus.withName(supdate)
               case "essential" =>
-                timeline.note(s"Updating essential", event.getEventTimestamp)
-                section.essential = body.as[Boolean]
+                val eupdate = body.as[Boolean]
+                section.timeline.note(s"Updating essential: $eupdate", event.getEventTimestamp)
+                section.essential = eupdate
               case "action" =>
-                timeline.note(s"Updating action", event.getEventTimestamp)
+                val aupdate = Json.stringify(body)
+                section.timeline.note(s"Updating action: $aupdate", event.getEventTimestamp)
                 section.jsonInitAction(body.as[JsObject])
               case "prereqs" =>
-                timeline.note(s"Updating prereqs", event.getEventTimestamp)
+                val pupdate = Json.stringify(body)
+                section.timeline.note(s"Updating prereqs: $pupdate", event.getEventTimestamp)
                 section.jsonInitPrereqs(body.as[JsArray])
               case _ =>
             }
@@ -551,6 +555,10 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     val attribs = event.getWorkflowExecutionCompletedEventAttributes
     timeline.success("COMPLETED:"+attribs.getResult, event.getEventTimestamp)
     resolution = "COMPLETED"
+  }
+
+  def terminal():Boolean = {
+    List("CANCELLED", "TIMED OUT", "TERMINATED", "FAILED").contains(resolution)
   }
 
   override def toString = {

@@ -69,7 +69,7 @@ trait ImageAdCreatorComponent {
         new ActivityParameter("url", "string", "Landing page URL"),
         new ActivityParameter("displayUrl", "string", "Visible Ad URL"),
         new ActivityParameter("imageUrl", "string", "URL Location of image data for this ad")
-      ))
+      ), new ActivityResult("int", "ImageAd ID"))
     }
 
     def getImageAd(params: ActivityParameters): ImageAd = {
@@ -79,7 +79,7 @@ trait ImageAdCreatorComponent {
       val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
 
       val selector = new SelectorBuilder()
-        .fields("Id", "Url", "DisplayUrl", "Status")
+        .fields("Id", "Url", "DisplayUrl", "Status", "MediaId", "ImageCreativeName")
         .equals("ImageCreativeName", name)
         .equals("AdGroupId", adGroupId)
         .build()
@@ -152,8 +152,11 @@ trait ImageAdCreatorComponent {
     }
 
     def _remove(iad:ImageAd, params:ActivityParameters) = {
+      val ad = new Ad()
+      ad.setId(iad.getId)
+
       val aga = new AdGroupAd()
-      aga.setAd(iad)
+      aga.setAd(ad)
       aga.setAdGroupId(params("adGroupId").toLong)
 
       val operation = new AdGroupAdOperation()

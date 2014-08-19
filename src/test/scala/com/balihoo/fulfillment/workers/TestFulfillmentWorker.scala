@@ -18,20 +18,25 @@ class TestFulfillmentWorker extends Specification with Mockito
       val spec = new ActivitySpecification(List(
         new ActivityParameter("param1", "ocelot", "Param 1 is an Ocelot"),
         new ActivityParameter("param2", "not an ocelot", "Param 2 is NOT an Ocelot", false)
-      ))
+      ), new ActivityResult("result type", "really interesting description"))
 
       spec.getSpecification mustEqual Json.toJson(Map(
-        "param1" -> Json.toJson(Map(
-          "name" -> Json.toJson("param1"),
-          "type" -> Json.toJson("ocelot"),
-          "description" -> Json.toJson("Param 1 is an Ocelot"),
-          "required" -> Json.toJson(true)
-        )),
-        "param2" -> Json.toJson(Map(
-          "name" -> Json.toJson("param2"),
-          "type" -> Json.toJson("not an ocelot"),
-          "description" -> Json.toJson("Param 2 is NOT an Ocelot"),
-          "required" -> Json.toJson(false)
+        "parameters" -> Json.toJson(Map(
+          "param1" -> Json.toJson(Map(
+            "name" -> Json.toJson("param1"),
+            "type" -> Json.toJson("ocelot"),
+            "description" -> Json.toJson("Param 1 is an Ocelot"),
+            "required" -> Json.toJson(true)
+          )),
+          "param2" -> Json.toJson(Map(
+            "name" -> Json.toJson("param2"),
+            "type" -> Json.toJson("not an ocelot"),
+            "description" -> Json.toJson("Param 2 is NOT an Ocelot"),
+            "required" -> Json.toJson(false)
+          )))),
+        "result" -> Json.toJson(Map(
+          "type" -> Json.toJson("result type"),
+          "description" -> Json.toJson("really interesting description")
         ))
       ))
 
@@ -42,7 +47,7 @@ class TestFulfillmentWorker extends Specification with Mockito
       val spec = new ActivitySpecification(List(
         new ActivityParameter("param1", "ocelot", "Param 1 is an Ocelot"),
         new ActivityParameter("param2", "not an ocelot", "Param 2 is NOT an Ocelot", false)
-      ))
+      ), new ActivityResult("result type", "really interesting description"))
 
       val params = spec.getParameters(
         """{
@@ -62,7 +67,7 @@ class TestFulfillmentWorker extends Specification with Mockito
       val spec = new ActivitySpecification(List(
         new ActivityParameter("param1", "ocelot", "Param 1 is an Ocelot"),
         new ActivityParameter("param2", "not an ocelot", "Param 2 is NOT an Ocelot", false)
-      ))
+      ), new ActivityResult("result type", "really interesting description"))
 
       spec.getParameters(
         """{

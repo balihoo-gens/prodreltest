@@ -31,6 +31,8 @@ app.factory('formatUtil', function() {
             "\t": '&nbsp;&nbsp;&nbsp;'
         };
 
+        if(str == undefined) { return "---"; }
+
         return str.replace(/[&<>"'\n\t]/g, function (m) {
             return map[m];
         });
@@ -74,7 +76,38 @@ app.factory('formatUtil', function() {
         if (undefined == jsonString) {
             return jsonString;
         }
-        return JSON.stringify(JSON.parse(jsonString), undefined, 4);
+        if(_isString(jsonString)) {
+            jsonString = JSON.parse(jsonString)
+        }
+
+        return JSON.stringify(jsonString, undefined, 4);
+    }
+
+    function _indent(n) {
+        return Array(n).join('\t');
+    }
+
+    function _formatJsonlike(str) {
+        if (undefined == str) {
+            return str;
+        }
+        var out = "";
+        var indent = 0;
+        for (var i = 0, len = str.length; i < len; i++) {
+            var c = str[i];
+            if(c == '{') {
+                c += " ";
+                out += "\n" + _indent(indent);
+                indent++;
+            }
+            if(c == '}') {
+                indent--;
+            }
+
+            out += c;
+        }
+
+        return _formatWhitespace(out);
     }
 
     function _formatURLs(param) {
@@ -94,7 +127,7 @@ app.factory('formatUtil', function() {
     }
 
     function _isJSON(j) {
-        return j[0] == '{';
+        return j[0] == '{' || j[0] == '[';
     }
 
     function _isArray(a) {
@@ -112,6 +145,7 @@ app.factory('formatUtil', function() {
         jsonFormat: _jsonFormat,
         formatJson: _formatJson,
         formatJsonBasic: _formatJsonBasic,
+        formatJsonlike: _formatJsonlike,
         formatURLs: _formatURLs,
         isJSON: _isJSON,
         isArray: _isArray,
@@ -159,6 +193,7 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 
     $scope.init = function() {
+        if(environment.data) { return; }
         $http.get('workflow/environment', {})
             .success(function(data) {
                          $scope.environment = data;
@@ -249,18 +284,18 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
             $scope.params = $route.current.params;
-            $scope.getWorkflow($scope.params.runId, $scope.params.workflowId);
+            $scope.getWorkflow();
         }
     );
 
 
     $scope.workflow = {};
 
-    $scope.getWorkflow = function(runId, workflowId) {
+    $scope.getWorkflow = function() {
         $scope.loading = true;
         var params = {};
-        params['runId'] = runId;
-        params['workflowId'] = workflowId;
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
         $http.get('workflow/detail', { params : params})
             .success(function(data) {
                          $scope.loading = false;
@@ -281,9 +316,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         params['input'] = $scope.assembleUpdates();
         $http.get('workflow/update', { params : params})
             .success(function(data) {
-                         $scope.loading = false;
-                         $scope.workflow = data;
-                         $scope.prepWorkflow();
+                         $scope.getWorkflow();
                      })
             .error(function(error) {
                        $scope.loading = false;
@@ -298,6 +331,9 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
         for(var s in $scope.workflow.sections) {
             var section = $scope.workflow.sections[s];
+            section.editingStatus = false;
+            section.originalStatus = section.status;
+            section.showContents = false;
             for(pname in section.params) {
                 var param = section.params[pname];
                 if(formatUtil.isJSON(param)) {
@@ -315,18 +351,34 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
                     "isString" : formatUtil.isString(param)
                 }
             }
+
+            section.statusChanged = function(section) {
+                return section.status != section.originalStatus;
+            };
+
+            section.editStatus = function(section) {
+                section.editingStatus = true;
+            };
+
+            section.changeStatus = function(section) {
+                //section.status = status;
+                section.editingStatus = false;
+                $scope.checkForEdits();
+            };
+
         }
     };
 
     $scope.cancelEdit = function(param) {
         param.value = param.original;
         param.editing = false;
+        $scope.checkForEdits();
     };
 
     $scope.finishEditing = function(param) {
         param.editing = false;
         param.edited = param.original != param.value;
-        $scope.workflow.edited = true;
+        $scope.checkForEdits();
     };
 
     $scope.assembleUpdates = function() {
@@ -334,6 +386,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
         for(var sname in $scope.workflow.sections) {
             var section = $scope.workflow.sections[sname];
+            var sectionUpdates = {};
             var paramUpdates = {};
             for (pname in section.params) {
                 var param = section.params[pname];
@@ -342,11 +395,24 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
                 }
             }
             if(Object.size(paramUpdates)) {
-                updates[sname] = { params : paramUpdates, status : "INCOMPLETE" };
+                sectionUpdates['params'] = paramUpdates;
+                sectionUpdates['status'] = "INCOMPLETE";
+            }
+
+            if(section.status != section.originalStatus) {
+                sectionUpdates['status'] = section.status;
+            }
+
+            if(!$.isEmptyObject(sectionUpdates)) {
+                updates[sname] = sectionUpdates;
             }
         }
 
         return updates;
+    };
+
+    $scope.checkForEdits = function() {
+        $scope.workflow.edited = !$.isEmptyObject($scope.assembleUpdates());
     };
 
     $scope.addSection = function(s) {
@@ -357,6 +423,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
         for(var sname in $scope.workflow.sections) {
             var section = $scope.workflow.sections[sname];
+            section.status = section.originalStatus;
             for (pname in section.params) {
                 var param = section.params[pname];
                 param.value = param.original;
@@ -418,6 +485,9 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         $('#rawInput').slideToggle()
     });
 
+    $("#historyViewToggle").click(function() {
+        $('#historyView').slideToggle()
+    });
 });
 
 app.controller('workersController', function($scope, $route, $http, $location, environment, formatUtil) {
@@ -466,8 +536,13 @@ app.controller('workersController', function($scope, $route, $http, $location, e
         $scope.domains = {};
         for(var w in $scope.workers) {
             var worker = $scope.workers[w];
+            worker.showFormatted = true;
             if(formatUtil.isJSON(worker.specification)) {
                 worker.specification = JSON.parse(worker.specification);
+            }
+
+            if(formatUtil.isJSON(worker.resolutionHistory)) {
+                worker.resolutionHistory = JSON.parse(worker.resolutionHistory);
             }
 
             $scope.setFreshnessLabel(worker);

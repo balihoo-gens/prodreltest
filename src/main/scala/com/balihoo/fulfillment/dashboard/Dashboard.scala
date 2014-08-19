@@ -7,6 +7,7 @@ import com.balihoo.fulfillment.workers.{UTCFormatter, FulfillmentWorkerTable, Fu
 import play.api.libs.json._
 
 import scala.collection.JavaConverters._
+import scala.collection.convert.wrapAsScala._
 
 import javax.servlet.http.HttpServletResponse
 
@@ -85,6 +86,69 @@ trait WorkflowInspectorComponent {
       ))
     }
 
+    /**
+     * This function is still a bummer.
+     * @param event: HistoryEvent
+     * @return String
+     */
+    def _getEventAttribs(event:HistoryEvent):String = {
+
+      for(f <- List(event.getWorkflowExecutionStartedEventAttributes _
+        ,event.getWorkflowExecutionCompletedEventAttributes _
+        ,event.getCompleteWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionFailedEventAttributes _
+        ,event.getFailWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionTimedOutEventAttributes _
+        ,event.getWorkflowExecutionCanceledEventAttributes _
+        ,event.getCancelWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionContinuedAsNewEventAttributes _
+        ,event.getContinueAsNewWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionTerminatedEventAttributes _
+        ,event.getWorkflowExecutionCancelRequestedEventAttributes _
+        ,event.getDecisionTaskScheduledEventAttributes _
+        ,event.getDecisionTaskStartedEventAttributes _
+        ,event.getDecisionTaskCompletedEventAttributes _
+        ,event.getDecisionTaskTimedOutEventAttributes _
+        ,event.getActivityTaskScheduledEventAttributes _
+        ,event.getActivityTaskStartedEventAttributes _
+        ,event.getActivityTaskCompletedEventAttributes _
+        ,event.getActivityTaskFailedEventAttributes _
+        ,event.getActivityTaskTimedOutEventAttributes _
+        ,event.getActivityTaskCanceledEventAttributes _
+        ,event.getActivityTaskCancelRequestedEventAttributes _
+        ,event.getWorkflowExecutionSignaledEventAttributes _
+        ,event.getMarkerRecordedEventAttributes _
+        ,event.getRecordMarkerFailedEventAttributes _
+        ,event.getTimerStartedEventAttributes _
+        ,event.getTimerFiredEventAttributes _
+        ,event.getTimerCanceledEventAttributes _
+        ,event.getStartChildWorkflowExecutionInitiatedEventAttributes _
+        ,event.getChildWorkflowExecutionStartedEventAttributes _
+        ,event.getChildWorkflowExecutionCompletedEventAttributes _
+        ,event.getChildWorkflowExecutionFailedEventAttributes _
+        ,event.getChildWorkflowExecutionTimedOutEventAttributes _
+        ,event.getChildWorkflowExecutionCanceledEventAttributes _
+        ,event.getChildWorkflowExecutionTerminatedEventAttributes _
+        ,event.getSignalExternalWorkflowExecutionInitiatedEventAttributes _
+        ,event.getExternalWorkflowExecutionSignaledEventAttributes _
+        ,event.getSignalExternalWorkflowExecutionFailedEventAttributes _
+        ,event.getExternalWorkflowExecutionCancelRequestedEventAttributes _
+        ,event.getRequestCancelExternalWorkflowExecutionInitiatedEventAttributes _
+        ,event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes _
+        ,event.getScheduleActivityTaskFailedEventAttributes _
+        ,event.getRequestCancelActivityTaskFailedEventAttributes _
+        ,event.getStartTimerFailedEventAttributes _
+        ,event.getCancelTimerFailedEventAttributes _
+        ,event.getStartChildWorkflowExecutionFailedEventAttributes _
+      )) {
+        f() match {
+          case o:AnyRef => return o.toString
+          case _ =>
+        }
+      }
+      "Unknown event type!"
+    }
+
     def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
       val filter = new ExecutionTimeFilter
       filter.setOldestDate(oldest)
@@ -124,8 +188,17 @@ trait WorkflowInspectorComponent {
       req.setDomain(swfAdapter.config.getString("domain"))
       req.setExecution(exec)
 
-      val history = swfAdapter.client.getWorkflowExecutionHistory(req)
-      val sectionMap = new SectionMap(history.getEvents)
+
+      val events = new java.util.ArrayList[HistoryEvent]()
+      var history = swfAdapter.client.getWorkflowExecutionHistory(req)
+      events.addAll(history.getEvents)
+      // The results come back in pages.
+      while(history.getNextPageToken != null) {
+        req.setNextPageToken(history.getNextPageToken)
+        history = swfAdapter.client.getWorkflowExecutionHistory(req)
+        events.addAll(history.getEvents)
+      }
+      val sectionMap = new SectionMap(events)
       val categorized = new CategorizedSections(sectionMap)
       new DecisionGenerator(categorized, sectionMap).makeDecisions()
 
@@ -135,13 +208,20 @@ trait WorkflowInspectorComponent {
       }
 
       val jtimeline = Json.toJson(for(entry <- sectionMap.timeline.events) yield entry.toJson)
+      val executionHistory = Json.toJson(for(event:HistoryEvent <- collectionAsScalaIterable(events)) yield Json.toJson(Map(
+        "type" -> Json.toJson(event.getEventType),
+        "id" -> Json.toJson(event.getEventId.toString),
+        "timestamp" -> Json.toJson(UTCFormatter.format(event.getEventTimestamp)),
+        "attributes" -> Json.toJson(_getEventAttribs(event))
+      )))
 
       top("timeline") = jtimeline
       top("sections") = Json.toJson(sections.toMap)
       top("workflowId") = Json.toJson(workflowId)
       top("runId") = Json.toJson(runId)
-      top("input") = Json.toJson(history.getEvents.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
+      top("input") = Json.toJson(events.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
       top("resolution") = Json.toJson(sectionMap.resolution)
+      top("history") = executionHistory
 
       top.toMap
     }

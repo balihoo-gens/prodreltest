@@ -28,15 +28,35 @@
                             <td>Started</td><td>{{worker.start}}</td>
                         </tr>
                         <tr ng-show="worker.specification">
-                            <td>Params</td>
+                            <td ng-click="worker.showFormatted = !worker.showFormatted">Params</td>
                             <td>
-                                <div ng-repeat="(name, param) in worker.specification">
-                                    <b>{{param.name}}</b><br/>
-                                    <div class="block">
-                                        <div ng-show="!param.required"><i>OPTIONAL</i></div>
-                                        Type:&nbsp;&nbsp;{{param.type}}<br/>
-                                        Description:&nbsp;&nbsp;{{param.description}}
+                                <div ng-show="worker.showFormatted">
+                                    <div ng-repeat="(name, param) in worker.specification.parameters">
+                                        <span class="glyphicon glyphicon-flash muted" ng-show="param.required" title="Parameter is REQUIRED"></span><b>{{param.name}}</b>&nbsp;&nbsp;{{param.type}}<br/>
+                                        <div class="block">
+                                            {{param.description}}
+                                        </div>
                                     </div>
+                                </div>
+                                <div ng-hide="worker.showFormatted">
+                                    <pre ng-bind-html="formatUtil.formatJsonBasic(worker.specification)"></pre>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr ng-show="worker.specification">
+                            <td>Result</td>
+                            <td>
+                                Type:&nbsp;&nbsp;{{worker.specification.result.type}}<br/>
+                                Description:&nbsp;&nbsp;{{worker.specification.result.description}}
+                            </td>
+                        </tr>
+                        <tr ng-show="worker.resolutionHistory">
+                            <td>History</td>
+                            <td>
+                                <div ng-repeat="resolution in worker.resolutionHistory">
+                                    <span class="muted pull-right">{{resolution.when}}</span>
+                                    <b>{{resolution.resolution}}</b>
+                                    <div class="block">{{resolution.details}}</div>
                                 </div>
                             </td>
                         </tr>

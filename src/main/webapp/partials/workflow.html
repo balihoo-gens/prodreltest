@@ -1,7 +1,9 @@
 <div class="panel panel-default">
     <div class="panel-heading">
 				<span class="pull-right">
-					<h1 style="display:table-cell;vertical-align: middle"><span class="label {{figureWorkflowStatusLabel(workflow.resolution)}}">{{workflow.resolution}}</span></h1>
+					<h1 style="display:table-cell;vertical-align: middle">
+                           <span ng-show="workflow.editable" class="glyphicon glyphicon-refresh muted red action" ng-click="getWorkflow()"></span>
+                        <span class="label {{figureWorkflowStatusLabel(workflow.resolution)}}">{{workflow.resolution}}</span></h1>
 				</span>
         <h1>Workflow » {{workflow.workflowId}}</h1>
     </div>
@@ -11,6 +13,15 @@
         </div>
         <span id="rawInputToggle" class="pull-right muted label">Show Input</span>
         <pre class="initiallyHidden" id="rawInput" ng-bind-html="formatUtil.formatJsonBasic(workflow.input)"></pre>
+        <span id="historyViewToggle" class="pull-right muted label">Show History</span>
+        <div id="historyView" class="initiallyHidden">
+            <br/>
+            <div ng-repeat="event in workflow.history">
+                <span class="pull-right muted">{{event.timestamp}}</span>
+                <span class="label label-default" title="{{event.id}}">{{event.type}}</span>
+                <pre ng-bind-html="formatUtil.formatJsonlike(event.attributes)"></pre>
+            </div>
+        </div>
         <h2 ng-show="workflow.timeline">Timeline</h2>
         <div class="block">
             <div ng-repeat="event in workflow.timeline">
@@ -23,12 +34,24 @@
             <div id="section_{{name}}" class="panel-heading-small">
 				<span class="pull-right">
 					{{section.input.action.name}} : {{section.input.action.version}} &nbsp;&nbsp;
-					<span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
+                    <span ng-hide="workflow.editable">
+					    <span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
+                    </span>
+
+                    <span ng-show="workflow.editable">
+					    <span ng-hide="section.editingStatus" ng-click="section.editStatus(section)" class="label {{figureStatusLabel(section.status)}}" ng-class="{'status-edited' : section.statusChanged(section)}">{{section.status}}</span>
+                        <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)">
+                            <option>{{section.originalStatus}}</option>
+                            <option>INCOMPLETE</option>
+                            <option>TERMINAL</option>
+                        </select>
+                    </span>
+
 				</span>
                 <img width="20" height="20" src="img/star_gold_256.png" style="margin-bottom:4px;margin-right:4px;" title="This section MUST be successful!!" ng-show="section.essential">
-                <b>{{name}}</b>
+                <b ng-click="section.showContents = !section.showContents" class="action">{{name}}</b>
             </div>
-            <div class="panel-body-small">
+            <div class="panel-body-small" ng-show="section.showContents">
 
                 <div class="blob" style="width:60%; margin-bottom:20px;">
                     <h3 ng-show="section.timeline">Timeline</h3>
@@ -91,7 +114,7 @@
                 </table>
             </div>
         </div>
-        <span ng-if="workflow.edited" class="pull-right" style="vertical-align: middle">
+        <span ng-if="workflow.edited" class="bottom-dialog modal-content" style="vertical-align: middle">
             <h2>
                 Post updates to fulfillment?&nbsp;
                 <span class="glyphicon glyphicon-remove muted red action" ng-click="cancelWorkflowUpdate()"></span>

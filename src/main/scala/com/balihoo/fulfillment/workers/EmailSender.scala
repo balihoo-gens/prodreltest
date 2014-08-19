@@ -15,7 +15,7 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
       new ActivityParameter("subject", "string", ""),
       new ActivityParameter("body", "string", ""),
       new ActivityParameter("type", "html|normal", "")
-    ))
+    ), new ActivityResult("JSON", "Result of Send"))
   }
 
   override def handleTask(params: ActivityParameters) = {
