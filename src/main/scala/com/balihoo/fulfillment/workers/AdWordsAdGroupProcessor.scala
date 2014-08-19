@@ -15,9 +15,13 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
    with DynamoAdapterComponent
    with AdGroupCreatorComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    adGroupCreator.getSpecification
+  }
+
   override def handleTask(params: ActivityParameters) = {
     try {
-      adWordsAdapter.setClientId(params.getRequiredParameter("account"))
+      adWordsAdapter.setClientId(params("account"))
 
       val adGroup = adGroupCreator.getAdGroup(params) match {
         case group: AdGroup =>
@@ -48,7 +52,7 @@ class AdWordsAdGroupProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsA
   with AdGroupCreatorComponent {
     //don't put this in the adGroupCreator method to avoid a new one from
     //being created on every call.
-    val _adGroupCreator = new AdGroupCreator(awa)
+    lazy val _adGroupCreator = new AdGroupCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa
@@ -62,10 +66,21 @@ trait AdGroupCreatorComponent {
     this: AdWordsAdapterComponent
       with CampaignCreatorComponent =>
 
+    def getSpecification: ActivitySpecification = {
+      new ActivitySpecification(List(
+        new ActivityParameter("account", "int", "Participant AdWords account ID"),
+        new ActivityParameter("name", "string", "Name of this AdGroup"),
+        new ActivityParameter("campaignId", "int", "AdWords Campaign ID"),
+        new ActivityParameter("bidDollars", "float", "Landing page URL"),
+        new ActivityParameter("status", "ENABLED|PAUSED|DELETED", ""),
+        new ActivityParameter("target", "JSON", "Mysterious and magical Form Builder output!", false)
+      ), new ActivityResult("int", "AdGroup ID"))
+    }
+
     def getAdGroup(params:ActivityParameters): AdGroup = {
 
-      val name = params.getRequiredParameter("name")
-      val campaignId = params.getRequiredParameter("campaignId")
+      val name = params("name")
+      val campaignId = params("campaignId")
       val context = s"getAdGroup(name='$name', campaignId='$campaignId')"
 
       val selector = new SelectorBuilder()
@@ -89,19 +104,19 @@ trait AdGroupCreatorComponent {
      */
     def createAdGroup(params:ActivityParameters): AdGroup = {
 
-      val name = params.getRequiredParameter("name")
-      val campaignId = params.getRequiredParameter("campaignId")
+      val name = params("name")
+      val campaignId = params("campaignId")
       val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
       val campaign = campaignCreator.getCampaign(campaignId)
 
       val adGroup = new AdGroup()
       adGroup.setName(name)
       adGroup.setCampaignId(campaignId.toLong)
-      adGroup.setStatus(AdGroupStatus.fromString(params.getRequiredParameter("status")))
+      adGroup.setStatus(AdGroupStatus.fromString(params("status")))
 
       val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
       val money = new Money()
-      money.setMicroAmount(adWordsAdapter.dollarsToMicros(params.getRequiredParameter("bidDollars").toFloat))
+      money.setMicroAmount(adWordsAdapter.dollarsToMicros(params("bidDollars").toFloat))
 
       campaign.getBiddingStrategyConfiguration.getBiddingStrategyType match {
         case BiddingStrategyType.MANUAL_CPC =>
@@ -126,7 +141,7 @@ trait AdGroupCreatorComponent {
         adWordsAdapter.adGroupService.mutate(Array(operation)).getValue(0)
       })
 
-      addTargeting(newGroup, params.getRequiredParameter("target"))
+      addTargeting(newGroup, params("target"))
 
       newGroup
     }
@@ -303,7 +318,7 @@ trait AdGroupCreatorComponent {
 object adwords_adgroupprocessor {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountLookup(
+    val worker = new AdWordsAdGroupProcessor(
       new SWFAdapter(cfg),
       new DynamoAdapter(cfg),
       new AdWordsAdapter(cfg)

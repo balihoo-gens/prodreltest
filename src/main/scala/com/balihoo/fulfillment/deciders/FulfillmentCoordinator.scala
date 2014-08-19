@@ -35,6 +35,8 @@ abstract class AbstractFulfillmentCoordinator {
 
   def coordinate() = {
 
+    println(s"$domain $taskListName")
+
     var done = false
     val getch = new Getch
     getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
@@ -131,7 +133,11 @@ class DecisionGenerator(categorized: CategorizedSections
       decisions += decision
       sections.timeline.success("Workflow Complete!!!")
       return decisions
+    }
 
+    if(sections.terminal()) {
+      sections.timeline.error(s"Workflow is TERMINAL (${sections.resolution})")
+      return decisions
     }
 
     if(categorized.impossible.length > 0) {
@@ -145,10 +151,13 @@ class DecisionGenerator(categorized: CategorizedSections
       if(section.failedCount < section.failureParams.maxRetries) {
         val message = s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})"
         section.timeline.warning(message)
-        decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
-          message)
+        if(!section.fixable) {
+          decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
+            message)
+        } else {
+          section.timeline.warning("Section is marked FIXABLE.")
+        }
       } else {
-
         val message = s"Section $section FAILED too many times! (${section.failedCount} of ${section.failureParams.maxRetries})"
         section.timeline.error(message)
         failReasons += message
@@ -233,35 +242,19 @@ class DecisionGenerator(categorized: CategorizedSections
     if(decisions.length == 0 && !categorized.hasPendingSections) {
       // We aren't making any progress at all! FAIL
 
-      val decision: Decision = new Decision
-      decision.setDecisionType(DecisionType.FailWorkflowExecution)
-      val attribs = new FailWorkflowExecutionDecisionAttributes
+      sections.resolution = "BLOCKED"
 
-      sections.timeline.error("Workflow FAILED")
+      if(categorized.failed.length > 0) {
+        var details: String = "Failed Sections:\n\t"
+        details += (for(section <- categorized.failed) yield section.name).mkString("\n\t")
+        sections.timeline.error(details)
+      }
+
       if(categorized.blocked.length > 0) {
         var details: String = "Blocked Sections:\n\t"
         details += (for(section <- categorized.blocked) yield section.name).mkString("\n\t")
-
-        val reason = "There are blocked sections and nothing is in progress!"
-        attribs.setReason(reason)
-        attribs.setDetails(details)
-        sections.timeline.error(reason)
         sections.timeline.error(details)
-
-      } else {
-        var details: String = "Sections:\n\t"
-        details += (for((name, section) <- sections.nameToSection) yield section.toString).mkString("\n\t")
-
-        val reason = "Progress isn't being made!"
-        attribs.setReason(reason)
-        attribs.setDetails(details)
-        sections.timeline.error(reason)
-        //sections.notes += details
       }
-
-      decision.setFailWorkflowExecutionDecisionAttributes(attribs)
-
-      decisions += decision
 
     }
 

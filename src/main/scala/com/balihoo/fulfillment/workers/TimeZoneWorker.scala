@@ -428,10 +428,17 @@ abstract class AbstractTimeZoneWorker extends FulfillmentWorker {
     "Africa/Accra" -> "Africa/Accra",
     "Africa/Abidjan" -> "Africa/Abidjan")
 
+  override def getSpecification: ActivitySpecification = {
+    new ActivitySpecification(List(
+      new ActivityParameter("lat", "float", ""),
+      new ActivityParameter("lon", "float", "")
+    ), new ActivityResult("string", "Timezone like (America/Denver)"))
+  }
+
   override def handleTask(params: ActivityParameters) = {
 
-    val lat = params.getRequiredParameter("lat")
-    val lon = params.getRequiredParameter("lon")
+    val lat = params("lat")
+    val lon = params("lon")
     val results = latLonToTimeZone(lat, lon)
 
     val jresults = Json.parse(results).as[JsObject]
