@@ -58,12 +58,13 @@ class Packager:
         self.info("gathering install script and deps")
         #cp $ROOTDIR/launch_fulfillment $TMPDIR
         installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall")
-        splogger = os.path.join(self._rootdir, "deployment/deployment/splogger.py")
         shutil.copy(installscript, tmpdir)
+        splogger = os.path.join(self._rootdir, "deployment/deployment/splogger.py")
+        shutil.copy(splogger, tmpdir)
 
         self.info("setting launch script execute permissions")
         #chmod a+x $TMPDIR/launch_fulfillment
-        launchfile = os.path.join(tmpdir, "launch_fulfillment")
+        launchfile = os.path.join(tmpdir, "ffinstall")
         os.chmod(launchfile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
                              stat.S_IRGRP |                stat.S_IXGRP |
                              stat.S_IROTH |                stat.S_IXOTH )
