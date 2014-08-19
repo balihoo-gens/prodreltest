@@ -1,3 +1,11 @@
+Object.size = function(obj) {
+    var size = 0, key;
+    for (key in obj) {
+        if (obj.hasOwnProperty(key)) size++;
+    }
+    return size;
+};
+
 var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize']);
 
 toastr.options = {
@@ -8,6 +16,142 @@ toastr.options = {
 
 app.factory('environment', function() {
     return {};
+});
+
+app.factory('formatUtil', function() {
+
+    function _formatWhitespace(str) {
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+            "\n": '<br/>',
+            "\t": '&nbsp;&nbsp;&nbsp;'
+        };
+
+        if(str == undefined) { return "---"; }
+
+        return str.replace(/[&<>"'\n\t]/g, function (m) {
+            return map[m];
+        });
+    }
+
+    function _div(contents, classes) {
+        return "<div class='" + classes + "'>" + contents + "</div>";
+    }
+
+    function _span(contents, classes) {
+        return "<span class='" + classes + "'>" + contents + "</span>";
+    }
+
+    function _jsonFormat(json, divclass) {
+        if (json instanceof Array) {
+            var body = "";
+            for (var item in json) {
+                body += _div(_jsonFormat(json[item]));
+            }
+            return _div(body, "block " + divclass);
+        }
+        if (json instanceof Object) {
+            var body = "";
+            for (var key in json) {
+                body += _div("<span><b>" + key + "</b></span> : " + _jsonFormat(json[key], "block"));
+            }
+            return _div(body, "block " + divclass);
+        }
+        if (_isString(json)) {
+            return _div(_formatURLs(json), divclass);
+        }
+
+        return json;
+    }
+
+    function _formatJson(jsonString) {
+        return _jsonFormat(JSON.parse(jsonString), "json");
+    }
+
+    function _formatJsonBasic(jsonString) {
+        if (undefined == jsonString) {
+            return jsonString;
+        }
+        if(_isString(jsonString)) {
+            jsonString = JSON.parse(jsonString)
+        }
+
+        return JSON.stringify(jsonString, undefined, 4);
+    }
+
+    function _indent(n) {
+        return Array(n).join('\t');
+    }
+
+    function _formatJsonlike(str) {
+        if (undefined == str) {
+            return str;
+        }
+        var out = "";
+        var indent = 0;
+        for (var i = 0, len = str.length; i < len; i++) {
+            var c = str[i];
+            if(c == '{') {
+                c += " ";
+                out += "\n" + _indent(indent);
+                indent++;
+            }
+            if(c == '}') {
+                indent--;
+            }
+
+            out += c;
+        }
+
+        return _formatWhitespace(out);
+    }
+
+    function _formatURLs(param) {
+        var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+
+        return param.replace(urlRegex, function (url) {
+
+            if (( url.indexOf(".jpg") > 0 )
+                || ( url.indexOf(".png") > 0 )
+                || ( url.indexOf(".gif") > 0 )) {
+                return '<img src="' + url + '">' + '<br/>' + url + '<br/>';
+            }
+            else {
+                return '<a href="' + url + '">' + url + '</a>' + '<br/>';
+            }
+        });
+    }
+
+    function _isJSON(j) {
+        return j[0] == '{' || j[0] == '[';
+    }
+
+    function _isArray(a) {
+        return a instanceof Array;
+    }
+
+    function _isString(s) {
+        return typeof s === "string";
+    }
+
+    return {
+        formatWhitespace: _formatWhitespace,
+        div: _div,
+        span: _span,
+        jsonFormat: _jsonFormat,
+        formatJson: _formatJson,
+        formatJsonBasic: _formatJsonBasic,
+        formatJsonlike: _formatJsonlike,
+        formatURLs: _formatURLs,
+        isJSON: _isJSON,
+        isArray: _isArray,
+        isString: _isString
+    }
+
 });
 
 app.config(
@@ -49,6 +193,7 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 
     $scope.init = function() {
+        if(environment.data) { return; }
         $http.get('workflow/environment', {})
             .success(function(data) {
                          $scope.environment = data;
@@ -66,8 +211,6 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 });
 
 app.controller('historyController', function($scope, $route, $http, $location) {
-
-
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -114,14 +257,14 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 
     $scope.figureStatusLabel = function(status) {
         if(status == null) {
-            return "label-default";
+            return "label-info";
         }
         return $scope.statusMap[status];
     };
 
     $scope.formatStatus = function(closeStatus) {
         if(closeStatus == null) {
-            return "ACTIVE";
+            return "IN PROGRESS";
         }
 
         return closeStatus;
@@ -133,33 +276,172 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     };
 });
 
-app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll) {
+app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil) {
+
+    $scope.formatUtil = formatUtil;
 
     $scope.$on(
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
             $scope.params = $route.current.params;
-            $scope.getWorkflow($scope.params.runId, $scope.params.workflowId);
+            $scope.getWorkflow();
         }
     );
 
 
     $scope.workflow = {};
 
-    $scope.getWorkflow = function(runId, workflowId) {
+    $scope.getWorkflow = function() {
         $scope.loading = true;
         var params = {};
-        params['runId'] = runId;
-        params['workflowId'] = workflowId;
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
         $http.get('workflow/detail', { params : params})
             .success(function(data) {
                          $scope.loading = false;
                          $scope.workflow = data;
+                         $scope.prepWorkflow();
                      })
             .error(function(error) {
                        $scope.loading = false;
                        toastr.error(error.details, error.error)
                    });
+    };
+
+    $scope.updateWorkflow = function() {
+        $scope.loading = true;
+        var params = {};
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
+        params['input'] = $scope.assembleUpdates();
+        $http.get('workflow/update', { params : params})
+            .success(function(data) {
+                         $scope.getWorkflow();
+                     })
+            .error(function(error) {
+                       $scope.loading = false;
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
+    $scope.prepWorkflow = function() {
+        $scope.workflow.editable = $scope.workflow.resolution == "IN PROGRESS" || $scope.workflow.resolution == "BLOCKED";
+        $scope.workflow.edited = false;
+
+        for(var s in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[s];
+            section.editingStatus = false;
+            section.originalStatus = section.status;
+            section.showContents = false;
+            for(pname in section.params) {
+                var param = section.params[pname];
+                if(formatUtil.isJSON(param)) {
+                    param = formatUtil.formatJsonBasic(param);
+                }
+                section.params[pname] = {
+                    "original" : param,
+                    "value" : param,
+                    "name" : pname,
+                    "edited" : false,
+                    "editing" : false,
+                    "editable" : $scope.workflow.editable && section.fixable,
+                    "isJson" : formatUtil.isJSON(param),
+                    "isArray" : formatUtil.isArray(param),
+                    "isString" : formatUtil.isString(param)
+                }
+            }
+
+            section.statusChanged = function(section) {
+                return section.status != section.originalStatus;
+            };
+
+            section.editStatus = function(section) {
+                section.editingStatus = true;
+            };
+
+            section.changeStatus = function(section) {
+                //section.status = status;
+                section.editingStatus = false;
+                $scope.checkForEdits();
+            };
+
+        }
+    };
+
+    $scope.cancelEdit = function(param) {
+        param.value = param.original;
+        param.editing = false;
+        $scope.checkForEdits();
+    };
+
+    $scope.finishEditing = function(param) {
+        param.editing = false;
+        param.edited = param.original != param.value;
+        $scope.checkForEdits();
+    };
+
+    $scope.assembleUpdates = function() {
+        var updates = {};
+
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            var sectionUpdates = {};
+            var paramUpdates = {};
+            for (pname in section.params) {
+                var param = section.params[pname];
+                if(param.edited) {
+                    paramUpdates[pname] = param.value;
+                }
+            }
+            if(Object.size(paramUpdates)) {
+                sectionUpdates['params'] = paramUpdates;
+                sectionUpdates['status'] = "INCOMPLETE";
+            }
+
+            if(section.status != section.originalStatus) {
+                sectionUpdates['status'] = section.status;
+            }
+
+            if(!$.isEmptyObject(sectionUpdates)) {
+                updates[sname] = sectionUpdates;
+            }
+        }
+
+        return updates;
+    };
+
+    $scope.checkForEdits = function() {
+        $scope.workflow.edited = !$.isEmptyObject($scope.assembleUpdates());
+    };
+
+    $scope.addSection = function(s) {
+        s.push('');
+    };
+
+    $scope.cancelWorkflowUpdate = function() {
+
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            section.status = section.originalStatus;
+            for (pname in section.params) {
+                var param = section.params[pname];
+                param.value = param.original;
+                param.edited = false;
+            }
+        }
+
+        $scope.workflow.edited = false;
+    };
+
+    $scope.workflowStatusMap = {
+        "IN PROGRESS" : "label-info",
+        "BLOCKED" : "label-warning",
+        "CANCELLED" : "label-warning",
+        "FAILED" : "label-danger",
+        "TIMED OUT" : "label-danger",
+        "TERMINATED" : "label-danger",
+        "COMPLETED" : "label-success"
     };
 
     $scope.statusMap = {
@@ -182,82 +464,16 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "WARNING" : "timeline-WARNING"
     };
 
+    $scope.figureWorkflowStatusLabel = function(status) {
+        return $scope.workflowStatusMap[status];
+    };
+
     $scope.figureStatusLabel = function(status) {
         return $scope.statusMap[status];
     };
 
     $scope.figureTimelineStyle = function(eventType) {
         return $scope.timelineMap[eventType];
-    };
-
-    $scope.formatWhitespace = function(str) {
-        return str.replace(/\n/g, '<br/>').replace(/\t/g, '&nbsp;&nbsp;&nbsp;');
-    };
-
-    $scope.div = function(contents, classes) {
-        return "<div class='"+classes+"'>"+contents+"</div>";
-    };
-
-    $scope.span = function(contents, classes) {
-        return "<span class='"+classes+"'>"+contents+"</span>";
-    };
-
-    $scope.jsonFormat = function(json, divclass) {
-        if(json instanceof Array) {
-            var body = "";
-            for(var item in json) {
-                body += $scope.div($scope.jsonFormat(json[item]));
-            }
-            return $scope.div(body, "block "+divclass);
-        }
-        if(json instanceof Object) {
-            var body = "";
-            for(var key in json) {
-                body += $scope.div("<span><b>"+key+"</b></span> : "+$scope.jsonFormat(json[key], "block"));
-            }
-            return $scope.div(body, "block "+divclass);
-        }
-        if($scope.isString(json)) {
-            return $scope.div($scope.formatURLs(json), divclass);
-        }
-
-        return json;
-    };
-
-    $scope.formatJson = function(jsonString) {
-        return $scope.jsonFormat(JSON.parse(jsonString), "json");
-    };
-
-    $scope.formatJsonBasic = function(jsonString) {
-        return JSON.stringify(JSON.parse(jsonString), undefined, 4);
-    };
-
-    $scope.formatURLs = function(param) {
-        var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-
-        return param.replace(urlRegex, function (url) {
-
-            if (( url.indexOf(".jpg") > 0 )
-                || ( url.indexOf(".png") > 0 )
-                || ( url.indexOf(".gif") > 0 )) {
-                return '<img src="'+url+'">'+'<br/>'+url+'<br/>';
-            }
-            else {
-                return '<a href="'+url+'">'+url+'</a>'+'<br/>';
-            }
-        });
-    };
-
-    $scope.isJSON = function(j) {
-        return j[0] == '{';
-    };
-
-    $scope.isArray = function(a) {
-        return a instanceof Array;
-    };
-
-    $scope.isString = function(s) {
-        return typeof s === "string";
     };
 
     $scope.scrollToSection = function(name) {
@@ -269,11 +485,15 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         $('#rawInput').slideToggle()
     });
 
+    $("#historyViewToggle").click(function() {
+        $('#historyView').slideToggle()
+    });
 });
 
-app.controller('workersController', function($scope, $route, $http, $location, environment) {
+app.controller('workersController', function($scope, $route, $http, $location, environment, formatUtil) {
 
     $scope.showDefunct = false;
+    $scope.formatUtil = formatUtil;
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -316,6 +536,15 @@ app.controller('workersController', function($scope, $route, $http, $location, e
         $scope.domains = {};
         for(var w in $scope.workers) {
             var worker = $scope.workers[w];
+            worker.showFormatted = true;
+            if(formatUtil.isJSON(worker.specification)) {
+                worker.specification = JSON.parse(worker.specification);
+            }
+
+            if(formatUtil.isJSON(worker.resolutionHistory)) {
+                worker.resolutionHistory = JSON.parse(worker.resolutionHistory);
+            }
+
             $scope.setFreshnessLabel(worker);
 
             if(!$scope.domains.hasOwnProperty(worker.domain)) {

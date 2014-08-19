@@ -12,11 +12,9 @@ trait FTPAdapterComponent {
 abstract class AbstractFTPAdapter {
   this: PropertiesLoaderComponent =>
 
-  def uploadFile(conf: FTPUploadConfig): String = {
+  def uploadFile(conf: FTPUploadConfig): Unit = {
     new FtpClient(conf.ftpHost, conf.ftpPort, conf.ftpUsername, conf.ftpPassword)
       .send(new URL(conf.sourceUrl).openStream(), conf.ftpDirectory, conf.ftpFilename)
-
-    "OK"
   }
 }
 

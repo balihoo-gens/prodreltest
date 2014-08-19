@@ -13,9 +13,13 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
     with DynamoAdapterComponent
     with CampaignCreatorComponent =>
 
+  override def getSpecification: ActivitySpecification = {
+    campaignCreator.getSpecification
+  }
+
   override def handleTask(params: ActivityParameters) = {
     try {
-      adWordsAdapter.setClientId(params.getRequiredParameter("account"))
+      adWordsAdapter.setClientId(params("account"))
 
       //val creator = new CampaignCreator with AdWordsAdapterComponent {
       //  def adWordsAdapter = AdWordsCampaignProcessor.this.adWordsAdapter
@@ -50,7 +54,7 @@ class AdWordsCampaignProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWords
   with CampaignCreatorComponent {
     //don't put this in the creator method to avoid a new one from
     //being created on every call.
-    val _creator = new CampaignCreator(awa)
+    lazy val _creator = new CampaignCreator(awa)
     def swfAdapter = swf
     def dynamoAdapter = dyn
     def adWordsAdapter = awa
@@ -118,10 +122,24 @@ trait CampaignCreatorComponent {
     this: AdWordsAdapterComponent
       with BudgetCreatorComponent =>
 
+    def getSpecification: ActivitySpecification = {
+      new ActivitySpecification(List(
+        new ActivityParameter("account", "int", "Participant AdWords account ID"),
+        new ActivityParameter("name", "string", "Name of the Campaign"),
+        new ActivityParameter("channel", "SEARCH|DISPLAY|SHOPPING", "The advertising channel"),
+        new ActivityParameter("budget", "float", "The monthly budget"),
+        new ActivityParameter("status", "ACTIVE|PAUSED|DELETED", "Always ACTIVE on Campaign creation", false),
+        new ActivityParameter("startDate", "YYYYMMDD", "Ignored on update."),
+        new ActivityParameter("endDate", "YYYYMMDD", ""),
+        new ActivityParameter("targetzips", "string", "Comma separated list of zip codes"),
+        new ActivityParameter("adschedule", "string", "M,T,W,Th,F,S,Su")
+      ), new ActivityResult("int", "AdWords Campaign ID"))
+    }
+
     def getCampaign(params: ActivityParameters):Campaign = {
 
-      val name = params.getRequiredParameter("name")
-      val channel = params.getRequiredParameter("channel")
+      val name = params("name")
+      val channel = params("channel")
       val context = s"getCampaign(name='$name', channel='$channel'"
 
       val selector = new SelectorBuilder()
@@ -161,15 +179,15 @@ trait CampaignCreatorComponent {
 
     def createCampaign(params:ActivityParameters):Campaign = {
 
-      val name = params.getRequiredParameter("name")
-      val channel = params.getRequiredParameter("channel")
+      val name = params("name")
+      val channel = params("channel")
       val context = s"createCampaign(name='$name', channel='$channel')"
 
       val budgetName = s"$name Budget"
       val budget:Budget = budgetCreator.getBudget(budgetName) match {
         case b:Budget => b
         case _ =>
-          budgetCreator.createBudget(budgetName, params.getRequiredParameter("budget"))
+          budgetCreator.createBudget(budgetName, params("budget"))
       }
 
       val campaignBudget = new Budget()
@@ -229,8 +247,8 @@ trait CampaignCreatorComponent {
         adWordsAdapter.campaignService.mutate(Array(operation)).getValue(0)
       })
 
-      setTargetZips(madeCampaign, params.getRequiredParameter("targetzips"))
-      setAdSchedule(madeCampaign, params.getRequiredParameter("adschedule"))
+      setTargetZips(madeCampaign, params("targetzips"))
+      setAdSchedule(madeCampaign, params("adschedule"))
       madeCampaign
     }
 

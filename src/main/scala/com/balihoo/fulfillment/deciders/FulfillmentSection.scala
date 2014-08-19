@@ -74,12 +74,13 @@ class FulfillmentSection(val name: String
   var action: ActivityType = null
   val params = collection.mutable.Map[String, Any]()
   val prereqs = mutable.MutableList[String]()
-  val timeline = new Timeline //mutable.MutableList[TimelineEvent]()
+  val timeline = new Timeline
   var value: String = ""
 
   var status = SectionStatus.INCOMPLETE
 
   var essential = false
+  var fixable = true
 
   var scheduledCount: Int = 0
   var startedCount: Int = 0
@@ -95,47 +96,63 @@ class FulfillmentSection(val name: String
   var scheduleToStartTimeout = ""
   var scheduleToCloseTimeout = ""
   var heartbeatTimeout = ""
-
   var waitUntil: Option[DateTime] = None
+  
+  jsonInit(jsonNode)
 
-  for((key, value) <- jsonNode.fields) {
-    key match {
-      case "action" =>
-        val jaction = value.as[JsObject]
-        action = new ActivityType
-        action.setName(jaction.value("name").as[String])
-        action.setVersion(jaction.value("version").as[String])
-        handleActionParams(jaction)
+  def jsonInit(jsonNode: JsObject) = {
+    for((key, value) <- jsonNode.fields) {
+      key match {
+        case "action" =>
+          jsonInitAction(value.as[JsObject])
 
-      case "params" =>
-        val jparams = value.as[JsObject]
-        for((jk, jv) <- jparams.fields) {
-          jv match {
-            case jArr: JsArray =>
-              params(jk) = new SectionReferences(jArr.as[List[String]])
-            case jStr: JsString =>
-              params(jk) = jv.as[String]
-            case _ =>
-              timeline.error(s"Parameter '$jk' is of type '${jv.getClass.toString}'. This is not a valid type.", creationDate)
-          }
-        }
+        case "params" =>
+          jsonInitParams(value.as[JsObject])
 
-      case "prereqs" =>
-        val jprereqs = value.as[JsArray]
-        prereqs ++= jprereqs.as[List[String]]
+        case "prereqs" =>
+          jsonInitPrereqs(value.as[JsArray])
 
-      case "status" =>
-        status = SectionStatus.withName(value.as[String])
+        case "status" =>
+          status = SectionStatus.withName(value.as[String])
 
-      case "essential" =>
-        essential = value.as[Boolean]
+        case "essential" =>
+          essential = value.as[Boolean]
 
-      case "waitUntil" =>
-        waitUntil = Some(new DateTime(value.as[String]))
+        case "fixable" =>
+          fixable = value.as[Boolean]
+          
+        case "waitUntil" =>
+          waitUntil = Some(new DateTime(value.as[String]))
 
-      case _ =>
-        timeline.warning(s"Section input '$key' unhandled!", creationDate)
+        case _ =>
+          timeline.warning(s"Section input '$key' unhandled!", creationDate)
+      }
     }
+  }
+
+  def jsonInitAction(jaction: JsObject) = {
+    action = new ActivityType
+    action.setName(jaction.value("name").as[String])
+    action.setVersion(jaction.value("version").as[String])
+    handleActionParams(jaction)
+  }
+
+  def jsonInitParams(jparams: JsObject) = {
+    for((jk, jv) <- jparams.fields) {
+      jv match {
+        case jArr: JsArray =>
+          params(jk) = new SectionReferences(jArr.as[List[String]])
+        case jStr: JsString =>
+          params(jk) = jv.as[String]
+        case _ =>
+          timeline.error(s"Parameter '$jk' is of type '${jv.getClass.toString}'. This is not a valid type.", creationDate)
+      }
+    }
+  }
+
+  def jsonInitPrereqs(jprereqs:JsArray) = {
+    prereqs.clear()
+    prereqs ++= jprereqs.as[List[String]]
   }
 
   def handleActionParams(jaction:JsObject) = {
@@ -246,6 +263,7 @@ class FulfillmentSection(val name: String
       "input" -> Json.toJson(jsonNode),
       "params" -> Json.toJson(jparams.toMap),
       "essential" -> Json.toJson(essential),
+      "fixable" -> Json.toJson(fixable),
       "scheduledCount" -> Json.toJson(scheduledCount),
       "startedCount" -> Json.toJson(startedCount),
       "timedoutCount" -> Json.toJson(timedoutCount),
@@ -263,8 +281,9 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   val registry = collection.mutable.Map[java.lang.Long, String]()
   val nameToSection = collection.mutable.Map[String, FulfillmentSection]()
-  val timeline = new Timeline //mutable.MutableList[TimelineEvent]()
+  val timeline = new Timeline
   val timers = collection.mutable.Map[String, String]()
+  var resolution = "IN PROGRESS"
 
   try {
     for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
@@ -291,6 +310,16 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
           processTimerStarted(event)
         case EventType.TimerFired =>
           processTimerFired(event)
+        case EventType.WorkflowExecutionCanceled =>
+          processCancel(event)
+        case EventType.WorkflowExecutionTimedOut =>
+          processTimedOut(event)
+        case EventType.WorkflowExecutionTerminated =>
+          processTerminated(event)
+        case EventType.WorkflowExecutionFailed =>
+          processFailed(event)
+        case EventType.WorkflowExecutionCompleted =>
+          processCompleted(event)
         //case EventType.Q =>
         //  processQ(event, sections)
         case _ => //println("Unhandled event type: " + event.getEventType)
@@ -431,7 +460,43 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
 
   protected def processWorkflowExecutionSignaled(event: HistoryEvent) = {
     val attribs = event.getWorkflowExecutionSignaledEventAttributes
-    timeline.note(s"Received signal ${attribs.getSignalName} ${attribs.getInput}", event.getEventTimestamp)
+
+    attribs.getSignalName match {
+      case "sectionUpdates" =>
+        val updates = Json.parse(attribs.getInput).as[JsObject]
+        for((sectionName, iupdate:JsValue) <- updates.fields) {
+          val update = iupdate.as[JsObject]
+          val section = nameToSection(sectionName)
+          for((updateType, body:JsValue) <- update.fields) {
+            updateType match {
+              case "params" =>
+                val pupdate = Json.stringify(body)
+                section.timeline.note(s"Updating params: $pupdate", event.getEventTimestamp)
+                section.jsonInitParams(body.as[JsObject])
+              case "status" =>
+                val supdate = body.as[String]
+                section.timeline.note(s"Updating status: ${section.status} -> $supdate", event.getEventTimestamp)
+                section.status = SectionStatus.withName(supdate)
+              case "essential" =>
+                val eupdate = body.as[Boolean]
+                section.timeline.note(s"Updating essential: $eupdate", event.getEventTimestamp)
+                section.essential = eupdate
+              case "action" =>
+                val aupdate = Json.stringify(body)
+                section.timeline.note(s"Updating action: $aupdate", event.getEventTimestamp)
+                section.jsonInitAction(body.as[JsObject])
+              case "prereqs" =>
+                val pupdate = Json.stringify(body)
+                section.timeline.note(s"Updating prereqs: $pupdate", event.getEventTimestamp)
+                section.jsonInitPrereqs(body.as[JsArray])
+              case _ =>
+            }
+          }
+        }
+      case _ =>
+        timeline.warning(s"Unhandled signal ${attribs.getSignalName} ${attribs.getInput}", event.getEventTimestamp)
+    }
+
   }
 
   protected def processTimerStarted(event: HistoryEvent) = {
@@ -461,7 +526,44 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     val sectionName = timerParams.value("section").as[String]
     val status = SectionStatus.withName(timerParams.value("status").as[String])
 
+    val section = getSectionByName(sectionName)
+    section.timeline.note(s"Timer for section '$sectionName' fired. Setting status to ${status.toString}", event.getEventTimestamp)
+
     getSectionByName(sectionName).status = status
+  }
+
+  protected def processCancel(event: HistoryEvent) = {
+    val attribs = event.getWorkflowExecutionCanceledEventAttributes
+    timeline.warning("CANCELLED: "+attribs.getDetails, event.getEventTimestamp)
+    resolution = "CANCELLED"
+  }
+
+  protected def processTimedOut(event: HistoryEvent) = {
+    val attribs = event.getWorkflowExecutionTimedOutEventAttributes
+    timeline.error("TIMEOUT: "+attribs.getTimeoutType, event.getEventTimestamp)
+    resolution = "TIMED OUT"
+  }
+
+  protected def processTerminated(event: HistoryEvent) = {
+    val attribs = event.getWorkflowExecutionTerminatedEventAttributes
+    timeline.error("TERMINATED: "+attribs.getCause+":"+attribs.getReason+":"+attribs.getDetails, event.getEventTimestamp)
+    resolution = "TERMINATED"
+  }
+
+  protected def processFailed(event: HistoryEvent) = {
+    val attribs = event.getWorkflowExecutionFailedEventAttributes
+    timeline.error("FAILED: "+attribs.getReason+":"+attribs.getDetails, event.getEventTimestamp)
+    resolution = "FAILED"
+  }
+
+  protected def processCompleted(event: HistoryEvent) = {
+    val attribs = event.getWorkflowExecutionCompletedEventAttributes
+    timeline.success("COMPLETED:"+attribs.getResult, event.getEventTimestamp)
+    resolution = "COMPLETED"
+  }
+
+  def terminal():Boolean = {
+    List("CANCELLED", "TIMED OUT", "TERMINATED", "FAILED").contains(resolution)
   }
 
   override def toString = {

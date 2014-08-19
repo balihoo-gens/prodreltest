@@ -49,12 +49,7 @@ object adWordsGetAccounts {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId(adWordsAdapter.baseAccountId) // Dogtopia
 
-      val accountParams =
-        s"""{
-         "parent" : "brand-demo"
-        }"""
-
-      val m:ManagedCustomer = accountCreator.getManagerAccount(new ActivityParameters(accountParams))
+      val m:ManagedCustomer = accountCreator.getManagerAccount(new ActivityParameters(Map("parent" -> "brand-demo")))
       println(m.getCustomerId)
       println(m.getName)
       println(m.getCompanyName)
@@ -81,13 +76,11 @@ object adWordsAccountCreator {
        //    adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("981-046-8123") // Dogtopia
 
-      val accountParams =
-        s"""{
-         "name" : "test campaign",
-          "currencyCode" : "USD",
-          "timeZone" : "America/Boise"
-        }"""
-      val newId = accountCreator.createAccount(new ActivityParameters(accountParams))
+      val newId = accountCreator.createAccount(new ActivityParameters(Map(
+        "name" -> "test campaign",
+        "currencyCode" -> "USD",
+        "timeZone" -> "America/Boise"
+      )))
     }
   }
 }

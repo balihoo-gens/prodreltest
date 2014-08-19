@@ -9,11 +9,16 @@ abstract class AbstractFTPUploadWorker extends FulfillmentWorker {
     with DynamoAdapterComponent
     with PropertiesLoaderComponent =>
 
+  override def getSpecification: ActivitySpecification = FTPUploadConfig.getSpecification
+
   override def handleTask(params: ActivityParameters) = {
     println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
       ftpAdapter.uploadFile(new FTPUploadConfig(params, config))
+
+      // No exceptions, so call it good.
+      "OK"
     }
   }
 }

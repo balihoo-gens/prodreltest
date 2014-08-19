@@ -7,6 +7,7 @@ import com.balihoo.fulfillment.workers.{UTCFormatter, FulfillmentWorkerTable, Fu
 import play.api.libs.json._
 
 import scala.collection.JavaConverters._
+import scala.collection.convert.wrapAsScala._
 
 import javax.servlet.http.HttpServletResponse
 
@@ -31,10 +32,10 @@ trait WorkflowInitiatorComponent {
       executionRequest.setWorkflowId(id)
       executionRequest.setInput(input)
       executionRequest.setTagList(tags.asJavaCollection)
-      val name = new SWFName(swfAdapter.config.getString("name"))
-      val version = new SWFVersion(swfAdapter.config.getString("version"))
-      val taskListName = new SWFName(name + version)
-      executionRequest.setWorkflowType(new WorkflowType().withName(name).withVersion(version))
+      val workflowName = new SWFName(swfAdapter.config.getString("workflowName"))
+      val workflowVersion = new SWFVersion(swfAdapter.config.getString("workflowVersion"))
+      val taskListName = new SWFName(workflowName + workflowVersion)
+      executionRequest.setWorkflowType(new WorkflowType().withName(workflowName).withVersion(workflowVersion))
       executionRequest.setTaskList(new TaskList().withName(taskListName))
       swfAdapter.client.startWorkflowExecution(executionRequest).getRunId
     }
@@ -44,6 +45,32 @@ trait WorkflowInitiatorComponent {
     def swfAdapter = swf
   }
 }
+
+trait WorkflowUpdaterComponent {
+  def workflowUpdater: WorkflowUpdater with SWFAdapterComponent
+
+  class AbstractWorkflowUpdater {
+    this: SWFAdapterComponent =>
+
+    def update(runId:String, workflowId:String, input:String) = {
+      val req = new SignalWorkflowExecutionRequest()
+      req.setDomain(swfAdapter.config.getString("domain"))
+      req.setRunId(runId)
+      req.setWorkflowId(workflowId)
+      req.setSignalName("sectionUpdates")
+      req.setInput(input)
+
+      swfAdapter.client.signalWorkflowExecution(req)
+
+      "success"
+    }
+  }
+
+  class WorkflowUpdater(swf: SWFAdapter) extends AbstractWorkflowUpdater with SWFAdapterComponent {
+    def swfAdapter = swf
+  }
+}
+
 
 trait WorkflowInspectorComponent {
   def workflowInspector: WorkflowInspector with SWFAdapterComponent
@@ -62,10 +89,70 @@ trait WorkflowInspectorComponent {
       ))
     }
 
-    def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
+    /**
+     * This function is still a bummer.
+     * @param event: HistoryEvent
+     * @return String
+     */
+    def _getEventAttribs(event:HistoryEvent):String = {
 
-  //    val oldest = new Date(System.currentTimeMillis() - (70 * UTCFormatter.DAY_IN_MS))
-  //    val latest = new Date(System.currentTimeMillis() + (10 * UTCFormatter.DAY_IN_MS))
+      for(f <- List(event.getWorkflowExecutionStartedEventAttributes _
+        ,event.getWorkflowExecutionCompletedEventAttributes _
+        ,event.getCompleteWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionFailedEventAttributes _
+        ,event.getFailWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionTimedOutEventAttributes _
+        ,event.getWorkflowExecutionCanceledEventAttributes _
+        ,event.getCancelWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionContinuedAsNewEventAttributes _
+        ,event.getContinueAsNewWorkflowExecutionFailedEventAttributes _
+        ,event.getWorkflowExecutionTerminatedEventAttributes _
+        ,event.getWorkflowExecutionCancelRequestedEventAttributes _
+        ,event.getDecisionTaskScheduledEventAttributes _
+        ,event.getDecisionTaskStartedEventAttributes _
+        ,event.getDecisionTaskCompletedEventAttributes _
+        ,event.getDecisionTaskTimedOutEventAttributes _
+        ,event.getActivityTaskScheduledEventAttributes _
+        ,event.getActivityTaskStartedEventAttributes _
+        ,event.getActivityTaskCompletedEventAttributes _
+        ,event.getActivityTaskFailedEventAttributes _
+        ,event.getActivityTaskTimedOutEventAttributes _
+        ,event.getActivityTaskCanceledEventAttributes _
+        ,event.getActivityTaskCancelRequestedEventAttributes _
+        ,event.getWorkflowExecutionSignaledEventAttributes _
+        ,event.getMarkerRecordedEventAttributes _
+        ,event.getRecordMarkerFailedEventAttributes _
+        ,event.getTimerStartedEventAttributes _
+        ,event.getTimerFiredEventAttributes _
+        ,event.getTimerCanceledEventAttributes _
+        ,event.getStartChildWorkflowExecutionInitiatedEventAttributes _
+        ,event.getChildWorkflowExecutionStartedEventAttributes _
+        ,event.getChildWorkflowExecutionCompletedEventAttributes _
+        ,event.getChildWorkflowExecutionFailedEventAttributes _
+        ,event.getChildWorkflowExecutionTimedOutEventAttributes _
+        ,event.getChildWorkflowExecutionCanceledEventAttributes _
+        ,event.getChildWorkflowExecutionTerminatedEventAttributes _
+        ,event.getSignalExternalWorkflowExecutionInitiatedEventAttributes _
+        ,event.getExternalWorkflowExecutionSignaledEventAttributes _
+        ,event.getSignalExternalWorkflowExecutionFailedEventAttributes _
+        ,event.getExternalWorkflowExecutionCancelRequestedEventAttributes _
+        ,event.getRequestCancelExternalWorkflowExecutionInitiatedEventAttributes _
+        ,event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes _
+        ,event.getScheduleActivityTaskFailedEventAttributes _
+        ,event.getRequestCancelActivityTaskFailedEventAttributes _
+        ,event.getStartTimerFailedEventAttributes _
+        ,event.getCancelTimerFailedEventAttributes _
+        ,event.getStartChildWorkflowExecutionFailedEventAttributes _
+      )) {
+        f() match {
+          case o:AnyRef => return o.toString
+          case _ =>
+        }
+      }
+      "Unknown event type!"
+    }
+
+    def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
       val filter = new ExecutionTimeFilter
       filter.setOldestDate(oldest)
       filter.setLatestDate(latest)
@@ -104,8 +191,17 @@ trait WorkflowInspectorComponent {
       req.setDomain(swfAdapter.config.getString("domain"))
       req.setExecution(exec)
 
-      val history = swfAdapter.client.getWorkflowExecutionHistory(req)
-      val sectionMap = new SectionMap(history.getEvents)
+
+      val events = new java.util.ArrayList[HistoryEvent]()
+      var history = swfAdapter.client.getWorkflowExecutionHistory(req)
+      events.addAll(history.getEvents)
+      // The results come back in pages.
+      while(history.getNextPageToken != null) {
+        req.setNextPageToken(history.getNextPageToken)
+        history = swfAdapter.client.getWorkflowExecutionHistory(req)
+        events.addAll(history.getEvents)
+      }
+      val sectionMap = new SectionMap(events)
       val categorized = new CategorizedSections(sectionMap)
       new DecisionGenerator(categorized, sectionMap).makeDecisions()
 
@@ -115,12 +211,20 @@ trait WorkflowInspectorComponent {
       }
 
       val jtimeline = Json.toJson(for(entry <- sectionMap.timeline.events) yield entry.toJson)
+      val executionHistory = Json.toJson(for(event:HistoryEvent <- collectionAsScalaIterable(events)) yield Json.toJson(Map(
+        "type" -> Json.toJson(event.getEventType),
+        "id" -> Json.toJson(event.getEventId.toString),
+        "timestamp" -> Json.toJson(UTCFormatter.format(event.getEventTimestamp)),
+        "attributes" -> Json.toJson(_getEventAttribs(event))
+      )))
 
       top("timeline") = jtimeline
       top("sections") = Json.toJson(sections.toMap)
       top("workflowId") = Json.toJson(workflowId)
       top("runId") = Json.toJson(runId)
-      top("input") = Json.toJson(history.getEvents.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
+      top("input") = Json.toJson(events.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
+      top("resolution") = Json.toJson(sectionMap.resolution)
+      top("history") = executionHistory
 
       top.toMap
     }
@@ -138,11 +242,11 @@ trait WorkflowInspectorComponent {
   }
 }
 
-
 class AbstractWorkflowServlet extends RestServlet {
   this: SWFAdapterComponent
     with WorkflowInspectorComponent
-    with WorkflowInitiatorComponent =>
+    with WorkflowInitiatorComponent
+    with WorkflowUpdaterComponent =>
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
@@ -157,6 +261,15 @@ class AbstractWorkflowServlet extends RestServlet {
       ,Json.stringify(Json.toJson(workflowInspector.workflowSections(
         rsq.getRequiredParameter("runId")
         ,rsq.getRequiredParameter("workflowId")
+      ))))
+  })
+
+  get("/workflow/update", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(workflowUpdater.update(
+        rsq.getRequiredParameter("runId")
+        ,rsq.getRequiredParameter("workflowId")
+        ,rsq.getRequiredParameter("input")
       ))))
   })
 
@@ -180,12 +293,15 @@ class WorkflowServlet(swf: SWFAdapter)
   extends AbstractWorkflowServlet
     with WorkflowInspectorComponent
     with WorkflowInitiatorComponent
+    with WorkflowUpdaterComponent
     with SWFAdapterComponent {
   private val _inspector = new WorkflowInspector(swf)
   private val _initiator = new WorkflowInitiator(swf)
+  private val _updater = new WorkflowUpdater(swf)
   def swfAdapter = swf
   def workflowInspector = _inspector
   def workflowInitiator = _initiator
+  def workflowUpdater = _updater
 }
 
 class AbstractWorkerServlet extends RestServlet {

@@ -32,20 +32,19 @@ object adWordsCampaignCreator {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams =
-        s"""{
-         "name" : "test campaign",
-          "channel" : "DISPLAY",
-          "budget" : "11",
-          "adschedule" : "M,T,S",
-          "status" : "PAUSED",
-          "startDate" : "20140625",
-          "endDate" : "20140701",
-          "targetzips" : "83704,83713",
-          "biddingStrategy" : "MANUAL_CPM"
-        }"""
+      val campaignParams = new ActivityParameters(Map(
+         "name" -> "test campaign",
+          "channel" -> "DISPLAY",
+          "budget" -> "11",
+          "adschedule" -> "M,T,S",
+          "status" -> "PAUSED",
+          "startDate" -> "20140625",
+          "endDate" -> "20140701",
+          "targetzips" -> "83704,83713",
+          "biddingStrategy" -> "MANUAL_CPM"
+      ))
 
-      val newCampaign = campaignCreator.createCampaign(new ActivityParameters(campaignParams))
+      val newCampaign = campaignCreator.createCampaign(campaignParams)
       println(newCampaign.getId)
     }
   }
@@ -66,12 +65,11 @@ object adWordsLocationCriterion {
 
       val zipString = "53001,53002,90210"
 
-      val campaignParams =
-        s"""{
-         "name" : "fulfillment Campaign",
-          "channel" : "DISPLAY"
-        }"""
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val campaignParams = new ActivityParameters(Map(
+         "name" -> "fulfillment Campaign",
+          "channel" -> "DISPLAY"
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
       campaignCreator.setTargetZips(campaign, zipString)
     }
   }
@@ -92,12 +90,11 @@ object adWordsSchedule {
 
       val scheduleString = "T,Th"
 
-      val campaignParams =
-        s"""{
-         "name" : "fulfillment Campaign",
-          "channel" : "DISPLAY"
-        }"""
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val campaignParams = new ActivityParameters(Map(
+        "name" -> "fulfillment Campaign",
+        "channel" -> "DISPLAY"
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
       campaignCreator.setAdSchedule(campaign, scheduleString)
     }
   }

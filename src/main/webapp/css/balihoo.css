@@ -862,6 +862,14 @@ footer .container {
     color: #59595B;
 }
 
+.muted.red:hover {
+    color: #aa1111;
+}
+
+.muted.green:hover {
+    color: #11aa11;
+}
+
 .timeline {
     color:#428bca;
 }
@@ -883,4 +891,24 @@ footer .container {
 
 .initiallyHidden {
     display: none;
+}
+
+.action {
+    cursor: pointer;
+}
+
+.status-edited {
+    border:3px solid #46b8da;
+    box-shadow:0 0 12px #46b8da;
+}
+
+.form-inline {
+    display:inline-block;
+}
+
+.bottom-dialog {
+    position:fixed;
+    padding:14px;
+    bottom:15px;
+    left:15px;
 }
