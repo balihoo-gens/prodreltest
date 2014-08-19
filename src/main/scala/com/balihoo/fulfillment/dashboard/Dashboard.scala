@@ -31,9 +31,9 @@ trait WorkflowInitiatorComponent {
       executionRequest.setWorkflowId(id)
       executionRequest.setInput(input)
       executionRequest.setTagList(tags.asJavaCollection)
-      val name = new ValidSWFName(swfAdapter.config.getString("name"))
-      val version = new ValidSWFVersion(swfAdapter.config.getString("version"))
-      val taskListName = new ValidSWFName(name + version)
+      val name = new SWFName(swfAdapter.config.getString("name"))
+      val version = new SWFVersion(swfAdapter.config.getString("version"))
+      val taskListName = new SWFName(name + version)
       executionRequest.setWorkflowType(new WorkflowType().withName(name).withVersion(version))
       executionRequest.setTaskList(new TaskList().withName(taskListName))
       swfAdapter.client.startWorkflowExecution(executionRequest).getRunId

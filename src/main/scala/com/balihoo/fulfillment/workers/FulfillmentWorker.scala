@@ -6,7 +6,7 @@ import java.util.UUID.randomUUID
 
 import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
-import com.balihoo.fulfillment.config.{ValidSWFVersion, ValidSWFName}
+import com.balihoo.fulfillment.config.{SWFVersion, SWFName}
 
 import scala.sys.process._
 import scala.language.implicitConversions
@@ -25,9 +25,9 @@ abstract class FulfillmentWorker {
   val instanceId = randomUUID().toString
 
   val domain = swfAdapter.domain
-  val name = new ValidSWFName(swfAdapter.config.getString("name"))
-  val version = new ValidSWFVersion(swfAdapter.config.getString("version"))
-  val taskListName = new ValidSWFName(name+version)
+  val name = new SWFName(swfAdapter.config.getString("name"))
+  val version = new SWFVersion(swfAdapter.config.getString("version"))
+  val taskListName = new SWFName(name+version)
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")

@@ -332,13 +332,13 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
     }
 
-    "schedule work when waitUntil is now" in {
-      val decisions = makeDecisions(Some(DateTime.now))
+    "schedule work when waitUntil is < 1 second in the future" in {
+      val decisions = makeDecisions(Some(DateTime.now.plusMillis(998)))
       decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
     }
 
-    "start a timer when waitUntil is in the future" in {
-      val decisions = makeDecisions(Some(DateTime.now.plusDays(1)))
+    "start a timer when waitUntil is > 1 second in the future" in {
+      val decisions = makeDecisions(Some(DateTime.now.plusSeconds(30)))
       decisions(0).getDecisionType mustEqual(DecisionType.StartTimer.toString)
     }
   }

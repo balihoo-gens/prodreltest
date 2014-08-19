@@ -6,7 +6,7 @@ package com.balihoo.fulfillment.config
  * @param ident the identifier string
  * @param maxLength An exception is thrown if ident exceeds this length.
  */
-abstract class ValidSWFIdentifier(ident: String, maxLength: Int) {
+abstract class SWFIdentifier(ident: String, maxLength: Int) {
 
   for(s <- Array("##", ":", "/", "|", "arn")) {
     if(ident.contains(s)) throw new IllegalArgumentException(s"$ident must not contain '$s'")
@@ -17,17 +17,17 @@ abstract class ValidSWFIdentifier(ident: String, maxLength: Int) {
   override def toString() = ident
 }
 
-object ValidSWFIdentifier {
+object SWFIdentifier {
 
   /**
    * This implicit conversion allows instances to be used as arguments to SWF API calls that expect strings.
    * @param identifier
    * @return
    */
-  implicit def identifierToString(identifier: ValidSWFIdentifier): String = identifier.toString
+  implicit def identifierToString(identifier: SWFIdentifier): String = identifier.toString
 
 }
 
-class ValidSWFName(ident: String) extends ValidSWFIdentifier(ident, 256)
+class SWFName(ident: String) extends SWFIdentifier(ident, 256)
 
-class ValidSWFVersion(ident:String) extends ValidSWFIdentifier(ident, 64)
+class SWFVersion(ident:String) extends SWFIdentifier(ident, 64)
