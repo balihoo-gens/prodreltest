@@ -59,6 +59,7 @@ abstract class AbstractAdWordsAdapter {
   val budgedService:BudgetServiceInterface = services.get(session, classOf[BudgetServiceInterface])
   val locationService:LocationCriterionServiceInterface = services.get(session, classOf[LocationCriterionServiceInterface])
   val mediaService:MediaServiceInterface = services.get(session, classOf[MediaServiceInterface])
+  val constantDataService:ConstantDataServiceInterface = services.get(session, classOf[ConstantDataServiceInterface])
 
   def dollarsToMicros(dollars:Float):Long = {
     (dollars * 1000000).toLong

@@ -75,7 +75,7 @@ object adwordsAdGroupSetInterests {
       adWordsAdapter.setClientId("100-019-2687")
 
       val campaignParams = new ActivityParameters(Map(
-        "name" -> "fulfillment campaign",
+        "name" -> "fulfillment Campaign",
       "channel" -> "DISPLAY"
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
@@ -87,7 +87,7 @@ object adwordsAdGroupSetInterests {
       ))
 
       val adgroup = adGroupCreator.getAdGroup(adgroupParams)
-      adGroupCreator.addUserInterests(adgroup, Array("Vehicle Shows", "Livestock"))
+      adGroupCreator._processInterests(adgroup, Array("Vehicle Shows", "Livestock"))
 
     }
   }
@@ -107,7 +107,7 @@ object adwordsAdGroupSetKeywords {
       adWordsAdapter.setClientId("100-019-2687")
 
       val campaignParams = new ActivityParameters(Map(
-        "name" -> "fulfillment campaign",
+        "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
@@ -119,7 +119,10 @@ object adwordsAdGroupSetKeywords {
       ))
       val adgroup = adGroupCreator.getAdGroup(adgroupParams)
 
-      adGroupCreator.addKeywords(adgroup, Array("tuna", "dressage", "aluminum"))
+      adGroupCreator._processKeywords(adgroup, Array("alabaster", "dressage", "aluminum"), KeywordMatchType.BROAD)
+      adGroupCreator._processKeywords(adgroup, Array("alpaca", "camel", "dromedary"), KeywordMatchType.PHRASE)
+      adGroupCreator._processKeywords(adgroup, Array("orange", "apple"), KeywordMatchType.EXACT)
+      adGroupCreator._processNegativeKeywords(adgroup, Array("applesauce", "gravel"))
     }
   }
 }
