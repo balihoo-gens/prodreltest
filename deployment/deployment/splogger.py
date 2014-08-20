@@ -25,10 +25,15 @@ class Splogger:
         self._filename = filename
         if filename:
             if not self.verify_filename(filename):
-                self._filename = "/tmp/splogger_defaut.log"
-                self.exception("unable to open log file %s" % (filename,))
+                self._filename = filename.replace("/", "_")
+                if not self.verify_filename(self._filename):
+                    self._filename = "/tmp/splogger_defaut.log"
+                    self.exception("unable to open log file %s" % (filename,))
 
-    def add_loglevel(level):
+    def filename(self):
+        return self._filename
+
+    def add_loglevel(self, level):
         self._loglevels.append(str(level).upper())
 
     def verify_filename(self, filename):
