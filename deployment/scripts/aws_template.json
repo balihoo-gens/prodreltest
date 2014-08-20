@@ -65,9 +65,9 @@
     },
 
     "AWSRegionArch2AMI" : {
-      "us-west-1"      : { "32" : "ami-951945d0", "64" : "ami-971945d2" },
-      "us-east-1"      : { "32" : "ami-31814f58", "64" : "ami-1b814f72", "64HVM" : "ami-0da96764" },
-      "us-west-2"      : { "32" : "ami-16fd7026", "64" : "ami-10fd7020" }
+      "us-east-1"      : { "64" : "ami-d2ff23ba" },
+      "us-west-1"      : { "64" : "ami-73717d36" },
+      "us-west-2"      : { "64" : "ami-f1ce8bc1" }
     }
   },
 
@@ -114,6 +114,10 @@
           "echo downloading fulfillment application >> ${LOGFILE} 2>&1\n",
           "mkdir -p ${FFDIR} >> ${LOGFILE} 2>&1\n",
           "/usr/local/bin/aws s3 sync ", { "Ref" : "S3BucketURL" }, " ${FFDIR} >> ${LOGFILE} 2>&1\n",
+
+          "echo setting install script execute permissions >> ${LOGFILE} 2>&1\n",
+          "chmod a+x ${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
+
           "echo installing fulfillment application >> ${LOGFILE} 2>&1\n",
           "${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
           "echo done >> ${LOGFILE} 2>&1\n"

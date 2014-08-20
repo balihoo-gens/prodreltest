@@ -1,31 +1,88 @@
 #!/usr/bin/env python
-from splogger import Splogger
-from launcher import Launcher
-import sys, os
+import sys, os, stat
+try:
+    from splogger import Splogger
+    from launcher import Launcher
+except ImportError:
+    #path hackery really just for local testing
+    # because these are elsewhere on the EC2 instance
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'deployment'))
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from splogger import Splogger
+    from launcher import Launcher
+
 import argparse
+import subprocess
+import time
 
-def launch(args):
-    splogger = Splogger(args.logfile)
-    launcher = Launcher(args.jarname, splogger)
-    if len(args.classes):
-        launcher.launch(classes)
-    else:
-        launcher.launch()
+class Installer(object):
+    def __init__(self, logfile):
+        self._log = Splogger(args.logfile)
 
-def install_deps(args):
-    # TODO: install splunk
-    pass
+    def launch(self, jarname, classes):
+        launcher = Launcher(jarname)
+        procs = launcher.launch(classes)
+        #we could monitor the output of the processes here, or wait for them
+        # but it seems more prudent to let the launch process terminate
+        # and rely on the processes to log properly (not just to stdout) themselves
+        for procname in procs:
+            proc = procs[procname]
+            s = "Launched %s with pid %d" % (procname, proc.pid)
+            self._log.info(s)
+        return procs
+
+    def check_processes(self, procs, delay_secs):
+        now = time.now()
+        then = now + delay_secs
+        while time.now() < then:
+            for procname in procs:
+                proc = procs[procname]
+                retval = proc.poll()
+                if not retval is None:
+                    elapsed = time.now() - now
+                    s = "%s [pid %d] died within %f seconds, returning %d" % (procname, proc.pid, elapsed, retval)
+                    self._log.error(s)
+            time.sleep(0.1)
+
+    def run_wait_log(self, cmd):
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        #block and accumulate output
+        out, err = proc.communicate()
+        if len(out) > 0:
+            self._log.info(out)
+        if len(err) > 0:
+            self._log.error(out)
+        return proc.returncode
+
+    def install_splunk(self, s3bucket, script_name):
+        s3url = os.path.join(s3bucket, script_name)
+        if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
+            os.chmod(script_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
+                                 stat.S_IRGRP |                stat.S_IXGRP |
+                                 stat.S_IROTH |                stat.S_IXOTH )
+            script_path = os.path.join(".", script_name)
+            self.run_wait_log([script_path])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Launch the Fulfillment application")
     thisdir = os.path.dirname(os.path.realpath(__file__))
     jar = os.path.join(thisdir, "fulfillment.jar")
-    parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
+    splunks3bucket = "s3://balihoo.dev.splunk"
+    splunkscript = "installSplunkForwarder.sh"
+
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
-    parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/launcher.log')
-    parser.add_argument('--aws-access-key', help='the AWS access key')
-    parser.add_argument('--aws-secret-key', help='the AWS secret key')
+    parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
+    parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')
+    parser.add_argument('-d', '--delay', type=float, help='the number of seconds to monitor the spawned processes', default=5)
+    parser.add_argument('--splunks3bucket', help='the AWS s3 bucket URL used to install splunk', default=splunks3bucket)
+    parser.add_argument('--splunkscript', help='the script name used to install splunk', default=splunkscript)
+
     args = parser.parse_args()
 
-    install_deps(args)
-    launch(args)
+    installer = Installer(args.logfile)
+    installer.install_splunk(args.splunks3bucket, args.splunkscript)
+    procs = installer.launch(args.jarname, args.classes)
+    installer.check_processes(procs, args.delay)

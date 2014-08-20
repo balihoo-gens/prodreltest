@@ -4,18 +4,22 @@ from launcher import Launcher
 import argparse
 import os
 
+def mkdir(path):
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    return path
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Launch the Fulfillment application")
     thisdir = os.path.dirname(os.path.realpath(__file__))
     jar = os.path.join(thisdir, "target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar")
-    parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
+    parser.add_argument('-j','--jarname', help='the path of the jar to run', default=jar)
+    parser.add_argument('-d','--logdir', help='the path for the logfiles', default="logs")
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
+
     args = parser.parse_args()
 
+    logdir = mkdir(args.logdir)
+
     launcher = Launcher(args.jarname)
-    if len(args.classes):
-        launcher.launch(classes)
-    else:
-        launcher.launch()
-
-
+    procs =  launcher.launch(args.classes)

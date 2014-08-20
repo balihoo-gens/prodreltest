@@ -17,27 +17,23 @@ class Launcher(object):
         'com.balihoo.fulfillment.deciders.coordinator'
     ]
 
-    def __init__(self, jar, splogger=None):
+    def __init__(self, jar):
         self._jar = jar
-        self._splogger = splogger
 
-    def launch(self, classes = ALL_CLASSES):
+    def launch(self, classes=None, pipe=False):
+        if classes == None or len(classes) < 1:
+            classes = self.ALL_CLASSES
         procs = {}
         for path in classes:
             cname = path.split('.')[-1]
             proc = subprocess.Popen(
                 ["java", "-cp", self._jar, path],
-                #these should log properly to files themselves
-                # if the output is to be splogged here, threads and nonblocking io are required.
-                # stdout=subprocess.PIPE,
-                # stderr=subprocess.PIPE
+                #if output is piped, it HAS to be consumed to avoid deadlock due to full pipes
+                stdout=subprocess.PIPE if pipe else sys.stdout,
+                stderr=subprocess.PIPE if pipe else sys.stderr,
             )
-            procs[proc.pid] = proc
-            s = "Launched %s with pid %d" % (cname, proc.pid)
-            if self._splogger:
-                self._splogger.info(s)
-            else:
-                print(s)
+            procs[cname] = proc
+        #return the procs so the caller can do something with them
         return procs
 
 
