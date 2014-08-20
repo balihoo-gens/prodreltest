@@ -26,18 +26,25 @@ class Packager:
 
     def assemble_fat_jar(self):
         jarname = os.path.join(self._rootdir, "target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar")
-        ret = subprocess.Popen(
+        proc = subprocess.Popen(
             ["sbt", "assembly"],
             cwd=self._rootdir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
+        #block and accumulate output
+        out, err = proc.communicate()
+        if len(out) > 0:
+            self._log.info(out)
+        if len(err) > 0:
+            self._log.error(out)
+
         return jarname
 
     def package(self):
         """ returns the path of the dir to be
             sync-ed to the S3 bucket
         """
-        tmpdir = os.path.join(self._rootdir, "deployments/%s" % (datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S.%f")))
+        tmpdir = os.path.join(self._rootdir, "deployments/%s" % (datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss%f")))
         if os.path.isdir(tmpdir):
             shutil.rmtree(tmpdir)
         os.makedirs(tmpdir)
