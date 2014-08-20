@@ -129,6 +129,9 @@
           "echo setting install script execute permissions >> ${LOGFILE} 2>&1\n",
           "chmod a+x ${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
 
+          "echo setting launch script execute permissions >> ${LOGFILE} 2>&1\n",
+          "chmod a+x ${FFDIR}/launcher.py >> ${LOGFILE} 2>&1\n",
+
           "echo installing fulfillment application >> ${LOGFILE} 2>&1\n",
           "${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
           "echo done >> ${LOGFILE} 2>&1\n"
