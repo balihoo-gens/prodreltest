@@ -35,11 +35,27 @@ class PropertiesLoader(propertiesFileName: String, propertiesDir: String = "") {
     Integer.parseInt(propVal)
   }
 
+  def getOptInt(propName: String, defaultValue:Int) : Int = {
+    val propVal: String = prop.getString(propName)
+    if (propVal == null)
+      defaultValue
+    else
+      Integer.parseInt(propVal)
+  }
+
   def getString(propName: String) : String = {
     val propVal: String = prop.getString(propName)
     if (propVal == null)
       throw new Exception(s"required config value '$propName' not found or blank in $propertiesFileName")
     propVal
+  }
+
+  def getOptString(propName: String, defaultValue: String) : String = {
+    val propVal: String = prop.getString(propName)
+    if (propVal == null)
+      defaultValue
+    else
+      propVal
   }
 }
 

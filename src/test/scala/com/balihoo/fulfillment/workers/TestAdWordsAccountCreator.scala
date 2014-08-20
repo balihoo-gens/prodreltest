@@ -51,7 +51,7 @@ class TestAdWordsAccountCreator extends Specification with Mockito
     "intialize properly" in {
       //creates an actual accountcreator with mock adapters
       val creator = new TestAdWordsAccountCreator
-      creator.name mustEqual "workername"
+      creator.name.toString mustEqual "workername"
     }
   }
 }
