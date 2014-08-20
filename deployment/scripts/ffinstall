@@ -17,38 +17,14 @@ import time
 
 class Installer(object):
     def __init__(self, logfile):
-        self._log = Splogger(args.logfile)
+        self._log = Splogger(logfile)
 
-    def launch(self, jarname, classes):
-        launcher = Launcher(jarname)
-        procs = launcher.launch(classes)
-        #we could monitor the output of the processes here, or wait for them
-        # but it seems more prudent to let the launch process terminate
-        # and rely on the processes to log properly (not just to stdout) themselves
-        for procname in procs:
-            proc = procs[procname]
-            s = "Launched %s with pid %d" % (procname, proc.pid)
-            self._log.info(s)
-        return procs
-
-    def check_processes(self, procs, delay_secs):
-        now = time.time()
-        then = now + delay_secs
-
-        done = []
-        while time.time() < then:
-            for procname in procs:
-                proc = procs[procname]
-                if proc.pid not in done:
-                    retval = proc.poll()
-                    if not retval is None:
-                        elapsed = time.time() - now
-                        s = "%s [pid %d] died within %f seconds, returning %d" % (procname, proc.pid, elapsed, retval)
-                        self._log.error(s)
-                        done.append(proc.pid)
-            time.sleep(0.1)
+    def launch_app(self):
+        proc = subprocess.Popen(["python", "launcher.py"])
+        self._log.info("started launcher process with pid %d" % (proc.pid,))
 
     def run_wait_log(self, cmd):
+        self._log.info("running " + " ".join(cmd))
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -71,22 +47,18 @@ class Installer(object):
             self.run_wait_log([script_path])
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Launch the Fulfillment application")
-    thisdir = os.path.dirname(os.path.realpath(__file__))
-    jar = os.path.join(thisdir, "fulfillment.jar")
+    parser = argparse.ArgumentParser("Install the Fulfillment application")
     splunks3bucket = "s3://balihoo.dev.splunk"
     splunkscript = "installSplunkForwarder.sh"
 
-    parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
-    parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')
-    parser.add_argument('-d', '--delay', type=float, help='the number of seconds to monitor the spawned processes', default=300)
     parser.add_argument('--splunks3bucket', help='the AWS s3 bucket URL used to install splunk', default=splunks3bucket)
     parser.add_argument('--splunkscript', help='the script name used to install splunk', default=splunkscript)
+    parser.add_argument('--nosplunk', help='do not install splunk', action='store_true')
 
     args = parser.parse_args()
 
     installer = Installer(args.logfile)
-    installer.install_splunk(args.splunks3bucket, args.splunkscript)
-    procs = installer.launch(args.jarname, args.classes)
-    installer.check_processes(procs, args.delay)
+    if not args.nosplunk:
+        installer.install_splunk(args.splunks3bucket, args.splunkscript)
+    installer.launch_app()
