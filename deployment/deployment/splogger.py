@@ -1,5 +1,11 @@
 from inspect import currentframe, getframeinfo, getouterframes
-from collections import OrderedDict
+try:
+    #python 2.7
+    from collections import OrderedDict
+except ImportError:
+    #python 2.6
+    from ordereddict import OrderedDict
+
 from copy import deepcopy
 import json
 import datetime
@@ -111,7 +117,7 @@ class Splogger:
 
         additional_fields = deepcopy(additional_fields) if additional_fields else {}
         entry = OrderedDict()
-        entry["time"] = str(datetime.datetime.now())
+        entry["utctime"] = str(datetime.datetime.utcnow())
         entry["level"] = level
         entry["event"] = str(event).replace("\n", " ")
         entry["file"] = ci.filename if ci else "unknown"

@@ -32,16 +32,20 @@ class Installer(object):
         return procs
 
     def check_processes(self, procs, delay_secs):
-        now = time.now()
+        now = time.time()
         then = now + delay_secs
-        while time.now() < then:
+
+        done = []
+        while time.time() < then:
             for procname in procs:
                 proc = procs[procname]
-                retval = proc.poll()
-                if not retval is None:
-                    elapsed = time.now() - now
-                    s = "%s [pid %d] died within %f seconds, returning %d" % (procname, proc.pid, elapsed, retval)
-                    self._log.error(s)
+                if proc.pid not in done:
+                    retval = proc.poll()
+                    if not retval is None:
+                        elapsed = time.time() - now
+                        s = "%s [pid %d] died within %f seconds, returning %d" % (procname, proc.pid, elapsed, retval)
+                        self._log.error(s)
+                        done.append(proc.pid)
             time.sleep(0.1)
 
     def run_wait_log(self, cmd):
@@ -76,7 +80,7 @@ if __name__ == "__main__":
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
     parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')
-    parser.add_argument('-d', '--delay', type=float, help='the number of seconds to monitor the spawned processes', default=5)
+    parser.add_argument('-d', '--delay', type=float, help='the number of seconds to monitor the spawned processes', default=300)
     parser.add_argument('--splunks3bucket', help='the AWS s3 bucket URL used to install splunk', default=splunks3bucket)
     parser.add_argument('--splunkscript', help='the script name used to install splunk', default=splunkscript)
 

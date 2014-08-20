@@ -28,9 +28,11 @@ class Launcher(object):
             cname = path.split('.')[-1]
             proc = subprocess.Popen(
                 ["java", "-cp", self._jar, path],
+                #run in the jar dir, config uses relative paths from cwd
+                cwd=os.path.dirname(self._jar),
                 #if output is piped, it HAS to be consumed to avoid deadlock due to full pipes
-                stdout=subprocess.PIPE if pipe else sys.stdout,
-                stderr=subprocess.PIPE if pipe else sys.stderr,
+                stdout=subprocess.PIPE if pipe else None,
+                stderr=subprocess.PIPE if pipe else None,
             )
             procs[cname] = proc
         #return the procs so the caller can do something with them
