@@ -20,7 +20,8 @@ class Installer(object):
         self._log = Splogger(logfile)
 
     def launch_app(self):
-        proc = subprocess.Popen(["python", "launcher.py"])
+        thisdir = os.path.dirname(os.path.realpath(__file__))
+        proc = subprocess.Popen(["python", "launcher.py"], cwd=thisdir)
         self._log.info("started launcher process with pid %d" % (proc.pid,))
 
     def run_wait_log(self, cmd):
