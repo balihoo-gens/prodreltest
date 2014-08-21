@@ -37,7 +37,7 @@ class Packager:
             self._log.info(out)
         if len(err) > 0:
             self._log.error(out)
-        if (proc.retval != 0):
+        if (proc.returncode != 0):
             raise Exception("fat jar creation failed. See %s" % (self._log.filename(),))
         return jarname
 
