@@ -176,7 +176,7 @@ class GeoNamesTimeZoneRetriever(swf: SWFAdapter, dyn: DynamoAdapter)
 
 object geonames_timezoneretriever {
   def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$"))
+    val name = getClass.getSimpleName.stripSuffix("$")
     val cfg = PropertiesLoader(args, name)
     val worker = new GeoNamesTimeZoneRetriever(
       new SWFAdapter(cfg),
