@@ -4,7 +4,7 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import scala.util.Random
 
-abstract class AbstractChaosWorker extends FulfillmentWorker {
+abstract class AbstractChaos extends FulfillmentWorker {
  this: SWFAdapterComponent
    with DynamoAdapterComponent =>
 
@@ -34,22 +34,23 @@ abstract class AbstractChaosWorker extends FulfillmentWorker {
   }
 }
 
-class ChaosWorker(swf: SWFAdapter, dyn: DynamoAdapter)
-  extends AbstractChaosWorker
+class Chaos(swf: SWFAdapter, dyn: DynamoAdapter)
+  extends AbstractChaos
   with SWFAdapterComponent
   with DynamoAdapterComponent {
     def swfAdapter = swf
     def dynamoAdapter = dyn
 }
 
-object chaosworker {
+object chaos {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new ChaosWorker(
+    val name = getClass.getSimpleName.stripSuffix("$")
+    val cfg = PropertiesLoader(args, name)
+    val worker = new Chaos(
       new SWFAdapter(cfg),
       new DynamoAdapter(cfg)
     )
-    println(s"Running ${getClass.getSimpleName}")
+    println(s"Running $name")
     worker.work()
   }
 }
