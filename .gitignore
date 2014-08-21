@@ -28,5 +28,11 @@ project/plugins/project/
 atlassian-ide-plugin.xml
 *.iml
 
+# Python
+*.pyc
+
+# archives
+*.tar.*
+
 #vi
 *.swp

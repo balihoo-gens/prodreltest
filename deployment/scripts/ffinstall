@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+import sys, os, stat
+try:
+    from splogger import Splogger
+    from launcher import Launcher
+except ImportError:
+    #path hackery really just for local testing
+    # because these are elsewhere on the EC2 instance
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'deployment'))
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from splogger import Splogger
+    from launcher import Launcher
+
+import argparse
+import subprocess
+import time
+
+class Installer(object):
+    def __init__(self, logfile):
+        self._log = Splogger(logfile)
+
+    def launch_app(self):
+        thisdir = os.path.dirname(os.path.realpath(__file__))
+        proc = subprocess.Popen(["python", "launcher.py"], cwd=thisdir)
+        self._log.info("started launcher process with pid %d" % (proc.pid,))
+
+    def run_wait_log(self, cmd):
+        self._log.info("running " + " ".join(cmd))
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        #block and accumulate output
+        out, err = proc.communicate()
+        if len(out) > 0:
+            self._log.info(out)
+        if len(err) > 0:
+            self._log.error(out)
+        return proc.returncode
+
+    def install_splunk(self, s3bucket, script_name):
+        s3url = os.path.join(s3bucket, script_name)
+        if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
+            os.chmod(script_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
+                                 stat.S_IRGRP |                stat.S_IXGRP |
+                                 stat.S_IROTH |                stat.S_IXOTH )
+            script_path = os.path.join(".", script_name)
+            self.run_wait_log([script_path])
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Install the Fulfillment application")
+    splunks3bucket = "s3://balihoo.dev.splunk"
+    splunkscript = "installSplunkForwarder.sh"
+
+    parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')
+    parser.add_argument('--splunks3bucket', help='the AWS s3 bucket URL used to install splunk', default=splunks3bucket)
+    parser.add_argument('--splunkscript', help='the script name used to install splunk', default=splunkscript)
+    parser.add_argument('--nosplunk', help='do not install splunk', action='store_true')
+
+    args = parser.parse_args()
+
+    installer = Installer(args.logfile)
+    if not args.nosplunk:
+        installer.install_splunk(args.splunks3bucket, args.splunkscript)
+    installer.launch_app()

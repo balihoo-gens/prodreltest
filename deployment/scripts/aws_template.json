@@ -1,0 +1,214 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "Autoscaling Fulfillment Stack for SWF workers and decider",
+
+  "Parameters" : {
+    "KeyName" : {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+      "Type" : "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[-_ a-zA-Z0-9]*",
+      "ConstraintDescription" : "can contain only alphanumeric characters, spaces, dashes and underscores."
+    },
+
+    "InstanceType" : {
+      "Description" : "WebServer EC2 instance type",
+      "Type" : "String",
+      "Default" : "t1.micro",
+      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.large", "m1.xlarge" ],
+      "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
+    },
+
+    "MinInstances" : {
+      "Description" : "The minimum number of Workers",
+      "Type" : "Number",
+      "MinValue" : "1",
+      "Default"  : "1",
+      "ConstraintDescription" : "Enter a number >0"
+    },
+
+    "MaxInstances" : {
+      "Description" : "The maximum number of Workers",
+      "Type" : "Number",
+      "MinValue" : "1",
+      "Default"  : "1",
+      "ConstraintDescription" : "Enter a number >1"
+    },
+
+    "AWSAccessKey" : {
+      "Description" : "The AWS Access key to download the app from S3",
+      "Type" : "String"
+    },
+
+    "AWSSecretKey" : {
+      "Description" : "The AWS Secret key to download the app from S3",
+      "Type" : "String"
+    },
+
+    "S3BucketURL" : {
+      "Description" : "URL of the S3 bucket containing the app installation",
+      "Type" : "String"
+    }
+  },
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "64" },
+      "t2.micro"    : { "Arch" : "64" },
+      "t2.small"    : { "Arch" : "64" },
+      "t2.medium"   : { "Arch" : "64" },
+      "m1.small"    : { "Arch" : "64" },
+      "m1.large"    : { "Arch" : "64" },
+      "m1.xlarge"   : { "Arch" : "64" }
+    },
+
+    "AWSRegionArch2AMIAmazonLinux" : {
+      "us-east-1"      : { "64" : "ami-7c807d14" },
+      "us-west-1"      : { "64" : "ami-a8d3d4ed" },
+      "us-west-2"      : { "64" : "ami-1b3b462b" }
+    },
+
+    "AWSRegionArch2AMIUbuntu" : {
+      "us-east-1"      : { "64" : "ami-d2ff23ba" },
+      "us-west-1"      : { "64" : "ami-73717d36" },
+      "us-west-2"      : { "64" : "ami-f1ce8bc1" }
+    }
+   },
+
+  "Resources" : {
+
+    "InstanceSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable SSH access",
+        "SecurityGroupIngress" : [
+            { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" },
+            { "IpProtocol" : "tcp", "FromPort" : "8089", "ToPort" : "8089", "CidrIp" : "0.0.0.0/0" } ]
+      }
+    },
+
+    "LaunchConfig" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Properties" : {
+        "KeyName" : { "Ref" : "KeyName" },
+        "ImageId" : { "Fn::FindInMap" : [
+          "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
+          "Arch" ] } ] },
+        "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "UserData": { "Fn::Base64" : { "Fn::Join" : ["", [
+          "#!/bin/bash\n",
+
+          "#set up vars and init logfiles\n",
+          "LOGFILE=/tmp/bootstrap.log\n",
+          "FFDIR=/opt/balihoo/fulfillment\n",
+          "echo running bootstrap script > ${LOGFILE} 2>&1\n",
+          "echo ${PATH}>> ${LOGFILE} 2>&1\n",
+
+          "echo export aws keys >> ${LOGFILE} 2>&1\n",
+          "export AWS_ACCESS_KEY_ID=", { "Ref" : "AWSAccessKey" }, "\n",
+          "export AWS_SECRET_ACCESS_KEY=", { "Ref" : "AWSSecretKey" }, "\n",
+
+          "# echo installing unzip >> ${LOGFILE} 2>&1\n",
+          "# apt-get-install unzip >> ${LOGFILE} 2>&1\n",
+
+          "echo downloading cli tools >> ${LOGFILE} 2>&1\n",
+          "curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip >> ${LOGFILE} 2>&1\n",
+          "unzip awscli-bundle.zip >> ${LOGFILE} 2>&1\n",
+          "echo unzipped bundle >> ${LOGFILE} 2>&1\n",
+          "./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws >> ${LOGFILE} 2>&1\n",
+          "echo installed bundle >> ${LOGFILE} 2>&1\n",
+
+          "echo downloading fulfillment application >> ${LOGFILE} 2>&1\n",
+          "mkdir -p ${FFDIR} >> ${LOGFILE} 2>&1\n",
+          "/usr/local/bin/aws s3 sync ", { "Ref" : "S3BucketURL" }, " ${FFDIR} >> ${LOGFILE} 2>&1\n",
+
+          "echo setting install script execute permissions >> ${LOGFILE} 2>&1\n",
+          "chmod a+x ${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
+
+          "echo setting launch script execute permissions >> ${LOGFILE} 2>&1\n",
+          "chmod a+x ${FFDIR}/launcher.py >> ${LOGFILE} 2>&1\n",
+
+          "echo installing fulfillment application >> ${LOGFILE} 2>&1\n",
+          "${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
+          "echo done >> ${LOGFILE} 2>&1\n"
+        ]]}}
+      }
+    },
+
+    "WorkerAutoScalingGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : { "Fn::GetAZs" : ""},
+        "LaunchConfigurationName" : { "Ref" : "LaunchConfig" },
+        "MinSize" : { "Ref" : "MinInstances" },
+        "MaxSize" : { "Ref" : "MaxInstances" }
+      }
+    },
+
+    "WorkerScaleUpPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "WorkerAutoScalingGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "1"
+      }
+    },
+
+    "WorkerScaleDownPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "WorkerAutoScalingGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "-1"
+      }
+    },
+
+    "CPUAlarmHigh": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Scale-up if CPU is greater than 90% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "90",
+        "AlarmActions": [ { "Ref": "WorkerScaleUpPolicy" } ],
+        "Dimensions": [
+           {
+              "Name": "AutoScalingGroupName",
+              "Value": { "Ref": "WorkerAutoScalingGroup" }
+           }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+
+    "CPUAlarmLow": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Scale-down if CPU is less than 70% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "70",
+        "AlarmActions": [ { "Ref": "WorkerScaleDownPolicy" } ],
+        "Dimensions": [
+           {
+              "Name": "AutoScalingGroupName",
+              "Value": { "Ref": "WorkerAutoScalingGroup" }
+           }
+        ],
+        "ComparisonOperator": "LessThanThreshold"
+      }
+    }
+  }
+}
