@@ -81,7 +81,7 @@ trait TextAdCreatorComponent {
 
       val selector = new SelectorBuilder()
         .fields("Id", "Url", "DisplayUrl", "Status")
-        .equals("TextCreativeName", name)
+        .equals("Headline", name)
         .equals("AdGroupId", adGroupId)
         .build()
 

@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.deciders
 import java.util.Date
 
 import com.balihoo.fulfillment.workers.UTCFormatter
+import org.joda.time.DateTime
 
 import scala.collection.convert.wrapAsScala._
 import com.amazonaws.services.simpleworkflow.model._
@@ -95,7 +96,8 @@ class FulfillmentSection(val name: String
   var scheduleToStartTimeout = ""
   var scheduleToCloseTimeout = ""
   var heartbeatTimeout = ""
-
+  var waitUntil: Option[DateTime] = None
+  
   jsonInit(jsonNode)
 
   def jsonInit(jsonNode: JsObject) = {
@@ -118,6 +120,9 @@ class FulfillmentSection(val name: String
 
         case "fixable" =>
           fixable = value.as[Boolean]
+          
+        case "waitUntil" =>
+          waitUntil = Some(new DateTime(value.as[String]))
 
         case _ =>
           timeline.warning(s"Section input '$key' unhandled!", creationDate)
@@ -508,6 +513,9 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
     if(section.status == SectionStatus.DEFERRED) {
       section.timeline.error(s"$sectionName is already DEFERRED!!", event.getEventTimestamp)
     }
+
+    val reason = timerParams.value("reason").as[String]
+    section.timeline.note(reason, event.getEventTimestamp)
 
     section.status = SectionStatus.DEFERRED
   }

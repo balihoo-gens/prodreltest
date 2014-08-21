@@ -6,6 +6,7 @@ import java.util.UUID.randomUUID
 
 import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
+import com.balihoo.fulfillment.config.{SWFVersion, SWFName}
 
 import scala.collection.mutable
 import scala.sys.process._
@@ -25,9 +26,9 @@ abstract class FulfillmentWorker {
   val instanceId = randomUUID().toString
 
   val domain = swfAdapter.domain
-  val name = validateSWFIdentifier(swfAdapter.config.getString("name"), 256)
-  val version = validateSWFIdentifier(swfAdapter.config.getString("version"), 64)
-  val taskListName = validateSWFIdentifier(name+version, 256)
+  val name = new SWFName(swfAdapter.config.getString("name"))
+  val version = new SWFVersion(swfAdapter.config.getString("version"))
+  val taskListName = new SWFName(name+version)
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
@@ -218,19 +219,10 @@ abstract class FulfillmentWorker {
     }
   }
 
-  def validateSWFIdentifier(ident:String, length:Int) = {
-    for(s <- Array("##", ":", "/", "|", "arn")) {
-      if(ident.contains(s)) throw new Exception(s"$ident must not contain '$s'")
-    }
-    if(ident.length > length) throw new Exception(s"$ident must not be longer than '$length'")
-
-    ident
-  }
 }
 
 class TaskResolution(val resolution:String, val details:String) {
   val when = UTCFormatter.format(new Date())
-
   def toJson:JsValue = {
     Json.toJson(Map(
       "resolution" -> Json.toJson(resolution),
