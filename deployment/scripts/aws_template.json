@@ -83,9 +83,8 @@
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
         "GroupDescription" : "Enable SSH access",
-        "SecurityGroupIngress" : [
-            { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" },
-            { "IpProtocol" : "tcp", "FromPort" : "8089", "ToPort" : "8089", "CidrIp" : "0.0.0.0/0" } ]
+        "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" } ],
+        "SecurityGroupEgress" : [ { "IpProtocol" : "tcp", "FromPort" : "8089", "ToPort" : "8089", "DestinationSecurityGroupId" : "sg-f4de779e" ]
       }
     },
 
