@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.4",
   "commons-configuration" % "commons-configuration" % "1.10",
   "commons-beanutils" % "commons-beanutils" % "1.9.2",
-  "com.balihoo.commons" % "commons-client" % "latest.snapshot",
+  ("com.balihoo.commons" % "commons-client" % "latest.snapshot").exclude("com.google.guava", "guava"),
   "com.google.api-ads" % "ads-lib" % "1.29.0",
   "com.google.api-ads" % "adwords-axis" % "1.29.0",
   "javax.activation" % "activation" % "1.1",
