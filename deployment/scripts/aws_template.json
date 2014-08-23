@@ -75,7 +75,7 @@
       "us-west-1"      : { "64" : "ami-73717d36" },
       "us-west-2"      : { "64" : "ami-f1ce8bc1" }
     }
-   },
+  },
 
   "Resources" : {
 
@@ -83,8 +83,7 @@
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
         "GroupDescription" : "Enable SSH access",
-        "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" } ],
-        "SecurityGroupEgress" : [ { "IpProtocol" : "tcp", "FromPort" : "8089", "ToPort" : "8089", "DestinationSecurityGroupId" : "sg-f4de779e" ]
+        "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" } ]
       }
     },
 
@@ -96,10 +95,14 @@
           "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
           "Arch" ] } ] },
-        "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+        "SecurityGroups" : [
+          { "Ref" : "InstanceSecurityGroup" },
+          "splunk-access"
+        ],
         "InstanceType" : { "Ref" : "InstanceType" },
         "UserData": { "Fn::Base64" : { "Fn::Join" : ["", [
           "#!/bin/bash\n",
+
 
           "#set up vars and init logfiles\n",
           "LOGFILE=/tmp/bootstrap.log\n",
