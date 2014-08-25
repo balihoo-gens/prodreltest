@@ -35,7 +35,6 @@ abstract class FulfillmentWorker {
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
-  //TODO: move to cake pattern
   val _log = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
   def splog = _log
 
@@ -150,11 +149,11 @@ abstract class FulfillmentWorker {
       entry.setLast(UTCFormatter.format(new Date()))
       entry.setStatus(status)
       workerTable.update(entry)
-      splog.log(level,status)
+      splog(level,status)
     } catch {
       case e:Exception =>
         //splog will print to stdout on any throwable, or log to the default logfile
-        splog.log("ERROR", s"$name failed to update status: ${e.toString}")
+        splog("ERROR", s"$name failed to update status: ${e.toString}")
     }
   }
 
