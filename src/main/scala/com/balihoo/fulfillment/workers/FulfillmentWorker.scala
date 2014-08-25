@@ -6,7 +6,9 @@ import java.util.UUID.randomUUID
 
 import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
+import com.balihoo.fulfillment.config.{SWFVersion, SWFName}
 
+import scala.collection.mutable
 import scala.sys.process._
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
@@ -16,28 +18,27 @@ import com.balihoo.fulfillment.adapters._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
-import com.balihoo.fulfillment.util.{SploggerComponent, Getch}
+import com.balihoo.fulfillment.util.{Getch, Splogger}
 
-abstract class FulfillmentWorker extends SploggerComponent {
-  this: SWFAdapterComponent
-    //with SploggerComponent
-    with DynamoAdapterComponent =>
+abstract class FulfillmentWorker {
+  this: SWFAdapterComponent with DynamoAdapterComponent =>
 
   val instanceId = randomUUID().toString
 
   val domain = swfAdapter.domain
-  val name = validateSWFIdentifier(swfAdapter.config.getString("name"), 256)
-  val version = validateSWFIdentifier(swfAdapter.config.getString("version"), 64)
-  val taskListName = validateSWFIdentifier(name+version, 256)
+  val name = new SWFName(swfAdapter.config.getString("name"))
+  val version = new SWFVersion(swfAdapter.config.getString("version"))
+  val taskListName = new SWFName(name+version)
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
-//  TODO This can be used to have the worker discover the address of the ec2 instance it is running on (if it is!)
-//  This would be a nice piece of information to put into dynamo so we can log in and administer via ssh
-//  without having to look up the instance in the ec2 dashboard.
+  //TODO: move to cake pattern
+  val _log = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
+  def splog = _log
+
   val hostAddress = sys.env.get("EC2_HOME") match {
     case Some(s:String) =>
       val aws_ec2_identify = "curl -s http://169.254.169.254/latest/meta-data/public-hostname"
@@ -50,13 +51,17 @@ abstract class FulfillmentWorker extends SploggerComponent {
     def dynamoAdapter = FulfillmentWorker.this.dynamoAdapter
   }
 
+  val taskResolutions = new mutable.Queue[TaskResolution]()
+
   val entry = new FulfillmentWorkerEntry
   entry.setInstance(instanceId)
   entry.setHostAddress(hostAddress)
   entry.setActivityName(name)
   entry.setActivityVersion(version)
+  entry.setSpecification(getSpecification.toString)
   entry.setDomain(domain)
   entry.setStatus("--")
+  entry.setResolutionHistory("[]")
   entry.setStart(UTCFormatter.format(new Date()))
 
   val taskList: TaskList = new TaskList().withName(taskListName)
@@ -75,43 +80,51 @@ abstract class FulfillmentWorker extends SploggerComponent {
 
   var task:ActivityTask = null
 
+
   def work() = {
 
-    withExceptionsSplogged {
+    registerActivityType()
 
-      registerActivityType()
-      updateStatus("Starting")
+    updateStatus("Starting")
 
-      var done = false
-      val getch = new Getch
-      getch.addMapping(Seq("q", "Q", "Exit"), () => { splog.info("Terminated by user");done = true})
+    val specification = getSpecification
 
-      getch.doWith {
-        while(!done) {
-          updateStatus("Polling")
-          task = new ActivityTask
-          try {
-            task = swfAdapter.client.pollForActivityTask(taskReq)
-            if(task.getTaskToken != null) {
-              updateStatus("Processing task..")
-              try {
-                handleTask(new ActivityParameters(task.getInput))
-              } catch {
-                case e: Exception =>
-                  failTask("Exception", e.getMessage)
-              }
+    var done = false
+    val getch = new Getch
+    getch.addMapping(
+      Seq("q", "Q", "Exit"), () => {
+        updateStatus("Terminated by user", "WARN")
+        done = true
+      }
+    )
+
+    getch.doWith {
+      while(!done) {
+        updateStatus("Polling")
+        task = new ActivityTask
+        try {
+          task = swfAdapter.client.pollForActivityTask(taskReq)
+          if(task.getTaskToken != null) {
+            updateStatus("Processing task..")
+            try {
+              handleTask(specification.getParameters(task.getInput))
+            } catch {
+              case e: Exception =>
+                failTask("Exception", e.getMessage)
             }
-          } catch {
-            case e:Exception =>
-              splog.exception(e.getMessage)
-            case t:Throwable =>
-              splog.error(t.getMessage)
           }
+        } catch {
+          case e:Exception =>
+            updateStatus("Polling Exception ${e.getMessage}", "EXCEPTION")
+          case t:Throwable =>
+            updateStatus("Polling Throwable ${t.getMessage}", "ERROR")
         }
       }
-      updateStatus("Exiting")
     }
+    updateStatus("Exiting")
   }
+
+  def getSpecification: ActivitySpecification
 
   def handleTask(params:ActivityParameters)
 
@@ -127,28 +140,32 @@ abstract class FulfillmentWorker extends SploggerComponent {
     }
   }
 
-  def withExceptionsSplogged[T](code: => T) {
+  def declareWorker() = {
+    updateStatus(s"Declaring $name $domain $taskListName")
+  }
+
+  def updateStatus(status:String, level:String="INFO") = {
     try {
-      code
+      splog.log(level,status)
+      updateCounter += 1
+      entry.setLast(UTCFormatter.format(new Date()))
+      entry.setStatus(status)
+      workerTable.update(entry)
     } catch {
       case e:Exception =>
-        splog.exception(e.getMessage)
-      case t:Throwable =>
-        splog.error(t.getMessage)
+        println(s"ERROR: $name failed to update status: ${e.toString}")
     }
   }
 
-  def declareWorker() = {
-    entry.setLast(UTCFormatter.format(new Date()))
-    workerTable.insert(entry)
-  }
-
-  def updateStatus(status:String) = {
-    splog.info("Status Update: $status")
-    updateCounter += 1
-    entry.setLast(UTCFormatter.format(new Date()))
-    entry.setStatus(status)
-    workerTable.update(entry)
+  private def _resolveTask(resolution:TaskResolution) = {
+    if(taskResolutions.size == 20) {
+      taskResolutions.dequeue()
+    }
+    taskResolutions.enqueue(resolution)
+    entry.setResolutionHistory(Json.stringify(
+      Json.toJson(for(res <- taskResolutions) yield res.toJson)
+    ))
+    updateStatus(resolution.resolution)
   }
 
   def completeTask(result:String) = {
@@ -157,7 +174,7 @@ abstract class FulfillmentWorker extends SploggerComponent {
     response.setTaskToken(task.getTaskToken)
     response.setResult(result)
     swfAdapter.client.respondActivityTaskCompleted(response)
-    updateStatus(s"Completed Task")
+    _resolveTask(new TaskResolution("Completed", result))
   }
 
   def failTask(reason:String, details:String) = {
@@ -167,7 +184,7 @@ abstract class FulfillmentWorker extends SploggerComponent {
     response.setReason(reason)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskFailed(response)
-    updateStatus(s"Failed Task: $reason $details")
+    _resolveTask(new TaskResolution("Failed", s"$reason $details"))
   }
 
   def cancelTask(details:String) = {
@@ -176,7 +193,7 @@ abstract class FulfillmentWorker extends SploggerComponent {
     response.setTaskToken(task.getTaskToken)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskCanceled(response)
-    updateStatus(s"Cancel Task: $details")
+    _resolveTask(new TaskResolution("Canceled", details))
   }
 
   def registerActivityType() = {
@@ -208,38 +225,94 @@ abstract class FulfillmentWorker extends SploggerComponent {
     }
   }
 
-  def validateSWFIdentifier(ident:String, length:Int) = {
-    for(s <- Array("##", ":", "/", "|", "arn")) {
-      if(ident.contains(s)) throw new Exception(s"$ident must not contain '$s'")
-    }
-    if(ident.length > length) throw new Exception(s"$ident must not be longer than '$length'")
+}
 
-    ident
+class TaskResolution(val resolution:String, val details:String) {
+  val when = UTCFormatter.format(new Date())
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "resolution" -> Json.toJson(resolution),
+      "when" -> Json.toJson(when),
+      "details" -> Json.toJson(details)
+    ))
+  }
+}
+
+class ActivityResult(val rtype:String, description:String) {
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "type" -> Json.toJson(rtype),
+      "description" -> Json.toJson(description)
+    ))
+  }
+}
+
+class ActivityParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true) {
+  var value:Option[String] = None
+
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "name" -> Json.toJson(name),
+      "type" -> Json.toJson(ptype),
+      "description" -> Json.toJson(description),
+      "required" -> Json.toJson(required)
+    ))
+  }
+}
+
+class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult) {
+
+  val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
+
+  def getSpecification:JsValue = {
+    Json.toJson(Map(
+      "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
+      "result" -> result.toJson
+    ))
+  }
+
+  override def toString:String = {
+    Json.stringify(getSpecification)
+  }
+
+  def getParameters(input:String):ActivityParameters = {
+    val inputObject:JsObject = Json.parse(input).as[JsObject]
+    for((name, value) <- inputObject.fields) {
+      if(paramsMap contains name) {
+        paramsMap(name).value = Some(value.as[String])
+      }
+    }
+    for(param <- params) {
+      if(param.required && param.value.isEmpty) {
+        throw new Exception(s"input parameter '${param.name}' is REQUIRED!")
+      }
+    }
+
+    new ActivityParameters(
+      (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap)
   }
 
 }
 
-class ActivityParameters(input:String) {
-  val inputObject:JsObject = Json.parse(input).as[JsObject]
-  val params:Map[String, String] = (for((key, value) <- inputObject.fields) yield key -> value.as[String]).toMap
+class ActivityParameters(val params:Map[String,String]) {
 
-  def hasParameter(param:String) = {
+  def has(param:String):Boolean = {
     params contains param
   }
 
-  def getRequiredParameter(param:String):String = {
-    if(!(params contains param)) {
-      throw new Exception(s"input parameter '$param' is REQUIRED! '$input' doesn't contain '$param'")
-    }
+  def apply(param:String):String = {
     params(param)
   }
 
-  def getOptionalParameter(param:String, default:String):String = {
-    params.getOrElse(param, default)
+  def getOrElse(param:String, default:String):String = {
+    if(has(param)) {
+      return params(param)
+    }
+    default
   }
 
-  override def toString = {
-    input
+  override def toString:String = {
+    params.toString()
   }
 }
 
@@ -299,7 +372,9 @@ class FulfillmentWorkerEntry {
   var domain:String = ""
   var activityName:String = ""
   var activityVersion:String = ""
+  var specification:String = ""
   var status:String = ""
+  var resolutionHistory:String = ""
   var start:String = ""
   var last:String = ""
 
@@ -312,7 +387,9 @@ class FulfillmentWorkerEntry {
       "domain" -> Json.toJson(domain),
       "activityName" -> Json.toJson(activityName),
       "activityVersion" -> Json.toJson(activityVersion),
+      "specification" -> Json.toJson(specification),
       "status" -> Json.toJson(status),
+      "resolutionHistory" -> Json.toJson(resolutionHistory),
       "start" -> Json.toJson(start),
       "last" -> Json.toJson(last),
       "minutesSinceLast" -> Json.toJson(minutesSinceLast)
@@ -340,9 +417,17 @@ class FulfillmentWorkerEntry {
   def getActivityVersion:String = { activityVersion }
   def setActivityVersion(activityVersion:String) { this.activityVersion = activityVersion; }
 
+  @DynamoDBAttribute(attributeName="specification")
+  def getSpecification:String = { specification }
+  def setSpecification(specification:String) { this.specification = specification; }
+
   @DynamoDBAttribute(attributeName="status")
   def getStatus:String = { status }
   def setStatus(status:String) { this.status = status; }
+
+  @DynamoDBAttribute(attributeName="resolutionHistory")
+  def getResolutionHistory:String = { resolutionHistory }
+  def setResolutionHistory(resolutionHistory:String) { this.resolutionHistory = resolutionHistory; }
 
   @DynamoDBAttribute(attributeName="start")
   def getStart:String = { start }
@@ -359,7 +444,9 @@ class FulfillmentWorkerEntry {
       .addString("domain", domain)
       .addString("activityName", activityName)
       .addString("activityVersion", activityVersion)
+      .addString("specification", specification)
       .addString("status", status)
+      .addString("resolutionHistory", resolutionHistory)
       .addString("start", start)
       .addString("last", last)
   }
@@ -368,6 +455,7 @@ class FulfillmentWorkerEntry {
     new DynamoUpdate("fulfillment_worker_status")
       .forKey("instance", instance)
       .addString("status", status)
+      .addString("resolutionHistory", resolutionHistory)
       .addString("last", last)
   }
 

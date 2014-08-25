@@ -4,11 +4,14 @@ import play.api.libs.json.{Json, JsObject}
 import org.joda.time._
 import java.io._
 
+/* TODO cake pattern
 trait SploggerComponent {
   def splog: AbstractSplogger with PropertiesLoaderComponent
 
   abstract class AbstractSplogger(filename:String ) {
     this: PropertiesLoaderComponent =>
+*/
+  class Splogger(filename:String ) {
     private val _fileName:String = filename
 
     private def _fileWrite(str:String) = {
@@ -22,7 +25,7 @@ trait SploggerComponent {
       retval
     }
 
-    private def _log(level: String, msg: String) = {
+    def log(level: String, msg: String) = {
       val now:DateTime = new DateTime(DateTimeZone.UTC)
       //{"utctime": "2014-08-20 23:42:50.030868", "level": "INFO", "event": "doing stuff" }
       if (!_fileWrite(Json.toJson(Map(
@@ -35,24 +38,24 @@ trait SploggerComponent {
      }
 
     def debug(msg:String) = {
-      _log("DEBUG", msg)
+      log("DEBUG", msg)
     }
 
     def info(msg:String) = {
-      _log("INFO", msg)
+      log("INFO", msg)
     }
 
     def warn(msg:String) = {
-      _log("WARN", msg)
+      log("WARN", msg)
     }
 
     def error(msg:String) = {
-      _log("ERROR", msg)
+      log("ERROR", msg)
     }
 
     def exception(msg:String) = {
-      _log("EXCEPTION", msg)
+      log("EXCEPTION", msg)
     }
 
   }
-}
+// }
