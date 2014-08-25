@@ -3,7 +3,7 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.{PropertiesLoaderComponent, FTPUploadConfig, PropertiesLoader}
 
-abstract class AbstractFTPUploadWorker extends FulfillmentWorker {
+abstract class AbstractFTPUploader extends FulfillmentWorker {
   this: FTPAdapterComponent
     with SWFAdapterComponent
     with DynamoAdapterComponent
@@ -23,8 +23,8 @@ abstract class AbstractFTPUploadWorker extends FulfillmentWorker {
   }
 }
 
-class FTPUploadWorker(swf: SWFAdapter, dyn: DynamoAdapter, ftp: FTPAdapter, cfg: PropertiesLoader)
-  extends AbstractFTPUploadWorker
+class FTPUploader(swf: SWFAdapter, dyn: DynamoAdapter, ftp: FTPAdapter, cfg: PropertiesLoader)
+  extends AbstractFTPUploader
   with SWFAdapterComponent
   with DynamoAdapterComponent
   with FTPAdapterComponent
@@ -35,10 +35,10 @@ class FTPUploadWorker(swf: SWFAdapter, dyn: DynamoAdapter, ftp: FTPAdapter, cfg:
     def config = cfg
 }
 
-object ftpuploadworker {
+object ftp_uploader {
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new FTPUploadWorker(
+    val worker = new FTPUploader(
       new SWFAdapter(cfg),
       new DynamoAdapter(cfg),
       new FTPAdapter(cfg),

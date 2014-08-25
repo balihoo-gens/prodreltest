@@ -3,7 +3,7 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 
-abstract class AbstractNoopWorker extends FulfillmentWorker {
+abstract class AbstractNoop extends FulfillmentWorker {
  this: SWFAdapterComponent
    with DynamoAdapterComponent =>
 
@@ -16,22 +16,23 @@ abstract class AbstractNoopWorker extends FulfillmentWorker {
   }
 }
 
-class NoopWorker(swf: SWFAdapter, dyn: DynamoAdapter)
-  extends AbstractNoopWorker
+class Noop(swf: SWFAdapter, dyn: DynamoAdapter)
+  extends AbstractNoop
   with SWFAdapterComponent
   with DynamoAdapterComponent {
     def swfAdapter = swf
     def dynamoAdapter = dyn
 }
 
-object noopworker {
+object noop {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new NoopWorker(
+    val name = getClass.getSimpleName.stripSuffix("$")
+    val cfg = PropertiesLoader(args, name)
+    val worker = new Noop(
       new SWFAdapter(cfg),
       new DynamoAdapter(cfg)
     )
-    println(s"Running ${getClass.getSimpleName}")
+    println(s"Running $name")
     worker.work()
   }
 }
