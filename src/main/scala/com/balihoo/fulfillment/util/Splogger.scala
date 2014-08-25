@@ -33,14 +33,16 @@ class Splogger(filename:String) {
   }
 
   private def _fileWrite(str:String) = {
-   val fw = new FileWriter(_file, true)
-    var retval = true
-    try fw.write(str)
+    //FileWriter(..., true) means append
+    val fw = new FileWriter(_file, true)
+    try {
+      fw.write(str)
+      true
+    }
     catch {
-      case _:Throwable => { retval = false }
+      case _: Throwable => false
     }
     finally fw.close()
-    retval
   }
 
   def apply(level: String, msg: String) = {
@@ -48,14 +50,22 @@ class Splogger(filename:String) {
   }
 
   def log(level: String, msg: String) = {
-    val now:DateTime = new DateTime(DateTimeZone.UTC)
-    //{"utctime": "2014-08-20 23:42:50.030868", "level": "INFO", "event": "doing stuff" }
-    if (!_fileWrite(Json.toJson(Map(
-      "utctime" -> now.toString,
-      "level" -> level,
-      "event" -> msg
-    )).toString + "\n")) {
-      print(s"$level: $msg\n")
+    try {
+      val now:DateTime = new DateTime(DateTimeZone.UTC)
+      //{"utctime": "2014-08-20 23:42:50.030868", "level": "INFO", "event": "doing stuff" }
+      val jstr = Json.stringify(Json.toJson(Map(
+        "utctime" -> now.toString,
+        "level" -> level,
+        "event" -> msg
+      )))
+
+      if (!_fileWrite(s"$jstr\n")) {
+        println(jstr)
+      }
+    }
+    catch {
+      case t: Throwable =>
+        print(s"$level: $msg [$t.getMessage]\n")
     }
    }
 
