@@ -39,7 +39,7 @@ class Splogger(filename:String) {
       val fw = new FileWriter(_file, true)
       try fw.write(str)
       //no except needed here;
-      // If write throws, few is closed and ret = false
+      // If write throws, fw is closed and ret = false
       finally fw.close()
     }
     catch { case _: Throwable => ret = false }
