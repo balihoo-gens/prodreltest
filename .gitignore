@@ -35,4 +35,4 @@ atlassian-ide-plugin.xml
 *.tar.*
 
 #vi
-*.swp
+.*.sw?
