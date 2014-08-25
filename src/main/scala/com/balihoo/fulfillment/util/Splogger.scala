@@ -12,10 +12,24 @@ trait SploggerComponent {
     this: PropertiesLoaderComponent =>
 */
   class Splogger(filename:String ) {
-    private val _fileName:String = filename
+    private val _file:File = _checkFile(filename)
+
+    private def _checkFile(filename:String):File = {
+      var file = new File(filename)
+      val path = new File(file.getAbsolutePath)
+      if (!path.isDirectory) {
+          if (!path.mkdirs) {
+            val name = """[\W]""".r.replaceAllIn(file.getName, "")
+            val default = s"/tmp/splogger_default_${name}.log"
+            println(s"unable to log to $filename; using $default instead")
+            file = new File(default)
+          }
+      }
+      file
+    }
 
     private def _fileWrite(str:String) = {
-      val fw = new FileWriter(_fileName, true)
+     val fw = new FileWriter(_file, true)
       var retval = true
       try fw.write(str)
       catch {
@@ -32,8 +46,8 @@ trait SploggerComponent {
         "utctime" -> now.toString,
         "level" -> level,
         "event" -> msg
-      )).toString)) {
-        print("$level: $event\n")
+      )).toString + "\n")) {
+        print(s"$level: $msg\n")
       }
      }
 

@@ -146,14 +146,15 @@ abstract class FulfillmentWorker {
 
   def updateStatus(status:String, level:String="INFO") = {
     try {
-      splog.log(level,status)
       updateCounter += 1
       entry.setLast(UTCFormatter.format(new Date()))
       entry.setStatus(status)
       workerTable.update(entry)
+      splog.log(level,status)
     } catch {
       case e:Exception =>
-        println(s"ERROR: $name failed to update status: ${e.toString}")
+        //splog will print to stdout on any throwable, or log to the default logfile
+        splog.log("ERROR", s"$name failed to update status: ${e.toString}")
     }
   }
 
