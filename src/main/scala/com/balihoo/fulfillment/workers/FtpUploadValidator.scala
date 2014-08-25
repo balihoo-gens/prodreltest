@@ -6,7 +6,7 @@ import java.net.URL
 import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter, DynamoAdapterComponent, SWFAdapterComponent}
 import com.balihoo.fulfillment.config.{PropertiesLoaderComponent, FTPUploadConfig, PropertiesLoader}
 
-abstract class AbstractFTPUploadValidatorWorker extends FulfillmentWorker {
+abstract class AbstractFTPUploadValidator extends FulfillmentWorker {
   this: SWFAdapterComponent
     with DynamoAdapterComponent
     with PropertiesLoaderComponent =>
@@ -30,8 +30,8 @@ abstract class AbstractFTPUploadValidatorWorker extends FulfillmentWorker {
   }
 }
 
-class FTPUploadValidatorWorker(swf: SWFAdapter, dyn: DynamoAdapter, cfg: PropertiesLoader)
-  extends AbstractFTPUploadValidatorWorker
+class FTPUploadValidator(swf: SWFAdapter, dyn: DynamoAdapter, cfg: PropertiesLoader)
+  extends AbstractFTPUploadValidator
   with SWFAdapterComponent
   with DynamoAdapterComponent
   with PropertiesLoaderComponent {
@@ -40,10 +40,10 @@ class FTPUploadValidatorWorker(swf: SWFAdapter, dyn: DynamoAdapter, cfg: Propert
     def config = cfg
 }
 
-object ftpuploadvalidatorworker {
+object ftp_uploadvalidator{
   def main(args: Array[String]) {
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new FTPUploadValidatorWorker(
+    val worker = new FTPUploadValidator(
       new SWFAdapter(cfg),
       new DynamoAdapter(cfg),
       cfg
