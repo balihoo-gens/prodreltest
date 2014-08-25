@@ -26,24 +26,25 @@ class Splogger(filename:String) {
       file
     } else {
       val name = """[\W]""".r.replaceAllIn(filename, "_")
-      val default = s"/tmp/${name}.log"
+      val default = s"/var/log/${name}.log"
       println(s"unable to log to $filename; using $default instead")
       new File(default)
     }
   }
 
   private def _fileWrite(str:String) = {
-    //FileWriter(..., true) means append
-    val fw = new FileWriter(_file, true)
+    var ret = true
     try {
-      fw.write(str)
-      true
+      //FileWriter(..., true) means append
+      val fw = new FileWriter(_file, true)
+      try fw.write(str)
+      //no except needed here;
+      // If write throws, few is closed and ret = false
+      finally fw.close()
     }
-    catch {
-      case _: Throwable => false
-    }
-    finally fw.close()
-  }
+    catch { case _: Throwable => ret = false }
+    ret
+   }
 
   def apply(level: String, msg: String) = {
     log(level, msg)
@@ -65,7 +66,7 @@ class Splogger(filename:String) {
     }
     catch {
       case t: Throwable =>
-        print(s"$level: $msg [$t.getMessage]\n")
+        print(s"$level: $msg [log parse exception: ${t.getMessage}]\n")
     }
    }
 
