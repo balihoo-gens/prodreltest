@@ -19,9 +19,9 @@ class Installer(object):
     def __init__(self, logfile):
         self._log = Splogger(logfile)
 
-    def launch_app(self):
+    def launch_app(self, classes):
         thisdir = os.path.dirname(os.path.realpath(__file__))
-        proc = subprocess.Popen(["python", "launcher.py"], cwd=thisdir)
+        proc = subprocess.Popen(["python", "launcher.py"] + classes, cwd=thisdir)
         self._log.info("started launcher process with pid %d" % (proc.pid,))
 
     def run_wait_log(self, cmd):
@@ -52,6 +52,7 @@ if __name__ == "__main__":
     splunks3bucket = "s3://balihoo.dev.splunk"
     splunkscript = "installSplunkForwarder.sh"
 
+    parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')
     parser.add_argument('--splunks3bucket', help='the AWS s3 bucket URL used to install splunk', default=splunks3bucket)
     parser.add_argument('--splunkscript', help='the script name used to install splunk', default=splunkscript)
@@ -62,4 +63,4 @@ if __name__ == "__main__":
     installer = Installer(args.logfile)
     if not args.nosplunk:
         installer.install_splunk(args.splunks3bucket, args.splunkscript)
-    installer.launch_app()
+    installer.launch_app(args.classes)

@@ -115,7 +115,8 @@
         "AvailabilityZones" : { "Fn::GetAZs" : ""},
         "LaunchConfigurationName" : { "Ref" : "LaunchConfig" },
         "MinSize" : { "Ref" : "MinInstances" },
-        "MaxSize" : { "Ref" : "MaxInstances" }
+        "MaxSize" : { "Ref" : "MaxInstances" },
+        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Decider and Workers", "PropagateAtLaunch" : "true"} ]
       }
     },
 
@@ -217,6 +218,7 @@
           "splunk-access"
         ],
         "InstanceType" : { "Ref" : "InstanceType" },
+        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Dashboard"} ],
         "UserData": { "Fn::Base64" : { "Ref" : "DashboardScript" } }
       }
     }
