@@ -71,7 +71,6 @@ class Deployment(object):
             "DashboardScript" : self.gen_script(script_file, access_key, secret_key, s3url, "com.balihoo.fulfillment.dashboard.dashboard")
         }
 
-        print(parameters)
         #json dump guarantees valid json, but not a valid template per se
         stackname = "fulfillment%d" % (int(time.time()),)
         return c.create_stack(stackname, json.dumps(template_data), parameters)

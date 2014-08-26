@@ -212,6 +212,11 @@
           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
           "Arch" ] } ] },
         "KeyName" : { "Ref" : "KeyName" },
+        "SecurityGroups" : [
+          { "Ref" : "DashboardSecurityGroup" },
+          "splunk-access"
+        ],
+        "InstanceType" : { "Ref" : "InstanceType" },
         "UserData": { "Fn::Base64" : { "Ref" : "DashboardScript" } }
       }
     }
