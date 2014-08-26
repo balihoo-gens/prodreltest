@@ -46,7 +46,7 @@ class Deployment(object):
         )
         return u.upload_dir(pkgpath)
 
-    def create_stack(self, s3url, template_file):
+    def create_stack(self, region, s3url, template_file, script_file):
         if not self.check_aws_requirements():
             raise Exception("AWS Credentials not in environment")
 
@@ -55,22 +55,38 @@ class Deployment(object):
             #validate json here by loading it
             template_data = json.loads(tf.read())
 
+
+        access_key = os.environ["AWS_ACCESS_KEY_ID"]
+        secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
         self.log.debug("creating a stack using " + s3url)
-        c = CloudFormer(
-            "us-west-2",
-            os.environ["AWS_ACCESS_KEY_ID"],
-            os.environ["AWS_SECRET_ACCESS_KEY"]
-        )
+        c = CloudFormer(region, access_key, secret_key)
+
         parameters = {
             "KeyName" : "paul-ami-pair",
             "InstanceType" : "t1.micro",
             "MinInstances" : "1",
             "MaxInstances" : "10",
-            "AWSAccessKey" : os.environ["AWS_ACCESS_KEY_ID"],
-            "AWSSecretKey" : os.environ["AWS_SECRET_ACCESS_KEY"],
-            "S3BucketURL" : s3url
+            "WebPort" : "80",
+            "WorkerScript" : self.gen_script(script_file, access_key, secret_key, s3url, ""),
+            "DashboardScript" : self.gen_script(script_file, access_key, secret_key, s3url, "com.balihoo.fulfillment.dashboard.dashboard")
         }
+
+        print(parameters)
         #json dump guarantees valid json, but not a valid template per se
         stackname = "fulfillment%d" % (int(time.time()),)
         return c.create_stack(stackname, json.dumps(template_data), parameters)
+
+    def gen_script(self, script_file, access_key, secret_key, s3_bucket_url, classes):
+        pieces = [
+          "#!/bin/bash",
+          "AWSACCESSKEY=%s" % access_key,
+          "AWSSECRETKEY=%s" % secret_key,
+          "S3BUCKETURL=%s" % s3_bucket_url,
+          "CLASSNAMES=%s" % classes,
+        ]
+
+        with open(script_file) as f:
+            pieces.append(f.read())
+
+        return "\n".join(pieces)
 

@@ -37,18 +37,22 @@
       "ConstraintDescription" : "Enter a number >1"
     },
 
-    "AWSAccessKey" : {
-      "Description" : "The AWS Access key to download the app from S3",
+    "WebPort" : {
+      "Description" : "The port of the dashboard",
+      "Type" : "Number",
+      "MinValue" : "1",
+      "MaxValue" : "255",
+      "Default"  : "80",
+      "ConstraintDescription" : "Enter a number between 0 and 256"
+    },
+
+    "WorkerScript" : {
+      "Description" : "The bootstrap script for the worker instance(s)",
       "Type" : "String"
     },
 
-    "AWSSecretKey" : {
-      "Description" : "The AWS Secret key to download the app from S3",
-      "Type" : "String"
-    },
-
-    "S3BucketURL" : {
-      "Description" : "URL of the S3 bucket containing the app installation",
+    "DashboardScript" : {
+      "Description" : "The bootstrap script for the dashboard instance",
       "Type" : "String"
     }
   },
@@ -75,6 +79,7 @@
       "us-west-1"      : { "64" : "ami-73717d36" },
       "us-west-2"      : { "64" : "ami-f1ce8bc1" }
     }
+
   },
 
   "Resources" : {
@@ -100,44 +105,7 @@
           "splunk-access"
         ],
         "InstanceType" : { "Ref" : "InstanceType" },
-        "UserData": { "Fn::Base64" : { "Fn::Join" : ["", [
-          "#!/bin/bash\n",
-
-
-          "#set up vars and init logfiles\n",
-          "LOGFILE=/tmp/bootstrap.log\n",
-          "FFDIR=/opt/balihoo/fulfillment\n",
-          "echo running bootstrap script > ${LOGFILE} 2>&1\n",
-          "echo ${PATH}>> ${LOGFILE} 2>&1\n",
-
-          "echo export aws keys >> ${LOGFILE} 2>&1\n",
-          "export AWS_ACCESS_KEY_ID=", { "Ref" : "AWSAccessKey" }, "\n",
-          "export AWS_SECRET_ACCESS_KEY=", { "Ref" : "AWSSecretKey" }, "\n",
-
-          "# echo installing unzip >> ${LOGFILE} 2>&1\n",
-          "# apt-get-install unzip >> ${LOGFILE} 2>&1\n",
-
-          "echo downloading cli tools >> ${LOGFILE} 2>&1\n",
-          "curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip >> ${LOGFILE} 2>&1\n",
-          "unzip awscli-bundle.zip >> ${LOGFILE} 2>&1\n",
-          "echo unzipped bundle >> ${LOGFILE} 2>&1\n",
-          "./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws >> ${LOGFILE} 2>&1\n",
-          "echo installed bundle >> ${LOGFILE} 2>&1\n",
-
-          "echo downloading fulfillment application >> ${LOGFILE} 2>&1\n",
-          "mkdir -p ${FFDIR} >> ${LOGFILE} 2>&1\n",
-          "/usr/local/bin/aws s3 sync ", { "Ref" : "S3BucketURL" }, " ${FFDIR} >> ${LOGFILE} 2>&1\n",
-
-          "echo setting install script execute permissions >> ${LOGFILE} 2>&1\n",
-          "chmod a+x ${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
-
-          "echo setting launch script execute permissions >> ${LOGFILE} 2>&1\n",
-          "chmod a+x ${FFDIR}/launcher.py >> ${LOGFILE} 2>&1\n",
-
-          "echo installing fulfillment application >> ${LOGFILE} 2>&1\n",
-          "${FFDIR}/ffinstall >> ${LOGFILE} 2>&1\n",
-          "echo done >> ${LOGFILE} 2>&1\n"
-        ]]}}
+        "UserData": { "Fn::Base64" : { "Ref" : "WorkerScript" } }
       }
     },
 
@@ -211,6 +179,52 @@
         ],
         "ComparisonOperator": "LessThanThreshold"
       }
+    },
+
+    "DashboardSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable SSH access",
+        "SecurityGroupIngress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" },
+          { "IpProtocol" : "tcp", "FromPort" : { "Ref": "WebPort" }, "ToPort" : { "Ref": "WebPort" }, "CidrIp" : "0.0.0.0/0" }
+        ]
+      }
+    },
+
+    "DashboardIP" : {
+      "Type": "AWS::EC2::EIP"
+    },
+
+    "IPAssoc" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "InstanceId": { "Ref": "DashboardInstance" },
+        "EIP" : { "Ref": "DashboardIP" }
+      }
+    },
+
+    "DashboardInstance" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [
+          "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
+          "Arch" ] } ] },
+        "KeyName" : { "Ref" : "KeyName" },
+        "UserData": { "Fn::Base64" : { "Ref" : "DashboardScript" } }
+      }
+    }
+  },
+
+  "Outputs" : {
+    "DashboardIP" : {
+      "Value" : { "Ref" : "DashboardIP" }
+    },
+
+    "URL" : {
+      "Description" : "Dashboard URL",
+      "Value" : { "Fn::Join" : ["", ["http://", { "Ref" : "DashboardIP" }, ":", { "Ref" : "WebPort" }]] }
     }
   }
 }
