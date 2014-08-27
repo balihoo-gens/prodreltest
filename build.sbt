@@ -10,7 +10,7 @@ scalaVersion := "2.10.2"
 
 resolvers ++= Seq(
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "Internal Snapshot Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/snapshots/",
+  //"Internal Snapshot Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/snapshots/",
   "Internal Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/internal/"
 )
 
@@ -53,3 +53,15 @@ resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
 ///Or, leave that all out and run the desired main like this
 // java -cp target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar com.balihoo.fulfillment.workers.sendemailworker -p <propfile> -d <propdir>
+
+resourceGenerators in Compile <+= (resourceManaged, baseDirectory) map
+  { (managedBase, base) =>
+    val webappBase = base / "src" / "main" / "webapp"
+    for {
+      (from, to) <- webappBase ** "*" x rebase(webappBase, managedBase /
+        "main" / "webapp")
+    } yield {
+      Sync.copy(from, to)
+      to
+    }
+  }
