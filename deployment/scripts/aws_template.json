@@ -41,7 +41,7 @@
       "Description" : "The port of the dashboard",
       "Type" : "Number",
       "MinValue" : "1",
-      "MaxValue" : "255",
+      "MaxValue" : "65535",
       "Default"  : "80",
       "ConstraintDescription" : "Enter a number between 0 and 256"
     },

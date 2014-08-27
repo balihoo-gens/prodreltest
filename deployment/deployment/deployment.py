@@ -66,7 +66,7 @@ class Deployment(object):
             "InstanceType" : "t1.micro",
             "MinInstances" : "1",
             "MaxInstances" : "10",
-            "WebPort" : "80",
+            "WebPort" : "8080",
             "WorkerScript" : self.gen_script(script_file, access_key, secret_key, s3url, ""),
             "DashboardScript" : self.gen_script(script_file, access_key, secret_key, s3url, "com.balihoo.fulfillment.dashboard.dashboard")
         }
