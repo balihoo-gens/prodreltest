@@ -1,5 +1,6 @@
 package com.balihoo.fulfillment.dashboard
 
+import java.io.File
 import java.util.Date
 
 import com.balihoo.fulfillment.deciders.{DecisionGenerator, CategorizedSections, FulfillmentSection, SectionMap}
@@ -338,7 +339,11 @@ object dashboard {
 
     val context = new WebAppContext()
     context setContextPath "/"
-    context.setResourceBase("src/main/webapp")
+    if(isRunningFromJar) {
+      context.setWar(context.getClass.getClassLoader.getResource("webapp").toExternalForm)
+    } else {
+      context.setResourceBase("src/main/webapp")
+    }
     context.setWelcomeFiles(Array[String]("index.html"))
 
     val workerServlet = new WorkerServlet(new DynamoAdapter(cfg))
@@ -351,5 +356,9 @@ object dashboard {
     server.setHandler(context)
     server.start()
     server.join()
+  }
+
+  def isRunningFromJar:Boolean = {
+    new File(getClass.getProtectionDomain.getCodeSource.getLocation.getPath).isFile
   }
 }

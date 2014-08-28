@@ -289,12 +289,13 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
     }
 
     new ActivityParameters(
-      (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap)
+      (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap
+      ,input)
   }
 
 }
 
-class ActivityParameters(val params:Map[String,String]) {
+class ActivityParameters(val params:Map[String,String], val input:String = "{}") {
 
   def has(param:String):Boolean = {
     params contains param
