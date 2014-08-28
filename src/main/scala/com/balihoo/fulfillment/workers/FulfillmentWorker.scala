@@ -18,7 +18,7 @@ import com.balihoo.fulfillment.adapters._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
-import com.balihoo.fulfillment.util.Getch
+import com.balihoo.fulfillment.util.{Getch, Splogger}
 
 abstract class FulfillmentWorker {
   this: SWFAdapterComponent with DynamoAdapterComponent =>
@@ -34,6 +34,9 @@ abstract class FulfillmentWorker {
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
+
+  val _log = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
+  def splog = _log
 
   val hostAddress = sys.env.get("EC2_HOME") match {
     case Some(s:String) =>
@@ -66,8 +69,6 @@ abstract class FulfillmentWorker {
     .withDomain(domain)
     .withTaskList(taskList)
 
-  println(s"$name $domain $taskListName")
-
   var completedTasks:Int = 0
   var failedTasks:Int = 0
   var canceledTasks:Int = 0
@@ -89,12 +90,15 @@ abstract class FulfillmentWorker {
 
     var done = false
     val getch = new Getch
-    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
+    getch.addMapping(
+      Seq("q", "Q", "Exit"), () => {
+        updateStatus("Terminated by user", "WARN")
+        done = true
+      }
+    )
 
     getch.doWith {
       while(!done) {
-        print(".")
-
         updateStatus("Polling")
         task = new ActivityTask
         try {
@@ -110,14 +114,13 @@ abstract class FulfillmentWorker {
           }
         } catch {
           case e:Exception =>
-            println("\n"+e.getMessage)
+            updateStatus("Polling Exception ${e.getMessage}", "EXCEPTION")
           case t:Throwable =>
-            println("\n"+t.getMessage)
+            updateStatus("Polling Throwable ${t.getMessage}", "ERROR")
         }
       }
     }
     updateStatus("Exiting")
-    print("Cleaning up...")
   }
 
   def getSpecification: ActivitySpecification
@@ -137,15 +140,21 @@ abstract class FulfillmentWorker {
   }
 
   def declareWorker() = {
-    entry.setLast(UTCFormatter.format(new Date()))
-    workerTable.insert(entry)
+    updateStatus(s"Declaring $name $domain $taskListName")
   }
 
-  def updateStatus(status:String) = {
-    updateCounter += 1
-    entry.setLast(UTCFormatter.format(new Date()))
-    entry.setStatus(status)
-    workerTable.update(entry)
+  def updateStatus(status:String, level:String="INFO") = {
+    try {
+      updateCounter += 1
+      entry.setLast(UTCFormatter.format(new Date()))
+      entry.setStatus(status)
+      workerTable.update(entry)
+      splog(level,status)
+    } catch {
+      case e:Exception =>
+        //splog will print to stdout on any throwable, or log to the default logfile
+        splog("ERROR", s"$name failed to update status: ${e.toString}")
+    }
   }
 
   private def _resolveTask(resolution:TaskResolution) = {
@@ -153,13 +162,10 @@ abstract class FulfillmentWorker {
       taskResolutions.dequeue()
     }
     taskResolutions.enqueue(resolution)
-    updateCounter += 1
-    entry.setLast(UTCFormatter.format(new Date()))
-    entry.setStatus(resolution.resolution)
     entry.setResolutionHistory(Json.stringify(
       Json.toJson(for(res <- taskResolutions) yield res.toJson)
     ))
-    workerTable.update(entry)
+    updateStatus(resolution.resolution)
   }
 
   def completeTask(result:String) = {
