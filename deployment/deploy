@@ -7,12 +7,16 @@ def main():
     parser = argparse.ArgumentParser("Deploy the Fulfillment application to AWS Cloud Formation")
     thisdir = os.path.dirname(os.path.realpath(__file__))
     rootdir = os.path.abspath(os.path.join(thisdir, ".."))
-    template_path = os.path.join(thisdir, "scripts/aws_template.json")
+    scriptdir = os.path.join(thisdir, "scripts")
+    template_path = os.path.join(scriptdir, "aws_template.json")
+    bootstrap_path = os.path.join(scriptdir, "base_bootstrap.sh")
     parser.add_argument('-d','--rootdir', help='the project root', default=rootdir)
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/deployment.log')
+    parser.add_argument('-r','--region', help='the AWS region', default='us-west-2')
     parser.add_argument('--s3bucket', help='the S3 bucket to use', default='balihoo.dev.fulfillment')
     parser.add_argument('--s3dir', help='the S3 sub dir to use (skips packaging and upload)')
     parser.add_argument('--template', help='the template to use for stack creation', default=template_path)
+    parser.add_argument('--bootstrap', help='the bootstrap script to use on the ec2 instances', default=bootstrap_path)
     parser.add_argument('--pkgdir', help='path of the package to use (skips packaging)')
     parser.add_argument('--nocf', help='do not create a cloud formation stack', action='store_true')
     parser.add_argument('--noupload', help='do not upload to S3', action='store_true')
@@ -28,7 +32,7 @@ def main():
     if not (s3dir or args.noupload):
         s3dir = d.upload(pkgdir, args.s3bucket)
     if not args.nocf:
-        d.create_stack(s3dir, args.template)
+        d.create_stack(args.region, s3dir, args.template, args.bootstrap)
 
 if __name__ == "__main__":
     main()
