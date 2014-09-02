@@ -42,7 +42,7 @@
 					    <span ng-hide="section.editingStatus" ng-click="section.editStatus(section)" class="label {{figureStatusLabel(section.status)}}" ng-class="{'status-edited' : section.statusChanged(section)}">{{section.status}}</span>
                         <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)">
                             <option>{{section.originalStatus}}</option>
-                            <option>INCOMPLETE</option>
+                            <option>READY</option>
                             <option>TERMINAL</option>
                         </select>
                     </span>

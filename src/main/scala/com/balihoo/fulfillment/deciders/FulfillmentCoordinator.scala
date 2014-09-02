@@ -157,7 +157,7 @@ class DecisionGenerator(categorized: CategorizedSections
         val message = s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})"
         section.timeline.warning(message)
         if(!section.fixable) {
-          decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
+          decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.READY.toString,
             message)
         } else {
           section.timeline.warning("Section is marked FIXABLE.")
@@ -173,7 +173,7 @@ class DecisionGenerator(categorized: CategorizedSections
       if(section.timedoutCount < section.timeoutParams.maxRetries) {
         val message = s"Section timed out and is allowed to retry (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
         section.timeline.warning(message)
-        decisions += _createTimerDecision(section.name, section.timeoutParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
+        decisions += _createTimerDecision(section.name, section.timeoutParams.delaySeconds, SectionStatus.READY.toString,
           message)
       } else {
         val message =  s"Section $section TIMED OUT too many times! (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
@@ -186,7 +186,7 @@ class DecisionGenerator(categorized: CategorizedSections
       if(section.canceledCount < section.cancelationParams.maxRetries) {
         val message = s"Section was canceled and is allowed to retry (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
         section.timeline.warning(message)
-        decisions += _createTimerDecision(section.name, section.cancelationParams.delaySeconds, SectionStatus.INCOMPLETE.toString,
+        decisions += _createTimerDecision(section.name, section.cancelationParams.delaySeconds, SectionStatus.READY.toString,
           message)
       } else {
         val message = s"Section $section was CANCELED too many times! (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
@@ -269,7 +269,7 @@ class DecisionGenerator(categorized: CategorizedSections
    */
   private def waitDecision(section: FulfillmentSection, waitSeconds: Int): Decision = {
     val message = s"Deferred until ${section.waitUntil.get}"
-    _createTimerDecision(section.name, waitSeconds, SectionStatus.INCOMPLETE.toString, message)
+    _createTimerDecision(section.name, waitSeconds, SectionStatus.READY.toString, message)
   }
 
   /**

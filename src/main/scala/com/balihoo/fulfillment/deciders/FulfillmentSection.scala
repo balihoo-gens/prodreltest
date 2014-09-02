@@ -12,7 +12,7 @@ import play.api.libs.json._
 import scala.collection.mutable
 
 object SectionStatus extends Enumeration {
-  val INCOMPLETE = Value("INCOMPLETE")
+  val READY = Value("READY")
   val SCHEDULED = Value("SCHEDULED")
   val STARTED = Value("STARTED")
   val FAILED = Value("FAILED")
@@ -77,7 +77,7 @@ class FulfillmentSection(val name: String
   val timeline = new Timeline
   var value: String = ""
 
-  var status = SectionStatus.INCOMPLETE
+  var status = SectionStatus.READY
 
   var essential = false
   var fixable = true
@@ -221,7 +221,7 @@ class FulfillmentSection(val name: String
 
   def resolveReferences(map:SectionMap):Boolean = {
 
-    if(status == SectionStatus.INCOMPLETE) {
+    if(status == SectionStatus.READY) {
       for((pname, param) <- params) {
         param match {
           case sectionReferences: SectionReferences =>
@@ -325,7 +325,7 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
         case _ => //println("Unhandled event type: " + event.getEventType)
       }
 
-      // We look through the section references to see if anything needs to be promoted from CONTINGENT -> INCOMPLETE.
+      // We look through the section references to see if anything needs to be promoted from CONTINGENT -> READY.
       // Sections get promoted when they're in a SectionReference list and the prior section is TERMINAL
       // We also check to see if sections
       for((name, section) <- nameToSection) {
@@ -476,7 +476,12 @@ class SectionMap(history: java.util.List[HistoryEvent]) {
               case "status" =>
                 val supdate = body.as[String]
                 section.timeline.note(s"Updating status: ${section.status} -> $supdate", event.getEventTimestamp)
-                section.status = SectionStatus.withName(supdate)
+                try {
+                  section.status = SectionStatus.withName(supdate)
+                } catch {
+                  case nsee:NoSuchElementException =>
+                    section.timeline.error(s"Status $supdate is INVALID!")
+                }
               case "essential" =>
                 val eupdate = body.as[Boolean]
                 section.timeline.note(s"Updating essential: $eupdate", event.getEventTimestamp)
@@ -610,7 +615,7 @@ class SectionReferences(sectionNames:List[String]) {
 
                 // The prior section didn't complete successfully.. let's
                 // let the next section have a try
-                sectionRef.section.status = SectionStatus.INCOMPLETE
+                sectionRef.section.status = SectionStatus.READY
                 sectionRef.section.resolveReferences(map) // <-- recurse
               }
             case _ => // We don't care about other status until a TERMINAL case is hit

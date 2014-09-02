@@ -396,7 +396,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             }
             if(Object.size(paramUpdates)) {
                 sectionUpdates['params'] = paramUpdates;
-                sectionUpdates['status'] = "INCOMPLETE";
+                sectionUpdates['status'] = "READY";
             }
 
             if(section.status != section.originalStatus) {
@@ -445,7 +445,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.statusMap = {
-        "INCOMPLETE" : "label-info",
+        "READY" : "label-info",
         "SCHEDULED" : "label-info",
         "STARTED" : "label-info",
         "FAILED" : "label-warning",
@@ -583,6 +583,7 @@ app.controller('workflowInitiationController', function($scope, $route, $http) {
             .success(function(data) {
                          $scope.loading = false;
                          $scope.runId = data;
+                         $location.path("workflow/"+encodeURIComponent($scope.workflowId)+"/run/"+encodeURIComponent($scope.runId));
                      })
             .error(function(error) {
                        $scope.loading = false;

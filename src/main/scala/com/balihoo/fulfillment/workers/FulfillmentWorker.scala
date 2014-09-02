@@ -7,6 +7,7 @@ import java.util.UUID.randomUUID
 import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
 import com.balihoo.fulfillment.config.{SWFVersion, SWFName}
+import org.keyczar.Crypter
 
 import scala.collection.mutable
 import scala.sys.process._
@@ -172,7 +173,10 @@ abstract class FulfillmentWorker {
     completedTasks += 1
     val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
     response.setTaskToken(task.getTaskToken)
-    response.setResult(result)
+    response.setResult(getSpecification.result.sensitive match {
+      case true => getSpecification.crypter.encrypt(result)
+      case _ => result
+    })
     swfAdapter.client.respondActivityTaskCompleted(response)
     _resolveTask(new TaskResolution("Completed", result))
   }
@@ -238,16 +242,17 @@ class TaskResolution(val resolution:String, val details:String) {
   }
 }
 
-class ActivityResult(val rtype:String, description:String) {
+class ActivityResult(val rtype:String, description:String, val sensitive:Boolean = false) {
   def toJson:JsValue = {
     Json.toJson(Map(
       "type" -> Json.toJson(rtype),
-      "description" -> Json.toJson(description)
+      "description" -> Json.toJson(description),
+      "sensitive" -> Json.toJson(sensitive)
     ))
   }
 }
 
-class ActivityParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true) {
+class ActivityParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true, val sensitive:Boolean = false) {
   var value:Option[String] = None
 
   def toJson:JsValue = {
@@ -255,13 +260,15 @@ class ActivityParameter(val name:String, val ptype:String, val description:Strin
       "name" -> Json.toJson(name),
       "type" -> Json.toJson(ptype),
       "description" -> Json.toJson(description),
-      "required" -> Json.toJson(required)
+      "required" -> Json.toJson(required),
+      "sensitive" -> Json.toJson(sensitive)
     ))
   }
 }
 
 class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult) {
 
+  val crypter = new Crypter("config/crypto")
   val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
 
   def getSpecification:JsValue = {
@@ -279,7 +286,13 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
     val inputObject:JsObject = Json.parse(input).as[JsObject]
     for((name, value) <- inputObject.fields) {
       if(paramsMap contains name) {
-        paramsMap(name).value = Some(value.as[String])
+        val param = paramsMap(name)
+        param.value = Some(
+          if(param.sensitive)
+            crypter.decrypt(value.as[String])
+          else
+            value.as[String]
+        )
       }
     }
     for(param <- params) {

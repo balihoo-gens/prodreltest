@@ -43,7 +43,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 				              "cake_pan" : "9\" x 11\"",
 				              "bake_time" : "40" },
          "prereqs" : ["heat_oven"],
-         "status" : "INCOMPLETE",
+         "status" : "READY",
          "waitUntil" : "2093-07-04T16:04:00-06",
          "totally unhandled" : "stuff"
 	      }}""")
@@ -76,7 +76,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.params("cake_pan").asInstanceOf[String] mustEqual "9\" x 11\""
       section.params("bake_time").asInstanceOf[String] mustEqual "40"
 
-      section.status mustEqual SectionStatus.withName("INCOMPLETE")
+      section.status mustEqual SectionStatus.withName("READY")
 
       section.timeline.events(0).message mustEqual "Section input 'totally unhandled' unhandled!"
     }
@@ -103,12 +103,12 @@ class TestFulfillmentCoordinator extends Specification with Mockito
          "params" : { "param1" : "1",
 				              "param2" : "2"},
          "prereqs" : ["heat_oven"],
-         "status" : "INCOMPLETE"
+         "status" : "READY"
 	      }""").as[JsObject]
 
       val section = new FulfillmentSection("sectionName", json, new Date())
 
-      section.status mustEqual SectionStatus.INCOMPLETE
+      section.status mustEqual SectionStatus.READY
 
       section.startedCount mustEqual 0
       section.setStarted(new Date())
@@ -171,7 +171,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                         "cake_pan" : "9\" x 11\"",
                         "bake_time" : "40" },
            "prereqs" : ["heat_oven"],
-           "status" : "INCOMPLETE",
+           "status" : "READY",
            "totally unhandled" : "stuff"
 	       },
         "batter" : {
@@ -181,7 +181,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
            "params" : { "cake_pan" : "9\" x 11\"",
                         "bake_time" : "40" },
            "prereqs" : [],
-           "status" : "INCOMPLETE"
+           "status" : "READY"
          },
         "heat_oven" : {
            "action" : { "name" : "bake",
@@ -189,7 +189,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                       },
            "params" : { "bake_time" : "40" },
            "prereqs" : [],
-           "status" : "INCOMPLETE"
+           "status" : "READY"
          }
 	      }"""
 
@@ -241,7 +241,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                         "cake_pan" : "9\" x 11\"",
                         "bake_time" : "40" },
            "prereqs" : ["heat_oven"],
-           "status" : "INCOMPLETE",
+           "status" : "READY",
            "totally unhandled" : "stuff"
 	       },
         "batter" : {
@@ -251,7 +251,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
            "params" : { "cake_pan" : "9\" x 11\"",
                         "bake_time" : "40" },
            "prereqs" : ["doesnotexist"],
-           "status" : "INCOMPLETE"
+           "status" : "READY"
          },
         "heat_oven" : {
            "action" : { "name" : "bake",
@@ -259,7 +259,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
                       },
            "params" : { "bake_time" : "40" },
            "prereqs" : [],
-           "status" : "INCOMPLETE"
+           "status" : "READY"
          }
 	      }"""
 
@@ -304,7 +304,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
          "params" : {},
          "prereqs" : [],""" +
          waitUntilString +
-         """"status" : "INCOMPLETE"
+         """"status" : "READY"
 	      }}"""
 
       var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()

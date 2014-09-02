@@ -1,0 +1,13 @@
+{
+    "encrypted": false,
+    "name": "Fulfillment Beta",
+    "purpose": "DECRYPT_AND_ENCRYPT",
+    "type": "AES",
+    "versions": [
+        {
+            "exportable": false,
+            "status": "PRIMARY",
+            "versionNumber": 1
+        }
+    ]
+}

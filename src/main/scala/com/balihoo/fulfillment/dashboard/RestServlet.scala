@@ -46,9 +46,13 @@ abstract class RestServlet extends HttpServlet {
       handlers(rsq.request.getRequestURI)(rsq)
     } catch {
       case bre:BadRequestException =>
+//        println(bre.getMessage)
+//        bre.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_BAD_REQUEST
           , _errorJson(bre.getMessage))
       case nsee:NoSuchElementException =>
+//        println(nsee.getMessage)
+//        nsee.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_NOT_FOUND
           , _errorJson(nsee.getMessage))
       case npe:NullPointerException =>
