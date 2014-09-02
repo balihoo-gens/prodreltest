@@ -125,7 +125,8 @@ class FulfillmentSection(val name: String
           waitUntil = Some(new DateTime(value.as[String]))
 
         case _ =>
-          timeline.warning(s"Section input '$key' unhandled!", creationDate)
+          // Add anything we don't recognize as a note in the timeline
+          timeline.note(s"$key : ${value.as[String]}", creationDate)
       }
     }
   }

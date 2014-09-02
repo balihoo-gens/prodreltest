@@ -32,7 +32,7 @@
                             <td>
                                 <div ng-show="worker.showFormatted">
                                     <div ng-repeat="(name, param) in worker.specification.parameters">
-                                        <span class="glyphicon glyphicon-flash muted" ng-show="param.required" title="Parameter is REQUIRED"></span><b>{{param.name}}</b>&nbsp;&nbsp;{{param.type}}<br/>
+                                        <span class="glyphicon glyphicon-flash muted" ng-show="param.required" title="Parameter is REQUIRED"></span><span class="glyphicon glyphicon-eye-close muted" ng-show="param.sensitive" title="Parameter will be ENCRYPTED"></span><b>{{param.name}}</b>&nbsp;&nbsp;{{param.type}}<br/>
                                         <div class="block">
                                             {{param.description}}
                                         </div>

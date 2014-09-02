@@ -141,7 +141,9 @@ abstract class FulfillmentWorker {
   }
 
   def declareWorker() = {
-    updateStatus(s"Declaring $name $domain $taskListName")
+    entry.setLast(UTCFormatter.format(new Date()))
+    entry.setStatus(s"Declaring $name $domain $taskListName")
+    workerTable.insert(entry)
   }
 
   def updateStatus(status:String, level:String="INFO") = {

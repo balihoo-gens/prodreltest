@@ -562,7 +562,7 @@ app.controller('workersController', function($scope, $route, $http, $location, e
 
 });
 
-app.controller('workflowInitiationController', function($scope, $route, $http) {
+app.controller('workflowInitiationController', function($scope, $route, $http, $location) {
 
     $scope.loading = false;
     $scope.tags = [ { text: 'Dashboard:Initiated'}];
@@ -582,8 +582,7 @@ app.controller('workflowInitiationController', function($scope, $route, $http) {
         $http.get('workflow/initiate', { params : params})
             .success(function(data) {
                          $scope.loading = false;
-                         $scope.runId = data;
-                         $location.path("workflow/"+encodeURIComponent($scope.workflowId)+"/run/"+encodeURIComponent($scope.runId));
+                         $scope.runId = data.runId;
                      })
             .error(function(error) {
                        $scope.loading = false;
@@ -595,4 +594,11 @@ app.controller('workflowInitiationController', function($scope, $route, $http) {
       $scope.tags.push({text : ""});
     };
 
+    $scope.restart = function() {
+      $scope.runId = false;
+    };
+
+    $scope.seeWorkflow = function() {
+        $location.path("workflow/"+encodeURIComponent($scope.workflowId)+"/run/"+encodeURIComponent($scope.runId));
+    };
 });

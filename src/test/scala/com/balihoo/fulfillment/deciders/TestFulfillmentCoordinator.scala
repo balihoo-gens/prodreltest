@@ -78,7 +78,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       section.status mustEqual SectionStatus.withName("READY")
 
-      section.timeline.events(0).message mustEqual "Section input 'totally unhandled' unhandled!"
+      section.timeline.events(0).message mustEqual "totally unhandled : stuff"
     }
 
     "handle status changes" in {

@@ -24,7 +24,11 @@
             </div>
         </form>
         <div ng-show="runId">
-            <h2>Run {{runId}} initiated...</h2>
+            <h5>Run {{runId}} initiated...</h5>
+            <br/>
+            <a ng-click="seeWorkflow()">View Workflow</a>
+            <br/>
+            <a ng-click="restart()">Start Another Workflow</a>
         </div>
     </div>
 </div>
