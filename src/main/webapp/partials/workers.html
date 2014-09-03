@@ -25,7 +25,7 @@
                             <td>Host</td><td>{{worker.hostAddress}}</td>
                         </tr>
                         <tr>
-                            <td>Started</td><td>{{worker.start | momentFromNow}}</td>
+                            <td>Started</td><td title="{{worker.start}}">{{worker.start | momentFromNow}}</td>
                         </tr>
                         <tr ng-show="worker.specification">
                             <td ng-click="worker.showFormatted = !worker.showFormatted">Params</td>
@@ -54,7 +54,7 @@
                             <td>History</td>
                             <td>
                                 <div ng-repeat="resolution in worker.resolutionHistory" style="max-width:460px;">
-                                    <span class="muted pull-right">{{resolution.when | momentFromNow}}</span>
+                                    <span class="muted pull-right" title="{{resolution.when}}">{{resolution.when | momentFromNow}}</span>
                                     <b>{{resolution.resolution}}</b>
                                     <div class="block">{{resolution.details|truncate:90}}</div>
                                 </div>

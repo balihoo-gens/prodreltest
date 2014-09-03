@@ -34,8 +34,6 @@ abstract class AbstractParticipantData extends FulfillmentWorker {
     } catch {
       case exception:Exception =>
         failTask(exception.toString, exception.getMessage)
-      case t:Throwable =>
-        failTask(s"$name Caught a Throwable", t.getMessage)
     }
   }
 }

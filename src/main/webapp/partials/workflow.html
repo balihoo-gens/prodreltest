@@ -17,7 +17,7 @@
         <div id="historyView" class="initiallyHidden">
             <br/>
             <div ng-repeat="event in workflow.history">
-                <span class="pull-right muted">{{event.timestamp | momentFromNow}}</span>
+                <span class="pull-right muted" title="{{event.timestamp}}">{{event.timestamp | momentFromNow}}</span>
                 <span class="label label-default" title="{{event.id}}">{{event.type}}</span>
                 <pre ng-bind-html="formatUtil.formatJsonlike(event.attributes)"></pre>
             </div>
@@ -25,7 +25,7 @@
         <h2 ng-show="workflow.timeline">Timeline</h2>
         <div class="block">
             <div ng-repeat="event in workflow.timeline">
-                <span class="pull-right muted">{{event.when | momentFromNow}}</span>
+                <span class="pull-right muted" title="{{event.when}}">{{event.when | momentFromNow}}</span>
                 <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
             </div>
         </div>
@@ -56,7 +56,7 @@
                 <div class="blob" style="width:45%; margin-bottom:20px;">
                     <h3 ng-show="section.timeline">Timeline</h3>
                     <div class="block" ng-repeat="event in section.timeline">
-                        <span class="pull-right muted">{{event.when | momentFromNow}}</span>
+                        <span class="pull-right muted" title="{{event.when}}">{{event.when | momentFromNow}}</span>
                         <span class="timeline {{figureTimelineStyle(event.eventType)}}" ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
                     </div>
                     <br/>
