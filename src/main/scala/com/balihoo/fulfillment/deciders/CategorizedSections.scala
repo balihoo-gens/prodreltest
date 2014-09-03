@@ -43,8 +43,8 @@ class CategorizedSections(sections: SectionMap) {
         deferred += section
       case SectionStatus.TERMINAL =>
         terminal += section
-      case SectionStatus.INCOMPLETE =>
-        categorizeIncompleteSection(section)
+      case SectionStatus.READY =>
+        categorizeReadySection(section)
       case SectionStatus.IMPOSSIBLE =>
         impossible += section
       case _ => println(section.status + " is not handled here!")
@@ -57,7 +57,7 @@ class CategorizedSections(sections: SectionMap) {
    * @param section FulfillmentSection
    * @return
    */
-  protected def categorizeIncompleteSection(section: FulfillmentSection) = {
+  protected def categorizeReadySection(section: FulfillmentSection) = {
 
     var paramsReady: Boolean = true
     for((name, value) <- section.params) {

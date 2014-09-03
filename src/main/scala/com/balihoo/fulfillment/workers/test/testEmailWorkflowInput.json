@@ -7,18 +7,18 @@
                      "type" : "html",
                      "body" : "<h1>ses test</h1>"
                    },
-        "status" : "INCOMPLETE"
+        "status" : "READY"
     },
 
     "Email-verifiedaddresslister" : {
         "action" : { "name" : "Email-verifiedaddresslister", "version" : "1" },
-        "status" : "INCOMPLETE"
+        "status" : "READY"
     },
 
     "Email-addressverifier" : {
         "action" : { "name" : "Email-addressverifier", "version" : "1" },
         "params" : { "address" : "gens@balihoo.com"
                    },
-        "status" : "INCOMPLETE"
+        "status" : "READY"
     }
 }

@@ -11,7 +11,8 @@ scalaVersion := "2.10.2"
 resolvers ++= Seq(
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
   "Internal Snapshot Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/snapshots/",
-  "Internal Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/internal/"
+  "Internal Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/internal/",
+  "Keyczar at Google Code" at "http://keyczar.googlecode.com/svn/trunk/java/maven/"
 )
 
 
@@ -36,7 +37,8 @@ libraryDependencies ++= Seq(
   "com.google.api-ads" % "adwords-axis" % "1.29.0",
   "javax.activation" % "activation" % "1.1",
   "com.github.scopt" %% "scopt" % "3.2.0",
-  "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106"
+  "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
+  "org.keyczar" % "keyczar" % "0.66"
 )
 
 scalacOptions in Test ++= Seq("-Yrangepos")

@@ -40,10 +40,10 @@
 
                     <span ng-show="workflow.editable">
 					    <span ng-hide="section.editingStatus" ng-click="section.editStatus(section)" class="label {{figureStatusLabel(section.status)}}" ng-class="{'status-edited' : section.statusChanged(section)}">{{section.status}}</span>
-                        <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)">
+                        <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)" ng-blur="section.editingStatus = false">
                             <option>{{section.originalStatus}}</option>
-                            <option>INCOMPLETE</option>
-                            <option>TERMINAL</option>
+                            <option ng-show="section.originalStatus != 'READY'">READY</option>
+                            <option ng-show="section.originalStatus != 'TERMINAL'">TERMINAL</option>
                         </select>
                     </span>
 

@@ -281,11 +281,12 @@ class AbstractWorkflowServlet extends RestServlet {
 
   get("/workflow/initiate", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
-      ,Json.stringify(Json.toJson(workflowInitiator.initate(
-        rsq.getRequiredParameter("id"),
-        rsq.getRequiredParameter("input"),
-        rsq.getOptionalParameter("tags", "").split(",").toList
-      ))))
+      ,Json.stringify(Json.toJson(Map(
+        "runId" -> workflowInitiator.initate(
+          rsq.getRequiredParameter("id"),
+          rsq.getRequiredParameter("input"),
+          rsq.getOptionalParameter("tags", "").split(",").toList
+      )))))
   })
 
 }
