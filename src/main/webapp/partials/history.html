@@ -33,9 +33,9 @@
                 </td>
                 <td><div ng-repeat="tag in ex.tagList"><div ng-bind-html="formatTag(tag)"></div></div></td>
                 <td>
-                    Start:{{ex.startTimestamp}}
+                    Start:{{ex.startTimestamp | momentFromNow}}
                     <br/>
-                    End:{{ex.closeTimestamp}}
+                    End:{{ex.closeTimestamp | momentFromNow}}
                 </td>
                 <td><span class="label {{figureStatusLabel(ex.closeStatus)}}" ng-bind-html="formatStatus(ex.closeStatus)"></span></td>
             </tr>

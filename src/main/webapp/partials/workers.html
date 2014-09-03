@@ -15,7 +15,7 @@
                 <b>{{activityName}}</b>
             </div>
             <div class="panel-body-small">
-                <div class="blob shadow lightbox" ng-repeat="worker in activities" ng-show="!worker.defunct || (worker.defunct && showDefunct)">
+                <div class="blob shadow lightbox" style="max-width:100%" ng-repeat="worker in activities" ng-show="!worker.defunct || (worker.defunct && showDefunct)">
 					<span class="pull-right">
 						<span title="Last seen {{worker.minutesSinceLast}} minutes ago" class="label {{worker.freshness}}">{{worker.status}}</span>
 					</span>
@@ -25,7 +25,7 @@
                             <td>Host</td><td>{{worker.hostAddress}}</td>
                         </tr>
                         <tr>
-                            <td>Started</td><td>{{worker.start}}</td>
+                            <td>Started</td><td>{{worker.start | momentFromNow}}</td>
                         </tr>
                         <tr ng-show="worker.specification">
                             <td ng-click="worker.showFormatted = !worker.showFormatted">Params</td>
@@ -53,10 +53,10 @@
                         <tr ng-show="worker.resolutionHistory">
                             <td>History</td>
                             <td>
-                                <div ng-repeat="resolution in worker.resolutionHistory">
-                                    <span class="muted pull-right">{{resolution.when}}</span>
+                                <div ng-repeat="resolution in worker.resolutionHistory" style="max-width:460px;">
+                                    <span class="muted pull-right">{{resolution.when | momentFromNow}}</span>
                                     <b>{{resolution.resolution}}</b>
-                                    <div class="block">{{resolution.details}}</div>
+                                    <div class="block">{{resolution.details|truncate:90}}</div>
                                 </div>
                             </td>
                         </tr>
