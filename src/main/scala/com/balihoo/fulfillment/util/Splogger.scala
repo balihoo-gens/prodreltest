@@ -9,12 +9,18 @@ class Splogger(filename:String) {
 
   private def _checkFile(file:File):Boolean = {
     if (file.isFile) {
+      //file exists; return the ability to write to it
       file.canWrite
     } else {
-      val path = new File(file.getAbsolutePath)
+      //file doesn't exist, so check the status of the parent dir
+      val parentdir = Option(file.getParentFile)
+      //if there is no parentdir, use local path
+      val path = new File(parentdir.getOrElse(new File(".")).getAbsolutePath)
       if (path.isDirectory) {
+        //dir exists; return ability to write
         path.canWrite
       } else {
+        //dir does not exist, see if we can make it
         path.mkdirs
       }
     }
