@@ -8,6 +8,7 @@ import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
 import com.balihoo.fulfillment.util.Splogger
 
+
 /*
  * trait to bundle the mixins for fulfillmentworker with an adwordsadapter
  * this is mixed in by any worker that needs adwords functionality
@@ -16,6 +17,18 @@ trait LoggingAdwordsWorkflowAdapter
   extends LoggingWorkflowAdapter
   with AdWordsAdapterComponent
 {}
+
+/*
+ * Implementation trait for the LoggingAdwordsWorkflowAdapter
+ * adwords worker mixin trait
+ */
+trait LoggingAdwordsWorkflowAdapterImpl
+  extends LoggingAdwordsWorkflowAdapter
+  with LoggingWorkflowAdapterImpl {
+
+  lazy private val _awa = new AdWordsAdapter(_cfg)
+  def adWordsAdapter = _awa
+}
 
 /*
  * this is the dependency-injectable class containing all functionality
@@ -54,22 +67,11 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
 /*
  * this is a specific implementation of the default (i.e. not test) AdWordsAccountCreator
  */
-class AdWordsAccountCreator(cfg: PropertiesLoader, splogger: Splogger)
+class AdWordsAccountCreator(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractAdWordsAccountCreator
-  with LoggingAdwordsWorkflowAdapter
+  with LoggingAdwordsWorkflowAdapterImpl
   with AccountCreatorComponent {
-    def splog = splogger
-
-    lazy private val _swf = new SWFAdapter(cfg)
-    def swfAdapter = _swf
-
-    lazy private val _dyn = new DynamoAdapter(cfg)
-    def dynamoAdapter = _dyn
-
-    lazy private val _awa = new AdWordsAdapter(cfg)
-    def adWordsAdapter = _awa
-
-    lazy private val _accountCreator = new AccountCreator(adWordsAdapter)
+    lazy val _accountCreator = new AccountCreator(adWordsAdapter)
     def accountCreator = _accountCreator
 }
 

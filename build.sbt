@@ -68,4 +68,50 @@ resourceGenerators in Compile <+= (resourceManaged, baseDirectory) map
     }
   }
 
-excludeFilter in unmanagedSources := "Email*.scala"
+//exclude some sources to allow testing compilation
+// of refactoring changes one file at a time
+excludeFilter in unmanagedSources :=
+/*
+//adapters
+  "FTPAdapter.scala" ||
+  "SQSAdapter.scala" ||
+  "SESAdapter.scala" ||
+  "AWSAdapter.scala" ||
+  "SWFAdapter.scala" ||
+  "DynamoAdapter.scala" ||
+  "AdWordsAdapter.scala" ||
+//utilities
+  "Splogger.scala" ||
+  "Getch.scala" ||
+//config
+  "PropertiesLoader.scala" ||
+  "FTPUploadConfig.scala" ||
+  "FulfillmentSection.scala" ||
+  "CategorizedSections.scala" ||
+  "FulfillmentCoordinator.scala" ||
+  "SWFIdentifier.scala" ||
+//dashboard
+  "RestServlet.scala" ||
+  "Dashboard.scala" ||
+//workers
+  "FulfillmentWorker.scala" ||
+  "AdWordsAccountCreator.scala" ||
+  "AdWordsAccountLookup.scala" ||
+*/
+  "AdWordsAdGroupProcessor.scala" ||
+  "AdWordsCampaignProcessor.scala" ||
+  "AdWordsImageAdProcessor.scala" ||
+  "AdWordsTextAdProcessor.scala" ||
+  "AdWordsUserInterests.scala" ||
+  "Chaos.scala" ||
+  "CommandComponent.scala" ||
+  "EmailAddressVerifier.scala" ||
+  "EmailSender.scala" ||
+  "EmailVerifiedAddressLister.scala" ||
+  "EmailWorkers.scala" ||
+  "FtpUploadValidator.scala" ||
+  "FtpUploader.scala" ||
+  "Noop.scala" ||
+  "TimeZoneWorker.scala" ||
+  "ZipCodeDemographics.scala" ||
+  ""

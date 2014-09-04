@@ -163,7 +163,7 @@ object Splogger {
    * @param name any identifier on which to base the log file name
    * @returns the full log file path
    */
-  mkFFName(name:String): String = {
+  def mkFFName(name:String): String = {
     val cleanName = """[\W]""".r.replaceAllIn(name, "_")
     s"/var/log/balihoo/fulfillment/${cleanName}.log"
   }

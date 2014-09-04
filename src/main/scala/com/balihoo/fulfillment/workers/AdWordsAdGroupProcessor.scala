@@ -15,9 +15,7 @@ class SetComparator[A](existing:Map[String,A], potential:Map[String,A]) {
 }
 
 abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
-  this: AdWordsAdapterComponent
-   with SWFAdapterComponent
-   with DynamoAdapterComponent
+  this: LoggingAdwordsWorkflowAdapter
    with AdGroupCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
@@ -50,18 +48,22 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
   }
 }
 
-class AdWordsAdGroupProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+class AdWordsAdGroupProcessor(cfg: PropertiesLoader, splogger: Splogger)
   extends AbstractAdWordsAdGroupProcessor
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
-  with AdWordsAdapterComponent
+  with LoggingAdwordsWorkflowAdapter
   with AdGroupCreatorComponent {
-    //don't put this in the adGroupCreator method to avoid a new one from
-    //being created on every call.
+    def splog = splogger
+
+    lazy private val _swf = new SWFAdapter(cfg)
+    def swfAdapter = _swf
+
+    lazy private val _dyn = new DynamoAdapter(cfg)
+    def dynamoAdapter = _dyn
+
+    lazy private val _awa = new AdWordsAdapter(cfg)
+    def adWordsAdapter = _awa
+
     lazy val _adGroupCreator = new AdGroupCreator(awa)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def adWordsAdapter = awa
     def adGroupCreator = _adGroupCreator
 }
 
@@ -442,14 +444,19 @@ trait AdGroupCreatorComponent {
 
 object adwords_adgroupprocessor {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAdGroupProcessor(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new AdWordsAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+    val name = getClass.getSimpleName.stripSuffix("$")
+    val splog = new Splogger(Splogger.mkFFName(name))
+    splog("INFO", s"Started $name")
+    try {
+      val cfg = PropertiesLoader(args, name)
+      val worker = new AdWordsAdGroupProcessor(cfg, splog)
+      worker.work()
+    }
+    catch {
+      case t:Throwable =>
+        splog("ERROR", t.getMessage)
+    }
+    splog("INFO", s"Terminated $name")
   }
 }
 
