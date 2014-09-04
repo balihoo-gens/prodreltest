@@ -67,3 +67,5 @@ resourceGenerators in Compile <+= (resourceManaged, baseDirectory) map
       to
     }
   }
+
+excludeFilter in unmanagedSources := "Email*.scala"

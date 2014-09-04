@@ -6,14 +6,22 @@ import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm.Operator
 import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
+import com.balihoo.fulfillment.util.Splogger
+
+/*
+ * trait to bundle the mixins for fulfillmentworker with an adwordsadapter
+ * this is mixed in by any worker that needs adwords functionality
+ */
+trait LoggingAdwordsWorkflowAdapter
+  extends LoggingWorkflowAdapter
+  with AdWordsAdapterComponent
+{}
 
 /*
  * this is the dependency-injectable class containing all functionality
  */
 abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
-  this: AdWordsAdapterComponent
-    with SWFAdapterComponent
-    with DynamoAdapterComponent
+  this: LoggingAdwordsWorkflowAdapter
     with AccountCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
@@ -44,21 +52,24 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
 }
 
 /*
- * this is a specific implementation of the default (i.e. not test) AdWordsAccoutnCreator
- * providing the adapter instances here allows reuse.
+ * this is a specific implementation of the default (i.e. not test) AdWordsAccountCreator
  */
-class AdWordsAccountCreator(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+class AdWordsAccountCreator(cfg: PropertiesLoader, splogger: Splogger)
   extends AbstractAdWordsAccountCreator
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
-  with AdWordsAdapterComponent
+  with LoggingAdwordsWorkflowAdapter
   with AccountCreatorComponent {
-    //don't put this in the accountCreator method to avoid a new one from
-    //being created on every call.
-    lazy val _accountCreator = new AccountCreator(awa)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def adWordsAdapter = awa
+    def splog = splogger
+
+    lazy private val _swf = new SWFAdapter(cfg)
+    def swfAdapter = _swf
+
+    lazy private val _dyn = new DynamoAdapter(cfg)
+    def dynamoAdapter = _dyn
+
+    lazy private val _awa = new AdWordsAdapter(cfg)
+    def adWordsAdapter = _awa
+
+    lazy private val _accountCreator = new AccountCreator(adWordsAdapter)
     def accountCreator = _accountCreator
 }
 
@@ -165,14 +176,18 @@ trait AccountCreatorComponent {
 
 object adwords_accountcreator {
   def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountCreator(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new AdWordsAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+    val name = getClass.getSimpleName.stripSuffix("$")
+    val splog = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
+    splog("INFO", s"Starting $name")
+    try {
+      val cfg = PropertiesLoader(args, name)
+      val worker = new AdWordsAccountCreator(cfg, splog)
+      worker.work()
+    }
+    catch {
+      case t:Throwable =>
+        splog("ERROR", t.getMessage)
+    }
   }
 }
 

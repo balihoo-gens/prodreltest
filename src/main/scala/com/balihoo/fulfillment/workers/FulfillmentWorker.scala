@@ -16,13 +16,20 @@ import scala.collection.JavaConversions._
 import play.api.libs.json._
 
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
-import com.balihoo.fulfillment.util.{Getch, Splogger}
+import com.balihoo.fulfillment.util.{Getch, SploggerComponent}
+
+trait LoggingWorkflowAdapter
+  extends SWFAdapterComponent
+    with DynamoAdapterComponent
+    with SploggerComponent
+{}
 
 abstract class FulfillmentWorker {
-  this: SWFAdapterComponent with DynamoAdapterComponent =>
+  this: LoggingWorkflowAdapter =>
 
   val instanceId = randomUUID().toString
 
@@ -35,9 +42,6 @@ abstract class FulfillmentWorker {
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
-
-  val _log = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
-  def splog = _log
 
   val hostAddress = sys.env.get("EC2_HOME") match {
     case Some(s:String) =>
@@ -141,8 +145,10 @@ abstract class FulfillmentWorker {
   }
 
   def declareWorker() = {
+    val status = s"Declaring $name $domain $taskListName"
+    splog("INFO",status)
     entry.setLast(UTCFormatter.format(new Date()))
-    entry.setStatus(s"Declaring $name $domain $taskListName")
+    entry.setStatus(status)
     workerTable.insert(entry)
   }
 
