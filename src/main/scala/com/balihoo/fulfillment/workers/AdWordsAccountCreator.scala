@@ -177,8 +177,8 @@ trait AccountCreatorComponent {
 object adwords_accountcreator {
   def main(args: Array[String]) {
     val name = getClass.getSimpleName.stripSuffix("$")
-    val splog = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
-    splog("INFO", s"Starting $name")
+    val splog = new Splogger(Splogger.mkFFName(name))
+    splog("INFO", s"Started $name")
     try {
       val cfg = PropertiesLoader(args, name)
       val worker = new AdWordsAccountCreator(cfg, splog)
@@ -188,6 +188,7 @@ object adwords_accountcreator {
       case t:Throwable =>
         splog("ERROR", t.getMessage)
     }
+    splog("INFO", s"Terminated $name")
   }
 }
 
