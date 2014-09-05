@@ -6,7 +6,32 @@ Object.size = function(obj) {
     return size;
 };
 
-var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize']);
+angular.module('filters', []).
+    filter('truncate', function () {
+               return function (text, length, end) {
+                   if (text === undefined) {
+                       return "";
+                   }
+                   if (text === null) {
+                       return "";
+                   }
+                   if (isNaN(length))
+                       length = 10;
+
+                   if (end === undefined)
+                       end = "...";
+
+                   if (text.length <= length || text.length - end.length <= length) {
+                       return text;
+                   }
+                   else {
+                       return String(text).substring(0, length - end.length) + end;
+                   }
+
+               };
+           });
+
+var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize', 'filters', 'angular-moment']);
 
 toastr.options = {
     "closeButton" : true,
@@ -62,7 +87,7 @@ app.factory('formatUtil', function() {
             return _div(body, "block " + divclass);
         }
         if (_isString(json)) {
-            return _div(_formatURLs(json), divclass);
+            return _span(_formatURLs(json), "");
         }
 
         return json;
@@ -118,7 +143,7 @@ app.factory('formatUtil', function() {
             if (( url.indexOf(".jpg") > 0 )
                 || ( url.indexOf(".png") > 0 )
                 || ( url.indexOf(".gif") > 0 )) {
-                return '<img src="' + url + '">' + '<br/>' + url + '<br/>';
+                return '<br/><div class="block"><img class="constrained" src="' + url + '">' + '<br/><a href="' + url + '">' + url + '</a>' + '</div>';
             }
             else {
                 return '<a href="' + url + '">' + url + '</a>' + '<br/>';

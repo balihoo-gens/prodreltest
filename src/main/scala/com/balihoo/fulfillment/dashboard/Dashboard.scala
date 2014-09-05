@@ -84,8 +84,10 @@ trait WorkflowInspectorComponent {
         "workflowId" -> Json.toJson(info.getExecution.getWorkflowId),
         "runId" -> Json.toJson(info.getExecution.getRunId),
         "closeStatus" -> Json.toJson(info.getCloseStatus),
-        "closeTimestamp" -> Json.toJson(if(info.getCloseTimestamp != null) info.getCloseTimestamp.toString else "--"),
-        "startTimestamp" -> Json.toJson(info.getStartTimestamp.toString),
+        "closeTimestamp" -> Json.toJson(Option(info.getCloseTimestamp) match {
+            case Some(ts) => UTCFormatter.format(ts);
+            case None => "--" }),
+        "startTimestamp" -> Json.toJson(UTCFormatter.format(info.getStartTimestamp)),
         "tagList" -> Json.toJson(info.getTagList.asScala)
       ))
     }
