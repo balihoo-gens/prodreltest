@@ -93,6 +93,7 @@ excludeFilter in unmanagedSources :=
 //dashboard
   "RestServlet.scala" ||
   "Dashboard.scala" ||
+  "CommandComponent.scala" ||
 //workers
   "FulfillmentWorker.scala" ||
   "AdWordsAccountCreator.scala" ||
@@ -101,10 +102,9 @@ excludeFilter in unmanagedSources :=
   "AdWordsCampaignProcessor.scala" ||
   "AdWordsUserInterests.scala" ||
   "AdWordsImageAdProcessor.scala" ||
-*/
   "AdWordsTextAdProcessor.scala" ||
+*/
   "Chaos.scala" ||
-  "CommandComponent.scala" ||
   "EmailAddressVerifier.scala" ||
   "EmailSender.scala" ||
   "EmailVerifiedAddressLister.scala" ||
