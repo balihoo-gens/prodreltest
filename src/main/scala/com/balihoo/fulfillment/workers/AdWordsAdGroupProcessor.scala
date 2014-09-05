@@ -3,6 +3,8 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
+import com.balihoo.fulfillment.util.Splogger
+
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
@@ -48,22 +50,11 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
   }
 }
 
-class AdWordsAdGroupProcessor(cfg: PropertiesLoader, splogger: Splogger)
-  extends AbstractAdWordsAdGroupProcessor
-  with LoggingAdwordsWorkflowAdapter
+class AdWordsAdGroupProcessor(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+extends AbstractAdWordsAdGroupProcessor
+  with LoggingAdwordsWorkflowAdapterImpl
   with AdGroupCreatorComponent {
-    def splog = splogger
-
-    lazy private val _swf = new SWFAdapter(cfg)
-    def swfAdapter = _swf
-
-    lazy private val _dyn = new DynamoAdapter(cfg)
-    def dynamoAdapter = _dyn
-
-    lazy private val _awa = new AdWordsAdapter(cfg)
-    def adWordsAdapter = _awa
-
-    lazy val _adGroupCreator = new AdGroupCreator(awa)
+    lazy val _adGroupCreator = new AdGroupCreator(adWordsAdapter)
     def adGroupCreator = _adGroupCreator
 }
 
@@ -441,23 +432,9 @@ trait AdGroupCreatorComponent {
   }
 }
 
-
-object adwords_adgroupprocessor {
-  def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$")
-    val splog = new Splogger(Splogger.mkFFName(name))
-    splog("INFO", s"Started $name")
-    try {
-      val cfg = PropertiesLoader(args, name)
-      val worker = new AdWordsAdGroupProcessor(cfg, splog)
-      worker.work()
-    }
-    catch {
-      case t:Throwable =>
-        splog("ERROR", t.getMessage)
-    }
-    splog("INFO", s"Terminated $name")
+object adwords_adgroupprocessor extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsAdGroupProcessor(cfg, splog)
   }
 }
-
 

@@ -97,12 +97,12 @@ excludeFilter in unmanagedSources :=
   "FulfillmentWorker.scala" ||
   "AdWordsAccountCreator.scala" ||
   "AdWordsAccountLookup.scala" ||
-*/
   "AdWordsAdGroupProcessor.scala" ||
   "AdWordsCampaignProcessor.scala" ||
-  "AdWordsImageAdProcessor.scala" ||
-  "AdWordsTextAdProcessor.scala" ||
   "AdWordsUserInterests.scala" ||
+  "AdWordsImageAdProcessor.scala" ||
+*/
+  "AdWordsTextAdProcessor.scala" ||
   "Chaos.scala" ||
   "CommandComponent.scala" ||
   "EmailAddressVerifier.scala" ||

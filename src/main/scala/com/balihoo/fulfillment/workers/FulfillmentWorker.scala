@@ -494,6 +494,25 @@ class FulfillmentWorkerEntry {
       .addString("resolutionHistory", resolutionHistory)
       .addString("last", last)
   }
+}
 
+abstract class FulfillmentWorkerApp {
+  def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker
+
+  def main(args: Array[String]) {
+    val name = getClass.getSimpleName.stripSuffix("$")
+    val splog = new Splogger(Splogger.mkFFName(name))
+    splog("INFO", s"Started $name")
+    try {
+      val cfg = PropertiesLoader(args, name)
+      val worker = createWorker(cfg, splog)
+      worker.work()
+    }
+    catch {
+      case t:Throwable =>
+        splog("ERROR", t.getMessage)
+    }
+    splog("INFO", s"Terminated $name")
+  }
 }
 
