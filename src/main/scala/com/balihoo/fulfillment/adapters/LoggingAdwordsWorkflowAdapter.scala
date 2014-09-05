@@ -7,7 +7,6 @@ package com.balihoo.fulfillment.adapters
 trait LoggingAdwordsWorkflowAdapter
   extends LoggingWorkflowAdapter
   with AdWordsAdapterComponent
-{}
 
 /*
  * Implementation trait for the LoggingAdwordsWorkflowAdapter

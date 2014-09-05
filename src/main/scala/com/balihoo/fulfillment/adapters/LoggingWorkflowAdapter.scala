@@ -7,10 +7,10 @@ import com.balihoo.fulfillment.config.PropertiesLoader
  * this is mixed in by any worker
  */
 trait LoggingWorkflowAdapter
-  extends SWFAdapterComponent
+  extends AnyRef
+    with SWFAdapterComponent
     with DynamoAdapterComponent
     with SploggerComponent
-{}
 
 /*
  * Implementation trait for the LoggingWorkflowAdapter
