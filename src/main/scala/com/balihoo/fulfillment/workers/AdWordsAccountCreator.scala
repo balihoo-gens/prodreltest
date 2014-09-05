@@ -153,22 +153,8 @@ trait AccountCreatorComponent {
   }
 }
 
-
-object adwords_accountcreator {
-  def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$")
-    val splog = new Splogger(Splogger.mkFFName(name))
-    splog("INFO", s"Started $name")
-    try {
-      val cfg = PropertiesLoader(args, name)
-      val worker = new AdWordsAccountCreator(cfg, splog)
-      worker.work()
-    }
-    catch {
-      case t:Throwable =>
-        splog("ERROR", t.getMessage)
-    }
-    splog("INFO", s"Terminated $name")
+object adwords_accountcreator extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsAccountCreator(cfg, splog)
   }
 }
-

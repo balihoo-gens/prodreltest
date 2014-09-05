@@ -51,21 +51,8 @@ class AdWordsAccountLookup(override val _cfg: PropertiesLoader, override val _sp
     def accountCreator = _accountCreator
 }
 
-object adwords_accountlookup {
-  def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$")
-    val splog = new Splogger(Splogger.mkFFName(name))
-    splog("INFO", s"Started $name")
-    try {
-      val cfg = PropertiesLoader(args, name)
-      val worker = new AdWordsAccountLookup(cfg, splog)
-      worker.work()
-    }
-    catch {
-      case t:Throwable =>
-        splog("ERROR", t.getMessage)
-    }
-    splog("INFO", s"Terminated $name")
+object adwords_accountlookup extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsAccountLookup(cfg, splog)
   }
 }
-
