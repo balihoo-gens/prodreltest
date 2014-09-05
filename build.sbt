@@ -106,14 +106,13 @@ excludeFilter in unmanagedSources :=
   "GeoNamesTimeZoneRetriever.scala" ||
   "Chaos.scala" ||
   "EmailAddressVerifier.scala" ||
-*/
   "EmailSender.scala" ||
   "EmailVerifiedAddressLister.scala" ||
-  "EmailWorkers.scala" ||
   "FtpUploadValidator.scala" ||
   "FtpUploader.scala" ||
   "Noop.scala" ||
-  "TimeZoneWorker.scala" ||
   "ZipCodeDemographics.scala" ||
   "ParticipantData.scala" ||
+*/
+  "EmailWorkers.scala" ||
   ""

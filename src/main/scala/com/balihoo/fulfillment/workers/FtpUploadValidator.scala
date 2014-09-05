@@ -5,11 +5,11 @@ import java.net.URL
 
 import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter, DynamoAdapterComponent, SWFAdapterComponent}
 import com.balihoo.fulfillment.config.{PropertiesLoaderComponent, FTPUploadConfig, PropertiesLoader}
+import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractFTPUploadValidator extends FulfillmentWorker {
-  this: SWFAdapterComponent
-    with DynamoAdapterComponent
-    with PropertiesLoaderComponent =>
+  this: LoggingWorkflowAdapter
+  with PropertiesLoaderComponent =>
 
   override def getSpecification: ActivitySpecification = FTPUploadConfig.getSpecification
 
@@ -30,25 +30,15 @@ abstract class AbstractFTPUploadValidator extends FulfillmentWorker {
   }
 }
 
-class FTPUploadValidator(swf: SWFAdapter, dyn: DynamoAdapter, cfg: PropertiesLoader)
+class FTPUploadValidator(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractFTPUploadValidator
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
+  with LoggingWorkflowAdapterImpl
   with PropertiesLoaderComponent {
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def config = cfg
+    def config = _cfg
 }
 
-object ftp_uploadvalidator{
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new FTPUploadValidator(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      cfg
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work
+object ftp_uploadvalidator extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new FTPUploadValidator(cfg, splog)
   }
 }

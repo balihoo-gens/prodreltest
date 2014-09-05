@@ -5,9 +5,8 @@ import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractEmailSender extends FulfillmentWorker {
-  this: SESAdapterComponent
-    with SWFAdapterComponent
-    with DynamoAdapterComponent =>
+  this: LoggingWorkflowAdapter
+  with SESAdapterComponent =>
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
@@ -38,35 +37,16 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
   }
 }
 
-class EmailSender(swf: SWFAdapter, dyn: DynamoAdapter, ses: SESAdapter, splogger: Splogger)
+class EmailSender(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractEmailSender
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
+  with LoggingWorkflowAdapterImpl
   with SESAdapterComponent {
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def sesAdapter = ses
-    def splog = splogger
+    private lazy val _ses = new SESAdapter(_cfg)
+    def sesAdapter = _ses
 }
 
-object email_sender {
-  def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$")
-    val splog = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
-    splog("INFO", s"Starting $name")
-    try {
-      val cfg = PropertiesLoader(args, name)
-      val worker = new EmailSender (
-        new SWFAdapter(cfg),
-        new DynamoAdapter(cfg),
-        new SESAdapter(cfg)
-      )
-      worker.work()
-    }
-    catch {
-      case t:Throwable =>
-        splog("ERROR", t.getMessage)
-    }
+object email_sender extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new EmailSender(cfg, splog)
   }
 }
-

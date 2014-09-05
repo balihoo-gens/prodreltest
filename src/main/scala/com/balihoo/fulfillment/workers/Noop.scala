@@ -2,10 +2,10 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractNoop extends FulfillmentWorker {
- this: SWFAdapterComponent
-   with DynamoAdapterComponent =>
+  this: LoggingWorkflowAdapter =>
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(), new ActivityResult("JSON", "Confirmation that nothing happened."))
@@ -16,23 +16,14 @@ abstract class AbstractNoop extends FulfillmentWorker {
   }
 }
 
-class Noop(swf: SWFAdapter, dyn: DynamoAdapter)
+
+class Noop(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractNoop
-  with SWFAdapterComponent
-  with DynamoAdapterComponent {
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
+  with LoggingWorkflowAdapterImpl {
 }
 
-object noop {
-  def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$")
-    val cfg = PropertiesLoader(args, name)
-    val worker = new Noop(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg)
-    )
-    println(s"Running $name")
-    worker.work()
+object noop extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new Noop(cfg, splog)
   }
 }

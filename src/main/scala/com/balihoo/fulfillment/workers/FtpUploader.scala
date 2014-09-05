@@ -2,12 +2,12 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.{PropertiesLoaderComponent, FTPUploadConfig, PropertiesLoader}
+import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractFTPUploader extends FulfillmentWorker {
-  this: FTPAdapterComponent
-    with SWFAdapterComponent
-    with DynamoAdapterComponent
-    with PropertiesLoaderComponent =>
+  this: LoggingWorkflowAdapter
+  with FTPAdapterComponent
+  with PropertiesLoaderComponent =>
 
   override def getSpecification: ActivitySpecification = FTPUploadConfig.getSpecification
 
@@ -23,28 +23,19 @@ abstract class AbstractFTPUploader extends FulfillmentWorker {
   }
 }
 
-class FTPUploader(swf: SWFAdapter, dyn: DynamoAdapter, ftp: FTPAdapter, cfg: PropertiesLoader)
+class FTPUploader(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractFTPUploader
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
+  with LoggingWorkflowAdapterImpl
   with FTPAdapterComponent
   with PropertiesLoaderComponent {
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def ftpAdapter = ftp
-    def config = cfg
+    def config = _cfg
+
+    lazy private val _ftp = new FTPAdapter(config)
+    def ftpAdapter = _ftp
 }
 
-object ftp_uploader {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new FTPUploader(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new FTPAdapter(cfg),
-      cfg
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object ftp_uploader extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new FTPUploader(cfg, splog)
   }
 }
