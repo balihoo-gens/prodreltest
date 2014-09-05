@@ -8,28 +8,6 @@ import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
 import com.balihoo.fulfillment.util.Splogger
 
-
-/*
- * trait to bundle the mixins for fulfillmentworker with an adwordsadapter
- * this is mixed in by any worker that needs adwords functionality
- */
-trait LoggingAdwordsWorkflowAdapter
-  extends LoggingWorkflowAdapter
-  with AdWordsAdapterComponent
-{}
-
-/*
- * Implementation trait for the LoggingAdwordsWorkflowAdapter
- * adwords worker mixin trait
- */
-trait LoggingAdwordsWorkflowAdapterImpl
-  extends LoggingAdwordsWorkflowAdapter
-  with LoggingWorkflowAdapterImpl {
-
-  lazy private val _awa = new AdWordsAdapter(_cfg)
-  def adWordsAdapter = _awa
-}
-
 /*
  * this is the dependency-injectable class containing all functionality
  */

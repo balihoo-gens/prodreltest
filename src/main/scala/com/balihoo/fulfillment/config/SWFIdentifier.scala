@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.config
 
+import scala.language.implicitConversions
+
 /**
  * This class performs validation on SWF identifiers.  An exception is thrown if the identifier is too long, or if it
  * contains illegal substrings.

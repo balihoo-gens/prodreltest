@@ -3,7 +3,7 @@ package com.balihoo.fulfillment.workers
 import java.io.IOException
 import java.net.URL
 
-import com.balihoo.fulfillment.adapters.{DynamoAdapter, SWFAdapter, DynamoAdapterComponent, SWFAdapterComponent}
+import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.{PropertiesLoaderComponent, FTPUploadConfig, PropertiesLoader}
 import com.balihoo.fulfillment.util.Splogger
 

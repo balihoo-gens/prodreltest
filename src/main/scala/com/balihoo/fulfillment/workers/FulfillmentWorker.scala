@@ -22,26 +22,6 @@ import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json.{Json, JsObject}
 import com.balihoo.fulfillment.util._
 
-trait LoggingWorkflowAdapter
-  extends SWFAdapterComponent
-    with DynamoAdapterComponent
-    with SploggerComponent
-{}
-
-trait LoggingWorkflowAdapterImpl
-  extends LoggingWorkflowAdapter {
-  val _cfg: PropertiesLoader
-  val _splog: Splogger
-
-  def splog = _splog
-
-  lazy private val _swf = new SWFAdapter(_cfg)
-  def swfAdapter = _swf
-
-  lazy private val _dyn = new DynamoAdapter(_cfg)
-  def dynamoAdapter = _dyn
-}
-
 abstract class FulfillmentWorker {
   this: LoggingWorkflowAdapter =>
 
