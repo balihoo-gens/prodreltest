@@ -103,9 +103,10 @@ excludeFilter in unmanagedSources :=
   "AdWordsUserInterests.scala" ||
   "AdWordsImageAdProcessor.scala" ||
   "AdWordsTextAdProcessor.scala" ||
-*/
+  "GeoNamesTimeZoneRetriever.scala" ||
   "Chaos.scala" ||
   "EmailAddressVerifier.scala" ||
+*/
   "EmailSender.scala" ||
   "EmailVerifiedAddressLister.scala" ||
   "EmailWorkers.scala" ||
@@ -114,4 +115,5 @@ excludeFilter in unmanagedSources :=
   "Noop.scala" ||
   "TimeZoneWorker.scala" ||
   "ZipCodeDemographics.scala" ||
+  "ParticipantData.scala" ||
   ""

@@ -2,6 +2,7 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.DefaultHttpClient
@@ -13,7 +14,7 @@ import org.apache.http.message.BasicNameValuePair
 import org.apache.http.client.utils.URLEncodedUtils
 
 abstract class AbstractGeoNamesTimeZoneRetriever extends FulfillmentWorker {
- this: SWFAdapterComponent with DynamoAdapterComponent =>
+  this: LoggingWorkflowAdapter =>
 
   val url = swfAdapter.config.getString("geonames.url")
   val username = swfAdapter.config.getString("geonames.user")
@@ -166,23 +167,14 @@ abstract class AbstractGeoNamesTimeZoneRetriever extends FulfillmentWorker {
 
 }
 
-class GeoNamesTimeZoneRetriever(swf: SWFAdapter, dyn: DynamoAdapter)
+class GeoNamesTimeZoneRetriever(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractGeoNamesTimeZoneRetriever
-  with SWFAdapterComponent
-  with DynamoAdapterComponent {
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
+  with LoggingWorkflowAdapterImpl {
 }
 
-object geonames_timezoneretriever {
-  def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$")
-    val cfg = PropertiesLoader(args, name)
-    val worker = new GeoNamesTimeZoneRetriever(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg)
-    )
-    println(s"Running $name")
-    worker.work()
+object geonames_timezoneretriever extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new GeoNamesTimeZoneRetriever(cfg, splog)
   }
 }
+

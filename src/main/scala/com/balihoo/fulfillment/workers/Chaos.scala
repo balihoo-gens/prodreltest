@@ -2,11 +2,12 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
+
 import scala.util.Random
 
 abstract class AbstractChaos extends FulfillmentWorker {
- this: SWFAdapterComponent
-   with DynamoAdapterComponent =>
+  this: LoggingWorkflowAdapter =>
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
@@ -34,23 +35,14 @@ abstract class AbstractChaos extends FulfillmentWorker {
   }
 }
 
-class Chaos(swf: SWFAdapter, dyn: DynamoAdapter)
+class Chaos(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractChaos
-  with SWFAdapterComponent
-  with DynamoAdapterComponent {
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
+  with LoggingWorkflowAdapterImpl {
 }
 
-object chaos {
-  def main(args: Array[String]) {
-    val name = getClass.getSimpleName.stripSuffix("$")
-    val cfg = PropertiesLoader(args, name)
-    val worker = new Chaos(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg)
-    )
-    println(s"Running $name")
-    worker.work()
+object chaos extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new Chaos(cfg, splog)
   }
 }
+
