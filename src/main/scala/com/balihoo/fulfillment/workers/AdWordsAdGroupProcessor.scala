@@ -3,6 +3,8 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
+import com.balihoo.fulfillment.util.Splogger
+
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
@@ -15,9 +17,7 @@ class SetComparator[A](existing:Map[String,A], potential:Map[String,A]) {
 }
 
 abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
-  this: AdWordsAdapterComponent
-   with SWFAdapterComponent
-   with DynamoAdapterComponent
+  this: LoggingAdwordsWorkflowAdapter
    with AdGroupCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
@@ -50,18 +50,11 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
   }
 }
 
-class AdWordsAdGroupProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
-  extends AbstractAdWordsAdGroupProcessor
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
-  with AdWordsAdapterComponent
+class AdWordsAdGroupProcessor(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+extends AbstractAdWordsAdGroupProcessor
+  with LoggingAdwordsWorkflowAdapterImpl
   with AdGroupCreatorComponent {
-    //don't put this in the adGroupCreator method to avoid a new one from
-    //being created on every call.
-    lazy val _adGroupCreator = new AdGroupCreator(awa)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def adWordsAdapter = awa
+    lazy val _adGroupCreator = new AdGroupCreator(adWordsAdapter)
     def adGroupCreator = _adGroupCreator
 }
 
@@ -439,18 +432,9 @@ trait AdGroupCreatorComponent {
   }
 }
 
-
-object adwords_adgroupprocessor {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAdGroupProcessor(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new AdWordsAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object adwords_adgroupprocessor extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsAdGroupProcessor(cfg, splog)
   }
 }
-
 

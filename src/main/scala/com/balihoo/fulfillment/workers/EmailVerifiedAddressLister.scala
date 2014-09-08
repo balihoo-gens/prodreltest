@@ -2,11 +2,11 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
-  this: SESAdapterComponent
-    with SWFAdapterComponent
-    with DynamoAdapterComponent =>
+  this: LoggingWorkflowAdapter
+  with SESAdapterComponent =>
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(), new ActivityResult("JSON", "Comma separated list of email addresses"))
@@ -25,26 +25,16 @@ abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
   }
 }
 
-class EmailVerifiedAddressLister(swf: SWFAdapter, dyn: DynamoAdapter, ses: SESAdapter)
+class EmailVerifiedAddressLister(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractEmailVerifiedAddressLister
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
+  with LoggingWorkflowAdapterImpl
   with SESAdapterComponent {
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def sesAdapter = ses
+    private lazy val _ses = new SESAdapter(_cfg)
+    def sesAdapter = _ses
 }
 
-object email_verifiedaddresslister {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new EmailVerifiedAddressLister (
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new SESAdapter(cfg)
-    )
-     println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object email_verifiedaddresslister extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new EmailVerifiedAddressLister(cfg, splog)
   }
 }
-

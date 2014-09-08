@@ -23,5 +23,5 @@ echo setting install script execute permissions >> ${LOGFILE} 2>&1
 chmod a+x ${FFDIR}/ffinstall >> ${LOGFILE} 2>&1
 
 echo installing fulfillment application >> ${LOGFILE} 2>&1
-${FFDIR}/ffinstall ${CLASSNAMES} >> ${LOGFILE} 2>&1
+nohup ${FFDIR}/ffinstall ${CLASSNAMES} >> ${LOGFILE} 2>&1 &
 echo done >> ${LOGFILE} 2>&1
