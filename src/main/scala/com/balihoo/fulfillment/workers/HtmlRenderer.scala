@@ -9,6 +9,7 @@ import com.balihoo.fulfillment.util.Splogger
  */
 abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
+  with S3Adapter
   with CommandComponent =>
 
   val commandLine = swfAdapter.config.getString("commandLine")
@@ -25,6 +26,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
       val result = command.run(params.input)
       result.code match {
         case 0 =>
+          //upload it to s3
           completeTask(result.out)
         case 1 => // Special case. We're using 1 to mean CANCEL
           cancelTask(result.out)
