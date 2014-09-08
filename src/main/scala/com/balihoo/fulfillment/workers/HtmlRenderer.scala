@@ -2,21 +2,21 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 
 /*
  * this is the dependency-injectable class containing all functionality
  */
-abstract class AbstractParticipantData extends FulfillmentWorker {
-    this: CommandComponent
-    with DynamoAdapterComponent
-    with SWFAdapterComponent =>
+abstract class AbstractHtmlRenderer extends FulfillmentWorker {
+  this: LoggingWorkflowAdapter
+  with CommandComponent =>
 
   val commandLine = swfAdapter.config.getString("commandLine")
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("participantId", "int", "Participant Identifier")
-      ), new ActivityResult("JSON", "An object of affiliate data"))
+        new ActivityParameter("URL", "string", "The URL of of the page to render")
+      ), new ActivityResult("string", "the URL of the rendered image"))
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -38,26 +38,16 @@ abstract class AbstractParticipantData extends FulfillmentWorker {
   }
 }
 
-class ParticipantData(swf: SWFAdapter, dyn: DynamoAdapter)
-  extends AbstractParticipantData
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
+class HtmlRenderer(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractHtmlRenderer
+  with LoggingWorkflowAdapterImpl
   with CommandComponent {
     lazy val _command = new Command(commandLine)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
     def command = _command
 }
 
-object participantdata {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new ParticipantData(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object htmlrenderer extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new HtmlRenderer(cfg, splog)
   }
 }
-
