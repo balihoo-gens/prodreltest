@@ -5,10 +5,10 @@ import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 
+import com.balihoo.fulfillment.util.Splogger
+
 abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
-  this: AdWordsAdapterComponent
-   with SWFAdapterComponent
-   with DynamoAdapterComponent
+  this: LoggingAdwordsWorkflowAdapter
    with TextAdCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
@@ -40,18 +40,11 @@ abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
   }
 }
 
-class AdWordsTextAdProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+class AdWordsTextAdProcessor(override val _cfg:PropertiesLoader, override val _splog:Splogger)
   extends AbstractAdWordsTextAdProcessor
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
-  with AdWordsAdapterComponent
+  with LoggingAdwordsWorkflowAdapterImpl
   with TextAdCreatorComponent {
-    //don't put this in the creator method to avoid a new one from
-    //being created on every call.
-    lazy val _creator = new AdCreator(awa)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def adWordsAdapter = awa
+    lazy val _creator = new AdCreator(adWordsAdapter)
     def adCreator = _creator
 }
 
@@ -172,15 +165,8 @@ trait TextAdCreatorComponent {
   }
 }
 
-object adwords_textadprocessor {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsTextAdProcessor(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new AdWordsAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object adwords_textadprocessor extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsTextAdProcessor(cfg, splog)
   }
 }

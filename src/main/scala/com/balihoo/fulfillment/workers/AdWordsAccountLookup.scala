@@ -4,11 +4,11 @@ import com.balihoo.fulfillment.config.{PropertiesLoader,PropertiesLoaderComponen
 import com.balihoo.fulfillment.adapters._
 import com.google.api.ads.adwords.axis.v201402.mcm.ManagedCustomer
 
+import com.balihoo.fulfillment.util.Splogger
+
 abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
-  this: AdWordsAdapterComponent
-    with SWFAdapterComponent
-    with DynamoAdapterComponent
-    with AccountCreatorComponent =>
+  this: LoggingAdwordsWorkflowAdapter
+  with AccountCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
@@ -41,31 +41,18 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
   }
 }
 
-class AdWordsAccountLookup(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+
+
+class AdWordsAccountLookup(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractAdWordsAccountLookup
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
-  with AdWordsAdapterComponent
+  with LoggingAdwordsWorkflowAdapterImpl
   with AccountCreatorComponent {
-    //don't put this in the accountCreator method to avoid a new one from
-    //being created on every call.
-    lazy val _accountCreator = new AccountCreator(awa)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def adWordsAdapter = awa
+    lazy private val _accountCreator = new AccountCreator(adWordsAdapter)
     def accountCreator = _accountCreator
 }
 
-object adwords_accountlookup {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountLookup(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new AdWordsAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object adwords_accountlookup extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsAccountLookup(cfg, splog)
   }
 }
-

@@ -2,15 +2,15 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
+
 import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm._
 
 import scala.collection.mutable
 
 abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
-  this: AdWordsAdapterComponent
-    with SWFAdapterComponent
-    with DynamoAdapterComponent
+  this: LoggingAdwordsWorkflowAdapter
     with CampaignCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
@@ -20,10 +20,6 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
     try {
       adWordsAdapter.setClientId(params("account"))
-
-      //val creator = new CampaignCreator with AdWordsAdapterComponent {
-      //  def adWordsAdapter = AdWordsCampaignProcessor.this.adWordsAdapter
-      //}
 
       val campaign = campaignCreator.getCampaign(params) match {
         case campaign:Campaign =>
@@ -46,18 +42,11 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
   }
 }
 
-class AdWordsCampaignProcessor(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+class AdWordsCampaignProcessor(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractAdWordsCampaignProcessor
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
-  with AdWordsAdapterComponent
+  with LoggingAdwordsWorkflowAdapterImpl
   with CampaignCreatorComponent {
-    //don't put this in the creator method to avoid a new one from
-    //being created on every call.
-    lazy val _creator = new CampaignCreator(awa)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def adWordsAdapter = awa
+    lazy val _creator = new CampaignCreator(adWordsAdapter)
     def campaignCreator = _creator
 }
 
@@ -443,17 +432,9 @@ trait CampaignCreatorComponent {
   }
 }
 
-
-object adwords_campaignprocessor {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsCampaignProcessor(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new AdWordsAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object adwords_campaignprocessor extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsCampaignProcessor(cfg, splog)
   }
 }
 

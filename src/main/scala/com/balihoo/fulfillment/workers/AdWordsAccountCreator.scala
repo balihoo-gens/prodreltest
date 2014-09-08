@@ -6,14 +6,13 @@ import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201402.cm.Operator
 import com.google.api.ads.adwords.axis.v201402.cm.Selector
 import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
+import com.balihoo.fulfillment.util.Splogger
 
 /*
  * this is the dependency-injectable class containing all functionality
  */
 abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
-  this: AdWordsAdapterComponent
-    with SWFAdapterComponent
-    with DynamoAdapterComponent
+  this: LoggingAdwordsWorkflowAdapter
     with AccountCreatorComponent =>
 
   override def getSpecification: ActivitySpecification = {
@@ -44,21 +43,13 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
 }
 
 /*
- * this is a specific implementation of the default (i.e. not test) AdWordsAccoutnCreator
- * providing the adapter instances here allows reuse.
+ * this is a specific implementation of the default (i.e. not test) AdWordsAccountCreator
  */
-class AdWordsAccountCreator(swf: SWFAdapter, dyn: DynamoAdapter, awa: AdWordsAdapter)
+class AdWordsAccountCreator(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractAdWordsAccountCreator
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
-  with AdWordsAdapterComponent
+  with LoggingAdwordsWorkflowAdapterImpl
   with AccountCreatorComponent {
-    //don't put this in the accountCreator method to avoid a new one from
-    //being created on every call.
-    lazy val _accountCreator = new AccountCreator(awa)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
-    def adWordsAdapter = awa
+    lazy val _accountCreator = new AccountCreator(adWordsAdapter)
     def accountCreator = _accountCreator
 }
 
@@ -162,17 +153,8 @@ trait AccountCreatorComponent {
   }
 }
 
-
-object adwords_accountcreator {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new AdWordsAccountCreator(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg),
-      new AdWordsAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object adwords_accountcreator extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new AdWordsAccountCreator(cfg, splog)
   }
 }
-
