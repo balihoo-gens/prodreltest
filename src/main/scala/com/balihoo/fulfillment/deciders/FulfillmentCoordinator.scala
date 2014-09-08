@@ -2,11 +2,10 @@ package com.balihoo.fulfillment.deciders
 
 import java.util.UUID.randomUUID
 
-import org.joda.time.{Seconds, DateTime}
+import org.joda.time.DateTime
 
 import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
-import scala.collection.mutable.MutableList
 import scala.collection.mutable
 
 import com.balihoo.fulfillment.adapters._
@@ -54,9 +53,8 @@ abstract class AbstractFulfillmentCoordinator {
 
           if(task.getTaskToken != null) {
 
-            val sections = new SectionMap(task.getEvents)
-            val categorized = new CategorizedSections(sections)
-            val decisions = new DecisionGenerator(categorized, sections).makeDecisions()
+            val sections = new FulfillmentSections(task.getEvents)
+            val decisions = new DecisionGenerator(sections).makeDecisions()
 
             val response: RespondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest
             response.setTaskToken(task.getTaskToken)
@@ -79,14 +77,12 @@ abstract class AbstractFulfillmentCoordinator {
 
 /**
  *
- * @param categorized The categorized current state of the segments
  * @param sections A Name -> Section mapping helper
  */
-class DecisionGenerator(categorized: CategorizedSections
-                       ,sections: SectionMap) {
+class DecisionGenerator(sections: FulfillmentSections) {
 
   protected def gatherParameters(section: FulfillmentSection
-                                ,sections: SectionMap) = {
+                                ,sections: FulfillmentSections) = {
 
     val params = mutable.Map[String, String]()
 
@@ -125,140 +121,190 @@ class DecisionGenerator(categorized: CategorizedSections
     decision
   }
 
-  def makeDecisions(): MutableList[Decision] = {
+  protected def operate(section: FulfillmentSection) = {
 
-    val decisions = new MutableList[Decision]()
+    val decision: Decision = new Decision
+    decision.setDecisionType(DecisionType.RecordMarker)
+    val attribs:RecordMarkerDecisionAttributes = new RecordMarkerDecisionAttributes
+    var outcome = "SUCCESS"
+    try {
+      section.setCompleted(section.operate(), DateTime.now)
+      attribs.setDetails(section.value)
+    } catch {
+      case e:Exception =>
+        outcome = "FAILURE"
+        section.setFailed("Operation Failed", e.getMessage, DateTime.now)
+        attribs.setDetails(e.getMessage)
+    }
+    attribs.setMarkerName(s"OperatorResult${Constants.delimiter}${section.name}${Constants.delimiter}$outcome")
+    decision.setRecordMarkerDecisionAttributes(attribs)
+    decision
+  }
 
-    val failReasons = MutableList[String]()
+  def _checkComplete(): Option[Decision] = {
 
-    if(categorized.workComplete()) {
+    if(sections.categorized.workComplete()) {
       // If we're done then let's just bail here
+      sections.timeline.success("Workflow Complete!!!", None)
+
       val decision: Decision = new Decision
       decision.setDecisionType(DecisionType.CompleteWorkflowExecution)
-      decisions += decision
-      sections.timeline.success("Workflow Complete!!!")
-      return decisions
+      return Some(decision)
     }
 
-    if(sections.terminal()) {
-      sections.timeline.error(s"Workflow is TERMINAL (${sections.resolution})")
-      return decisions
-    }
+    None
+  }
 
-    if(categorized.impossible.length > 0) {
-      var details: String = "Impossible Sections:\n\t"
-      details += (for(section <- categorized.impossible) yield s"${section.name}").mkString(", ")
-      failReasons += details
+  def _checkFailed(): Option[Decision] = {
+
+    val failReasons = mutable.MutableList[String]()
+
+    if(sections.categorized.impossible.length > 0) {
+      failReasons += (for(section <- sections.categorized.impossible) yield s"${section.name}").mkString("Impossible Sections:\n\t", ", ", "")
     }
 
     // Loop through the problem sections
-    for(section <- categorized.failed) {
-      if(section.failedCount < section.failureParams.maxRetries) {
-        val message = s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})"
-        section.timeline.warning(message)
-        if(!section.fixable) {
-          decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.READY.toString,
-            message)
-        } else {
-          section.timeline.warning("Section is marked FIXABLE.")
-        }
-      } else {
+    for(section <- sections.categorized.failed) {
+      if(section.failedCount >= section.failureParams.maxRetries) {
         val message = s"Section $section FAILED too many times! (${section.failedCount} of ${section.failureParams.maxRetries})"
-        section.timeline.error(message)
+        section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
     }
 
-    for(section <- categorized.timedout) {
-      if(section.timedoutCount < section.timeoutParams.maxRetries) {
-        val message = s"Section timed out and is allowed to retry (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
-        section.timeline.warning(message)
-        decisions += _createTimerDecision(section.name, section.timeoutParams.delaySeconds, SectionStatus.READY.toString,
-          message)
-      } else {
+    for(section <- sections.categorized.timedout) {
+      if(section.timedoutCount >= section.timeoutParams.maxRetries) {
         val message =  s"Section $section TIMED OUT too many times! (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
-        section.timeline.error(message)
+        section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
     }
 
-    for(section <- categorized.canceled) {
-      if(section.canceledCount < section.cancelationParams.maxRetries) {
-        val message = s"Section was canceled and is allowed to retry (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
-        section.timeline.warning(message)
-        decisions += _createTimerDecision(section.name, section.cancelationParams.delaySeconds, SectionStatus.READY.toString,
-          message)
-      } else {
+    for(section <- sections.categorized.canceled) {
+      if(section.canceledCount >= section.cancelationParams.maxRetries) {
         val message = s"Section $section was CANCELED too many times! (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
-        section.timeline.error(message)
+        section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
     }
 
+    // Any fail reasons are non-recoverable and ultimately terminal for the workflow. We're going to end it.
     if(failReasons.length > 0) {
 
-      decisions.clear() // Get rid of any existing decisions.
-
-      val decision: Decision = new Decision
-      decision.setDecisionType(DecisionType.FailWorkflowExecution)
-
       val details: String = failReasons.mkString("Failed Sections:\n\t", "\n\t", "\n")
+      sections.timeline.error("Workflow FAILED "+details, Some(DateTime.now))
 
       // TODO. We should cancel the in-progress sections as BEST as we can
       val attribs: FailWorkflowExecutionDecisionAttributes = new FailWorkflowExecutionDecisionAttributes
       attribs.setReason("There are failed sections!")
       attribs.setDetails(details)
 
+      val decision: Decision = new Decision
+      decision.setDecisionType(DecisionType.FailWorkflowExecution)
       decision.setFailWorkflowExecutionDecisionAttributes(attribs)
 
-      decisions += decision
-
-      sections.timeline.error("Workflow FAILED "+details)
-
-      return decisions
+      return Some(decision)
     }
 
-    for(section <- categorized.ready) {
-      val delaySeconds = calculateWaitSeconds(section)
-      // Does this task need to be delayed until the waitUntil time?
-      if (delaySeconds > 0)
-        decisions += waitDecision(section, delaySeconds)
-      else
-        decisions += triggerWorkerDecision(section)
-    }
-
-    if(decisions.length == 0 && !categorized.hasPendingSections) {
-      // We aren't making any progress at all! FAIL
-
-      sections.resolution = "BLOCKED"
-
-      if(categorized.failed.length > 0) {
-        var details: String = "Failed Sections:\n\t"
-        details += (for(section <- categorized.failed) yield section.name).mkString("\n\t")
-        sections.timeline.error(details)
-      }
-
-      if(categorized.blocked.length > 0) {
-        var details: String = "Blocked Sections:\n\t"
-        details += (for(section <- categorized.blocked) yield section.name).mkString("\n\t")
-        sections.timeline.error(details)
-      }
-
-    }
-
-    decisions
+    None
   }
 
-  /**
-   * Calculates the proper wait time for a task.  If there is no waitUntil value, the wait time will be zero.
-   * @param section the section describing the task
-   * @return the wait time in seconds
-   */
-  private def calculateWaitSeconds(section: FulfillmentSection): Int = {
-    section.waitUntil match {
-      case Some(d) => Seconds.secondsBetween(DateTime.now, d).getSeconds
-      case _ => 0
+  def makeDecisions(runOperations:Boolean = true): List[Decision] = {
+
+    _checkComplete() match {
+      case d:Some[Decision] => return List(d.get)
+      case _ =>
     }
+
+    if(sections.terminal()) {
+      sections.timeline.error(s"Workflow is TERMINAL (${sections.resolution})", None)
+      return List()
+    }
+
+    _checkFailed() match {
+      case d:Some[Decision] => return List(d.get)
+      case _ =>
+    }
+
+    val decisions = new mutable.MutableList[Decision]()
+
+    var decisionLength = 0
+
+    if(runOperations) {
+      do { // Loop through the operations until they're all processed
+        decisionLength = decisions.length
+        for(section <- sections.categorized.ready) {
+          if(section.operator.isDefined) {
+            decisions += operate(section)
+          }
+        }
+        sections.categorized.categorize() // Re-categorize the sections based on the new statuses
+
+      } while(decisions.length > decisionLength)
+    }
+
+    _checkComplete() match { // YES AGAIN.. processing any pending operations may have pushed us into complete
+      case d:Some[Decision] => return List(d.get)
+      case _ =>
+    }
+
+    for(section <- sections.categorized.ready) {
+      val delaySeconds = section.calculateWaitSeconds()
+      // Does this task need to be delayed until the waitUntil time?
+      if (delaySeconds > 0) {
+        decisions += waitDecision(section, delaySeconds)
+      } else if(section.action.isDefined) {
+        decisions += _createActivityDecision(section)
+      }
+    }
+
+    // Loop through the problem sections
+    for(section <- sections.categorized.failed) {
+      val message = s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})"
+      section.timeline.warning(message, None)
+      if(!section.fixable) {
+        decisions += _createTimerDecision(section.name, section.failureParams.delaySeconds, SectionStatus.READY.toString,
+          message)
+      } else {
+        section.timeline.warning("Section is marked FIXABLE.", None)
+      }
+    }
+
+    for(section <- sections.categorized.timedout) {
+      val message = s"Section timed out and is allowed to retry (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
+      section.timeline.warning(message, None)
+      decisions += _createTimerDecision(section.name, section.timeoutParams.delaySeconds, SectionStatus.READY.toString,
+        message)
+    }
+
+    for(section <- sections.categorized.canceled) {
+      val message = s"Section was canceled and is allowed to retry (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
+      section.timeline.warning(message, None)
+      decisions += _createTimerDecision(section.name, section.cancelationParams.delaySeconds, SectionStatus.READY.toString,
+        message)
+    }
+
+
+    if(decisions.length == 0 && !sections.categorized.hasPendingSections) {
+
+      // We aren't making any progress...
+      sections.resolution = "BLOCKED"
+
+      if(sections.categorized.failed.length > 0) {
+        sections.timeline.error(
+          (for(section <- sections.categorized.failed) yield section.name)
+            .mkString("Failed Sections:\n\t", "\n\t", ""), None)
+      }
+
+      if(sections.categorized.blocked.length > 0) {
+        sections.timeline.error(
+          (for(section <- sections.categorized.blocked) yield section.name)
+            .mkString("Blocked Sections:\n\t", "\n\t", ""), None)
+      }
+
+    }
+
+    decisions.toList
   }
 
   /**
@@ -277,29 +323,29 @@ class DecisionGenerator(categorized: CategorizedSections
    * @param section the section describing the activity
    * @return the decision
    */
-  private def triggerWorkerDecision(section: FulfillmentSection): Decision = {
+  private def _createActivityDecision(section: FulfillmentSection): Decision = {
     val params = gatherParameters(section, sections)
 
     val decision: Decision = new Decision
     decision.setDecisionType(DecisionType.ScheduleActivityTask)
 
     val taskList = new TaskList
-    taskList.setName(section.action.getName+section.action.getVersion)
+    taskList.setName(section.action.get.getName+section.action.get.getVersion)
 
     val attribs: ScheduleActivityTaskDecisionAttributes = new ScheduleActivityTaskDecisionAttributes
-    attribs.setActivityType(section.action)
+    attribs.setActivityType(section.action.get)
     attribs.setInput(params)
     attribs.setTaskList(taskList)
     attribs.setActivityId(section.getActivityId)
 
-    if(section.startToCloseTimeout.nonEmpty) attribs.setStartToCloseTimeout(section.startToCloseTimeout)
-    if(section.scheduleToStartTimeout.nonEmpty) attribs.setScheduleToStartTimeout(section.scheduleToStartTimeout)
-    if(section.scheduleToCloseTimeout.nonEmpty) attribs.setScheduleToCloseTimeout(section.scheduleToCloseTimeout)
-    if(section.heartbeatTimeout.nonEmpty) attribs.setHeartbeatTimeout(section.heartbeatTimeout)
+    if(section.startToCloseTimeout.isDefined) attribs.setStartToCloseTimeout(section.startToCloseTimeout.get)
+    if(section.scheduleToStartTimeout.isDefined) attribs.setScheduleToStartTimeout(section.scheduleToStartTimeout.get)
+    if(section.scheduleToCloseTimeout.isDefined) attribs.setScheduleToCloseTimeout(section.scheduleToCloseTimeout.get)
+    if(section.heartbeatTimeout.isDefined) attribs.setHeartbeatTimeout(section.heartbeatTimeout.get)
 
     decision.setScheduleActivityTaskDecisionAttributes(attribs)
 
-    sections.timeline.note("Scheduling work for: "+section.name)
+    sections.timeline.note("Scheduling work for: "+section.name, None)
 
     decision
   }

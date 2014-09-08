@@ -50,12 +50,12 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
 
       val jso = json.as[JsObject].value("cake").as[JsObject]
-      val section = new FulfillmentSection("test section", jso, new Date())
+      val section = new FulfillmentSection("test section", jso, DateTime.now)
 
       section.name mustEqual "test section"
       section.prereqs(0) mustEqual "heat_oven"
-      section.action.getName mustEqual "bake"
-      section.action.getVersion mustEqual "1"
+      section.action.get.getName mustEqual "bake"
+      section.action.get.getVersion mustEqual "1"
       section.failureParams.maxRetries mustEqual 3
       section.failureParams.delaySeconds mustEqual 100
       section.cancelationParams.maxRetries mustEqual 7
@@ -69,7 +69,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.canceledCount mustEqual 0
       section.startedCount mustEqual 0
 
-      section.startToCloseTimeout mustEqual "tuna sandwich"
+      section.startToCloseTimeout mustEqual Some("tuna sandwich")
       section.waitUntil.get mustEqual new DateTime("2093-07-04T16:04:00-06")
 
       section.params("cake_batter").asInstanceOf[SectionReferences].sections(0).name mustEqual "batter"
@@ -106,41 +106,41 @@ class TestFulfillmentCoordinator extends Specification with Mockito
          "status" : "READY"
 	      }""").as[JsObject]
 
-      val section = new FulfillmentSection("sectionName", json, new Date())
+      val section = new FulfillmentSection("sectionName", json, DateTime.now)
 
       section.status mustEqual SectionStatus.READY
 
       section.startedCount mustEqual 0
-      section.setStarted(new Date())
+      section.setStarted(DateTime.now)
 
       section.status mustEqual SectionStatus.STARTED
 
       section.startedCount mustEqual 1
 
-      section.setStarted(new Date())
-      section.setStarted(new Date())
+      section.setStarted(DateTime.now)
+      section.setStarted(DateTime.now)
 
       section.startedCount mustEqual 3
       section.status mustEqual SectionStatus.STARTED
 
-      section.setScheduled(new Date())
+      section.setScheduled(DateTime.now)
       section.status mustEqual SectionStatus.SCHEDULED
 
       section.scheduledCount mustEqual 1
       section.startedCount mustEqual 3 // STILL 3
 
-      section.setCompleted("awesome results", new Date())
+      section.setCompleted("awesome results", DateTime.now)
 
       section.value mustEqual "awesome results"
       section.scheduledCount mustEqual 1 // STILL 1
       section.startedCount mustEqual 3 // STILL 3
       section.status mustEqual SectionStatus.COMPLETE
 
-      section.setFailed("reasons", "terrible reasons", new Date())
+      section.setFailed("reasons", "terrible reasons", DateTime.now)
       section.status mustEqual SectionStatus.FAILED
       section.timeline.events.last.message mustEqual "Failed because:reasons terrible reasons"
 
-      section.setFailed("reasons", "more terrible reasons", new Date())
+      section.setFailed("reasons", "more terrible reasons", DateTime.now)
       section.status mustEqual SectionStatus.TERMINAL
       section.timeline.events.last.message mustEqual "Failed because:reasons more terrible reasons"
     }
@@ -209,9 +209,9 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       event2.setActivityTaskScheduledEventAttributes(event2Attribs)
       events += event2
 
-      val map = new SectionMap(mutableSeqAsJavaList(events))
+      val map = new FulfillmentSections(mutableSeqAsJavaList(events))
 
-      map.getClass mustEqual classOf[SectionMap]
+      map.getClass mustEqual classOf[FulfillmentSections]
 
       map.nameToSection.size mustEqual 3
 
@@ -279,13 +279,13 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       event2.setActivityTaskStartedEventAttributes(event2Attribs)
       events += event2
 
-      val map = new SectionMap(mutableSeqAsJavaList(events))
+      val map = new FulfillmentSections(mutableSeqAsJavaList(events))
 
-      map.getClass mustEqual classOf[SectionMap]
+      map.getClass mustEqual classOf[FulfillmentSections]
 
       map.nameToSection.size mustEqual 3
 
-      map.timeline.events(0).message mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+      map.timeline.events(0).message mustEqual "Problem processing WorkflowExecutionStarted: Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }
   }
 
@@ -316,30 +316,29 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
       events += event
 
-      val sections = new SectionMap(mutableSeqAsJavaList(events))
-      val categorized = new CategorizedSections(sections)
-      val generator = new DecisionGenerator(categorized, sections)
-      generator.makeDecisions()
+      val sections = new FulfillmentSections(mutableSeqAsJavaList(events))
+      val generator = new DecisionGenerator(sections)
+      generator.makeDecisions(false)
     }
 
     "schedule work when there's no waitUntil" in {
       val decisions = makeDecisions(None)
-      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
     "schedule work when waitUntil is in the past" in {
       val decisions = makeDecisions(Some(DateTime.now.minusDays(1)))
-      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
     "schedule work when waitUntil is < 1 second in the future" in {
       val decisions = makeDecisions(Some(DateTime.now.plusMillis(998)))
-      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
     "start a timer when waitUntil is > 1 second in the future" in {
       val decisions = makeDecisions(Some(DateTime.now.plusSeconds(30)))
-      decisions(0).getDecisionType mustEqual(DecisionType.StartTimer.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.StartTimer.toString
     }
   }
 }

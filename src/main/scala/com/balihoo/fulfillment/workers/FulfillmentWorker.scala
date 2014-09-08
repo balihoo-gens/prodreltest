@@ -1,12 +1,13 @@
 package com.balihoo.fulfillment.workers
 
-import java.text.SimpleDateFormat
-import java.util.{Date, TimeZone}
+import java.util.Date
 import java.util.UUID.randomUUID
 
 import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
 import com.balihoo.fulfillment.config.{SWFVersion, SWFName}
+import org.joda.time.{Minutes, DateTime}
+import org.joda.time.format.ISODateTimeFormat
 import org.keyczar.Crypter
 
 import scala.collection.mutable
@@ -36,7 +37,7 @@ abstract class FulfillmentWorker {
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
-  val _log = new Splogger(s"/var/log/balihoo/fulfillment/${name}.log")
+  val _log = new Splogger(s"/var/log/balihoo/fulfillment/$name.log")
   def splog = _log
 
   val hostAddress = sys.env.get("EC2_HOME") match {
@@ -62,7 +63,7 @@ abstract class FulfillmentWorker {
   entry.setDomain(domain)
   entry.setStatus("--")
   entry.setResolutionHistory("[]")
-  entry.setStart(UTCFormatter.format(new Date()))
+  entry.setStart(UTCFormatter.format(DateTime.now))
 
   val taskList: TaskList = new TaskList().withName(taskListName)
 
@@ -141,7 +142,7 @@ abstract class FulfillmentWorker {
   }
 
   def declareWorker() = {
-    entry.setLast(UTCFormatter.format(new Date()))
+    entry.setLast(UTCFormatter.format(DateTime.now))
     entry.setStatus(s"Declaring $name $domain $taskListName")
     workerTable.insert(entry)
   }
@@ -149,7 +150,7 @@ abstract class FulfillmentWorker {
   def updateStatus(status:String, level:String="INFO") = {
     try {
       updateCounter += 1
-      entry.setLast(UTCFormatter.format(new Date()))
+      entry.setLast(UTCFormatter.format(DateTime.now))
       entry.setStatus(status)
       workerTable.update(entry)
       splog(level,status)
@@ -234,7 +235,7 @@ abstract class FulfillmentWorker {
 }
 
 class TaskResolution(val resolution:String, val details:String) {
-  val when = UTCFormatter.format(new Date())
+  val when = UTCFormatter.format(DateTime.now)
   def toJson:JsValue = {
     Json.toJson(Map(
       "resolution" -> Json.toJson(resolution),
@@ -339,12 +340,15 @@ object UTCFormatter {
   val HOUR_IN_MS = MIN_IN_MS * 60
   val DAY_IN_MS = HOUR_IN_MS * 24
 
-  val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
-  dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"))
+  val dateTimeFormatter = ISODateTimeFormat.dateTime().withZoneUTC()
 
-  def format(date:Date): String = {
-    dateFormat.format(date)
+  def format(dateTime:DateTime): String = {
+    dateTimeFormatter.print(dateTime)
   }
+  def format(date:Date): String = {
+    dateTimeFormatter.print(new DateTime(date))
+  }
+
 
 }
 
@@ -362,18 +366,16 @@ class FulfillmentWorkerTable {
   def get() = {
     val scanExp:DynamoDBScanExpression = new DynamoDBScanExpression()
 
-    val oldest = UTCFormatter.format(new Date(System.currentTimeMillis() - UTCFormatter.DAY_IN_MS))
+    val oldest = DateTime.now.minusDays(1)
 
     scanExp.addFilterCondition("last",
       new Condition()
         .withComparisonOperator(ComparisonOperator.GT)
-        .withAttributeValueList(new AttributeValue().withS(oldest)))
-
-    val now = new Date()
+        .withAttributeValueList(new AttributeValue().withS(UTCFormatter.format(oldest))))
 
     val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp)
     for(worker:FulfillmentWorkerEntry <- list) {
-      worker.minutesSinceLast = (now.getTime - UTCFormatter.dateFormat.parse(worker.last).getTime) / UTCFormatter.MIN_IN_MS
+      worker.minutesSinceLast = Minutes.minutesBetween(DateTime.now, new DateTime(worker.last)).getMinutes
     }
 
     list.toList

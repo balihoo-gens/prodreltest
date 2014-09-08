@@ -1,10 +1,10 @@
 package com.balihoo.fulfillment.dashboard
 
 import java.io.File
-import java.util.Date
 
-import com.balihoo.fulfillment.deciders.{DecisionGenerator, CategorizedSections, FulfillmentSection, SectionMap}
+import com.balihoo.fulfillment.deciders.{DecisionGenerator, FulfillmentSection, FulfillmentSections}
 import com.balihoo.fulfillment.workers.{UTCFormatter, FulfillmentWorkerTable, FulfillmentWorkerEntry}
+import org.joda.time.DateTime
 import play.api.libs.json._
 
 import scala.collection.JavaConverters._
@@ -155,10 +155,10 @@ trait WorkflowInspectorComponent {
       "Unknown event type!"
     }
 
-    def executionHistory(oldest:Date, latest:Date):List[JsValue] = {
+    def executionHistory(oldest:DateTime, latest:DateTime):List[JsValue] = {
       val filter = new ExecutionTimeFilter
-      filter.setOldestDate(oldest)
-      filter.setLatestDate(latest)
+      filter.setOldestDate(oldest.toDate)
+      filter.setLatestDate(latest.toDate)
 
       val infos = new collection.mutable.MutableList[JsValue]()
       val oreq = new ListOpenWorkflowExecutionsRequest()
@@ -204,16 +204,15 @@ trait WorkflowInspectorComponent {
         history = swfAdapter.client.getWorkflowExecutionHistory(req)
         events.addAll(history.getEvents)
       }
-      val sectionMap = new SectionMap(events)
-      val categorized = new CategorizedSections(sectionMap)
-      new DecisionGenerator(categorized, sectionMap).makeDecisions()
+      val sections = new FulfillmentSections(events)
+      new DecisionGenerator(sections).makeDecisions(false)
 
-      val sections = collection.mutable.Map[String, JsValue]()
-      for((name, section:FulfillmentSection) <- sectionMap.nameToSection) {
-        sections(name) = section.toJson
+      val sectionsJson = collection.mutable.Map[String, JsValue]()
+      for((name, section:FulfillmentSection) <- sections.nameToSection) {
+        sectionsJson(name) = section.toJson
       }
 
-      val jtimeline = Json.toJson(for(entry <- sectionMap.timeline.events) yield entry.toJson)
+      val jtimeline = Json.toJson(for(entry <- sections.timeline.events) yield entry.toJson)
       val executionHistory = Json.toJson(for(event:HistoryEvent <- collectionAsScalaIterable(events)) yield Json.toJson(Map(
         "type" -> Json.toJson(event.getEventType),
         "id" -> Json.toJson(event.getEventId.toString),
@@ -222,11 +221,11 @@ trait WorkflowInspectorComponent {
       )))
 
       top("timeline") = jtimeline
-      top("sections") = Json.toJson(sections.toMap)
+      top("sections") = Json.toJson(sectionsJson.toMap)
       top("workflowId") = Json.toJson(workflowId)
       top("runId") = Json.toJson(runId)
       top("input") = Json.toJson(events.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
-      top("resolution") = Json.toJson(sectionMap.resolution)
+      top("resolution") = Json.toJson(sections.resolution)
       top("history") = executionHistory
 
       top.toMap
@@ -254,8 +253,8 @@ class AbstractWorkflowServlet extends RestServlet {
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
       ,Json.stringify(Json.toJson(workflowInspector.executionHistory(
-          UTCFormatter.dateFormat.parse(rsq.getRequiredParameter("startDate")),
-          UTCFormatter.dateFormat.parse(rsq.getRequiredParameter("endDate"))
+          new DateTime(rsq.getRequiredParameter("startDate")),
+          new DateTime(rsq.getRequiredParameter("endDate"))
       ))))
   })
 
@@ -267,7 +266,7 @@ class AbstractWorkflowServlet extends RestServlet {
       ))))
   })
 
-  get("/workflow/update", (rsq:RestServletQuery) => {
+  post("/workflow/update", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
       ,Json.stringify(Json.toJson(workflowUpdater.update(
         rsq.getRequiredParameter("runId")
@@ -281,7 +280,7 @@ class AbstractWorkflowServlet extends RestServlet {
       ,Json.stringify(Json.toJson(workflowInspector.environment())))
   })
 
-  get("/workflow/initiate", (rsq:RestServletQuery) => {
+  post("/workflow/initiate", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
       ,Json.stringify(Json.toJson(Map(
         "runId" -> workflowInitiator.initate(
