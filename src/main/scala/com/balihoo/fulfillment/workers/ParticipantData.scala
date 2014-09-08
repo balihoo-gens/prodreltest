@@ -2,14 +2,14 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 
 /*
  * this is the dependency-injectable class containing all functionality
  */
 abstract class AbstractParticipantData extends FulfillmentWorker {
-    this: CommandComponent
-    with DynamoAdapterComponent
-    with SWFAdapterComponent =>
+  this: LoggingWorkflowAdapter
+  with CommandComponent =>
 
   val commandLine = swfAdapter.config.getString("commandLine")
 
@@ -38,26 +38,16 @@ abstract class AbstractParticipantData extends FulfillmentWorker {
   }
 }
 
-class ParticipantData(swf: SWFAdapter, dyn: DynamoAdapter)
+class ParticipantData(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractParticipantData
-  with SWFAdapterComponent
-  with DynamoAdapterComponent
+  with LoggingWorkflowAdapterImpl
   with CommandComponent {
     lazy val _command = new Command(commandLine)
-    def swfAdapter = swf
-    def dynamoAdapter = dyn
     def command = _command
 }
 
-object participantdata {
-  def main(args: Array[String]) {
-    val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val worker = new ParticipantData(
-      new SWFAdapter(cfg),
-      new DynamoAdapter(cfg)
-    )
-    println(s"Running ${getClass.getSimpleName}")
-    worker.work()
+object participantdata extends FulfillmentWorkerApp {
+  override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
+    new ParticipantData(cfg, splog)
   }
 }
-

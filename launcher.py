@@ -13,18 +13,22 @@ except ImportError:
 
 class Launcher(object):
     ALL_CLASSES = [
-        'com.balihoo.fulfillment.workers.adwords_accountcreator',
-        'com.balihoo.fulfillment.workers.adwords_accountlookup',
-        'com.balihoo.fulfillment.workers.adwords_adgroupprocessor',
-        'com.balihoo.fulfillment.workers.adwords_campaignprocessor',
-        'com.balihoo.fulfillment.workers.adwords_imageadprocessor',
-        'com.balihoo.fulfillment.workers.chaosworker',
-        'com.balihoo.fulfillment.workers.email_addressverifier',
-        'com.balihoo.fulfillment.workers.email_sender',
-        'com.balihoo.fulfillment.workers.email_verifiedaddresslister',
-        'com.balihoo.fulfillment.workers.noopworker',
-        'com.balihoo.fulfillment.workers.timezoneworker',
-        'com.balihoo.fulfillment.deciders.coordinator'
+        "com.balihoo.fulfillment.workers.ftp_uploadvalidator",
+        "com.balihoo.fulfillment.workers.adwords_campaignprocessor",
+        "com.balihoo.fulfillment.workers.chaos",
+        "com.balihoo.fulfillment.workers.adwords_textadprocessor",
+        "com.balihoo.fulfillment.workers.email_verifiedaddresslister",
+        "com.balihoo.fulfillment.workers.geonames_timezoneretriever",
+        "com.balihoo.fulfillment.workers.adwords_accountlookup",
+        "com.balihoo.fulfillment.workers.zipcodedemographics",
+        "com.balihoo.fulfillment.workers.email_sender",
+        "com.balihoo.fulfillment.workers.adwords_accountcreator",
+        "com.balihoo.fulfillment.workers.adwords_adgroupprocessor",
+        "com.balihoo.fulfillment.workers.ftp_uploader",
+        "com.balihoo.fulfillment.deciders.coordinator",
+        "com.balihoo.fulfillment.workers.email_addressverifier",
+        "com.balihoo.fulfillment.workers.adwords_imageadprocessor",
+        "com.balihoo.fulfillment.workers.noop"
     ]
 
     def __init__(self, jar, logfile):
