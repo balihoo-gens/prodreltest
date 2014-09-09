@@ -19,7 +19,7 @@ import com.amazonaws.services.simpleworkflow.model._
 class TestFulfillmentCoordinator extends Specification with Mockito
 {
   "FulfillmentSection" should {
-    "be initialized without error" in {
+    "  be initialized without error" in {
 
       val json = Json.parse( """{
          "cake" : {
@@ -81,7 +81,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.timeline.events(0).message mustEqual "totally unhandled : stuff"
     }
 
-    "handle status changes" in {
+    "  handle status changes" in {
 
       val json = Json.parse( """{
          "action" : { "name" : "awesome",
@@ -147,7 +147,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
   }
 
   "SectionMap" should {
-    "be initialized without error" in {
+    "  be initialized without error" in {
 
       val json = """{
          "cake" : {
@@ -217,7 +217,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
     }
 
-    "be angry about sanity" in {
+    "  be angry about sanity" in {
 
       val json = """{
          "cake" : {
@@ -321,24 +321,182 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       generator.makeDecisions(false)
     }
 
-    "schedule work when there's no waitUntil" in {
+    "  schedule work when there's no waitUntil" in {
       val decisions = makeDecisions(None)
       decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
-    "schedule work when waitUntil is in the past" in {
+    "  schedule work when waitUntil is in the past" in {
       val decisions = makeDecisions(Some(DateTime.now.minusDays(1)))
       decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
-    "schedule work when waitUntil is < 1 second in the future" in {
+    "  schedule work when waitUntil is < 1 second in the future" in {
       val decisions = makeDecisions(Some(DateTime.now.plusMillis(998)))
       decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
-    "start a timer when waitUntil is > 1 second in the future" in {
+    "  start a timer when waitUntil is > 1 second in the future" in {
       val decisions = makeDecisions(Some(DateTime.now.plusSeconds(30)))
       decisions(0).getDecisionType mustEqual DecisionType.StartTimer.toString
     }
+  }
+
+  "FulfillmentOperators" should {
+    def generateSections(json:String) = {
+      var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
+
+      val event:HistoryEvent = new HistoryEvent
+      val eventAttribs = new WorkflowExecutionStartedEventAttributes
+      event.setEventType(EventType.WorkflowExecutionStarted)
+      eventAttribs.setInput(json)
+      event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
+      events += event
+
+      new FulfillmentSections(mutableSeqAsJavaList(events))
+    }
+
+    "  be upset about missing 'input'" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "MD5",
+            "params" : {},
+            "prereqs" : [],
+            "status" : "READY"
+	          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      val wrongattribs = decisions(0).getCompleteWorkflowExecutionDecisionAttributes
+      wrongattribs mustEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##FAILURE"
+      attribs.getDetails mustEqual "input parameter 'input' is REQUIRED!"
+    }
+
+    "  evaluate MD5 properly and not freak over an undeclared param" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "MD5",
+            "params" : { "input" : "some trash string not related to tuna at all", "fig" : "newton" },
+            "prereqs" : [],
+            "status" : "READY"
+	          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs.getDetails mustEqual "E546FF3E618B9579D3D039C11A2FFFCA"
+
+      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
+
+    }
+
+    "  format strings with StringFormat" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "The {subject} eats {food} when {time}",
+                         "subject" : "GIANT",
+                         "food" : "tuna flesh",
+                         "time" : "whenever the hail he wants..!!",
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+	          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs.getDetails mustEqual "The GIANT eats tuna flesh when whenever the hail he wants..!!"
+
+      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
+
+    }
+
+    "  reference results from other sections properly" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "The movie {movie} is {detailedreview}",
+                         "movie" : ["taen"],
+                         "detailedreview" : "alright. I mean it's oK I guess.",
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+	          },
+          "taen" : {
+            "value" : "ANIMAL HOUSE",
+            "status" : "COMPLETE"
+          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs.getDetails mustEqual "The movie ANIMAL HOUSE is alright. I mean it's oK I guess."
+
+      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
+
+    }
+
+    "  multiple operators should evaluate in series" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "The movie {movie} is {detailedreview}",
+                         "movie" : ["taen"],
+                         "detailedreview" : "alright. I mean it's oK I guess.",
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+	          },
+          "taen" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "{firstword} {secondword}",
+                         "firstword" : "Under",
+                         "secondword" : ["seagal got plump"],
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+          },
+          "seagal got plump" : {
+            "value" : "SIEGE",
+            "status" : "COMPLETE"
+          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs0 = decisions(0).getRecordMarkerDecisionAttributes
+      attribs0 mustNotEqual null
+
+      attribs0.getMarkerName mustEqual "OperatorResult##taen##SUCCESS"
+      attribs0.getDetails mustEqual "Under SIEGE"
+
+      val attribs1 = decisions(1).getRecordMarkerDecisionAttributes
+      attribs1 mustNotEqual null
+
+      attribs1.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs1.getDetails mustEqual "The movie Under SIEGE is alright. I mean it's oK I guess."
+
+      decisions(2).getDecisionType mustEqual "CompleteWorkflowExecution"
+    }
+
   }
 }

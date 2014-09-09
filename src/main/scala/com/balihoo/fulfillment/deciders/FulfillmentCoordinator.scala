@@ -1,8 +1,10 @@
 package com.balihoo.fulfillment.deciders
 
+import java.security.MessageDigest
 import java.util.UUID.randomUUID
 
 import org.joda.time.DateTime
+import org.keyczar.Crypter
 
 import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
@@ -14,6 +16,8 @@ import com.balihoo.fulfillment.config._
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 import com.balihoo.fulfillment.util.Getch
+
+import scala.util.matching.Regex
 
 object Constants {
   final val delimiter = "##"
@@ -36,6 +40,8 @@ abstract class AbstractFulfillmentCoordinator {
   val taskReq: PollForDecisionTaskRequest = new PollForDecisionTaskRequest()
     .withDomain(domain)
     .withTaskList(taskList)
+
+  val operators = new FulfillmentOperators
 
   def coordinate() = {
 
@@ -75,14 +81,158 @@ abstract class AbstractFulfillmentCoordinator {
   }
 }
 
+
+class OperatorResult(val rtype:String, description:String, val sensitive:Boolean = false) {
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "type" -> Json.toJson(rtype),
+      "description" -> Json.toJson(description),
+      "sensitive" -> Json.toJson(sensitive)
+    ))
+  }
+}
+
+class OperatorParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true, val sensitive:Boolean = false) {
+  var value:Option[String] = None
+
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "name" -> Json.toJson(name),
+      "type" -> Json.toJson(ptype),
+      "description" -> Json.toJson(description),
+      "required" -> Json.toJson(required),
+      "sensitive" -> Json.toJson(sensitive)
+    ))
+  }
+}
+
+class OperatorSpecification(val params:List[OperatorParameter], val result:OperatorResult) {
+
+  val crypter = new Crypter("config/crypto")
+  val paramsMap:Map[String,OperatorParameter] = (for(param <- params) yield param.name -> param).toMap
+
+  def toJson:JsValue = {
+    Json.toJson(Map(
+      "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
+      "result" -> result.toJson
+    ))
+  }
+
+  override def toString:String = {
+    Json.stringify(toJson)
+  }
+
+  def getParameters(inputParams:Map[String, String]):OperatorParameters = {
+    val outputMap = mutable.Map[String, String]()
+    for((name, value) <- inputParams) {
+      if(paramsMap contains name) {
+        val param = paramsMap(name)
+        param.value = Some(
+          if(param.sensitive)
+            crypter.decrypt(value)
+          else
+            value
+        )
+      } else {
+        outputMap(name) = value
+      }
+    }
+    for(param <- params) {
+      if(param.required && param.value.isEmpty) {
+        throw new Exception(s"input parameter '${param.name}' is REQUIRED!")
+      }
+    }
+
+    new OperatorParameters(
+      (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap ++ outputMap.toMap
+      ,Json.stringify(Json.toJson(inputParams)))
+  }
+
+}
+
+class OperatorParameters(val params:Map[String,String], val input:String = "{}") {
+
+  def has(param:String):Boolean = {
+    params contains param
+  }
+
+  def apply(param:String):String = {
+    params(param)
+  }
+
+  def getOrElse(param:String, default:String):String = {
+    if(has(param)) {
+      return params(param)
+    }
+    default
+  }
+
+  override def toString:String = {
+    params.toString()
+  }
+}
+
+class FulfillmentOperator(val name:String, val specification:OperatorSpecification, code:(OperatorParameters) => String) {
+
+  def apply(inputParams:Map[String, String]):String = {
+    code(specification.getParameters(inputParams))
+  }
+}
+
+class FulfillmentOperators {
+
+  var operators = mutable.Map[String, FulfillmentOperator]()
+
+  registerOperator(
+    new FulfillmentOperator(
+      "MD5",
+      new OperatorSpecification(
+        List(new OperatorParameter("input", "string", "The string to MD5")),
+        new OperatorResult("string", "MD5 checksum of 'input'")
+      ),
+      (parameters) => {
+        MessageDigest.getInstance("MD5").digest(parameters("input").getBytes).map("%02X".format(_)).mkString
+      })
+  )
+  registerOperator(
+    new FulfillmentOperator(
+      "StringFormat",
+      new OperatorSpecification(
+        List(new OperatorParameter("format", "string", "A string containing {param1} {param2}.. tokens")
+            ,new OperatorParameter("...", "string", "Strings to be substituted into 'format' at token locations", false)
+        ),
+        new OperatorResult("string", "'format' with tokens substituted")
+      ),
+      (parameters) => {
+        val pattern = new Regex("""\{(\w+)\}""", "token")
+          pattern.replaceAllIn(parameters("format"),
+          m => parameters.getOrElse(m.group("token"), "--"))
+      })
+  )
+
+  def registerOperator(operator:FulfillmentOperator) = {
+    operators(operator.name) = operator
+  }
+
+  def apply(operator:String, params:Map[String, String]):String = {
+    operators(operator)(params)
+  }
+
+  def toJson:JsValue = {
+    Json.toJson((for((name, operator) <- operators) yield name -> operator.specification.toJson).toMap)
+  }
+}
+
 /**
  *
  * @param sections A Name -> Section mapping helper
  */
 class DecisionGenerator(sections: FulfillmentSections) {
 
+  val operators = new FulfillmentOperators
+
   protected def gatherParameters(section: FulfillmentSection
-                                ,sections: FulfillmentSections) = {
+                                ,sections: FulfillmentSections):Map[String,String] = {
 
     val params = mutable.Map[String, String]()
 
@@ -93,13 +243,13 @@ class DecisionGenerator(sections: FulfillmentSections) {
         case v: String =>
           params(name) = v
         case _ =>
-          sections.timeline.warning(s"Parameter '$name' doesn't have a recognizable value '$value'", null)
+          section.timeline.warning(s"Parameter '$name' doesn't have a recognizable value '$value'", None)
       }
     }
 
-    Json.stringify(Json.toJson(params.toMap))
-
+    params.toMap
   }
+
 
   protected def _createTimerDecision(name:String, delaySeconds:Int, status:String, reason:String) = {
 
@@ -123,12 +273,14 @@ class DecisionGenerator(sections: FulfillmentSections) {
 
   protected def operate(section: FulfillmentSection) = {
 
+    val params = gatherParameters(section, sections)
     val decision: Decision = new Decision
     decision.setDecisionType(DecisionType.RecordMarker)
     val attribs:RecordMarkerDecisionAttributes = new RecordMarkerDecisionAttributes
     var outcome = "SUCCESS"
     try {
-      section.setCompleted(section.operate(), DateTime.now)
+      val result = operators(section.operator.get, params)
+      section.setCompleted(result, DateTime.now)
       attribs.setDetails(section.value)
     } catch {
       case e:Exception =>
@@ -244,7 +396,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
     }
 
     _checkComplete() match { // YES AGAIN.. processing any pending operations may have pushed us into complete
-      case d:Some[Decision] => return List(d.get)
+      case d:Some[Decision] => return decisions.toList ++ List(d.get)
       case _ =>
     }
 
@@ -334,7 +486,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
 
     val attribs: ScheduleActivityTaskDecisionAttributes = new ScheduleActivityTaskDecisionAttributes
     attribs.setActivityType(section.action.get)
-    attribs.setInput(params)
+    attribs.setInput(Json.stringify(Json.toJson(params)))
     attribs.setTaskList(taskList)
     attribs.setActivityId(section.getActivityId)
 

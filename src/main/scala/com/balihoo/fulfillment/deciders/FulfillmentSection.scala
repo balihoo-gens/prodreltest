@@ -259,16 +259,6 @@ class FulfillmentSection(val name: String
     }
   }
 
-  def operate():String = {
-    // TODO FIXME AWFUL BAH! We need to formalize these operators
-    operator.get match {
-      case "MD5" =>
-        MessageDigest.getInstance("MD5").digest(params("input").asInstanceOf[String].getBytes).map("%02X".format(_)).mkString
-      case _ =>
-        throw new Exception(s"Operator ${operator.get} is not implemented!")
-    }
-  }
-
   override def toString = {
     Json.stringify(toJson)
   }
