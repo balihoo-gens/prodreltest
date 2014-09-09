@@ -38,7 +38,8 @@ libraryDependencies ++= Seq(
   "javax.activation" % "activation" % "1.1",
   "com.github.scopt" %% "scopt" % "3.2.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
-  "org.keyczar" % "keyczar" % "0.66"
+  "org.keyczar" % "keyczar" % "0.66",
+  "com.stackmob" %% "newman" % "1.3.5"
 )
 
 scalacOptions in Test ++= Seq("-Yrangepos")
