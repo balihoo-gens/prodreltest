@@ -38,7 +38,6 @@ object adwordsAdGroupCreator {
       val campaign = campaignCreator.getCampaign(new ActivityParameters(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
-
       )))
 
       val target =

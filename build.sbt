@@ -113,6 +113,6 @@ excludeFilter in unmanagedSources :=
   "Noop.scala" ||
   "ZipCodeDemographics.scala" ||
   "ParticipantData.scala" ||
-*/
   "EmailWorkers.scala" ||
+*/
   ""

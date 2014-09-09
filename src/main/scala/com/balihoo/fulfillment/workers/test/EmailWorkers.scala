@@ -2,6 +2,7 @@ package com.balihoo.fulfillment.workers.test
 
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.util.Splogger
 import com.balihoo.fulfillment.workers.{
   EmailSender,
   EmailAddressVerifier,
@@ -16,6 +17,8 @@ import com.amazonaws.services.simpleworkflow.model.{
 import scala.io.Source
 
 object email {
+  private val name = getClass.getSimpleName.stripSuffix("$")
+  private val splog = new Splogger(Splogger.mkFFName(name))
   def main(args: Array[String]) {
     println("Running SendEmailWorker")
     val options = collection.mutable.Map[String, Tuple2[String, () => Unit]] ()
@@ -27,11 +30,7 @@ object email {
 
     def verifyAddress() = {
       val cfg = PropertiesLoader(args, "email_addressverifier")
-      val worker = new EmailAddressVerifier(
-        new SWFAdapter(cfg),
-        new DynamoAdapter(cfg),
-        new SESAdapter(cfg)
-      )
+      val worker = new EmailAddressVerifier(cfg, splog)
       println("enter the address to verify")
       val address = readLine("verifyemail> ")
       worker.verifyAddress(address)
@@ -40,11 +39,7 @@ object email {
 
     def getValidEmailList() = {
       val cfg = PropertiesLoader(args, "email_verifiedaddresslister")
-      val worker = new EmailVerifiedAddressLister(
-        new SWFAdapter(cfg),
-        new DynamoAdapter(cfg),
-        new SESAdapter(cfg)
-      )
+      val worker = new EmailVerifiedAddressLister(cfg, splog)
       worker.listVerifiedEmailAddresses()
     }
 
@@ -56,11 +51,7 @@ object email {
 
     def sendEmail() = {
       val cfg = PropertiesLoader(args, "email_sender")
-      val worker = new EmailSender(
-        new SWFAdapter(cfg),
-        new DynamoAdapter(cfg),
-        new SESAdapter(cfg)
-      )
+      val worker = new EmailSender(cfg, splog)
       val from = "gens@balihoo.com"
       val subject = "This is an EmailWorker Test"
       val body = "<h1>sup<br>SUP</h1>"
