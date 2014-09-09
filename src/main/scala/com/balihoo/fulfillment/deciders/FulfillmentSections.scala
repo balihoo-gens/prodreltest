@@ -41,8 +41,14 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
   _addEventHandler(EventType.DecisionTaskStarted, processIgnoredEventType)
   _addEventHandler(EventType.DecisionTaskCompleted, processIgnoredEventType)
 
-  for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
-    processEvent(event)
+  try {
+    for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
+      processEvent(event)
+    }
+  } catch {
+    case e:Exception =>
+      timeline.error(e.getMessage, Some(DateTime.now))
+      resolution = "FAILED"
   }
 
   // Now that all of the HistoryEvents have been processed our sections have been created and are up to date.
@@ -100,16 +106,27 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
     }
   }
 
-  protected def getSectionByName(name:String): FulfillmentSection = {
-    nameToSection(name)
+  def size():Int = {
+    nameToSection.size
   }
 
-  protected def getSectionById(id:Long): FulfillmentSection = {
+  def getSectionByName(name:String): FulfillmentSection = {
+    try {
+      nameToSection(name)
+    } catch {
+      case nsee:NoSuchElementException =>
+        throw new Exception(s"There is no section '$name'", nsee)
+      case e:Exception =>
+        throw new Exception(s"Error while looking up section '$name'", e)
+    }
+  }
+
+  private def getSectionById(id:Long): FulfillmentSection = {
     nameToSection(registry(id))
   }
 
-  protected def hasSection(name:String): Boolean = {
-    nameToSection contains name
+  def hasSection(name:String): Boolean = {
+    nameToSection isDefinedAt name
   }
 
   protected def processEvent(event:HistoryEvent) = {
@@ -187,7 +204,7 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
 
     // FIXME This isn't the typical 'FAILED'. It failed to even get scheduled
     // Not actually sure if this needs to be distinct or not.
-    nameToSection(name).setFailed("Failed to Schedule task!", attribs.getCause, new DateTime(event.getEventTimestamp))
+    getSectionByName(name).setFailed("Failed to Schedule task!", attribs.getCause, new DateTime(event.getEventTimestamp))
 
   }
 
@@ -199,7 +216,7 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
         val updates = Json.parse(attribs.getInput).as[JsObject]
         for((sectionName, iupdate:JsValue) <- updates.fields) {
           val update = iupdate.as[JsObject]
-          val section = nameToSection(sectionName)
+          val section = getSectionByName(sectionName)
           for((updateType, body:JsValue) <- update.fields) {
             updateType match {
               case "params" =>

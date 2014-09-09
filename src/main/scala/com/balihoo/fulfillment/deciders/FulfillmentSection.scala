@@ -101,32 +101,35 @@ class FulfillmentSection(val name: String
   jsonInit(jsonNode)
 
   def jsonInit(jsonNode: JsObject) = {
-    for((key, value) <- jsonNode.fields) {
+    for((key, v) <- jsonNode.fields) {
       key match {
         case "action" =>
-          jsonInitAction(value)
+          jsonInitAction(v)
 
         case "params" =>
-          jsonInitParams(value.as[JsObject])
+          jsonInitParams(v.as[JsObject])
 
         case "prereqs" =>
-          jsonInitPrereqs(value.as[JsArray])
+          jsonInitPrereqs(v.as[JsArray])
 
         case "status" =>
-          status = SectionStatus.withName(value.as[String])
+          status = SectionStatus.withName(v.as[String])
 
         case "essential" =>
-          essential = value.as[Boolean]
+          essential = v.as[Boolean]
 
         case "fixable" =>
-          fixable = value.as[Boolean]
+          fixable = v.as[Boolean]
           
         case "waitUntil" =>
-          waitUntil = Some(new DateTime(value.as[String]))
+          waitUntil = Some(new DateTime(v.as[String]))
+
+        case "value" =>
+          value = v.as[String]
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
-          timeline.note(s"$key : ${value.as[String]}", Some(creationDate))
+          timeline.note(s"$key : ${v.as[String]}", Some(creationDate))
       }
     }
   }
@@ -309,7 +312,11 @@ class FulfillmentSection(val name: String
 
 class SectionReference(val name:String) {
   var dismissed:Boolean = false
-  var section:FulfillmentSection = null
+  var section:Option[FulfillmentSection] = None
+
+  def isValid:Boolean = {
+    section.isDefined
+  }
 
   def toJson:JsValue = {
     Json.toJson(Map(
@@ -325,7 +332,9 @@ class SectionReferences(sectionNames:List[String]) {
 
   def hydrate(map:FulfillmentSections) = {
     for(sectionRef <- sections) {
-      sectionRef.section = map.nameToSection(sectionRef.name)
+      if(map.hasSection(sectionRef.name)) {
+        sectionRef.section = Some(map.getSectionByName(sectionRef.name))
+      }
     }
   }
 
@@ -337,16 +346,18 @@ class SectionReferences(sectionNames:List[String]) {
     for(sectionRef <- sections) {
       priorSectionRef match {
         case sr: SectionReference =>
-          sr.section.status match {
-            case SectionStatus.TERMINAL =>
-              if(sectionRef.section.status == SectionStatus.CONTINGENT) {
+          if(sr.isValid) {
+            sr.section.get.status match {
+              case SectionStatus.TERMINAL =>
+                if(sectionRef.section.get.status == SectionStatus.CONTINGENT) {
 
-                // The prior section didn't complete successfully.. let's
-                // let the next section have a try
-                sectionRef.section.status = SectionStatus.READY
-                sectionRef.section.resolveReferences(map) // <-- recurse
-              }
-            case _ => // We don't care about other status until a TERMINAL case is hit
+                  // The prior section didn't complete successfully.. let's
+                  // let the next section have a try
+                  sectionRef.section.get.status = SectionStatus.READY
+                  sectionRef.section.get.resolveReferences(map) // <-- recurse
+                }
+              case _ => // We don't care about other status until a TERMINAL case is hit
+            }
           }
           priorSectionRef.dismissed = true
         case _ =>
@@ -360,9 +371,13 @@ class SectionReferences(sectionNames:List[String]) {
     hydrate(map)
 
     for(sectionRef <- sections) {
-      sectionRef.section.status match {
-        case SectionStatus.COMPLETE =>
-          return true
+      sectionRef.section match {
+        case section: Some[FulfillmentSection] =>
+          section.get.status match {
+            case SectionStatus.COMPLETE =>
+              return true
+            case _ =>
+          }
         case _ =>
       }
     }
@@ -373,8 +388,8 @@ class SectionReferences(sectionNames:List[String]) {
     hydrate(map)
 
     for(sectionRef <- sections) {
-      if(sectionRef.section.status == SectionStatus.COMPLETE) {
-        return sectionRef.section.value
+      if(sectionRef.isValid && sectionRef.section.get.status == SectionStatus.COMPLETE) {
+        return sectionRef.section.get.value
       }
     }
 

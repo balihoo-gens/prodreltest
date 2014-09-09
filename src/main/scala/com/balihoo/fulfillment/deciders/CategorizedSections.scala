@@ -91,7 +91,7 @@ class CategorizedSections(sections: FulfillmentSections) {
 
     var prereqsReady: Boolean = true
     for(prereq: String <- section.prereqs) {
-      val referencedSection: FulfillmentSection = sections.nameToSection(prereq)
+      val referencedSection: FulfillmentSection = sections.getSectionByName(prereq)
       referencedSection.status match {
         case SectionStatus.COMPLETE =>
           // println("Section is complete")
@@ -112,12 +112,12 @@ class CategorizedSections(sections: FulfillmentSections) {
   }
 
   def workComplete() : Boolean = {
-    if(sections.nameToSection.size == 0) { return false; }
+    if(sections.size == 0) { return false; }
 
     essentialTotal match {
       case 0 =>
         // No essential sections.. we just want everything complete or contingent
-        sections.nameToSection.size == (complete.length + contingent.length)
+        sections.size == (complete.length + contingent.length)
       case _ =>
         // If there are essential sections.. they MUST ALL be COMPLETE
         essentialComplete == essentialTotal

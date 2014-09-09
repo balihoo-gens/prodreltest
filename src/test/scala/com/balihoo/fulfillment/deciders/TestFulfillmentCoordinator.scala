@@ -213,7 +213,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.getClass mustEqual classOf[FulfillmentSections]
 
-      map.nameToSection.size mustEqual 3
+      map.size mustEqual 3
 
     }
 
@@ -283,7 +283,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.getClass mustEqual classOf[FulfillmentSections]
 
-      map.nameToSection.size mustEqual 3
+      map.size mustEqual 3
 
       map.timeline.events(0).message mustEqual "Problem processing WorkflowExecutionStarted: Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }

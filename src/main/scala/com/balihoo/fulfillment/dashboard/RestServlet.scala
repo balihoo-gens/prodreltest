@@ -48,25 +48,17 @@ abstract class RestServlet extends HttpServlet {
       handlers(rsq.request.getRequestURI)(rsq)
     } catch {
       case bre:BadRequestException =>
-//        println(bre.getMessage)
-//        bre.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_BAD_REQUEST
-          , _errorJson(bre.getMessage))
+          , _errorJson("Bad Request", bre.getMessage))
       case nsee:NoSuchElementException =>
-//        println(nsee.getMessage)
-//        nsee.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_NOT_FOUND
           , _errorJson(nsee.getMessage, s"${rsq.request.getRequestURI} not handled for method ${rsq.request.getMethod}"))
       case npe:NullPointerException =>
-//        println(npe.getMessage)
-//        npe.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          ,_errorJson(npe.getMessage))
+          ,_errorJson("Internal Server Error", npe.getMessage))
       case e:Exception =>
-//        println(e.getMessage)
-//        println(e.getStackTrace)
         rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          ,_errorJson(e.getMessage, e.getClass.toString))
+          ,_errorJson("Internal Server Error("+e.getClass.toString+")", e.getMessage))
     }
   }
 

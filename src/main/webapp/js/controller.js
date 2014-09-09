@@ -506,7 +506,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.figureStatusLabel = function(status) {
-        return $scope.statusMap[status];
+        return $scope.statusMap[status ? status : "IMPOSSIBLE"];
     };
 
     $scope.figureTimelineStyle = function(eventType) {

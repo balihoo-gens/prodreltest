@@ -54,6 +54,7 @@
 				</span>
                 <img width="20" height="20" src="img/star_gold_256.png" style="margin-bottom:4px;margin-right:4px;" title="This section MUST be successful!!" ng-show="section.essential">
                 <b ng-click="section.showContents = !section.showContents" class="action">{{name}}</b>
+                <span ng-show="section.waitUntil" title="{{section.waitUntil}}">will run {{section.waitUntil | momentFromNow}}</span>
             </div>
             <div class="panel-body-small" ng-show="section.showContents">
 
