@@ -105,7 +105,11 @@ app.factory('formatUtil', function() {
             return jsonString;
         }
         if(_isString(jsonString)) {
-            jsonString = JSON.parse(jsonString)
+            try {
+              jsonString = JSON.parse(jsonString)
+            } catch(e) {
+
+            }
         }
 
         return JSON.stringify(jsonString, undefined, 4);
