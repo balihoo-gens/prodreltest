@@ -14,44 +14,59 @@ import com.amazonaws.services.simpleworkflow.model._
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 
+/**
+ * Example on how to mock up all the layers of the cake pattern
+ */
 @RunWith(classOf[JUnitRunner])
 class TestAdWordsAccountCreator extends Specification with Mockito
 {
-  trait MockSWFAdapterComponent extends SWFAdapterComponent {
-    def swfAdapter = {
-      val _swfAdapter = mock[SWFAdapter]
-      val _config = mock[PropertiesLoader]
-      _config.getString(anyString) returns "mock"
-      _config.getString("name") returns "workername"
-      _swfAdapter.domain returns "mockdomain"
-      _swfAdapter.config returns _config
-      _swfAdapter
-    }
-  }
-
-  trait MockDynamoAdapterComponent extends DynamoAdapterComponent {
-    def dynamoAdapter = mock[DynamoAdapter]
-  }
-
-  trait MockAdWordsAdapterComponent extends AdWordsAdapterComponent {
-    def adWordsAdapter = mock[AdWordsAdapter]
-  }
-
-  class TestAdWordsAccountCreator
+  /**
+   * Everything is mocked here, except the AccountCreator
+   *  a new AccountCreator is instantiated here on every call
+   *  to 'accountCreator'
+   */
+  class AdWordsAccountCreatorTest
     extends AbstractAdWordsAccountCreator
-    with MockSWFAdapterComponent
-    with MockDynamoAdapterComponent
-    with MockAdWordsAdapterComponent
+    with LoggingAdwordsWorkflowAdapter
     with AccountCreatorComponent {
+
+      /**
+       * Mock objects for the LoggingAdwordsWorkflowAdapter mixins
+       */
+      def splog = mock[Splogger]
+      def dynamoAdapter = mock[DynamoAdapter]
+      def adWordsAdapter = mock[AdWordsAdapter]
+      def swfAdapter = {
+        val _swfAdapter = mock[SWFAdapter]
+        val _config = mock[PropertiesLoader]
+        _config.getString(anyString) returns "mock"
+        _config.getString("name") returns "workername"
+        _swfAdapter.domain returns "mockdomain"
+        _swfAdapter.config returns _config
+        _swfAdapter
+      }
+
+      /**
+       * instantiate a REAL Account creator
+       */
       def accountCreator = new AccountCreator(adWordsAdapter)
   }
 
+  /**
+   * The actual test, using all the Mock objects
+   */
   "AdWordsAccountCreator" should {
     "intialize properly" in {
       //creates an actual accountcreator with mock adapters
-      val creator = new TestAdWordsAccountCreator
+      val creator = new AdWordsAccountCreatorTest
       creator.name.toString mustEqual "workername"
+    }
+    "return a valid spec" in {
+      val creator = new AdWordsAccountCreatorTest
+      val spec = creator.getSpecification
+      spec mustNotEqual null
     }
   }
 }
