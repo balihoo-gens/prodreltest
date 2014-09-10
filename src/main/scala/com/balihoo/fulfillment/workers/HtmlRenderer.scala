@@ -9,7 +9,7 @@ import com.balihoo.fulfillment.util.Splogger
  */
 abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
-  with S3Adapter
+  with S3AdapterComponent
   with CommandComponent =>
 
   val commandLine = swfAdapter.config.getString("commandLine")
@@ -44,7 +44,10 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 class HtmlRenderer(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractHtmlRenderer
   with LoggingWorkflowAdapterImpl
+  with S3AdapterComponent
   with CommandComponent {
+    lazy val _s3Adapter = new S3Adapter(_cfg)
+    def s3Adapter = _s3Adapter
     lazy val _command = new Command(commandLine)
     def command = _command
 }
