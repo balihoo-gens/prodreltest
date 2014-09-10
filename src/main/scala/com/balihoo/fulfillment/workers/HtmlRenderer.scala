@@ -3,6 +3,8 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
+import scala.io.Source
+import java.io._
 
 /*
  * this is the dependency-injectable class containing all functionality
@@ -12,7 +14,18 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   with S3AdapterComponent
   with CommandComponent =>
 
-  val commandLine = swfAdapter.config.getString("commandLine")
+  def storeScript = {
+    val scriptName = swfAdapter.config.getString("scriptName")
+    splog("DEBUG", s"using script $scriptName")
+    val scriptData = Source.fromURL(getClass.getResource("/" + scriptName))
+    val scriptFile = new FileWriter("/tmp/" + scriptName)
+    scriptData.getLines.foreach((line:String) => scriptFile.write(s"$line\n"))
+    scriptFile.close
+    scriptName
+  }
+
+  val commandLine = swfAdapter.config.getString("commandLine") + " " + storeScript
+  splog.debug(s"Commandline $commandLine")
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
@@ -24,7 +37,11 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
     try {
       // We're passing the raw JSON string to the command. The command will digest it.
-      val result = command.run(params.input)
+      val cleaninput = params.input.replace("\n","")
+      splog.debug(s"running process with ${cleaninput}")
+      val result = command.run(cleaninput)
+      splog.debug(s"process out: ${result.out}")
+      splog.debug(s"process err: ${result.err}")
       result.code match {
         case 0 =>
           //upload it to s3
