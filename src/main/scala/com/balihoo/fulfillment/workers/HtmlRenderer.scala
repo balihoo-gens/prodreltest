@@ -16,8 +16,9 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("URL", "string", "The URL of of the page to render")
-      ), new ActivityResult("string", "the URL of the rendered image"))
+        new ActivityParameter("source", "string", "The URL of of the page to render"),
+        new ActivityParameter("target", "string", "The S3 location of the resulting image")
+      ), new ActivityResult("string", "the target URL if successfully saved"))
   }
 
   override def handleTask(params: ActivityParameters) = {
