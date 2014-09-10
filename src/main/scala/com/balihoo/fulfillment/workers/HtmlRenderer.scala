@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.workers
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
+import play.api.libs.json.{Json, JsObject}
 import scala.io.Source
 import java.io._
 
@@ -14,6 +15,8 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   with S3AdapterComponent
   with CommandComponent =>
 
+  val s3bucket = swfAdapter.config.getString("s3bucket")
+
   /**
     * gets the script name from the config file, finds in in the resources
     * and saves is to /tmp/ so it can be executed cmd line with phantomjs
@@ -21,12 +24,25 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   def storeScript = {
     val scriptName = swfAdapter.config.getString("scriptName")
     val scriptPath = s"/tmp/$scriptName"
-    splog("DEBUG", s"using script $scriptName")
+    splog.debug(s"using script $scriptName")
     val scriptData = Source.fromURL(getClass.getResource("/" + scriptName))
     val scriptFile = new FileWriter(scriptPath)
     scriptData.getLines.foreach((line:String) => scriptFile.write(s"$line\n"))
     scriptFile.close
     scriptPath
+  }
+
+  def s3Store(imageFileName: String, target: String) = {
+    val key:String = "htmlrenderer/" + target
+    val file = new File(imageFileName)
+    val s3Url = s"s3://${s3bucket}/${key}"
+    if (file.canRead) {
+      splog.info(s"storing $imageFileName into $s3Url")
+      s3Adapter.client.putObject(s3bucket, key, file)
+    } else {
+      throw new Exception(s"Unable to store rendered image to S3: $imageFileName does not exist")
+    }
+    s3Url
   }
 
   val commandLine = swfAdapter.config.getString("commandLine") + " " + storeScript
@@ -49,10 +65,10 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
       splog.debug(s"process err: ${result.err}")
       result.code match {
         case 0 =>
-          //upload it to s3
-          completeTask(result.out)
-        case 1 => // Special case. We're using 1 to mean CANCEL
-          cancelTask(result.out)
+          val jres = Json.parse(result.out)
+          val imageFileName = (jres \ "result").as[String]
+          val s3location = s3Store(imageFileName, params("target"))
+          completeTask(s3location)
         case _ =>
           failTask(s"Process returned code '${result.code}'", result.err)
       }
