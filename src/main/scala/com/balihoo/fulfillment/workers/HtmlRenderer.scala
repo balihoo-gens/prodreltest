@@ -14,14 +14,19 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   with S3AdapterComponent
   with CommandComponent =>
 
+  /**
+    * gets the script name from the config file, finds in in the resources
+    * and saves is to /tmp/ so it can be executed cmd line with phantomjs
+    */
   def storeScript = {
     val scriptName = swfAdapter.config.getString("scriptName")
+    val scriptPath = s"/tmp/$scriptName"
     splog("DEBUG", s"using script $scriptName")
     val scriptData = Source.fromURL(getClass.getResource("/" + scriptName))
-    val scriptFile = new FileWriter("/tmp/" + scriptName)
+    val scriptFile = new FileWriter(scriptPath)
     scriptData.getLines.foreach((line:String) => scriptFile.write(s"$line\n"))
     scriptFile.close
-    scriptName
+    scriptPath
   }
 
   val commandLine = swfAdapter.config.getString("commandLine") + " " + storeScript
