@@ -27,7 +27,7 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.ftp_uploader",
         "com.balihoo.fulfillment.workers.ftp_uploadvalidator",
         "com.balihoo.fulfillment.workers.geonames_timezoneretriever",
-        "com.balihoo.fulfillment.workers.htmlrenderer"
+        "com.balihoo.fulfillment.workers.htmlrenderer",
         "com.balihoo.fulfillment.workers.noop",
         "com.balihoo.fulfillment.workers.zipcodedemographics",
     ]

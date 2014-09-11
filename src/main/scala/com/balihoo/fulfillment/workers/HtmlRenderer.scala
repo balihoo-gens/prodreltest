@@ -33,9 +33,9 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   }
 
   def s3Store(imageFileName: String, target: String) = {
-    val key:String = "htmlrenderer/" + target
+    val key:String = "fulfillment/htmlrenderer/" + target
     val file = new File(imageFileName)
-    val s3Url = s"s3://${s3bucket}/${key}"
+    val s3Url = s"https://s3.amazonaws.com/{s3bucket}/${key}"
     if (file.canRead) {
       splog.info(s"storing $imageFileName into $s3Url")
       s3Adapter.client.putObject(s3bucket, key, file)
