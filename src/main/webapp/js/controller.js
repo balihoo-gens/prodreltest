@@ -87,14 +87,17 @@ app.factory('formatUtil', function() {
             return _div(body, "block " + divclass);
         }
         if (_isString(json)) {
-            return _span(_formatURLs(json), "");
+            return _span(_formatURLs(json), "jsonvalue");
         }
 
-        return json;
+        return _span(json, "jsonvalue");
     }
 
     function _formatJson(jsonString) {
-        return _jsonFormat(JSON.parse(jsonString), "json");
+        if(_isJSON(jsonString)) {
+            return _jsonFormat(JSON.parse(jsonString), "json");
+        }
+        return _span(_formatURLs(jsonString), "");
     }
 
     function _formatJsonBasic(jsonString) {
@@ -102,7 +105,11 @@ app.factory('formatUtil', function() {
             return jsonString;
         }
         if(_isString(jsonString)) {
-            jsonString = JSON.parse(jsonString)
+            try {
+              jsonString = JSON.parse(jsonString)
+            } catch(e) {
+
+            }
         }
 
         return JSON.stringify(jsonString, undefined, 4);
@@ -338,8 +345,8 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         var params = {};
         params['runId'] = $scope.params.runId;
         params['workflowId'] = $scope.params.workflowId;
-        params['input'] = $scope.assembleUpdates();
-        $http.get('workflow/update', { params : params})
+        params['input'] = angular.toJson($scope.assembleUpdates());
+        $http.post('workflow/update', params )
             .success(function(data) {
                          $scope.getWorkflow();
                      })
@@ -484,9 +491,18 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.timelineMap = {
+        "NOTE" : "timeline",
         "ERROR" : "timeline-ERROR",
         "SUCCESS" : "timeline-SUCCESS",
         "WARNING" : "timeline-WARNING"
+    };
+
+    // http://fortawesome.github.io/Font-Awesome/icons/
+    $scope.timelineIconMap = {
+        "NOTE" : "circle",
+        "ERROR" : "times-circle",
+        "SUCCESS" : "check-circle",
+        "WARNING" : "exclamation-circle"
     };
 
     $scope.figureWorkflowStatusLabel = function(status) {
@@ -494,11 +510,15 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.figureStatusLabel = function(status) {
-        return $scope.statusMap[status];
+        return $scope.statusMap[status ? status : "IMPOSSIBLE"];
     };
 
     $scope.figureTimelineStyle = function(eventType) {
         return $scope.timelineMap[eventType];
+    };
+
+    $scope.figureTimelineIcon = function(eventType) {
+        return $scope.timelineIconMap[eventType];
     };
 
     $scope.scrollToSection = function(name) {
@@ -604,7 +624,7 @@ app.controller('workflowInitiationController', function($scope, $route, $http, $
             mtags.push(t.text);
         }
         params['tags'] = mtags.join(",");
-        $http.get('workflow/initiate', { params : params})
+        $http.post('workflow/initiate', params)
             .success(function(data) {
                          $scope.loading = false;
                          $scope.runId = data.runId;
