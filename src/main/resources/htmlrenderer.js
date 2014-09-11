@@ -1,3 +1,5 @@
+
+var output = { messages: "", result: "" };
 try {
   system = require("system");
   webpage = require("webpage");
@@ -6,7 +8,6 @@ try {
   var input = JSON.parse(system.stdin.readLine());
   var url = input.source;
   var filename = "/tmp/htmlrenderer.png";
-  var output = { messages: "", result: "" };
   var ret = 0;
 
   page = webpage.create();
@@ -33,6 +34,7 @@ try {
     });
 } catch(e) {
   ret = 4;
+  output.messages += " exception: " + e.message + "\n";
   console.log(JSON.stringify(output));
   phantom.exit(ret);
 }
