@@ -37,6 +37,17 @@ class Launcher(object):
         self._procs = {}
         self._log = Splogger(logfile)
 
+    def plog(self, p):
+        line = p.stdout.readline()
+        while len(line) > 0:
+            self._log.info("pid %d stdout %s" % (p.pid, line))
+            line = p.stdout.readline()
+
+        line = p.stderr.readline()
+        while len(line) > 0:
+            self._log.info("pid %d stderr %s" % (p.pid, line))
+            line = p.stderr.readline()
+
     def monitor(self):
         start = time.time()
         done = []
@@ -49,8 +60,8 @@ class Launcher(object):
                     retval = proc.poll()
                     if not retval is None:
                         elapsed = time.time() - start
-                        s = "%s [pid %d] died within %f seconds, returning %d" % (procname, proc.pid, elapsed, retval)
-                        self._log.error(s)
+                        self._log.error("%s [pid %d] died within %f seconds, returncode %d" % (procname, proc.pid, elapsed, retval))
+                        self.plog(proc)
                         done.append(proc.pid)
             time.sleep(0.2)
         self._log.info("Done: no processes left to monitor")
@@ -84,7 +95,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     launcher = Launcher(args.jarname, args.logfile)
-    launcher.launch(args.classes)
+    launcher.launch(args.classes, True)
     launcher.monitor()
 
 
