@@ -917,3 +917,11 @@ footer .container {
     bottom:15px;
     left:15px;
 }
+
+.json {
+    font-family: "Ubuntu Mono", monospace;
+}
+
+.jsonvalue:hover {
+    color:black;
+}

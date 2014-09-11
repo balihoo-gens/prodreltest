@@ -87,10 +87,10 @@ app.factory('formatUtil', function() {
             return _div(body, "block " + divclass);
         }
         if (_isString(json)) {
-            return _span(_formatURLs(json), "");
+            return _span(_formatURLs(json), "jsonvalue");
         }
 
-        return json;
+        return _span(json, "jsonvalue");
     }
 
     function _formatJson(jsonString) {
