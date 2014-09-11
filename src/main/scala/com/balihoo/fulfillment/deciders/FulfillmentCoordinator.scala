@@ -15,7 +15,7 @@ import com.balihoo.fulfillment.config._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
-import com.balihoo.fulfillment.util.Getch
+import com.balihoo.fulfillment.util.{Getch, Splogger, SploggerComponent}
 
 import scala.util.matching.Regex
 
@@ -24,7 +24,8 @@ object Constants {
 }
 
 abstract class AbstractFulfillmentCoordinator {
-  this: SWFAdapterComponent =>
+  this: SploggerComponent
+  with SWFAdapterComponent =>
 
   //can't have constructor code using the self type reference
   // unless it was declared 'lazy'. If not, swfAdapter is still null
@@ -45,20 +46,20 @@ abstract class AbstractFulfillmentCoordinator {
 
   def coordinate() = {
 
-    println(s"$domain $taskListName")
+    splog.info(s"$domain $taskListName")
 
     var done = false
     val getch = new Getch
-    getch.addMapping(Seq("q", "Q", "Exit"), () => {println("\nExiting...\n");done = true})
+    getch.addMapping(Seq("q", "Q", "Exit"), () => {splog.info("\nExiting...\n");done = true})
 
     getch.doWith {
       while(!done) {
-        print(".")
         try {
           val task: DecisionTask = swfAdapter.client.pollForDecisionTask(taskReq)
 
           if(task.getTaskToken != null) {
 
+            splog.info(s"processing token ${task.getTaskToken.toString}")
             val sections = new FulfillmentSections(task.getEvents)
             val decisions = new DecisionGenerator(sections).makeDecisions()
 
@@ -71,13 +72,13 @@ abstract class AbstractFulfillmentCoordinator {
           case se: java.net.SocketException =>
           // these happen.. no biggie.
           case e: Exception =>
-            println("\n" + e.getMessage)
+            splog.error(e.getMessage)
           case t: Throwable =>
-            println("\n" + t.getMessage)
+            splog.error(t.getMessage)
         }
       }
     }
-    print("Cleaning up...")
+    splog.info("Done. Cleaning up...")
   }
 }
 
@@ -503,18 +504,29 @@ class DecisionGenerator(sections: FulfillmentSections) {
   }
 }
 
-class FulfillmentCoordinator(swf: SWFAdapter)
+class FulfillmentCoordinator(swf: SWFAdapter, splogger: Splogger)
   extends AbstractFulfillmentCoordinator
+  with SploggerComponent
   with SWFAdapterComponent {
     def swfAdapter = swf
+    def splog = splogger
 }
 
 object coordinator {
   def main(args: Array[String]) {
-    val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
-    val swf = new SWFAdapter(config)
-    val fc = new FulfillmentCoordinator(swf)
-    println("Running decider")
-    fc.coordinate()
+    val name = getClass.getSimpleName.stripSuffix("$")
+    val splog = new Splogger(Splogger.mkFFName(name))
+    splog("INFO", s"Started $name")
+    try {
+      val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+      val swf = new SWFAdapter(config)
+      val fc = new FulfillmentCoordinator(swf, splog)
+      fc.coordinate()
+    }
+    catch {
+      case t:Throwable =>
+        splog("ERROR", t.getMessage)
+    }
+    splog("INFO", s"Terminated $name")
   }
 }
