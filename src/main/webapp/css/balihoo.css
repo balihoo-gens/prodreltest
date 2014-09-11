@@ -167,7 +167,7 @@ img.constrained {
     }
 }
 
-td .glyphicon {
+td .fa {
     margin-right: 5px;
 }
 
@@ -916,4 +916,12 @@ footer .container {
     padding:14px;
     bottom:15px;
     left:15px;
+}
+
+.json {
+    font-family: "Ubuntu Mono", monospace;
+}
+
+.jsonvalue:hover {
+    color:black;
 }

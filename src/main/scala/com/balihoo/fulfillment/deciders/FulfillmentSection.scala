@@ -1,11 +1,10 @@
 package com.balihoo.fulfillment.deciders
 
-import java.util.Date
+import java.security.MessageDigest
 
 import com.balihoo.fulfillment.workers.UTCFormatter
-import org.joda.time.DateTime
+import org.joda.time.{Seconds, DateTime}
 
-import scala.collection.convert.wrapAsScala._
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 
@@ -36,13 +35,13 @@ object TimelineEventType extends Enumeration {
   val SUCCESS = Value("SUCCESS")
 }
 
-class TimelineEvent(val eventType:TimelineEventType.Value, val message:String, val when:Date = null) {
+class TimelineEvent(val eventType:TimelineEventType.Value, val message:String, val when:Option[DateTime]) {
 
   def toJson: JsValue = {
     Json.toJson(Map(
       "eventType" -> Json.toJson(eventType.toString),
       "message" -> Json.toJson(message),
-      "when" -> Json.toJson(if(when != null) UTCFormatter.format(when) else "--")
+      "when" -> Json.toJson(if(when.isDefined) UTCFormatter.format(when.get) else "--")
     ))
   }
 }
@@ -50,28 +49,29 @@ class TimelineEvent(val eventType:TimelineEventType.Value, val message:String, v
 class Timeline {
   val events = mutable.MutableList[TimelineEvent]()
 
-  def error(message:String, when:Date = null) = {
+  def error(message:String, when:Option[DateTime]) = {
     events += new TimelineEvent(TimelineEventType.ERROR, message, when)
   }
 
-  def warning(message:String, when:Date = null) = {
+  def warning(message:String, when:Option[DateTime]) = {
     events += new TimelineEvent(TimelineEventType.WARNING, message, when)
   }
 
-  def note(message:String, when:Date = null) = {
+  def note(message:String, when:Option[DateTime]) = {
     events += new TimelineEvent(TimelineEventType.NOTE, message, when)
   }
 
-  def success(message:String, when:Date = null) = {
+  def success(message:String, when:Option[DateTime]) = {
     events += new TimelineEvent(TimelineEventType.SUCCESS, message, when)
   }
 }
 
 class FulfillmentSection(val name: String
                          ,val jsonNode: JsObject
-                         ,val creationDate:Date) {
+                         ,val creationDate:DateTime) {
 
-  var action: ActivityType = null
+  var action: Option[ActivityType] = None
+  var operator: Option[String] = None
   val params = collection.mutable.Map[String, Any]()
   val prereqs = mutable.MutableList[String]()
   val timeline = new Timeline
@@ -92,50 +92,60 @@ class FulfillmentSection(val name: String
   val timeoutParams = new ActionParams(0, 0)
   val cancelationParams = new ActionParams(0, 0)
 
-  var startToCloseTimeout = ""
-  var scheduleToStartTimeout = ""
-  var scheduleToCloseTimeout = ""
-  var heartbeatTimeout = ""
+  var startToCloseTimeout: Option[String] = None
+  var scheduleToStartTimeout: Option[String] = None
+  var scheduleToCloseTimeout: Option[String] = None
+  var heartbeatTimeout: Option[String] = None
   var waitUntil: Option[DateTime] = None
   
   jsonInit(jsonNode)
 
   def jsonInit(jsonNode: JsObject) = {
-    for((key, value) <- jsonNode.fields) {
+    for((key, v) <- jsonNode.fields) {
       key match {
         case "action" =>
-          jsonInitAction(value.as[JsObject])
+          jsonInitAction(v)
 
         case "params" =>
-          jsonInitParams(value.as[JsObject])
+          jsonInitParams(v.as[JsObject])
 
         case "prereqs" =>
-          jsonInitPrereqs(value.as[JsArray])
+          jsonInitPrereqs(v.as[JsArray])
 
         case "status" =>
-          status = SectionStatus.withName(value.as[String])
+          status = SectionStatus.withName(v.as[String])
 
         case "essential" =>
-          essential = value.as[Boolean]
+          essential = v.as[Boolean]
 
         case "fixable" =>
-          fixable = value.as[Boolean]
+          fixable = v.as[Boolean]
           
         case "waitUntil" =>
-          waitUntil = Some(new DateTime(value.as[String]))
+          waitUntil = Some(new DateTime(v.as[String]))
+
+        case "value" =>
+          value = v.as[String]
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
-          timeline.note(s"$key : ${value.as[String]}", creationDate)
+          timeline.note(s"$key : ${v.as[String]}", Some(creationDate))
       }
     }
   }
 
-  def jsonInitAction(jaction: JsObject) = {
-    action = new ActivityType
-    action.setName(jaction.value("name").as[String])
-    action.setVersion(jaction.value("version").as[String])
-    handleActionParams(jaction)
+  def jsonInitAction(jaction: JsValue) = {
+    jaction match {
+      case jObj:JsObject =>
+        action = Some(new ActivityType)
+        action.get.setName(jObj.value("name").as[String])
+        action.get.setVersion(jObj.value("version").as[String])
+        handleActionParams(jObj)
+      case jStr:JsString =>
+        operator = Some(jStr.as[String])
+      case _ =>
+        timeline.error(s"Action '${Json.stringify(jaction)}' is of type '${jaction.getClass.toString}'. This is not a valid type.", Some(creationDate))
+    }
   }
 
   def jsonInitParams(jparams: JsObject) = {
@@ -146,7 +156,7 @@ class FulfillmentSection(val name: String
         case jStr: JsString =>
           params(jk) = jv.as[String]
         case _ =>
-          timeline.error(s"Parameter '$jk' is of type '${jv.getClass.toString}'. This is not a valid type.", creationDate)
+          timeline.error(s"Parameter '$jk' is of type '${jv.getClass.toString}'. This is not a valid type.", Some(creationDate))
       }
     }
   }
@@ -172,56 +182,55 @@ class FulfillmentSection(val name: String
           cancelationParams.maxRetries =  cancelation.value("max").as[String].toInt
           cancelationParams.delaySeconds =  cancelation.value("delay").as[String].toInt
         case "startToCloseTimeout" =>
-          startToCloseTimeout = avalue.as[String]
+          startToCloseTimeout = Some(avalue.as[String])
         case "scheduleToCloseTimeout" =>
-          startToCloseTimeout = avalue.as[String]
+          scheduleToCloseTimeout = Some(avalue.as[String])
         case "scheduleToStartTimeout" =>
-          startToCloseTimeout = avalue.as[String]
+          scheduleToStartTimeout = Some(avalue.as[String])
         case "heartbeatTimeout" =>
-          startToCloseTimeout = avalue.as[String]
+          heartbeatTimeout = Some(avalue.as[String])
         case _ =>
       }
     }
   }
 
-  def setStarted(when:Date) = {
+  def setStarted(when:DateTime) = {
     startedCount += 1
     status = SectionStatus.STARTED
-    timeline.note("Started", when)
+    timeline.note("Started", Some(when))
   }
 
-  def setScheduled(when:Date) = {
+  def setScheduled(when:DateTime) = {
     scheduledCount += 1
     status = SectionStatus.SCHEDULED
-    timeline.note("Scheduled", when)
+    timeline.note("Scheduled", Some(when))
   }
 
-  def setCompleted(result:String, when:Date) = {
+  def setCompleted(result:String, when:DateTime) = {
     status = SectionStatus.COMPLETE
-    timeline.note("Completed", when)
+    timeline.success("Completed", Some(when))
     value = result
   }
 
-  def setFailed(reason:String, details:String, when:Date) = {
+  def setFailed(reason:String, details:String, when:DateTime) = {
     failedCount += 1
-    timeline.warning(s"Failed because:$reason $details", when)
+    timeline.warning(s"Failed because:$reason $details", Some(when))
     status = if(failedCount > failureParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.FAILED
   }
 
-  def setCanceled(details:String, when:Date) = {
+  def setCanceled(details:String, when:DateTime) = {
     canceledCount += 1
-    timeline.warning(s"Canceled because: $details", when)
+    timeline.warning(s"Canceled because: $details", Some(when))
     status = if(canceledCount > cancelationParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.CANCELED
   }
 
-  def setTimedOut(when:Date) = {
+  def setTimedOut(when:DateTime) = {
     timedoutCount += 1
-    timeline.warning("Timed out!", when)
+    timeline.warning("Timed out!", Some(when))
     status = if(timedoutCount > timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
   }
 
-  def resolveReferences(map:SectionMap):Boolean = {
-
+  def resolveReferences(map:FulfillmentSections):Boolean = {
     if(status == SectionStatus.READY) {
       for((pname, param) <- params) {
         param match {
@@ -231,12 +240,23 @@ class FulfillmentSection(val name: String
         }
       }
     }
-    true
+    true // <-- cause it's recursive... I guess..
   }
 
   def getActivityId = {
     val timestamp: Long = System.currentTimeMillis()
-    s"$name${Constants.delimiter}${action.getName}${Constants.delimiter}"+timestamp
+    s"$name${Constants.delimiter}${action.get.getName}${Constants.delimiter}"+timestamp
+  }
+
+  /**
+   * Calculates the proper wait time for a task.  If there is no waitUntil value, the wait time will be zero.
+   * @return the wait time in seconds
+   */
+  def calculateWaitSeconds(): Int = {
+    waitUntil match {
+      case Some(d) => Seconds.secondsBetween(DateTime.now, d).getSeconds
+      case _ => 0
+    }
   }
 
   override def toString = {
@@ -269,320 +289,24 @@ class FulfillmentSection(val name: String
       "startedCount" -> Json.toJson(startedCount),
       "timedoutCount" -> Json.toJson(timedoutCount),
       "canceledCount" -> Json.toJson(canceledCount),
-      "failedCount" -> Json.toJson(failedCount)
+      "failedCount" -> Json.toJson(failedCount),
+      "waitUntil" ->
+        Json.toJson(waitUntil.isDefined match {
+          case true =>
+            UTCFormatter.format(waitUntil.get)
+          case _ => ""
+        })
     ))
-  }
-}
-
-/**
- * Build and update FulfillmentSections from the SWF execution history
- * @param history java.util.List[HistoryEvent]
- */
-class SectionMap(history: java.util.List[HistoryEvent]) {
-
-  val registry = collection.mutable.Map[java.lang.Long, String]()
-  val nameToSection = collection.mutable.Map[String, FulfillmentSection]()
-  val timeline = new Timeline
-  val timers = collection.mutable.Map[String, String]()
-  var resolution = "IN PROGRESS"
-
-  try {
-    for(event: HistoryEvent <- collectionAsScalaIterable(history)) {
-      EventType.fromValue(event.getEventType) match {
-        case EventType.WorkflowExecutionStarted =>
-          processWorkflowExecutionStarted(event)
-        case EventType.ActivityTaskScheduled =>
-          processActivityTaskScheduled(event)
-        case EventType.ActivityTaskStarted =>
-          processActivityTaskStarted(event)
-        case EventType.ActivityTaskCompleted =>
-          processActivityTaskCompleted(event)
-        case EventType.ActivityTaskFailed =>
-          processActivityTaskFailed(event)
-        case EventType.ActivityTaskTimedOut =>
-          processActivityTaskTimedOut(event)
-        case EventType.ActivityTaskCanceled =>
-          processActivityTaskCanceled(event)
-        case EventType.WorkflowExecutionSignaled =>
-          processWorkflowExecutionSignaled(event)
-        case EventType.ScheduleActivityTaskFailed =>
-          processScheduleActivityTaskFailed(event)
-        case EventType.TimerStarted =>
-          processTimerStarted(event)
-        case EventType.TimerFired =>
-          processTimerFired(event)
-        case EventType.WorkflowExecutionCanceled =>
-          processCancel(event)
-        case EventType.WorkflowExecutionTimedOut =>
-          processTimedOut(event)
-        case EventType.WorkflowExecutionTerminated =>
-          processTerminated(event)
-        case EventType.WorkflowExecutionFailed =>
-          processFailed(event)
-        case EventType.WorkflowExecutionCompleted =>
-          processCompleted(event)
-        //case EventType.Q =>
-        //  processQ(event, sections)
-        case _ => //println("Unhandled event type: " + event.getEventType)
-      }
-
-      // We look through the section references to see if anything needs to be promoted from CONTINGENT -> READY.
-      // Sections get promoted when they're in a SectionReference list and the prior section is TERMINAL
-      // We also check to see if sections
-      for((name, section) <- nameToSection) {
-        section.resolveReferences(this)
-      }
-
-    }
-  } catch {
-    case e:NoSuchElementException =>
-      throw e
-    case e:Exception =>
-      timeline.error(e.getMessage, new Date())
-  }
-
-  /**
-   * This checks for situations that would make fulfillment impossible
-   */
-  protected def ensureSanity(when:Date) = {
-    var essentialCount = 0
-    for((name, section) <- nameToSection) {
-      if(section.essential) { essentialCount += 1 }
-      for(prereq <- section.prereqs) {
-        if(prereq == name) {
-          section.status = SectionStatus.IMPOSSIBLE
-          val ception = s"Fulfillment is impossible! $name has a self-referential prereq!"
-          section.timeline.error(ception, when)
-          throw new Exception(ception)
-        }
-        if(!hasSection(prereq)) {
-          section.status = SectionStatus.IMPOSSIBLE
-          val ception = s"Fulfillment is impossible! Prereq ($prereq) for $name does not exist!"
-          section.timeline.error(ception, when)
-          throw new Exception(ception)
-        }
-      }
-      for((pname, param) <- section.params) {
-        if(pname == name) {
-          section.status = SectionStatus.IMPOSSIBLE
-          val ception = s"Fulfillment is impossible! $name has a self-referential parameter!"
-          section.timeline.error(ception, when)
-          throw new Exception(ception)
-        }
-        param match {
-          case sectionReferences: SectionReferences =>
-            for(sectionRef <- sectionReferences.sections) {
-              if(!hasSection(sectionRef.name)) {
-                section.status = SectionStatus.IMPOSSIBLE
-                val ception = s"Fulfillment is impossible! Param ($pname -> ${sectionRef.name}) for $name does not exist!"
-                section.timeline.error(ception, when)
-                throw new Exception(ception)
-              }
-            }
-          case _ =>
-        }
-      }
-    }
-
-    if(0 == essentialCount) {
-      timeline.warning("No essential sections!", when)
-    }
-  }
-
-  protected def getSectionByName(name:String): FulfillmentSection = {
-    nameToSection(name)
-  }
-
-  protected def getSectionById(id:Long): FulfillmentSection = {
-    nameToSection(registry(id))
-  }
-
-  protected def hasSection(name:String): Boolean = {
-    nameToSection contains name
-  }
-
-  /**
-   * This method builds all of the sections from the initial input to the workflow
-   * @param event HistoryEvent
-   */
-  protected def processWorkflowExecutionStarted(event: HistoryEvent) = {
-    val fulfillmentInput = Json.parse(event.getWorkflowExecutionStartedEventAttributes.getInput).as[JsObject]
-
-    for((jk, jv) <- fulfillmentInput.fields) {
-      nameToSection += (jk -> new FulfillmentSection(jk, jv.as[JsObject], event.getEventTimestamp))
-    }
-
-    ensureSanity(event.getEventTimestamp)
-  }
-
-  protected def processActivityTaskScheduled(event: HistoryEvent) = {
-    val activityIdParts = event.getActivityTaskScheduledEventAttributes.getActivityId.split(Constants.delimiter)
-    val name = activityIdParts(0)
-    registry += (event.getEventId -> name)
-    getSectionByName(name).setScheduled(event.getEventTimestamp)
-  }
-
-  protected def processActivityTaskStarted(event: HistoryEvent) = {
-    val attribs = event.getActivityTaskStartedEventAttributes
-    getSectionById(attribs.getScheduledEventId).setStarted(event.getEventTimestamp)
-  }
-
-  protected def processActivityTaskCompleted(event: HistoryEvent) = {
-    val attribs = event.getActivityTaskCompletedEventAttributes
-    getSectionById(attribs.getScheduledEventId).setCompleted(attribs.getResult, event.getEventTimestamp)
-  }
-
-  protected def processActivityTaskFailed(event: HistoryEvent) = {
-    val attribs = event.getActivityTaskFailedEventAttributes
-    getSectionById(attribs.getScheduledEventId).setFailed(attribs.getReason, attribs.getDetails, event.getEventTimestamp)
-  }
-
-  protected def processActivityTaskTimedOut(event: HistoryEvent) = {
-    val attribs = event.getActivityTaskTimedOutEventAttributes
-    getSectionById(attribs.getScheduledEventId).setTimedOut(event.getEventTimestamp)
-  }
-
-  protected def processActivityTaskCanceled(event: HistoryEvent) = {
-    val attribs = event.getActivityTaskCanceledEventAttributes
-    getSectionById(attribs.getScheduledEventId).setCanceled(attribs.getDetails, event.getEventTimestamp)
-  }
-
-  protected def processScheduleActivityTaskFailed(event: HistoryEvent) = {
-    val attribs = event.getScheduleActivityTaskFailedEventAttributes
-    val activityIdParts = attribs.getActivityId.split(Constants.delimiter)
-
-    val name = activityIdParts(0)
-
-    // FIXME This isn't the typical 'FAILED'. It failed to even get scheduled
-    // Not actually sure if this needs to be distinct or not.
-    nameToSection(name).setFailed("Failed to Schedule task!", attribs.getCause, event.getEventTimestamp)
-
-  }
-
-  protected def processWorkflowExecutionSignaled(event: HistoryEvent) = {
-    val attribs = event.getWorkflowExecutionSignaledEventAttributes
-
-    attribs.getSignalName match {
-      case "sectionUpdates" =>
-        val updates = Json.parse(attribs.getInput).as[JsObject]
-        for((sectionName, iupdate:JsValue) <- updates.fields) {
-          val update = iupdate.as[JsObject]
-          val section = nameToSection(sectionName)
-          for((updateType, body:JsValue) <- update.fields) {
-            updateType match {
-              case "params" =>
-                val pupdate = Json.stringify(body)
-                section.timeline.note(s"Updating params: $pupdate", event.getEventTimestamp)
-                section.jsonInitParams(body.as[JsObject])
-              case "status" =>
-                val supdate = body.as[String]
-                section.timeline.note(s"Updating status: ${section.status} -> $supdate", event.getEventTimestamp)
-                try {
-                  section.status = SectionStatus.withName(supdate)
-                } catch {
-                  case nsee:NoSuchElementException =>
-                    section.timeline.error(s"Status $supdate is INVALID!")
-                }
-              case "essential" =>
-                val eupdate = body.as[Boolean]
-                section.timeline.note(s"Updating essential: $eupdate", event.getEventTimestamp)
-                section.essential = eupdate
-              case "action" =>
-                val aupdate = Json.stringify(body)
-                section.timeline.note(s"Updating action: $aupdate", event.getEventTimestamp)
-                section.jsonInitAction(body.as[JsObject])
-              case "prereqs" =>
-                val pupdate = Json.stringify(body)
-                section.timeline.note(s"Updating prereqs: $pupdate", event.getEventTimestamp)
-                section.jsonInitPrereqs(body.as[JsArray])
-              case _ =>
-            }
-          }
-        }
-      case _ =>
-        timeline.warning(s"Unhandled signal ${attribs.getSignalName} ${attribs.getInput}", event.getEventTimestamp)
-    }
-
-  }
-
-  protected def processTimerStarted(event: HistoryEvent) = {
-    val attribs = event.getTimerStartedEventAttributes
-
-    // Save the timer so we can look it up when it's fired
-    timers += (attribs.getTimerId -> attribs.getControl)
-
-    val timerParams:JsObject = Json.parse(attribs.getControl).as[JsObject]
-    val sectionName = timerParams.value("section").as[String]
-
-    val section = getSectionByName(sectionName)
-
-    if(section.status == SectionStatus.DEFERRED) {
-      section.timeline.error(s"$sectionName is already DEFERRED!!", event.getEventTimestamp)
-    }
-
-    val reason = timerParams.value("reason").as[String]
-    section.timeline.note(reason, event.getEventTimestamp)
-
-    section.status = SectionStatus.DEFERRED
-  }
-
-  protected def processTimerFired(event: HistoryEvent) = {
-    val attribs = event.getTimerFiredEventAttributes
-
-    val timer = timers(attribs.getTimerId)
-
-    val timerParams:JsObject = Json.parse(timer).as[JsObject]
-    val sectionName = timerParams.value("section").as[String]
-    val status = SectionStatus.withName(timerParams.value("status").as[String])
-
-    val section = getSectionByName(sectionName)
-    section.timeline.note(s"Timer for section '$sectionName' fired. Setting status to ${status.toString}", event.getEventTimestamp)
-
-    getSectionByName(sectionName).status = status
-  }
-
-  protected def processCancel(event: HistoryEvent) = {
-    val attribs = event.getWorkflowExecutionCanceledEventAttributes
-    timeline.warning("CANCELLED: "+attribs.getDetails, event.getEventTimestamp)
-    resolution = "CANCELLED"
-  }
-
-  protected def processTimedOut(event: HistoryEvent) = {
-    val attribs = event.getWorkflowExecutionTimedOutEventAttributes
-    timeline.error("TIMEOUT: "+attribs.getTimeoutType, event.getEventTimestamp)
-    resolution = "TIMED OUT"
-  }
-
-  protected def processTerminated(event: HistoryEvent) = {
-    val attribs = event.getWorkflowExecutionTerminatedEventAttributes
-    timeline.error("TERMINATED: "+attribs.getCause+":"+attribs.getReason+":"+attribs.getDetails, event.getEventTimestamp)
-    resolution = "TERMINATED"
-  }
-
-  protected def processFailed(event: HistoryEvent) = {
-    val attribs = event.getWorkflowExecutionFailedEventAttributes
-    timeline.error("FAILED: "+attribs.getReason+":"+attribs.getDetails, event.getEventTimestamp)
-    resolution = "FAILED"
-  }
-
-  protected def processCompleted(event: HistoryEvent) = {
-    val attribs = event.getWorkflowExecutionCompletedEventAttributes
-    timeline.success("COMPLETED:"+attribs.getResult, event.getEventTimestamp)
-    resolution = "COMPLETED"
-  }
-
-  def terminal():Boolean = {
-    List("CANCELLED", "TIMED OUT", "TERMINATED", "FAILED").contains(resolution)
-  }
-
-  override def toString = {
-    (for((k, s) <- nameToSection) yield s"$k\t${s.status.toString}").mkString("\n")
   }
 }
 
 class SectionReference(val name:String) {
   var dismissed:Boolean = false
-  var section:FulfillmentSection = null
+  var section:Option[FulfillmentSection] = None
+
+  def isValid:Boolean = {
+    section.isDefined
+  }
 
   def toJson:JsValue = {
     Json.toJson(Map(
@@ -596,13 +320,15 @@ class SectionReferences(sectionNames:List[String]) {
 
   val sections = for(name <- sectionNames) yield new SectionReference(name)
 
-  def hydrate(map:SectionMap) = {
+  def hydrate(map:FulfillmentSections) = {
     for(sectionRef <- sections) {
-      sectionRef.section = map.nameToSection(sectionRef.name)
+      if(map.hasSection(sectionRef.name)) {
+        sectionRef.section = Some(map.getSectionByName(sectionRef.name))
+      }
     }
   }
 
-  def processReferences(map:SectionMap) = {
+  def processReferences(map:FulfillmentSections) = {
     hydrate(map)
 
     var priorSectionRef:SectionReference = null
@@ -610,16 +336,18 @@ class SectionReferences(sectionNames:List[String]) {
     for(sectionRef <- sections) {
       priorSectionRef match {
         case sr: SectionReference =>
-          sr.section.status match {
-            case SectionStatus.TERMINAL =>
-              if(sectionRef.section.status == SectionStatus.CONTINGENT) {
+          if(sr.isValid) {
+            sr.section.get.status match {
+              case SectionStatus.TERMINAL =>
+                if(sectionRef.section.get.status == SectionStatus.CONTINGENT) {
 
-                // The prior section didn't complete successfully.. let's
-                // let the next section have a try
-                sectionRef.section.status = SectionStatus.READY
-                sectionRef.section.resolveReferences(map) // <-- recurse
-              }
-            case _ => // We don't care about other status until a TERMINAL case is hit
+                  // The prior section didn't complete successfully.. let's
+                  // let the next section have a try
+                  sectionRef.section.get.status = SectionStatus.READY
+                  sectionRef.section.get.resolveReferences(map) // <-- recurse
+                }
+              case _ => // We don't care about other status until a TERMINAL case is hit
+            }
           }
           priorSectionRef.dismissed = true
         case _ =>
@@ -629,30 +357,34 @@ class SectionReferences(sectionNames:List[String]) {
     }
   }
 
-  def resolved(map:SectionMap):Boolean = {
+  def resolved(map:FulfillmentSections):Boolean = {
     hydrate(map)
 
     for(sectionRef <- sections) {
-      sectionRef.section.status match {
-        case SectionStatus.COMPLETE =>
-          return true
+      sectionRef.section match {
+        case section: Some[FulfillmentSection] =>
+          section.get.status match {
+            case SectionStatus.COMPLETE =>
+              return true
+            case _ =>
+          }
         case _ =>
       }
     }
     false
   }
 
-  def getValue(map:SectionMap):String = {
+  def getValue(map:FulfillmentSections):String = {
     hydrate(map)
 
     for(sectionRef <- sections) {
-      if(sectionRef.section.status == SectionStatus.COMPLETE) {
-        return sectionRef.section.value
+      if(sectionRef.isValid && sectionRef.section.get.status == SectionStatus.COMPLETE) {
+        return sectionRef.section.get.value
       }
     }
 
     val gripe = "Tried to get value from referenced sections and no value was available! "+toString()
-    map.timeline.error(gripe)
+    map.timeline.error(gripe, None)
 
     throw new Exception(gripe)
   }
