@@ -615,8 +615,12 @@ app.controller('workflowInitiationController', function($scope, $route, $http, $
                    });
     };
 
-    $scope.addLabel = function() {
+    $scope.addTag = function() {
       $scope.tags.push({text : ""});
+    };
+
+    $scope.removeTag = function(tag) {
+        $scope.tags.splice($scope.tags.indexOf(tag), 1);
     };
 
     $scope.restart = function() {

@@ -125,3 +125,34 @@ object adwordsAdGroupSetKeywords {
     }
   }
 }
+
+object adwordsAdGroupSetBidModifier {
+  def main(args: Array[String]) {
+    val cfg = PropertiesLoader(args, "adwords_adgroupprocessor")
+    val test = new TestAdGroupSetBM(cfg)
+    test.run
+  }
+
+  class TestAdGroupSetBM(cfg: PropertiesLoader) extends AdGroupTest(cfg) {
+
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
+
+      val campaignParams = new ActivityParameters(Map(
+        "name" -> "fulfillment Campaign",
+        "channel" -> "DISPLAY"
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
+
+      val adgroupParams = new ActivityParameters(Map(
+        "name" -> "GROUP A",
+        "campaignId" -> s"${campaign.getId}"
+
+      ))
+      val adgroup = adGroupCreator.getAdGroup(adgroupParams)
+
+      adGroupCreator._processBidModifier(adgroup, "0.35", 30001)
+    }
+  }
+}

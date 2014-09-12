@@ -142,3 +142,48 @@ object adWordsZipsByCountry {
     }
   }
 }
+
+object adWordsAddress {
+  def main(args: Array[String]) {
+    val cfg = PropertiesLoader(args, "adwords_campaignprocessor")
+    val test = new TestAddressStuff(cfg)
+    test.run
+  }
+
+  class TestAddressStuff(cfg: PropertiesLoader) extends CampaignTest(cfg) {
+
+    def run = {
+      val address = new Address()
+      address.setStreetAddress("404 South 8th Street")
+      address.setCityName("Boise")
+      address.setPostalCode("83702")
+
+      val geoLocationSelector = new GeoLocationSelector()
+      geoLocationSelector.setAddresses(Array(address))
+
+      val geoLocations = adWordsAdapter.geoLocationService.get(geoLocationSelector)
+      for(geoLocation <- geoLocations) {
+        val point = geoLocation.getGeoPoint
+        println(s"POINT: ${point.getLatitudeInMicroDegrees} ${point.getLongitudeInMicroDegrees}")
+      }
+
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
+
+      val campaignParams = new ActivityParameters(Map(
+        "name" -> "fulfillment Campaign",
+        "channel" -> "DISPLAY"
+      ))
+
+      val campaign = campaignCreator.getCampaign(campaignParams)
+
+      val locationExtension = new ActivityParameters(Map(
+        "city" -> "Boise",
+        "street address" -> "6700 W Fairview Ave",
+        "postal code" -> "83704",
+        "country code" -> "US"
+      ))
+      campaignCreator.setLocationExtension(campaign, locationExtension)
+    }
+  }
+}

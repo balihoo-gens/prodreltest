@@ -121,7 +121,13 @@ trait CampaignCreatorComponent {
         new ActivityParameter("startDate", "YYYYMMDD", "Ignored on update."),
         new ActivityParameter("endDate", "YYYYMMDD", ""),
         new ActivityParameter("targetzips", "string", "Comma separated list of zip codes"),
-        new ActivityParameter("adschedule", "string", "M,T,W,Th,F,S,Su")
+        new ActivityParameter("adschedule", "string", "M,T,W,Th,F,S,Su"),
+        new ActivityParameter("street address", "string", "LocationExtension: Street address line 1", false),
+        new ActivityParameter("city", "string", "LocationExtension: Name of the city", false),
+        new ActivityParameter("postal code", "string", "LocationExtension: Postal code", false),
+        new ActivityParameter("country code", "string", "LocationExtension: Country code", false),
+        new ActivityParameter("company name", "string", "LocationExtension(Optional): The name of the company located at the given address. The length of this string should be between 1 and 80, inclusive.", false),
+        new ActivityParameter("phone number", "string", "LocationExtension(Optional): The phone number for the location", false)
       ), new ActivityResult("int", "AdWords Campaign ID"))
     }
 
@@ -257,6 +263,8 @@ trait CampaignCreatorComponent {
             setTargetZips(campaign, value)
           case "adschedule" =>
             setAdSchedule(campaign, value)
+          case "street address" =>
+            setLocationExtension(campaign, params)
           case _ =>
         }
       }
@@ -418,6 +426,104 @@ trait CampaignCreatorComponent {
 
       adWordsAdapter.withErrorsHandled[Any](context, {
         adWordsAdapter.campaignCriterionService.mutate(operations.toArray)
+      })
+    }
+
+    def setLocationExtension(campaign:Campaign, params:ActivityParameters) = {
+
+      val address = new Address()
+      address.setStreetAddress(params("street address"))
+      address.setCityName(params("city"))
+      address.setPostalCode(params("postal code"))
+      address.setCountryCode(params("country code"))
+
+      // First we query the existing extensions
+      val existingSelector = new SelectorBuilder()
+        .fields("AdExtensionId", "Address", "CompanyName", "PhoneNumber")
+        .equals("CampaignId", String.valueOf(campaign.getId))
+        .equals("Status", CampaignAdExtensionStatus.ACTIVE.getValue)
+        .equals("LocationExtensionSource", LocationExtensionSource.ADWORDS_FRONTEND.getValue)
+        .build()
+
+      val locationExtensions = new mutable.ArrayBuffer[LocationExtension]()
+      var extensionExists = false
+      val existing:CampaignAdExtensionPage = adWordsAdapter.campaignAdExtensionService.get(existingSelector)
+      for(ext <- existing.getEntries) {
+        ext.getAdExtension match {
+          case le:LocationExtension =>
+            locationExtensions += le
+            val existingAddress = le.getAddress
+            extensionExists |= (address.getStreetAddress == existingAddress.getStreetAddress &&
+              address.getCityName == existingAddress.getCityName &&
+              address.getPostalCode == existingAddress.getPostalCode &&
+              address.getCountryCode == existingAddress.getCountryCode)
+        }
+      }
+
+      if(!extensionExists) {
+        _addLocationExtension(campaign, address, params)
+        _removeLocationExtensions(campaign, locationExtensions.toArray)
+      }
+
+    }
+
+    def _removeLocationExtensions(campaign:Campaign, locationExtensions:Array[LocationExtension]) = {
+
+      val operations = new mutable.ArrayBuffer[CampaignAdExtensionOperation]()
+
+      for(extension <- locationExtensions) {
+        val campaignAdExtension = new CampaignAdExtension()
+        campaignAdExtension.setCampaignId(campaign.getId)
+        campaignAdExtension.setAdExtension(extension)
+
+        val campaignAdExtensionOp = new CampaignAdExtensionOperation()
+        campaignAdExtensionOp.setOperand(campaignAdExtension)
+        campaignAdExtensionOp.setOperator(Operator.REMOVE)
+        operations += campaignAdExtensionOp
+      }
+
+      adWordsAdapter.withErrorsHandled[Any](s"Removing ${operations.size} location extensions", {
+        adWordsAdapter.campaignAdExtensionService.mutate(operations.toArray)
+      })
+    }
+
+    def _addLocationExtension(campaign:Campaign, address:Address, params:ActivityParameters) = {
+
+      val geoLocationSelector = new GeoLocationSelector()
+      geoLocationSelector.setAddresses(Array(address))
+
+      val geoLocations = adWordsAdapter.geoLocationService.get(geoLocationSelector)
+      val geoLocation:Option[GeoLocation] = geoLocations.size match {
+        case 1 =>
+          Some(geoLocations(0))
+        case _ =>
+          throw new Exception("Could not resole GeoLocation for address ")
+      }
+
+      val locationExtension = new LocationExtension()
+      locationExtension.setAddress(geoLocation.get.getAddress)
+      locationExtension.setGeoPoint(geoLocation.get.getGeoPoint)
+      locationExtension.setEncodedLocation(geoLocation.get.getEncodedLocation)
+      locationExtension.setSource(LocationExtensionSource.ADWORDS_FRONTEND)
+
+      if(params.has("company name")) { // These are optional..
+        locationExtension.setCompanyName(params("company name"))
+      }
+
+      if(params.has("phone number")) { // Yep.. optional
+        locationExtension.setPhoneNumber(params("phone number"))
+      }
+
+      val campaignAdExtension = new CampaignAdExtension()
+      campaignAdExtension.setCampaignId(campaign.getId)
+      campaignAdExtension.setAdExtension(locationExtension)
+
+      val campaignAdExtensionOp = new CampaignAdExtensionOperation()
+      campaignAdExtensionOp.setOperand(campaignAdExtension)
+      campaignAdExtensionOp.setOperator(Operator.ADD)
+
+      adWordsAdapter.withErrorsHandled[Any]("Adding location extension", {
+        adWordsAdapter.campaignAdExtensionService.mutate(Array(campaignAdExtensionOp))
       })
     }
   }
