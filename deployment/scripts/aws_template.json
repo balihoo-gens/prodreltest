@@ -13,7 +13,15 @@
       "ConstraintDescription" : "can contain only alphanumeric characters, spaces, dashes and underscores."
     },
 
-    "InstanceType" : {
+    "WorkerInstanceType" : {
+      "Description" : "WebServer EC2 instance type",
+      "Type" : "String",
+      "Default" : "t1.micro",
+      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.large", "m1.xlarge" ],
+      "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
+    },
+
+    "DashboardInstanceType" : {
       "Description" : "WebServer EC2 instance type",
       "Type" : "String",
       "Default" : "t1.micro",
@@ -98,13 +106,13 @@
         "KeyName" : { "Ref" : "KeyName" },
         "ImageId" : { "Fn::FindInMap" : [
           "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
-          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "WorkerInstanceType" },
           "Arch" ] } ] },
         "SecurityGroups" : [
           { "Ref" : "InstanceSecurityGroup" },
           "splunk-access"
         ],
-        "InstanceType" : { "Ref" : "InstanceType" },
+        "InstanceType" : { "Ref" : "WorkerInstanceType" },
         "UserData": { "Fn::Base64" : { "Ref" : "WorkerScript" } }
       }
     },
@@ -210,14 +218,14 @@
       "Properties" : {
         "ImageId" : { "Fn::FindInMap" : [
           "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
-          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "DashboardInstanceType" },
           "Arch" ] } ] },
         "KeyName" : { "Ref" : "KeyName" },
         "SecurityGroups" : [
           { "Ref" : "DashboardSecurityGroup" },
           "splunk-access"
         ],
-        "InstanceType" : { "Ref" : "InstanceType" },
+        "InstanceType" : { "Ref" : "DashboardInstanceType" },
         "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Dashboard"} ],
         "UserData": { "Fn::Base64" : { "Ref" : "DashboardScript" } }
       }

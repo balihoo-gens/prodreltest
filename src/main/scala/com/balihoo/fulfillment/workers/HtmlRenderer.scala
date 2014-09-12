@@ -23,7 +23,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
     */
   def storeScript = {
     val scriptName = swfAdapter.config.getString("scriptName")
-    val scriptPath = s"/tmp/$scriptName"
+    val scriptPath = s"$scriptName"
     splog.debug(s"using script $scriptName")
     val scriptData = Source.fromURL(getClass.getResource("/" + scriptName))
     val scriptFile = new FileWriter(scriptPath)
@@ -39,6 +39,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
     if (file.canRead) {
       splog.info(s"storing $imageFileName into $s3Url")
       s3Adapter.client.putObject(s3bucket, key, file)
+      file.delete
     } else {
       throw new Exception(s"Unable to store rendered image to S3: $imageFileName does not exist")
     }

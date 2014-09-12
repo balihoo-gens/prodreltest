@@ -7,7 +7,7 @@ try {
   //reads 1 line of stdin
   var input = JSON.parse(system.stdin.readLine());
   var url = input.source;
-  var filename = "/tmp/htmlrenderer.png";
+  var filename = input.target;
   var ret = 0;
 
   page = webpage.create();
@@ -16,11 +16,14 @@ try {
     if (status === "success") {
       output.messages += "page " + url + " retrieved\n";
       try {
-        page.render(filename);
-        output.messages += "saved to " + filename + "\n";
-        output.result = filename;
+        if (page.render(filename)) {
+          output.messages += "saved to " + filename + "\n";
+          output.result = filename;
+        } else {
+          output.messages += "failed rendering to " + filename + "\n";
+        }
       } catch (e) {
-        output.messages += "failed rendering to " + filename + "\n";
+        output.messages += "failed rendering to " + filename + ": " + e.message + "\n";
         ret = 2;
       }
     } else {
@@ -28,10 +31,10 @@ try {
       output.messages += " status: " + status + "\n";
       ret = 3;
     }
-      page.close();
-      console.log(JSON.stringify(output));
-      phantom.exit(ret);
-    });
+    page.close();
+    console.log(JSON.stringify(output));
+    phantom.exit(ret);
+  });
 } catch(e) {
   ret = 4;
   output.messages += " exception: " + e.message + "\n";

@@ -516,16 +516,21 @@ object coordinator {
   def main(args: Array[String]) {
     val name = getClass.getSimpleName.stripSuffix("$")
     val splog = new Splogger(Splogger.mkFFName(name))
-    splog("INFO", s"Started $name")
+    splog.info(s"Started $name")
     try {
       val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
+      splog.debug("Created PropertiesLoader")
       val swf = new SWFAdapter(config)
+      splog.debug("Created SWFAdapter")
       val fc = new FulfillmentCoordinator(swf, splog)
+      splog.debug("Created FulfillmentCoordinator")
       fc.coordinate()
     }
     catch {
+      case e:Exception =>
+        splog.error(e.getMessage)
       case t:Throwable =>
-        splog("ERROR", t.getMessage)
+        splog.error(t.getMessage)
     }
     splog("INFO", s"Terminated $name")
   }
