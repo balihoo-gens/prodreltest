@@ -32,15 +32,19 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.4",
   "commons-configuration" % "commons-configuration" % "1.10",
   "commons-beanutils" % "commons-beanutils" % "1.9.2",
-  ("com.balihoo.commons" % "commons-client" % "latest.snapshot").exclude("com.google.guava", "guava"),
+  ("com.balihoo.commons" % "commons-client" % "latest.snapshot")
+    .exclude("com.google.guava", "guava")
+    .exclude("com.sun.jersey", "jersey-core"),
   "com.google.api-ads" % "ads-lib" % "1.29.0",
   "com.google.api-ads" % "adwords-axis" % "1.29.0",
   "javax.activation" % "activation" % "1.1",
   "com.github.scopt" %% "scopt" % "3.2.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
   "org.keyczar" % "keyczar" % "0.66",
-  "com.stackmob" %% "newman" % "1.3.5"
+  "com.stackmob" %% "newman" % "1.3.5",
+  "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test
 )
+
 
 scalacOptions in Test ++= Seq("-Yrangepos")
 

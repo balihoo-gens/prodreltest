@@ -28,5 +28,3 @@ class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
   override def post(url: URL, body: AnyRef) = execute(POST(url).setBody(body))
   override def put(url: URL, body: AnyRef) = execute(PUT(url).setBody(body))
 }
-
-class HTTPResult(responseCode: Int, body: String)
