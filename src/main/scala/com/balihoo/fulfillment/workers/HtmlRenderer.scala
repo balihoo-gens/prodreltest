@@ -52,6 +52,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
         new ActivityParameter("source", "string", "The URL of of the page to render"),
+        new ActivityParameter("clipid", "string", "The id of the element used to clip the image", false)
         new ActivityParameter("target", "string", "The S3 location of the resulting image")
       ), new ActivityResult("string", "the target URL if successfully saved"))
   }
