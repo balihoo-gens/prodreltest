@@ -8,7 +8,6 @@ import scala.collection.JavaConversions._
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
 import com.amazonaws.services.dynamodbv2.model._
 import com.balihoo.fulfillment.config._
-import com.amazonaws.regions.{Regions, Region}
 
 //for the cake pattern dependency injection
 trait DynamoAdapterComponent {
@@ -75,7 +74,7 @@ class DynamoItem(table:String) {
       .withItem(item)
   }
 
-  override def toString() = {
+  override def toString = {
     (for((key,value) <- item) yield s"$key: $value").mkString("DynamoItem:{", ", ", "}")
   }
 }

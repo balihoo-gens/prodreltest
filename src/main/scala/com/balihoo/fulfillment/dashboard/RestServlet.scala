@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.dashboard
 
+import java.io.BufferedReader
+
 import play.api.libs.json._
 import scala.collection.JavaConversions._
 
@@ -46,25 +48,17 @@ abstract class RestServlet extends HttpServlet {
       handlers(rsq.request.getRequestURI)(rsq)
     } catch {
       case bre:BadRequestException =>
-//        println(bre.getMessage)
-//        bre.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_BAD_REQUEST
-          , _errorJson(bre.getMessage))
+          , _errorJson("Bad Request", bre.getMessage))
       case nsee:NoSuchElementException =>
-//        println(nsee.getMessage)
-//        nsee.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_NOT_FOUND
-          , _errorJson(nsee.getMessage))
+          , _errorJson(nsee.getMessage, s"${rsq.request.getRequestURI} not handled for method ${rsq.request.getMethod}"))
       case npe:NullPointerException =>
-//        println(npe.getMessage)
-//        npe.printStackTrace()
         rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          ,_errorJson(npe.getMessage))
+          ,_errorJson("Internal Server Error", npe.getMessage))
       case e:Exception =>
-//        println(e.getMessage)
-//        println(e.getStackTrace)
         rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          ,_errorJson(e.getMessage, e.getClass.toString))
+          ,_errorJson("Internal Server Error("+e.getClass.toString+")", e.getMessage))
     }
   }
 
@@ -88,8 +82,30 @@ class RestServletQuery(val request:HttpServletRequest
                       ,val response:HttpServletResponse) {
 
   val params = collection.mutable.Map[String, String]()
-  for((key, values) <- request.getParameterMap) {
-    params(key) = values(0)
+  if("POST" == request.getMethod) {
+    val sb:StringBuilder = new StringBuilder()
+    val reader:BufferedReader = request.getReader
+    try {
+        var loop:Boolean = true
+        while(loop) {
+          reader.readLine match {
+            case s:String =>
+              sb.append(s)
+            case _ =>
+              loop = false
+          }
+        }
+    } finally {
+        reader.close()
+    }
+
+    for((key, value) <- Json.parse(sb.toString()).as[JsObject].fields) {
+      params(key) = value.as[String]
+    }
+  } else {
+    for((key, values) <- request.getParameterMap) {
+      params(key) = values(0)
+    }
   }
 
   def hasParameter(param:String) = {

@@ -19,7 +19,7 @@ import com.amazonaws.services.simpleworkflow.model._
 class TestFulfillmentCoordinator extends Specification with Mockito
 {
   "FulfillmentSection" should {
-    "be initialized without error" in {
+    "  be initialized without error" in {
 
       val json = Json.parse( """{
          "cake" : {
@@ -50,12 +50,12 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
 
       val jso = json.as[JsObject].value("cake").as[JsObject]
-      val section = new FulfillmentSection("test section", jso, new Date())
+      val section = new FulfillmentSection("test section", jso, DateTime.now)
 
       section.name mustEqual "test section"
       section.prereqs(0) mustEqual "heat_oven"
-      section.action.getName mustEqual "bake"
-      section.action.getVersion mustEqual "1"
+      section.action.get.getName mustEqual "bake"
+      section.action.get.getVersion mustEqual "1"
       section.failureParams.maxRetries mustEqual 3
       section.failureParams.delaySeconds mustEqual 100
       section.cancelationParams.maxRetries mustEqual 7
@@ -69,7 +69,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.canceledCount mustEqual 0
       section.startedCount mustEqual 0
 
-      section.startToCloseTimeout mustEqual "tuna sandwich"
+      section.startToCloseTimeout mustEqual Some("tuna sandwich")
       section.waitUntil.get mustEqual new DateTime("2093-07-04T16:04:00-06")
 
       section.params("cake_batter").asInstanceOf[SectionReferences].sections(0).name mustEqual "batter"
@@ -81,7 +81,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       section.timeline.events(0).message mustEqual "totally unhandled : stuff"
     }
 
-    "handle status changes" in {
+    "  handle status changes" in {
 
       val json = Json.parse( """{
          "action" : { "name" : "awesome",
@@ -106,48 +106,48 @@ class TestFulfillmentCoordinator extends Specification with Mockito
          "status" : "READY"
 	      }""").as[JsObject]
 
-      val section = new FulfillmentSection("sectionName", json, new Date())
+      val section = new FulfillmentSection("sectionName", json, DateTime.now)
 
       section.status mustEqual SectionStatus.READY
 
       section.startedCount mustEqual 0
-      section.setStarted(new Date())
+      section.setStarted(DateTime.now)
 
       section.status mustEqual SectionStatus.STARTED
 
       section.startedCount mustEqual 1
 
-      section.setStarted(new Date())
-      section.setStarted(new Date())
+      section.setStarted(DateTime.now)
+      section.setStarted(DateTime.now)
 
       section.startedCount mustEqual 3
       section.status mustEqual SectionStatus.STARTED
 
-      section.setScheduled(new Date())
+      section.setScheduled(DateTime.now)
       section.status mustEqual SectionStatus.SCHEDULED
 
       section.scheduledCount mustEqual 1
       section.startedCount mustEqual 3 // STILL 3
 
-      section.setCompleted("awesome results", new Date())
+      section.setCompleted("awesome results", DateTime.now)
 
       section.value mustEqual "awesome results"
       section.scheduledCount mustEqual 1 // STILL 1
       section.startedCount mustEqual 3 // STILL 3
       section.status mustEqual SectionStatus.COMPLETE
 
-      section.setFailed("reasons", "terrible reasons", new Date())
+      section.setFailed("reasons", "terrible reasons", DateTime.now)
       section.status mustEqual SectionStatus.FAILED
       section.timeline.events.last.message mustEqual "Failed because:reasons terrible reasons"
 
-      section.setFailed("reasons", "more terrible reasons", new Date())
+      section.setFailed("reasons", "more terrible reasons", DateTime.now)
       section.status mustEqual SectionStatus.TERMINAL
       section.timeline.events.last.message mustEqual "Failed because:reasons more terrible reasons"
     }
   }
 
   "SectionMap" should {
-    "be initialized without error" in {
+    "  be initialized without error" in {
 
       val json = """{
          "cake" : {
@@ -209,15 +209,15 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       event2.setActivityTaskScheduledEventAttributes(event2Attribs)
       events += event2
 
-      val map = new SectionMap(mutableSeqAsJavaList(events))
+      val map = new FulfillmentSections(mutableSeqAsJavaList(events))
 
-      map.getClass mustEqual classOf[SectionMap]
+      map.getClass mustEqual classOf[FulfillmentSections]
 
-      map.nameToSection.size mustEqual 3
+      map.size mustEqual 3
 
     }
 
-    "be angry about sanity" in {
+    "  be angry about sanity" in {
 
       val json = """{
          "cake" : {
@@ -279,13 +279,13 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       event2.setActivityTaskStartedEventAttributes(event2Attribs)
       events += event2
 
-      val map = new SectionMap(mutableSeqAsJavaList(events))
+      val map = new FulfillmentSections(mutableSeqAsJavaList(events))
 
-      map.getClass mustEqual classOf[SectionMap]
+      map.getClass mustEqual classOf[FulfillmentSections]
 
-      map.nameToSection.size mustEqual 3
+      map.size mustEqual 3
 
-      map.timeline.events(0).message mustEqual "Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+      map.timeline.events(0).message mustEqual "Problem processing WorkflowExecutionStarted: Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }
   }
 
@@ -316,30 +316,187 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
       events += event
 
-      val sections = new SectionMap(mutableSeqAsJavaList(events))
-      val categorized = new CategorizedSections(sections)
-      val generator = new DecisionGenerator(categorized, sections)
-      generator.makeDecisions()
+      val sections = new FulfillmentSections(mutableSeqAsJavaList(events))
+      val generator = new DecisionGenerator(sections)
+      generator.makeDecisions(false)
     }
 
-    "schedule work when there's no waitUntil" in {
+    "  schedule work when there's no waitUntil" in {
       val decisions = makeDecisions(None)
-      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
-    "schedule work when waitUntil is in the past" in {
+    "  schedule work when waitUntil is in the past" in {
       val decisions = makeDecisions(Some(DateTime.now.minusDays(1)))
-      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
-    "schedule work when waitUntil is < 1 second in the future" in {
+    "  schedule work when waitUntil is < 1 second in the future" in {
       val decisions = makeDecisions(Some(DateTime.now.plusMillis(998)))
-      decisions(0).getDecisionType mustEqual(DecisionType.ScheduleActivityTask.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
     }
 
-    "start a timer when waitUntil is > 1 second in the future" in {
+    "  start a timer when waitUntil is > 1 second in the future" in {
       val decisions = makeDecisions(Some(DateTime.now.plusSeconds(30)))
-      decisions(0).getDecisionType mustEqual(DecisionType.StartTimer.toString)
+      decisions(0).getDecisionType mustEqual DecisionType.StartTimer.toString
     }
+  }
+
+  "FulfillmentOperators" should {
+    def generateSections(json:String) = {
+      var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
+
+      val event:HistoryEvent = new HistoryEvent
+      val eventAttribs = new WorkflowExecutionStartedEventAttributes
+      event.setEventType(EventType.WorkflowExecutionStarted)
+      eventAttribs.setInput(json)
+      event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
+      events += event
+
+      new FulfillmentSections(mutableSeqAsJavaList(events))
+    }
+
+    "  be upset about missing 'input'" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "MD5",
+            "params" : {},
+            "prereqs" : [],
+            "status" : "READY"
+	          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      val wrongattribs = decisions(0).getCompleteWorkflowExecutionDecisionAttributes
+      wrongattribs mustEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##FAILURE"
+      attribs.getDetails mustEqual "input parameter 'input' is REQUIRED!"
+    }
+
+    "  evaluate MD5 properly and not freak over an undeclared param" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "MD5",
+            "params" : { "input" : "some trash string not related to tuna at all", "fig" : "newton" },
+            "prereqs" : [],
+            "status" : "READY"
+	          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs.getDetails mustEqual "E546FF3E618B9579D3D039C11A2FFFCA"
+
+      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
+
+    }
+
+    "  format strings with StringFormat" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "The {subject} eats {food} when {time}",
+                         "subject" : "GIANT",
+                         "food" : "tuna flesh",
+                         "time" : "whenever the hail he wants..!!",
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+	          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs.getDetails mustEqual "The GIANT eats tuna flesh when whenever the hail he wants..!!"
+
+      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
+
+    }
+
+    "  reference results from other sections properly" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "The movie {movie} is {detailedreview}",
+                         "movie" : ["taen"],
+                         "detailedreview" : "alright. I mean it's oK I guess.",
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+	          },
+          "taen" : {
+            "value" : "ANIMAL HOUSE",
+            "status" : "COMPLETE"
+          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs = decisions(0).getRecordMarkerDecisionAttributes
+      attribs mustNotEqual null
+
+      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs.getDetails mustEqual "The movie ANIMAL HOUSE is alright. I mean it's oK I guess."
+
+      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
+
+    }
+
+    "  multiple operators should evaluate in series" in {
+      val sections = generateSections("""{
+         "neat" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "The movie {movie} is {detailedreview}",
+                         "movie" : ["taen"],
+                         "detailedreview" : "alright. I mean it's oK I guess.",
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+	          },
+          "taen" : {
+            "action" : "StringFormat",
+            "params" : { "format" : "{firstword} {secondword}",
+                         "firstword" : "Under",
+                         "secondword" : ["seagal got plump"],
+                         "pointless" : "this won't get used" },
+            "prereqs" : [],
+            "status" : "READY"
+          },
+          "seagal got plump" : {
+            "value" : "SIEGE",
+            "status" : "COMPLETE"
+          }
+	        }""")
+
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs0 = decisions(0).getRecordMarkerDecisionAttributes
+      attribs0 mustNotEqual null
+
+      attribs0.getMarkerName mustEqual "OperatorResult##taen##SUCCESS"
+      attribs0.getDetails mustEqual "Under SIEGE"
+
+      val attribs1 = decisions(1).getRecordMarkerDecisionAttributes
+      attribs1 mustNotEqual null
+
+      attribs1.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
+      attribs1.getDetails mustEqual "The movie Under SIEGE is alright. I mean it's oK I guess."
+
+      decisions(2).getDecisionType mustEqual "CompleteWorkflowExecution"
+    }
+
   }
 }

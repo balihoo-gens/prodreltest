@@ -8,11 +8,11 @@
                 <div class="row">
                     <span class='input-group date' id='startDate' title="Start Date">
                         <input type='text' class="form-control" />
-                        <span class="input-group-addon"><span class="glyphicon glyphicon-calendar"></span></span>
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
                     </span>
                     <span class='input-group date' id='endDate' title="End Date">
                         <input type='text' class="form-control" />
-                        <span class="input-group-addon"><span class="glyphicon glyphicon-calendar"></span></span>
+                        <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
                     </span>
                     <button class="btn btn-default" ng-click="getHistory()">QUERY</button>
                 </div>
@@ -35,7 +35,7 @@
                 <td>
                     Start : <span title="{{ex.startTimestamp}}">{{ex.startTimestamp | momentFromNow}}</span>
                     <br/>
-                    End : <span title="{{ex.closeTimestamp}}">{{ex.closeTemestamp | momentFromNow}}</span>
+                    End : <span title="{{ex.closeTimestamp}}">{{ex.closeTimestamp | momentFromNow}}</span>
                 </td>
                 <td><span class="label {{figureStatusLabel(ex.closeStatus)}}" ng-bind-html="formatStatus(ex.closeStatus)"></span></td>
             </tr>
