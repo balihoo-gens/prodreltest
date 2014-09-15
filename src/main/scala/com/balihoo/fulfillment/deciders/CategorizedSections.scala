@@ -5,7 +5,7 @@ import scala.collection.mutable
  * Bin the sections by status. So we can make decisions
  * @param sections SectionMap
  */
-class CategorizedSections(sections: SectionMap) {
+class CategorizedSections(sections: FulfillmentSections) {
   val complete = mutable.MutableList[FulfillmentSection]()
   val inprogress = mutable.MutableList[FulfillmentSection]()
   val timedout = mutable.MutableList[FulfillmentSection]()
@@ -21,33 +21,53 @@ class CategorizedSections(sections: SectionMap) {
   var essentialComplete = 0
   var essentialTotal = 0
 
-  for((name, section) <- sections.nameToSection) {
-    if(section.essential) { essentialTotal += 1 }
-    section.status match {
-      case SectionStatus.COMPLETE =>
-        complete += section
-        if(section.essential) { essentialComplete += 1 }
-      case SectionStatus.SCHEDULED =>
-        inprogress += section
-      case SectionStatus.STARTED =>
-        inprogress += section
-      case SectionStatus.FAILED =>
-        failed += section
-      case SectionStatus.CANCELED =>
-        canceled += section
-      case SectionStatus.CONTINGENT =>
-        contingent += section
-      case SectionStatus.TIMED_OUT =>
-        timedout += section
-      case SectionStatus.DEFERRED =>
-        deferred += section
-      case SectionStatus.TERMINAL =>
-        terminal += section
-      case SectionStatus.READY =>
-        categorizeReadySection(section)
-      case SectionStatus.IMPOSSIBLE =>
-        impossible += section
-      case _ => println(section.status + " is not handled here!")
+  categorize()
+
+  def categorize() = {
+
+    essentialComplete = 0
+    essentialTotal = 0
+
+    complete.clear()
+    inprogress.clear()
+    timedout.clear()
+    deferred.clear()
+    blocked.clear()
+    failed.clear()
+    canceled.clear()
+    contingent.clear()
+    terminal.clear()
+    ready.clear()
+    impossible.clear()
+
+    for((name, section) <- sections.nameToSection) {
+      if(section.essential) { essentialTotal += 1 }
+      section.status match {
+        case SectionStatus.COMPLETE =>
+          complete += section
+          if(section.essential) { essentialComplete += 1 }
+        case SectionStatus.SCHEDULED =>
+          inprogress += section
+        case SectionStatus.STARTED =>
+          inprogress += section
+        case SectionStatus.FAILED =>
+          failed += section
+        case SectionStatus.CANCELED =>
+          canceled += section
+        case SectionStatus.CONTINGENT =>
+          contingent += section
+        case SectionStatus.TIMED_OUT =>
+          timedout += section
+        case SectionStatus.DEFERRED =>
+          deferred += section
+        case SectionStatus.TERMINAL =>
+          terminal += section
+        case SectionStatus.READY =>
+          categorizeReadySection(section)
+        case SectionStatus.IMPOSSIBLE =>
+          impossible += section
+        case _ => println(section.status + " is not handled here!")
+      }
     }
   }
 
@@ -71,13 +91,13 @@ class CategorizedSections(sections: SectionMap) {
 
     var prereqsReady: Boolean = true
     for(prereq: String <- section.prereqs) {
-      val referencedSection: FulfillmentSection = sections.nameToSection(prereq)
+      val referencedSection: FulfillmentSection = sections.getSectionByName(prereq)
       referencedSection.status match {
         case SectionStatus.COMPLETE =>
           // println("Section is complete")
         case _ =>
           // Anything other than complete is BLOCKING our progress
-          section.timeline.warning(s"Waiting for prereq $prereq (${referencedSection.status})")
+          section.timeline.warning(s"Waiting for prereq $prereq (${referencedSection.status})", None)
           prereqsReady = false
       }
     }
@@ -92,10 +112,12 @@ class CategorizedSections(sections: SectionMap) {
   }
 
   def workComplete() : Boolean = {
+    if(sections.size == 0) { return false; }
+
     essentialTotal match {
       case 0 =>
         // No essential sections.. we just want everything complete or contingent
-        sections.nameToSection.size == (complete.length + contingent.length)
+        sections.size == (complete.length + contingent.length)
       case _ =>
         // If there are essential sections.. they MUST ALL be COMPLETE
         essentialComplete == essentialTotal

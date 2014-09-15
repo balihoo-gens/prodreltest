@@ -1,7 +1,6 @@
 package com.balihoo.fulfillment.adapters
 
 import com.balihoo.fulfillment.config._
-import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.sqs.AmazonSQSClient
 
 //for the cake pattern dependency injection

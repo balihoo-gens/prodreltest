@@ -1,7 +1,6 @@
 package com.balihoo.fulfillment.adapters
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
 
 import com.balihoo.fulfillment.config._
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClient
