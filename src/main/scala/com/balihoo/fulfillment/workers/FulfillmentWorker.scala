@@ -113,9 +113,9 @@ abstract class FulfillmentWorker {
           }
         } catch {
           case e:Exception =>
-            updateStatus("Polling Exception ${e.getMessage}", "EXCEPTION")
+            updateStatus(s"Polling Exception ${e.getMessage}", "EXCEPTION")
           case t:Throwable =>
-            updateStatus("Polling Throwable ${t.getMessage}", "ERROR")
+            updateStatus(s"Polling Throwable ${t.getMessage}", "ERROR")
         }
       }
     }

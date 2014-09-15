@@ -13,28 +13,39 @@ except ImportError:
 
 class Launcher(object):
     ALL_CLASSES = [
-        "com.balihoo.fulfillment.workers.ftp_uploadvalidator",
-        "com.balihoo.fulfillment.workers.adwords_campaignprocessor",
-        "com.balihoo.fulfillment.workers.chaos",
-        "com.balihoo.fulfillment.workers.adwords_textadprocessor",
-        "com.balihoo.fulfillment.workers.email_verifiedaddresslister",
-        "com.balihoo.fulfillment.workers.geonames_timezoneretriever",
-        "com.balihoo.fulfillment.workers.adwords_accountlookup",
-        "com.balihoo.fulfillment.workers.zipcodedemographics",
-        "com.balihoo.fulfillment.workers.email_sender",
-        "com.balihoo.fulfillment.workers.adwords_accountcreator",
-        "com.balihoo.fulfillment.workers.adwords_adgroupprocessor",
-        "com.balihoo.fulfillment.workers.ftp_uploader",
         "com.balihoo.fulfillment.deciders.coordinator",
-        "com.balihoo.fulfillment.workers.email_addressverifier",
+        "com.balihoo.fulfillment.workers.adwords_accountcreator",
+        "com.balihoo.fulfillment.workers.adwords_accountlookup",
+        "com.balihoo.fulfillment.workers.adwords_adgroupprocessor",
+        "com.balihoo.fulfillment.workers.adwords_campaignprocessor",
         "com.balihoo.fulfillment.workers.adwords_imageadprocessor",
-        "com.balihoo.fulfillment.workers.noop"
+        "com.balihoo.fulfillment.workers.adwords_textadprocessor",
+        "com.balihoo.fulfillment.workers.chaos",
+        "com.balihoo.fulfillment.workers.email_addressverifier",
+        "com.balihoo.fulfillment.workers.email_sender",
+        "com.balihoo.fulfillment.workers.email_verifiedaddresslister",
+        "com.balihoo.fulfillment.workers.ftp_uploader",
+        "com.balihoo.fulfillment.workers.ftp_uploadvalidator",
+        "com.balihoo.fulfillment.workers.geonames_timezoneretriever",
+        "com.balihoo.fulfillment.workers.htmlrenderer",
+        "com.balihoo.fulfillment.workers.noop",
     ]
 
     def __init__(self, jar, logfile):
         self._jar = jar
         self._procs = {}
         self._log = Splogger(logfile)
+
+    def plog(self, p):
+        line = p.stdout.readline()
+        while len(line) > 0:
+            self._log.info("pid %d stdout %s" % (p.pid, line))
+            line = p.stdout.readline()
+
+        line = p.stderr.readline()
+        while len(line) > 0:
+            self._log.info("pid %d stderr %s" % (p.pid, line))
+            line = p.stderr.readline()
 
     def monitor(self):
         start = time.time()
@@ -48,8 +59,8 @@ class Launcher(object):
                     retval = proc.poll()
                     if not retval is None:
                         elapsed = time.time() - start
-                        s = "%s [pid %d] died within %f seconds, returning %d" % (procname, proc.pid, elapsed, retval)
-                        self._log.error(s)
+                        self._log.error("%s [pid %d] died within %f seconds, returncode %d" % (procname, proc.pid, elapsed, retval))
+                        self.plog(proc)
                         done.append(proc.pid)
             time.sleep(0.2)
         self._log.info("Done: no processes left to monitor")
@@ -83,7 +94,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     launcher = Launcher(args.jarname, args.logfile)
-    launcher.launch(args.classes)
+    launcher.launch(args.classes, True)
     launcher.monitor()
 
 
