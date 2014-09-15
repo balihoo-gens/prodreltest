@@ -9,8 +9,8 @@ import com.google.api.ads.common.lib.auth.OfflineCredentials.Api
 import com.google.api.ads.common.lib.auth.OfflineCredentials
 import org.apache.commons.configuration.{BaseConfiguration, Configuration}
 import com.google.api.ads.adwords.axis.factory.AdWordsServices
-import com.google.api.ads.adwords.axis.v201402.cm._
-import com.google.api.ads.adwords.axis.v201402.mcm._
+import com.google.api.ads.adwords.axis.v201406.cm._
+import com.google.api.ads.adwords.axis.v201406.mcm._
 import scala.collection.mutable
 
 //typical cake would nest the adapter inside the provider
@@ -93,6 +93,7 @@ abstract class AbstractAdWordsAdapter {
         for((error) <- apiException.getErrors) {
           error match {
             case rateExceeded: RateExceededError =>
+              Thread.sleep(rateExceeded.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
               throw new RateExceededException(rateExceeded)
             case apiError: ApiError =>
               errors += (apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
@@ -104,9 +105,9 @@ abstract class AbstractAdWordsAdapter {
         }
         throw new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
       case e:Exception =>
-        throw e
+        throw new Exception(s"Exception during $context :${e.getMessage}", e)
       case e:Throwable =>
-        throw e
+        throw new Exception(s"THROWABLE during $context :${e.getMessage}", e)
     }
   }
 

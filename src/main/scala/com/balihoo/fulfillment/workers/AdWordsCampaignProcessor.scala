@@ -4,8 +4,8 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
 
-import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201402.cm._
+import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201406.cm._
 
 import scala.collection.mutable
 
@@ -18,27 +18,18 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    try {
+    adWordsAdapter.withErrorsHandled[Any]("Campaign Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val campaign = campaignCreator.getCampaign(params) match {
-        case campaign:Campaign =>
+        case campaign: Campaign =>
           campaignCreator.updateCampaign(campaign, params)
         case _ =>
           campaignCreator.createCampaign(params)
       }
 
       completeTask(String.valueOf(campaign.getId))
-    } catch {
-      case rateExceeded: RateExceededException =>
-        // Whoops! We've hit the rate limit! Let's sleep!
-        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
-        throw rateExceeded
-      case exception: Exception =>
-        throw exception
-      case throwable: Throwable =>
-        throw new Exception(throwable.getMessage)
-    }
+    })
   }
 }
 
@@ -192,7 +183,7 @@ trait CampaignCreatorComponent {
       campaign.setName(name)
       campaign.setAdvertisingChannelType(AdvertisingChannelType.fromString(channel))
 
-      campaign.setStatus(CampaignStatus.ACTIVE)
+      campaign.setStatus(CampaignStatus.ENABLED)
       campaign.setBudget(campaignBudget)
 
       if(params.params contains "startDate") {
@@ -278,10 +269,40 @@ trait CampaignCreatorComponent {
       })
     }
 
+    def lookupLocationsByZips(zips:Array[String]):Array[LocationCriterion] = {
+
+      val locations = new mutable.ArrayBuffer[LocationCriterion]()
+      for(subset <- zips.sliding(25)) {
+
+        val selector = new SelectorBuilder()
+          .fields(
+            "Id",
+            "LocationName",
+            "CanonicalName",
+            "DisplayType",
+            "ParentLocations",
+            "Reach",
+            "TargetingStatus")
+          .in("LocationName", subset:_*) // Evil scala magic to splat a tuple into a Java variadic
+          // Set the locale of the returned location names.
+          .equals("Locale", "en")
+          .build()
+
+        val glocations = adWordsAdapter.withErrorsHandled[Array[LocationCriterion]](s"Checking zips '$subset'", {
+          adWordsAdapter.locationService.get(selector)
+        })
+
+        // Make the get request.
+        locations ++= ensureLocationsInUnitedStates(glocations)
+      }
+
+      locations.toArray
+    }
+
     /**
      * This function is the result of the unfortunate fact that you can't (or at least I couldn't figure out)
      * filter by CountryCode = 'US' as you'd expect.
-     * Details here: https://developers.google.com/adWordsAdapter/api/docs/appendix/selectorfields#v201402-LocationCriterionService
+     * Details here: https://developers.google.com/adWordsAdapter/api/docs/appendix/selectorfields#v201406-LocationCriterionService
      * @param locations Array[LocationCriterion]
      * @return
      */
@@ -309,7 +330,9 @@ trait CampaignCreatorComponent {
         .equals("CampaignId", String.valueOf(campaign.getId))
         .build()
 
-      val existingZips:CampaignCriterionPage = adWordsAdapter.campaignCriterionService.get(existingSelector)
+      val existingZips = adWordsAdapter.withErrorsHandled[CampaignCriterionPage]("Fetching existing Campaign criterion", {
+        adWordsAdapter.campaignCriterionService.get(existingSelector)
+      })
       for(page <- existingZips.getEntries) {
         page.getCriterion match {
           case location: Location =>
@@ -326,22 +349,8 @@ trait CampaignCreatorComponent {
         }
       }
 
-      val selector = new SelectorBuilder()
-        .fields(
-          "Id",
-          "LocationName",
-          "CanonicalName",
-          "DisplayType",
-          "ParentLocations",
-          "Reach",
-          "TargetingStatus")
-        .in("LocationName", zipString.split(","):_*) // Evil scala magic to splat a tuple into a Java variadic
-        // Set the locale of the returned location names.
-        .equals("Locale", "en")
-        .build()
-
       // Make the get request.
-      val locationCriteria = ensureLocationsInUnitedStates(adWordsAdapter.locationService.get(selector))
+      val locationCriteria = lookupLocationsByZips(zipString.split(","))
       for(loc <- locationCriteria) {
         val campaignCriterion = new CampaignCriterion()
         campaignCriterion.setCampaignId(campaign.getId)
@@ -441,7 +450,7 @@ trait CampaignCreatorComponent {
       val existingSelector = new SelectorBuilder()
         .fields("AdExtensionId", "Address", "CompanyName", "PhoneNumber")
         .equals("CampaignId", String.valueOf(campaign.getId))
-        .equals("Status", CampaignAdExtensionStatus.ACTIVE.getValue)
+        .equals("Status", CampaignAdExtensionStatus.ENABLED.getValue)
         .equals("LocationExtensionSource", LocationExtensionSource.ADWORDS_FRONTEND.getValue)
         .build()
 

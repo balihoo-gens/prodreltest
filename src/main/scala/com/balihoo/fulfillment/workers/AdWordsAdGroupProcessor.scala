@@ -5,8 +5,8 @@ import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
 import com.balihoo.fulfillment.util.Splogger
 
-import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201402.cm._
+import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201406.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 import scala.collection.mutable
@@ -25,7 +25,7 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    try {
+    adWordsAdapter.withErrorsHandled[Any]("AdGroup Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val adGroup = adGroupCreator.getAdGroup(params) match {
@@ -36,17 +36,7 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
       }
 
       completeTask(String.valueOf(adGroup.getId))
-
-    } catch {
-      case rateExceeded: RateExceededException =>
-        // Whoops! We've hit the rate limit! Let's sleep!
-        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
-        throw rateExceeded
-      case exception: Exception =>
-        throw exception
-      case throwable: Throwable =>
-        throw new Exception(throwable.getMessage)
-    }
+    })
   }
 }
 
@@ -399,7 +389,6 @@ trait AdGroupCreatorComponent {
         Some(existing.getEntries(0))
       } catch {
         case e:Exception =>
-          println(e.getMessage)
           if(e.getMessage.contains("INVALID_ID")) {
             None
           } else {

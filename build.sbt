@@ -35,6 +35,7 @@ libraryDependencies ++= Seq(
   ("com.balihoo.commons" % "commons-client" % "latest.snapshot").exclude("com.google.guava", "guava"),
   "com.google.api-ads" % "ads-lib" % "1.32.0",
   "com.google.api-ads" % "adwords-axis" % "1.32.0",
+  "com.google.guava" % "guava" % "18.0",
   "javax.activation" % "activation" % "1.1",
   "com.github.scopt" %% "scopt" % "3.2.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
