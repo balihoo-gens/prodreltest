@@ -77,7 +77,7 @@ class FulfillmentSection(val name: String
   val timeline = new Timeline
   var value: String = ""
 
-  var status = SectionStatus.READY
+  var status = SectionStatus.CONTINGENT
 
   var essential = false
   var fixable = true
@@ -88,9 +88,10 @@ class FulfillmentSection(val name: String
   var canceledCount: Int = 0
   var failedCount: Int = 0
 
-  val failureParams = new ActionParams(0, 0)
-  val timeoutParams = new ActionParams(0, 0)
-  val cancelationParams = new ActionParams(0, 0)
+  // 3 events of each type. 10 minute wait.
+  val failureParams = new ActionParams(3, 600)
+  val timeoutParams = new ActionParams(3, 600)
+  val cancelationParams = new ActionParams(3, 600)
 
   var startToCloseTimeout: Option[String] = None
   var scheduleToStartTimeout: Option[String] = None
@@ -194,6 +195,15 @@ class FulfillmentSection(val name: String
     }
   }
 
+  def setReady(reason:String, when:DateTime) = {
+    if(status == SectionStatus.TERMINAL) {
+      timeline.error("Can't set status to READY because section is TERMINAL!", Some(when))
+    } else {
+      status = SectionStatus.READY
+      timeline.note("READY: "+reason, Some(when))
+    }
+  }
+
   def setStarted(when:DateTime) = {
     startedCount += 1
     status = SectionStatus.STARTED
@@ -215,19 +225,61 @@ class FulfillmentSection(val name: String
   def setFailed(reason:String, details:String, when:DateTime) = {
     failedCount += 1
     timeline.warning(s"Failed because:$reason $details", Some(when))
-    status = if(failedCount > failureParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.FAILED
+    status = SectionStatus.FAILED
+    if(failedCount > failureParams.maxRetries) {
+      setTerminal(s"Failed too many times! ($failedCount > ${failureParams.maxRetries})", when)
+    }
   }
 
   def setCanceled(details:String, when:DateTime) = {
     canceledCount += 1
     timeline.warning(s"Canceled because: $details", Some(when))
-    status = if(canceledCount > cancelationParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.CANCELED
+    status = SectionStatus.CANCELED
+    if(canceledCount > cancelationParams.maxRetries) {
+      setTerminal(s"Canceled too many times! ($canceledCount > ${cancelationParams.maxRetries})", when)
+    }
   }
 
-  def setTimedOut(when:DateTime) = {
+  def setTimedOut(tot:String, details:String, when:DateTime) = {
     timedoutCount += 1
-    timeline.warning("Timed out!", Some(when))
-    status = if(timedoutCount > timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
+    timeline.warning("Timed out! "+tot+" "+details, Some(when))
+    status = SectionStatus.TIMED_OUT
+    if(timedoutCount > timeoutParams.maxRetries) {
+      setTerminal(s"Timed out too many times! ($timedoutCount > ${timeoutParams.maxRetries})", when)
+    }
+  }
+
+  def setContingent(reason:String, when:DateTime) = {
+    status = SectionStatus.CONTINGENT
+    timeline.note("Contingent: "+reason, Some(when))
+  }
+
+  def setImpossible(reason:String, when:DateTime) = {
+    status = SectionStatus.IMPOSSIBLE
+    timeline.error(reason, Some(when))
+  }
+
+  def setTerminal(reason:String, when:DateTime) = {
+    status = SectionStatus.TERMINAL
+    timeline.error(reason, Some(when))
+  }
+
+  def setDeferred(note:String, when:DateTime) = {
+    status = SectionStatus.DEFERRED
+    timeline.note("Deferred: "+note, Some(when))
+  }
+
+  def setStatus(ss:String, message:String, when:DateTime) = {
+    SectionStatus.withName(ss) match {
+      case SectionStatus.READY =>
+        setReady(message, when)
+      case SectionStatus.FAILED =>
+        setFailed("FAILED", message, when)
+      case SectionStatus.TERMINAL =>
+        setTerminal(message, when)
+      case _ =>
+        throw new Exception(s"Can't generically set status to '$ss'!")
+    }
   }
 
   def resolveReferences(map:FulfillmentSections):Boolean = {
@@ -343,7 +395,7 @@ class SectionReferences(sectionNames:List[String]) {
 
                   // The prior section didn't complete successfully.. let's
                   // let the next section have a try
-                  sectionRef.section.get.status = SectionStatus.READY
+                  sectionRef.section.get.setReady("Promoted from Contingent", DateTime.now)
                   sectionRef.section.get.resolveReferences(map) // <-- recurse
                 }
               case _ => // We don't care about other status until a TERMINAL case is hit

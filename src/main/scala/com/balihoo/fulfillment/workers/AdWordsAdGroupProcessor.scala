@@ -384,6 +384,8 @@ trait AdGroupCreatorComponent {
         val existing: AdGroupBidModifierPage = adWordsAdapter.adGroupBidModifierService.get(existingSelector)
         if(existing.getTotalNumEntries == 0) {
           return None
+        } else if(existing.getEntries(0).getBidModifier == null) {
+          return None
         }
 
         Some(existing.getEntries(0))
@@ -399,30 +401,31 @@ trait AdGroupCreatorComponent {
 
     def _processBidModifier(adGroup:AdGroup, modifier:String, platformId:Long) = {
 
-      val operator = _getExistingBidModifier(adGroup, platformId) match {
-        case m:Some[AdGroupBidModifier] =>
-          Operator.SET
-        case _ =>
-          Operator.ADD
-      }
-
       val operations = new mutable.ArrayBuffer[AdGroupBidModifierOperation]()
 
       val platform = new Platform()
       platform.setId(platformId)
 
-      val criterion = new AdGroupBidModifier()
-      criterion.setAdGroupId(adGroup.getId)
-      criterion.setBidModifier(modifier.toDouble)
-      criterion.setCriterion(platform)
+      var operator:Operator = Operator.SET
+      val bidModifier =  _getExistingBidModifier(adGroup, platformId) match {
+        case m:Some[AdGroupBidModifier] =>
+          m.get
+        case _ =>
+          operator = Operator.ADD
+          new AdGroupBidModifier()
+      }
+
+      bidModifier.setAdGroupId(adGroup.getId)
+      bidModifier.setBidModifier(modifier.toDouble)
+      bidModifier.setCriterion(platform)
 
       val operation = new AdGroupBidModifierOperation()
-      operation.setOperand(criterion)
+      operation.setOperand(bidModifier)
       operation.setOperator(operator)
 
       operations += operation
 
-      adWordsAdapter.withErrorsHandled[Any](s"Adding bid modifier $modifier", {
+      adWordsAdapter.withErrorsHandled[Any](s"${operator.getValue} bid modifier $modifier", {
         adWordsAdapter.adGroupBidModifierService.mutate(operations.toArray)
       })
     }

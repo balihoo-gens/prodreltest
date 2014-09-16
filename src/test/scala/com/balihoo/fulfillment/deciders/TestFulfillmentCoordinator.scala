@@ -142,7 +142,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       section.setFailed("reasons", "more terrible reasons", DateTime.now)
       section.status mustEqual SectionStatus.TERMINAL
-      section.timeline.events.last.message mustEqual "Failed because:reasons more terrible reasons"
+      section.timeline.events.last.message mustEqual "Failed too many times! (2 > 1)"
     }
   }
 

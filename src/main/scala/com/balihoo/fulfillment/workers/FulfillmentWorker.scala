@@ -103,7 +103,7 @@ abstract class FulfillmentWorker {
         try {
           task = swfAdapter.client.pollForActivityTask(taskReq)
           if(task.getTaskToken != null) {
-            updateStatus("Processing task.." + task.getTaskToken.substring(0, 8))
+            updateStatus("Processing task.." + (task.getTaskToken takeRight 10))
             try {
               handleTask(specification.getParameters(task.getInput))
             } catch {

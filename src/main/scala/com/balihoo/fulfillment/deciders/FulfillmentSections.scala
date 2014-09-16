@@ -67,32 +67,28 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
       if(section.essential) { essentialCount += 1 }
       for(prereq <- section.prereqs) {
         if(prereq == name) {
-          section.status = SectionStatus.IMPOSSIBLE
           val ception = s"Fulfillment is impossible! $name has a self-referential prereq!"
-          section.timeline.error(ception, Some(when))
+          section.setImpossible(ception, when)
           throw new Exception(ception)
         }
         if(!hasSection(prereq)) {
-          section.status = SectionStatus.IMPOSSIBLE
           val ception = s"Fulfillment is impossible! Prereq ($prereq) for $name does not exist!"
-          section.timeline.error(ception, Some(when))
+          section.setImpossible(ception, when)
           throw new Exception(ception)
         }
       }
       for((pname, param) <- section.params) {
         if(pname == name) {
-          section.status = SectionStatus.IMPOSSIBLE
           val ception = s"Fulfillment is impossible! $name has a self-referential parameter!"
-          section.timeline.error(ception, Some(when))
+          section.setImpossible(ception, when)
           throw new Exception(ception)
         }
         param match {
           case sectionReferences: SectionReferences =>
             for(sectionRef <- sectionReferences.sections) {
               if(!hasSection(sectionRef.name)) {
-                section.status = SectionStatus.IMPOSSIBLE
                 val ception = s"Fulfillment is impossible! Param ($pname -> ${sectionRef.name}) for $name does not exist!"
-                section.timeline.error(ception, Some(when))
+                section.setImpossible(ception, when)
                 throw new Exception(ception)
               }
             }
@@ -188,7 +184,7 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
 
   protected def processActivityTaskTimedOut(event: HistoryEvent) = {
     val attribs = event.getActivityTaskTimedOutEventAttributes
-    getSectionById(attribs.getScheduledEventId).setTimedOut(new DateTime(event.getEventTimestamp))
+    getSectionById(attribs.getScheduledEventId).setTimedOut(attribs.getTimeoutType, attribs.getDetails, new DateTime(event.getEventTimestamp))
   }
 
   protected def processActivityTaskCanceled(event: HistoryEvent) = {
@@ -227,7 +223,7 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
                 val supdate = body.as[String]
                 section.timeline.note(s"Updating status: ${section.status} -> $supdate", Some(new DateTime(event.getEventTimestamp)))
                 try {
-                  section.status = SectionStatus.withName(supdate)
+                  section.setStatus(supdate, "sectionUpdate(status)", new DateTime(event.getEventTimestamp))
                 } catch {
                   case nsee:NoSuchElementException =>
                     section.timeline.error(s"Status $supdate is INVALID!", None)
@@ -270,9 +266,8 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
     }
 
     val reason = timerParams.value("reason").as[String]
-    section.timeline.note(reason, Some(new DateTime(event.getEventTimestamp)))
-
-    section.status = SectionStatus.DEFERRED
+    section.setDeferred(reason, new DateTime(event.getEventTimestamp))
+    None
   }
 
   protected def processTimerFired(event: HistoryEvent) = {
@@ -282,12 +277,12 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
 
     val timerParams:JsObject = Json.parse(timer).as[JsObject]
     val sectionName = timerParams.value("section").as[String]
-    val status = SectionStatus.withName(timerParams.value("status").as[String])
-
     val section = getSectionByName(sectionName)
-    section.timeline.note(s"Timer for section '$sectionName' fired. Setting status to ${status.toString}", Some(new DateTime(event.getEventTimestamp)))
-
-    getSectionByName(sectionName).status = status
+    if(section.status == SectionStatus.DEFERRED) {
+      section.setStatus(timerParams.value("status").as[String], "Timer fired", new DateTime(event.getEventTimestamp))
+    } else {
+      section.timeline.warning(s"Timer fired but section status was '${section.status.toString} instead of DEFERRED!", Some(new DateTime(event.getEventTimestamp)))
+    }
   }
 
   protected def processMarkerRecorded(event: HistoryEvent) = {
