@@ -1,14 +1,14 @@
 var output = { messages: [], result: "" };
 
-function clip_page(page, clipId) {
-  var clipRect = page.evaluate(function (id) {
-    var qs = document.querySelector(id);
+function clip_page(page, clipSelector) {
+  var clipRect = page.evaluate(function (selector) {
+    var qs = document.querySelector(selector);
     if (qs) {
       return qs.getBoundingClientRect();
     } else {
       return null;
     }
-  }, clipId);
+  }, clipSelector);
   if (clipRect) {
     page.clipRect = {
         top:    clipRect.top,
@@ -19,7 +19,7 @@ function clip_page(page, clipId) {
   }
 }
 
-function render_page(url, filename, clipId, log) {
+function render_page(url, filename, clipSelector, log) {
     webpage = require("webpage");
 
     var ret = 0;
@@ -30,8 +30,8 @@ function render_page(url, filename, clipId, log) {
       if (status === "success") {
         log.push("page " + url + " retrieved");
         try {
-          if (clipId) {
-            clip_page(page, clipId);
+          if (clipSelector) {
+            clip_page(page, clipSelector);
           }
           if (page.render(filename)) {
             log.push("saved to " + filename);
@@ -63,7 +63,7 @@ function main() {
     system = require("system");
     //reads 1 line of stdin
     var input = JSON.parse(system.stdin.readLine());
-    render_page(input.source, input.target, input.clipid, output.messages);
+    render_page(input.source, input.target, input.clipselector, output.messages);
   } catch(e) {
     output.messages.push(" exception: " + e.message);
     exit(ret);
