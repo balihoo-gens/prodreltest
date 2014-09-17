@@ -33,7 +33,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   }
 
   def s3Move(imageFileName: String, target: String) = {
-    val key:String = "fulfillment/htmlrenderer/" + target
+    val key:String = "render/" + target
     val file = new File(imageFileName)
     val s3Url = s"https://s3.amazonaws.com/$s3bucket/$key"
     if (file.canRead) {

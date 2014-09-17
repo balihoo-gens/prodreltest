@@ -34,7 +34,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
   }
 
   def s3Move(htmlFileName: String, target: String) = {
-    val key:String = "fulfillment/layoutrenderer/" + target
+    val key:String = "render/" + target
     val file = new File(htmlFileName)
     val s3Url = s"https://s3.amazonaws.com/$s3bucket/$key"
     if (file.canRead) {
@@ -74,7 +74,8 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
       }
 
       val cleaninput = Json.stringify(Json.toJson(Map(
-        "source" -> s"$formBuilderSite/forms/$id/render-layout?inputdata=$bdata&inputdata=$idata",
+        "source" -> s"$formBuilderSite/forms/$id/render-layout",
+        "data" -> s"inputdata=$bdata&inputdata=$idata",
         "target" -> params("target"),
         cliptuple
       )))

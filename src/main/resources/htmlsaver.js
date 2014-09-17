@@ -64,14 +64,14 @@ function save_page(page, filename) {
   return false;
 }
 
-function get_page(url, filename, action, clipSelector) {
+function get_page(url, data, filename, action, clipSelector) {
   webpage = require("webpage");
 
   var ret = 0;
 
   page = webpage.create();
   page.settings.userAgent = "Balihoo Html Saver";
-  page.open(url, function(status) {
+  function process_page(status) {
     if (status === "success") {
       prog.log("page " + url + " retrieved");
       if (clipSelector) clip_page(page, clipSelector);
@@ -86,7 +86,13 @@ function get_page(url, filename, action, clipSelector) {
     }
     page.close();
     prog.exit(ret);
-  });
+  }
+
+  if (data) {
+    page.open(url, "post", data, process_page);
+  } else {
+    page.open(url, process_page);
+  }
 }
 
 function main() {
@@ -94,7 +100,12 @@ function main() {
     system = require("system");
     var input = JSON.parse(system.stdin.read());
     var action = (input.action === "render") ? render_page : save_page;
-    get_page(input.source, input.target, action, input.clipselector);
+    get_page(
+      input.source,
+      input.data,
+      input.target,
+      action,
+      input.clipselector);
   } catch(e) {
     prog.log(" exception: " + e.message);
     prog.exit(4);
