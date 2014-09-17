@@ -135,7 +135,6 @@ h3 {
 }
 
 img.constrained {
-    width:100%;
     max-width:360px;
 }
 
@@ -849,7 +848,7 @@ footer .container {
     padding:4px;
     border:1px solid #BBBBBB;
     min-width:270px;
-    min-height:70px;
+    min-height:30px;
 }
 
 .shadow {

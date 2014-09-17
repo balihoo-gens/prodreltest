@@ -103,18 +103,24 @@ abstract class FulfillmentWorker {
         try {
           task = swfAdapter.client.pollForActivityTask(taskReq)
           if(task.getTaskToken != null) {
-            updateStatus("Processing task..")
+            updateStatus("Processing task.." + (task.getTaskToken takeRight 10))
             try {
               handleTask(specification.getParameters(task.getInput))
             } catch {
               case e: Exception =>
-                failTask("Exception", e.getMessage)
+                failTask(e.getClass.getCanonicalName, e.getMessage)
             }
           }
         } catch {
           case e:Exception =>
+            if(task.getTaskToken != null) {
+              failTask(e.getClass.getCanonicalName, e.getMessage)
+            }
             updateStatus(s"Polling Exception ${e.getMessage}", "EXCEPTION")
           case t:Throwable =>
+            if(task.getTaskToken != null) {
+              failTask(t.getClass.getCanonicalName, t.getMessage)
+            }
             updateStatus(s"Polling Throwable ${t.getMessage}", "ERROR")
         }
       }

@@ -9,8 +9,8 @@ import com.google.api.ads.common.lib.auth.OfflineCredentials.Api
 import com.google.api.ads.common.lib.auth.OfflineCredentials
 import org.apache.commons.configuration.{BaseConfiguration, Configuration}
 import com.google.api.ads.adwords.axis.factory.AdWordsServices
-import com.google.api.ads.adwords.axis.v201402.cm._
-import com.google.api.ads.adwords.axis.v201402.mcm._
+import com.google.api.ads.adwords.axis.v201406.cm._
+import com.google.api.ads.adwords.axis.v201406.mcm._
 import scala.collection.mutable
 
 //typical cake would nest the adapter inside the provider
@@ -52,14 +52,17 @@ abstract class AbstractAdWordsAdapter {
 
   val campaignService:CampaignServiceInterface = services.get(session, classOf[CampaignServiceInterface])
   val campaignCriterionService:CampaignCriterionServiceInterface = services.get(session, classOf[CampaignCriterionServiceInterface])
+  val campaignAdExtensionService:CampaignAdExtensionServiceInterface = services.get(session, classOf[CampaignAdExtensionServiceInterface])
   val adGroupService:AdGroupServiceInterface = services.get(session, classOf[AdGroupServiceInterface])
   val adGroupCriterionService:AdGroupCriterionServiceInterface = services.get(session, classOf[AdGroupCriterionServiceInterface])
+  val adGroupBidModifierService:AdGroupBidModifierServiceInterface = services.get(session, classOf[AdGroupBidModifierServiceInterface])
   val adGroupAdService:AdGroupAdServiceInterface = services.get(session, classOf[AdGroupAdServiceInterface])
   val managedCustomerService:ManagedCustomerServiceInterface = services.get(session, classOf[ManagedCustomerServiceInterface])
   val budgedService:BudgetServiceInterface = services.get(session, classOf[BudgetServiceInterface])
   val locationService:LocationCriterionServiceInterface = services.get(session, classOf[LocationCriterionServiceInterface])
   val mediaService:MediaServiceInterface = services.get(session, classOf[MediaServiceInterface])
   val constantDataService:ConstantDataServiceInterface = services.get(session, classOf[ConstantDataServiceInterface])
+  val geoLocationService:GeoLocationServiceInterface = services.get(session, classOf[GeoLocationServiceInterface])
 
   def dollarsToMicros(dollars:Float):Long = {
     (dollars * 1000000).toLong
@@ -90,6 +93,7 @@ abstract class AbstractAdWordsAdapter {
         for((error) <- apiException.getErrors) {
           error match {
             case rateExceeded: RateExceededError =>
+              Thread.sleep(rateExceeded.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
               throw new RateExceededException(rateExceeded)
             case apiError: ApiError =>
               errors += (apiError.getErrorString + "(" + apiError.getTrigger + ") path:"
@@ -101,9 +105,9 @@ abstract class AbstractAdWordsAdapter {
         }
         throw new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
       case e:Exception =>
-        throw e
+        throw new Exception(s"Exception during $context :${e.getMessage}", e)
       case e:Throwable =>
-        throw e
+        throw new Exception(s"THROWABLE during $context :${e.getMessage}", e)
     }
   }
 

@@ -16,51 +16,55 @@
             </div>
             <div class="panel-body-small">
                 <div class="blob shadow lightbox" style="max-width:100%" ng-repeat="worker in activities" ng-show="!worker.defunct || (worker.defunct && showDefunct)">
+                    <span ng-click="worker.showContents = !worker.showContents">
 					<span class="pull-right">
 						<span title="Last seen {{worker.minutesSinceLast}} minutes ago" class="label {{worker.freshness}}">{{worker.status}}</span>
 					</span>
                     <b>{{worker.activityName}} - {{worker.activityVersion}}</b>
-                    <table class="table table-condensed params">
-                        <tr>
-                            <td>Host</td><td>{{worker.hostAddress}}</td>
-                        </tr>
-                        <tr>
-                            <td>Started</td><td title="{{worker.start}}">{{worker.start | momentFromNow}}</td>
-                        </tr>
-                        <tr ng-show="worker.specification">
-                            <td ng-click="worker.showFormatted = !worker.showFormatted">Params</td>
-                            <td>
-                                <div ng-show="worker.showFormatted">
-                                    <div ng-repeat="(name, param) in worker.specification.parameters">
-                                        <i class="fa fa-flash muted" ng-show="param.required" title="Parameter is REQUIRED"></i>&nbsp;<i class="fa fa-eye-slash muted" ng-show="param.sensitive" title="Parameter will be ENCRYPTED"></i>&nbsp;<b>{{param.name}}</b>&nbsp;&nbsp;{{param.type}}<br/>
-                                        <div class="block">
-                                            <span ng-bind-html="formatUtil.formatURLs(param.description)"></span>
+                    </span>
+                    <div ng-show="worker.showContents">
+                        <table class="table table-condensed params">
+                            <tr>
+                                <td>Host</td><td>{{worker.hostAddress}}</td>
+                            </tr>
+                            <tr>
+                                <td>Started</td><td title="{{worker.start}}">{{worker.start | momentFromNow}}</td>
+                            </tr>
+                            <tr ng-show="worker.specification">
+                                <td ng-click="worker.showFormatted = !worker.showFormatted">Params</td>
+                                <td>
+                                    <div ng-show="worker.showFormatted">
+                                        <div ng-repeat="(name, param) in worker.specification.parameters">
+                                            <i class="fa fa-flash muted" ng-show="param.required" title="Parameter is REQUIRED"></i>&nbsp;<i class="fa fa-eye-slash muted" ng-show="param.sensitive" title="Parameter will be ENCRYPTED"></i>&nbsp;<b>{{param.name}}</b>&nbsp;&nbsp;{{param.type}}<br/>
+                                            <div class="block">
+                                                <span ng-bind-html="formatUtil.formatURLs(param.description)"></span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div ng-hide="worker.showFormatted">
-                                    <pre ng-bind-html="formatUtil.formatJsonBasic(worker.specification)"></pre>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr ng-show="worker.specification">
-                            <td>Result</td>
-                            <td>
-                                Type:&nbsp;&nbsp;{{worker.specification.result.type}}<br/>
-                                Description:&nbsp;&nbsp;{{worker.specification.result.description}}
-                            </td>
-                        </tr>
-                        <tr ng-show="worker.resolutionHistory">
-                            <td>History</td>
-                            <td>
-                                <div ng-repeat="resolution in worker.resolutionHistory" style="max-width:460px;">
-                                    <span class="muted pull-right" title="{{resolution.when}}">{{resolution.when | momentFromNow}}</span>
-                                    <b>{{resolution.resolution}}</b>
-                                    <div class="block">{{resolution.details|truncate:90}}</div>
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
+                                    <div ng-hide="worker.showFormatted">
+                                        <pre ng-bind-html="formatUtil.formatJsonBasic(worker.specification)"></pre>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr ng-show="worker.specification">
+                                <td>Result</td>
+                                <td>
+                                    Type:&nbsp;&nbsp;{{worker.specification.result.type}}<br/>
+                                    Description:&nbsp;&nbsp;{{worker.specification.result.description}}
+                                </td>
+                            </tr>
+                            <tr ng-show="worker.resolutionHistory">
+                                <td>History</td>
+                                <td>
+                                    <div ng-repeat="resolution in worker.resolutionHistory" style="max-width:460px;">
+                                        <span class="muted pull-right" title="{{resolution.when}}">{{resolution.when | momentFromNow}}</span>
+                                        <b>{{resolution.resolution}}</b>
+                                        <div class="block">{{resolution.details|truncate:90}}</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
