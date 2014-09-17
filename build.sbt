@@ -42,6 +42,7 @@ libraryDependencies ++= Seq(
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
   "org.keyczar" % "keyczar" % "0.66",
   "com.stackmob" %% "newman" % "1.3.5",
+  "com.balihoo.socialmedia" % "facebook-client" % "latest.snapshot",
   "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test
 )
 

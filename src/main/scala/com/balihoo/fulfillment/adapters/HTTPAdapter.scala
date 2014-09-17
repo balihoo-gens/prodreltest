@@ -12,10 +12,10 @@ trait HTTPAdapterComponent {
 }
 
 abstract class AbstractHTTPAdapter {
-  def delete(url: URL): HttpResponse
-  def get(url: URL): HttpResponse
-  def post(url: URL, body: AnyRef): HttpResponse
-  def put(url: URL, body: AnyRef): HttpResponse
+  def delete(url: URL, headers: List[(String, String)] = List()): HttpResponse
+  def get(url: URL, headers: List[(String, String)] = List()): HttpResponse
+  def post(url: URL, body: AnyRef, headers: List[(String, String)] = List()): HttpResponse
+  def put(url: URL, body: AnyRef, headers: List[(String, String)] = List()): HttpResponse
 }
 
 class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
@@ -23,8 +23,8 @@ class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
 
   private def execute(builder: Builder) = Await.result(builder.apply, timeoutSeconds.seconds)
 
-  override def delete(url: URL) = execute(DELETE(url))
-  override def get(url: URL) = execute(GET(url))
-  override def post(url: URL, body: AnyRef) = execute(POST(url).setBody(body))
-  override def put(url: URL, body: AnyRef) = execute(PUT(url).setBody(body))
+  override def delete(url: URL, headers: List[(String, String)] = List()) = execute(DELETE(url).addHeaders(headers))
+  override def get(url: URL, headers: List[(String, String)] = List()) = execute(GET(url).addHeaders(headers))
+  override def post(url: URL, body: AnyRef, headers: List[(String, String)] = List()) = execute(POST(url).addHeaders(headers).setBody(body))
+  override def put(url: URL, body: AnyRef, headers: List[(String, String)] = List()) = execute(PUT(url).addHeaders(headers).setBody(body))
 }
