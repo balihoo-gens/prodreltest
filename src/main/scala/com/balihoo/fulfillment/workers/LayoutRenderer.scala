@@ -33,7 +33,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
     scriptPath
   }
 
-  def s3Store(htmlFileName: String, target: String) = {
+  def s3Move(htmlFileName: String, target: String) = {
     val key:String = "fulfillment/layoutrenderer/" + target
     val file = new File(htmlFileName)
     val s3Url = s"https://s3.amazonaws.com/$s3bucket/$key"
@@ -87,7 +87,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
         case 0 =>
           val jres = Json.parse(result.out)
           val htmlFileName = (jres \ "result").as[String]
-          val s3location = s3Store(htmlFileName, params("target"))
+          val s3location = s3Move(htmlFileName, params("target"))
           completeTask(s3location)
         case _ =>
           failTask(s"Process returned code '${result.code}'", result.err)

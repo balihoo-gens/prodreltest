@@ -32,7 +32,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
     scriptPath
   }
 
-  def s3Store(imageFileName: String, target: String) = {
+  def s3Move(imageFileName: String, target: String) = {
     val key:String = "fulfillment/htmlrenderer/" + target
     val file = new File(imageFileName)
     val s3Url = s"https://s3.amazonaws.com/$s3bucket/$key"
@@ -59,8 +59,19 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      // We're passing the raw JSON string to the command. The command will digest it.
-      val cleaninput = params.input.replace("\n","")
+      val cliptuple = if (params.has("clipselector")) { (
+        "clipselector", params("clipselector"))
+      } else {
+        ("ignore", "undefined")
+      }
+
+      val cleaninput = Json.stringify(Json.toJson(Map(
+        "action" -> "render",
+        "source" -> params("source"),
+        "target" -> params("target"),
+        cliptuple
+      )))
+
       splog.debug(s"running process with ${cleaninput}")
       val result = command.run(cleaninput)
       splog.debug(s"process out: ${result.out}")
@@ -69,7 +80,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
         case 0 =>
           val jres = Json.parse(result.out)
           val imageFileName = (jres \ "result").as[String]
-          val s3location = s3Store(imageFileName, params("target"))
+          val s3location = s3Move(imageFileName, params("target"))
           completeTask(s3location)
         case _ =>
           failTask(s"Process returned code '${result.code}'", result.err)
