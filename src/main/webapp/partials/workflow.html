@@ -83,7 +83,8 @@
 
                                     <div ng-if="param.isArray">
                                 <span ng-if="!param.editing">
-                                    <span ng-repeat="item in param.value"><span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}<span ng-repeat="pathItem in item.path"><span ng-show="pathItem.key">/{{pathItem.key}}</span><span ng-show="pathItem.index">[{{pathItem.index}}]</span></span></span>&nbsp;</span>
+                                    <div ng-repeat="item in param.value">
+                                        <span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}<span ng-repeat="pathItem in item.path"><span ng-show="pathItem.key">/{{pathItem.key}}</span><span ng-show="pathItem.index">[{{pathItem.index}}]</span></span></span>&nbsp;<span ng-show="item.resolved" ng-bind-html="formatUtil.formatJson(item.value)"></span></div>
                                 </span>
                                 <span ng-if="param.editing">
                                     <select ng-repeat="item in param.value" ng-model="item">

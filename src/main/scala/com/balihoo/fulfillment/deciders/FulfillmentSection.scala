@@ -445,6 +445,7 @@ class SectionReference(referenceString:String) {
   }
 
   def getValue:String = {
+    if(section.isEmpty) { return null; }
     path.isEmpty match {
       case true => section.get.value
       case _ =>
@@ -467,8 +468,13 @@ class SectionReference(referenceString:String) {
       "path" -> (path.isDefined match {
         case true => path.get.toJson
         case _ => new JsArray
-      }))
-    )
+      }),
+      "resolved" -> (section.isDefined match {
+        case true => Json.toJson(section.get.status == SectionStatus.COMPLETE)
+        case _ => Json.toJson(false)
+      }),
+      "value" -> Json.toJson(getValue)
+    ))
   }
 }
 
