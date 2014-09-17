@@ -1,0 +1,3 @@
+[submodule "deployment/virtualenv"]
+	path = deployment/virtualenv
+	url = git@github.com:balihoo-gens/virtualenv.git
