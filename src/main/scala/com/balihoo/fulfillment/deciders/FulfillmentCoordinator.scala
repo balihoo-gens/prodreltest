@@ -319,7 +319,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
     // Loop through the problem sections
     for(section <- sections.categorized.failed) {
       if(section.failedCount >= section.failureParams.maxRetries) {
-        val message = s"Section ${section.name} FAILED too many times! (${section.failedCount} of ${section.failureParams.maxRetries})"
+        val message = s"Section ${section.name} FAILED too many times! (${section.failedCount})"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
@@ -327,7 +327,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
 
     for(section <- sections.categorized.timedout) {
       if(section.timedoutCount >= section.timeoutParams.maxRetries) {
-        val message =  s"Section ${section.name} TIMED OUT too many times! (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
+        val message =  s"Section ${section.name} TIMED OUT too many times! (${section.timedoutCount})"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
@@ -335,7 +335,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
 
     for(section <- sections.categorized.canceled) {
       if(section.canceledCount >= section.cancelationParams.maxRetries) {
-        val message = s"Section ${section.name} was CANCELED too many times! (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
+        val message = s"Section ${section.name} was CANCELED too many times! (${section.canceledCount})"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }

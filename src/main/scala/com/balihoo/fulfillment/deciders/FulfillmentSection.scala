@@ -9,6 +9,7 @@ import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 
 import scala.collection.mutable
+import scala.util.matching.Regex
 
 object SectionStatus extends Enumeration {
   val READY = Value("READY")
@@ -130,7 +131,7 @@ class FulfillmentSection(val name: String
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
-          timeline.note(s"$key : ${v.as[String]}", Some(creationDate))
+          timeline.note(s"$key : $v", Some(creationDate))
       }
     }
   }
@@ -352,19 +353,122 @@ class FulfillmentSection(val name: String
   }
 }
 
-class SectionReference(val name:String) {
+class ReferencePathComponent(val key:Option[String] = None, val index:Option[Int] = None) {
+
+  if((key.isEmpty && index.isEmpty) || (key.isDefined && index.isDefined))
+    throw new Exception("PathComponent must have a key xor index!") // Exclusive OR
+
+  override def toString = {
+    Json.stringify(toJson)
+  }
+
+  def toJson: JsValue = {
+    val obj = mutable.Map[String, String]()
+    if(key.isDefined) {
+      obj("key") = key.get
+    } else {
+      obj("index") = index.get.toString
+    }
+    Json.toJson(obj.toMap)
+  }
+}
+
+object ReferencePath {
+
+  def isJsonPath(candidate:String):Boolean = {
+    candidate.matches(".*[/\\[\\]]+.*")
+  }
+}
+
+class ReferencePath(path:String) {
+
+  val components = mutable.MutableList[ReferencePathComponent]()
+  private val pattern = new Regex("""([^\[\]/]+)|(\[\d+\])""")
+  private val matches = (for(m <- pattern.findAllIn(path)) yield m).toList
+  val sectionName = matches.head
+  for(part <- matches.slice(1, matches.length)) {
+    components += (part contains "[" match {
+      case true =>
+        new ReferencePathComponent(None, Some(part.substring(1, part.length - 1).toInt))
+      case _ =>
+        new ReferencePathComponent(Some(part), None)
+    })
+  }
+
+  def getValue(jsonString:String):String = {
+    var current:JsValue = Json.parse(jsonString)
+    for(component <- components) {
+      component.key.isDefined match {
+        case true =>
+          current match {
+            case jObj:JsObject =>
+              current = jObj.value(component.key.get)
+            case _ =>
+              throw new Exception(s"Expected JSON Object with key '${component.key.get}'!")
+          }
+        case _ =>
+          current match {
+            case jArr:JsArray =>
+              val l = jArr.as[List[JsValue]]
+              current = l(component.index.get)
+            case _ =>
+              throw new Exception(s"Expected JSON Array to index with ${component.index.get}!")
+
+          }
+      }
+    }
+
+    current.as[String]
+  }
+
+  override def toString = {
+    Json.stringify(toJson)
+  }
+
+  def toJson: JsValue = {
+    Json.toJson(for(component <- components) yield component.toJson)
+  }
+}
+
+class SectionReference(referenceString:String) {
+
+  protected var _sectionName = "-undefined-"
   var dismissed:Boolean = false
   var section:Option[FulfillmentSection] = None
+  var path:Option[ReferencePath] = None
+
+  ReferencePath.isJsonPath(referenceString) match {
+    case false => _sectionName = referenceString
+    case _ =>
+      path = Some(new ReferencePath(referenceString))
+      _sectionName = path.get.sectionName
+  }
+
+  def getValue:String = {
+    path.isEmpty match {
+      case true => section.get.value
+      case _ =>
+        path.get.getValue(section.get.value)
+    }
+  }
 
   def isValid:Boolean = {
     section.isDefined
   }
 
+  def name:String = {
+    _sectionName
+  }
+
   def toJson:JsValue = {
     Json.toJson(Map(
       "name" -> Json.toJson(name),
-      "dismissed" -> Json.toJson(dismissed)
-    ))
+      "dismissed" -> Json.toJson(dismissed),
+      "path" -> (path.isDefined match {
+        case true => path.get.toJson
+        case _ => new JsArray
+      }))
+    )
   }
 }
 
@@ -431,7 +535,7 @@ class SectionReferences(sectionNames:List[String]) {
 
     for(sectionRef <- sections) {
       if(sectionRef.isValid && sectionRef.section.get.status == SectionStatus.COMPLETE) {
-        return sectionRef.section.get.value
+        return sectionRef.getValue
       }
     }
 

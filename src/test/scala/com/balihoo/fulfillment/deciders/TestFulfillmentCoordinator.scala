@@ -78,7 +78,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       section.status mustEqual SectionStatus.withName("READY")
 
-      section.timeline.events(0).message mustEqual "totally unhandled : stuff"
+      section.timeline.events(0).message mustEqual "totally unhandled : \"stuff\""
     }
 
     "  handle status changes" in {
@@ -498,5 +498,57 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       decisions(2).getDecisionType mustEqual "CompleteWorkflowExecution"
     }
 
+  }
+
+  "SectionReference" should {
+    "  return simple values" in {
+      val result = Json.parse("""{
+            "value" : "donkey teeth"
+	        }""")
+
+      val reference = new SectionReference("none")
+
+      ReferencePath.isJsonPath("stuff") mustEqual false
+      ReferencePath.isJsonPath("stuff/tea") mustEqual true
+      ReferencePath.isJsonPath("stuff[0]/") mustEqual true
+      ReferencePath.isJsonPath("stuff/monkey[9]") mustEqual true
+      ReferencePath.isJsonPath("stuff/monkey[9]/cheese") mustEqual true
+
+      reference.section = Some(new FulfillmentSection("some section", result.as[JsObject], DateTime.now))
+
+      reference.getValue mustEqual "donkey teeth"
+
+    }
+
+    "  parse paths properly" in {
+      val reference = new SectionReference("none/first/second[3]/fourth")
+
+      reference.name mustEqual "none"
+      reference.path.get.components(0).key.get mustEqual "first"
+      reference.path.get.components(1).key.get mustEqual "second"
+      reference.path.get.components(2).index.get mustEqual 3
+      reference.path.get.components(3).key.get mustEqual "fourth"
+
+    }
+
+    "  return json value from jsobject" in {
+
+      val result = """{
+            "first" : { "second" : ["u", "o'brien", "y", { "fourth" : "donkey tooth" } ] }
+	        }"""
+      val sectionJson = Json.parse(s"""{}""")
+
+      val reference = new SectionReference("none/first/second[3]/fourth")
+      reference.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
+      reference.section.get.value = result
+
+      reference.getValue mustEqual "donkey tooth"
+
+      val reference2 = new SectionReference("none/first/second/[1]")
+      reference2.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
+      reference2.section.get.value = result
+
+      reference2.getValue mustEqual "o'brien"
+    }
   }
 }

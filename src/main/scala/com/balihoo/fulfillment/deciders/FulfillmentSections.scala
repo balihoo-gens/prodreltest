@@ -67,29 +67,29 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
       if(section.essential) { essentialCount += 1 }
       for(prereq <- section.prereqs) {
         if(prereq == name) {
-          val ception = s"Fulfillment is impossible! $name has a self-referential prereq!"
-          section.setImpossible(ception, when)
-          throw new Exception(ception)
+          val gripe = s"Fulfillment is impossible! $name has a self-referential prereq!"
+          section.setImpossible(gripe, when)
+          throw new Exception(gripe)
         }
         if(!hasSection(prereq)) {
-          val ception = s"Fulfillment is impossible! Prereq ($prereq) for $name does not exist!"
-          section.setImpossible(ception, when)
-          throw new Exception(ception)
+          val gripe = s"Fulfillment is impossible! Prereq ($prereq) for $name does not exist!"
+          section.setImpossible(gripe, when)
+          throw new Exception(gripe)
         }
       }
       for((pname, param) <- section.params) {
         if(pname == name) {
-          val ception = s"Fulfillment is impossible! $name has a self-referential parameter!"
-          section.setImpossible(ception, when)
-          throw new Exception(ception)
+          val gripe = s"Fulfillment is impossible! $name has a self-referential parameter!"
+          section.setImpossible(gripe, when)
+          throw new Exception(gripe)
         }
         param match {
           case sectionReferences: SectionReferences =>
             for(sectionRef <- sectionReferences.sections) {
               if(!hasSection(sectionRef.name)) {
-                val ception = s"Fulfillment is impossible! Param ($pname -> ${sectionRef.name}) for $name does not exist!"
-                section.setImpossible(ception, when)
-                throw new Exception(ception)
+                val gripe = s"Fulfillment is impossible! Param ($pname -> ${sectionRef.name}) for $name does not exist!"
+                section.setImpossible(gripe, when)
+                throw new Exception(gripe)
               }
             }
           case _ =>
