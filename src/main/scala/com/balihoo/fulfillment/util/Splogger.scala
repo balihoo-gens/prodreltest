@@ -54,7 +54,7 @@ class Splogger(filename:String) {
       file
     } else {
       val name = """[\W]""".r.replaceAllIn(filename, "_")
-      val default = s"/var/log/${name}.log"
+      val default = s"${name}.log"
       println(s"unable to log to $filename; using $default instead")
       new File(default)
     }

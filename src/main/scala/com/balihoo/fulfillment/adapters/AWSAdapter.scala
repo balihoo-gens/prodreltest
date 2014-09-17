@@ -18,7 +18,7 @@ abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] 
 
   //put this all in a method rather than just in the constructor to
   // make it easier to Mock this
-  private def createClient:T = {
+  protected def createClient:T = {
     val accessKey: String = config.getString("aws.accessKey")
     val secretKey = config.getString("aws.secretKey")
     val credentials = new BasicAWSCredentials(accessKey, secretKey)

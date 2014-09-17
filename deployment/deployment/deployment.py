@@ -63,7 +63,8 @@ class Deployment(object):
 
         parameters = {
             "KeyName" : "paul-ami-pair",
-            "InstanceType" : "t1.micro",
+            "WorkerInstanceType" : "m1.small",
+            "DashboardInstanceType" : "t1.micro",
             "MinInstances" : "1",
             "MaxInstances" : "10",
             "WebPort" : "8080",
