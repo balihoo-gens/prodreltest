@@ -81,8 +81,10 @@ class Launcher(object):
     def launch(self, classes=None, pipe=False):
         if classes == None or len(classes) < 1:
             classes = self.ALL_CLASSES
-        for classname in classes:
-            path = self.resolve_classname(classname)
+        else:
+            classes = [self.resolve_classname(classname) for classname in classes]
+
+        for path in classes:
             procname = path.split('.')[-1]
             proc = subprocess.Popen(
                 ["java", "-cp", self._jar, path],
