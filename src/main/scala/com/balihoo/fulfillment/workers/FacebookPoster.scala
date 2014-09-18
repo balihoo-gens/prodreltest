@@ -16,11 +16,11 @@ import scala.collection.JavaConversions._
  * 1. Use a FacebookPost worker to validate the post data.  This should happen without delay.
  *
  * 2. Use a RESTClient worker to get the targeting data from the Facebook Geo Service. The worker should wait almost
- * until the scheduled publication time to start.  12 hours early would be good.
+ * until the scheduled publication time to start.  12 hours early would be reasonable.
  *
  * 3. Use a FacebookPost worker to publish the post.
  */
-abstract class AbstractFacebookPost extends FulfillmentWorker {
+abstract class AbstractFacebookPoster extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
   with FacebookAdapterComponent =>
 
@@ -32,9 +32,9 @@ abstract class AbstractFacebookPost extends FulfillmentWorker {
       new ActivityParameter("postType", "string", "\"link\", \"photo\", or \"status update\""),
       new ActivityParameter("pageId", "string", "The Facebook page ID"),
       new ActivityParameter("target", "JSON", "The targeting data"),
-      new ActivityParameter("message", "string", "The message to post", false),
-      new ActivityParameter("linkUrl", "string", "A link to include in the post", false),
-      new ActivityParameter("photoUrl", "string", "The URL of the photo to include in the post", false),
+      new ActivityParameter("message", "string", "The message to post", required = false),
+      new ActivityParameter("linkUrl", "string", "A link to include in the post", required = false),
+      new ActivityParameter("photoUrl", "string", "The URL of the photo to include in the post", required = false),
       new ActivityParameter("action", "string", "\"validate\" or \"publish\"")
     ), new ActivityResult("string", "the Facebook post ID if the action is \"publish\", otherwise ignore this value"))
   }
@@ -58,7 +58,10 @@ abstract class AbstractFacebookPost extends FulfillmentWorker {
    */
   private def getPhotoBytes(url: Option[String]): Array[Byte] = {
     url match {
-      case Some(u) => IOUtils.toByteArray(new URL(u))
+      case Some(u) => {
+        splog.info(s"Facebook poster downloading $u")
+        IOUtils.toByteArray(new URL(u))
+      }
       case None => null
     }
   }
@@ -73,13 +76,14 @@ abstract class AbstractFacebookPost extends FulfillmentWorker {
       val connection = new FacebookConnection(appId, appSecret, accessToken)
       val postType = params("postType")
       val pageId = params("pageId")
+      val target = createTarget(params("target"))
       val message = params.getOrElse("message", null)
       lazy val linkUrl = params.getOrElse("linkUrl", null)
       lazy val photoUrl = params.get("photoUrl")
       lazy val photoBytes = getPhotoBytes(photoUrl)
       lazy val photoName = getPhotoName(photoUrl)
       val action = params("action")
-      val target = createTarget(params("target"))
+      splog.info(s"Facebook poster was asked to $action a $postType. The page ID is $pageId.")
 
       (action, postType) match {
         case ("validate", "link") => facebookAdapter.validateLinkPost(connection, pageId, target, linkUrl, message); "OK"
@@ -95,11 +99,11 @@ abstract class AbstractFacebookPost extends FulfillmentWorker {
 
   /**
    * Converts a JSON string into a Target object.
-   * @param s the input
+   * @param jsonString the input
    * @return the output
    */
-  private def createTarget(s: String): Target = {
-    val json = Json.parse(s).as[JsObject]
+  private def createTarget(jsonString: String): Target = {
+    val json = Json.parse(jsonString).as[JsObject]
 
     val countryCodes = (json \ "countryCodes").as[Seq[String]]
     val regionIds = (json \ "regionIds").as[Seq[Int]].map(Integer.valueOf(_))
@@ -109,16 +113,16 @@ abstract class AbstractFacebookPost extends FulfillmentWorker {
   }
 }
 
-class FacebookPost(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractFacebookPost
+class FacebookPoster(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractFacebookPoster
   with LoggingWorkflowAdapterImpl
   with FacebookAdapterComponent {
     lazy private val _facebookAdapter = new FacebookAdapter
     def facebookAdapter = _facebookAdapter
 }
 
-object facebook_post extends FulfillmentWorkerApp {
+object facebook_poster extends FulfillmentWorkerApp {
   override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
-    new FacebookPost(cfg, splog)
+    new FacebookPoster(cfg, splog)
   }
 }

@@ -27,6 +27,7 @@ class AbstractRESTClient extends FulfillmentWorker {
       val headers = Json.parse(params.getOrElse("headers", "{}")).as[Map[String, String]].toList
       val method = params("method")
       lazy val body = params("body")
+      splog.info(s"REST client was asked to $method $url")
 
       val response = method match {
         case "DELETE" => httpAdapter.delete(url, headers)

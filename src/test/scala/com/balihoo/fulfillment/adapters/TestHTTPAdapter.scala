@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
 import java.net.URL
-import javax.ws.rs.core.{MediaType, Response}
+import javax.ws.rs.core._
 import javax.ws.rs._
 import org.glassfish.jersey.server.ResourceConfig
 import org.glassfish.jersey.test.{TestProperties, JerseyTest}
@@ -47,6 +47,10 @@ class MockServer extends JerseyTest {
   @PUT
   @Path("error")
   def putError(body: String) = throw new PlainTextWebApplicationException(s"PUT Error: $body", Response.Status.INTERNAL_SERVER_ERROR)
+
+  @GET
+  @Path("header")
+  def getOk(@Context headers: HttpHeaders) = headers.getHeaderString("testHeader")
 
   override def configure = {
     forceSet(TestProperties.CONTAINER_PORT, "0") // Choose first available port.
@@ -120,6 +124,12 @@ class TestHTTPAdapter extends Specification {
       val result = httpAdapter.put(server.getUrl("error"), "Blue fish")
       result.code.code mustEqual 500
       result.bodyString mustEqual "PUT Error: Blue fish"
+    }
+
+    "set a request header" in {
+      val result = httpAdapter.get(server.getUrl("header"), List(("testHeader", "Colorful sashimi buffet")))
+      result.code.code mustEqual 200
+      result.bodyString mustEqual "Colorful sashimi buffet"
     }
   }
 
