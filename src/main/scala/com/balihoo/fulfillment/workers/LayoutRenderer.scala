@@ -9,8 +9,9 @@ import java.io._
 
 /*
  * this is the dependency-injectable class containing all functionality
+ * This borrows heavily from HtmlRenderer; duplicated code could be factored out
  */
-abstract class AbstractHtmlRenderer extends FulfillmentWorker {
+abstract class AbstractLayoutRenderer extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
   with S3AdapterComponent
   with CommandComponent =>
@@ -32,33 +33,40 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
     scriptPath
   }
 
-  def s3Move(imageFileName: String, target: String) = {
+  def s3Move(htmlFileName: String, target: String) = {
     val key:String = "render/" + target
-    val file = new File(imageFileName)
+    val file = new File(htmlFileName)
     val s3Url = s"https://s3.amazonaws.com/$s3bucket/$key"
     if (file.canRead) {
-      splog.info(s"storing $imageFileName into $s3Url")
+      splog.info(s"storing $htmlFileName into $s3Url")
       s3Adapter.putPublic(s3bucket, key, file)
       file.delete
     } else {
-      throw new Exception(s"Unable to store rendered image to S3: $imageFileName does not exist")
+      throw new Exception(s"Unable to store rendered image to S3: $htmlFileName does not exist")
     }
     s3Url
   }
 
   val commandLine = swfAdapter.config.getString("commandLine") + " " + storeScript
   splog.debug(s"Commandline $commandLine")
+  val formBuilderSite = swfAdapter.config.getString("formBuilderSite")
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("source", "string", "The URL of of the page to render"),
-        new ActivityParameter("clipselector", "string", "The selector used to clip the image", false),
-        new ActivityParameter("target", "string", "The S3 filename of the resulting image")
+        new ActivityParameter("formid", "string", "The form id of the form to render"),
+        new ActivityParameter("branddata", "string", "The branddata to use as input to the form"),
+        new ActivityParameter("inputdata", "string", "The inputdata to use as input to the form"),
+        new ActivityParameter("clipselector", "string", "The selector used to clip the page", false),
+        new ActivityParameter("target", "string", "The S3 filename of the resulting page")
       ), new ActivityResult("string", "the target URL if successfully saved"))
   }
 
   override def handleTask(params: ActivityParameters) = {
     try {
+      val id = params("formid")
+      val bdata = params("branddata")
+      val idata = params("inputdata")
+
       val cliptuple = if (params.has("clipselector")) { (
         "clipselector", params("clipselector"))
       } else {
@@ -66,8 +74,8 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
       }
 
       val cleaninput = Json.stringify(Json.toJson(Map(
-        "action" -> "render",
-        "source" -> params("source"),
+        "source" -> s"$formBuilderSite/forms/$id/render-layout",
+        "data" -> s"inputdata=$bdata&inputdata=$idata",
         "target" -> params("target"),
         cliptuple
       )))
@@ -79,8 +87,8 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
       result.code match {
         case 0 =>
           val jres = Json.parse(result.out)
-          val imageFileName = (jres \ "result").as[String]
-          val s3location = s3Move(imageFileName, params("target"))
+          val htmlFileName = (jres \ "result").as[String]
+          val s3location = s3Move(htmlFileName, params("target"))
           completeTask(s3location)
         case _ =>
           failTask(s"Process returned code '${result.code}'", result.err)
@@ -92,8 +100,8 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   }
 }
 
-class HtmlRenderer(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractHtmlRenderer
+class LayoutRenderer(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractLayoutRenderer
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
   with CommandComponent {
@@ -103,8 +111,8 @@ class HtmlRenderer(override val _cfg: PropertiesLoader, override val _splog: Spl
     def command = _command
 }
 
-object htmlrenderer extends FulfillmentWorkerApp {
+object layoutrenderer extends FulfillmentWorkerApp {
   override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
-    new HtmlRenderer(cfg, splog)
+    new LayoutRenderer(cfg, splog)
   }
 }

@@ -18,6 +18,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   //aws
+  "com.google.guava" % "guava" % "18.0",
   "com.amazonaws" % "aws-java-sdk" % "1.6.12",
   "org.scala-lang" % "scala-actors" % "2.10.2",
   //jansi is included with ivy2, but deduplicate fails so exclude it from jline explicitly
@@ -35,8 +36,8 @@ libraryDependencies ++= Seq(
   ("com.balihoo.commons" % "commons-client" % "latest.snapshot")
     .exclude("com.google.guava", "guava")
     .exclude("com.sun.jersey", "jersey-core"),
-  "com.google.api-ads" % "ads-lib" % "1.29.0",
-  "com.google.api-ads" % "adwords-axis" % "1.29.0",
+  ("com.google.api-ads" % "ads-lib" % "1.32.0").exclude("com.google.guava", "guava-jdk5"), // exclude old guava
+  ("com.google.api-ads" % "adwords-axis" % "1.32.0").exclude("com.google.guava", "guava-jdk5"), // exclude old guava
   "javax.activation" % "activation" % "1.1",
   "com.github.scopt" %% "scopt" % "3.2.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
@@ -73,6 +74,8 @@ resourceGenerators in Compile <+= (resourceManaged, baseDirectory) map
       to
     }
   }
+
+net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 //exclude some sources to allow testing compilation
 // of refactoring changes one file at a time

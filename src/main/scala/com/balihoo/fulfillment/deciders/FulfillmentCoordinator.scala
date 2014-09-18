@@ -319,7 +319,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
     // Loop through the problem sections
     for(section <- sections.categorized.failed) {
       if(section.failedCount >= section.failureParams.maxRetries) {
-        val message = s"Section $section FAILED too many times! (${section.failedCount} of ${section.failureParams.maxRetries})"
+        val message = s"Section ${section.name} FAILED too many times! (${section.failedCount})"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
@@ -327,7 +327,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
 
     for(section <- sections.categorized.timedout) {
       if(section.timedoutCount >= section.timeoutParams.maxRetries) {
-        val message =  s"Section $section TIMED OUT too many times! (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
+        val message =  s"Section ${section.name} TIMED OUT too many times! (${section.timedoutCount})"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
@@ -335,7 +335,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
 
     for(section <- sections.categorized.canceled) {
       if(section.canceledCount >= section.cancelationParams.maxRetries) {
-        val message = s"Section $section was CANCELED too many times! (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
+        val message = s"Section ${section.name} was CANCELED too many times! (${section.canceledCount})"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
@@ -443,10 +443,10 @@ class DecisionGenerator(sections: FulfillmentSections) {
       // We aren't making any progress...
       sections.resolution = "BLOCKED"
 
-      if(sections.categorized.failed.length > 0) {
+      if(sections.categorized.terminal.length > 0) {
         sections.timeline.error(
-          (for(section <- sections.categorized.failed) yield section.name)
-            .mkString("Failed Sections:\n\t", "\n\t", ""), None)
+          (for(section <- sections.categorized.terminal) yield section.name)
+            .mkString("Terminal Sections:\n\t", "\n\t", ""), None)
       }
 
       if(sections.categorized.blocked.length > 0) {

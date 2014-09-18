@@ -1,8 +1,8 @@
 package com.balihoo.fulfillment.workers
 
-import com.balihoo.fulfillment.config.{PropertiesLoader,PropertiesLoaderComponent}
+import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters._
-import com.google.api.ads.adwords.axis.v201402.mcm.ManagedCustomer
+import com.google.api.ads.adwords.axis.v201406.mcm.ManagedCustomer
 
 import com.balihoo.fulfillment.util.Splogger
 
@@ -18,7 +18,7 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    try {
+    adWordsAdapter.withErrorsHandled[Any]("Account Lookup", {
       adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
       val aname = params("name")
@@ -28,16 +28,7 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
         case _ =>
           failTask(s"No account with name '$aname' was found!", "-")
       }
-    } catch {
-      case rateExceeded: RateExceededException =>
-        // Whoops! We've hit the rate limit! Let's sleep!
-        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
-        throw rateExceeded
-      case exception: Exception =>
-        throw exception
-      case throwable: Throwable =>
-        throw new Exception(throwable.getMessage)
-    }
+    })
   }
 }
 

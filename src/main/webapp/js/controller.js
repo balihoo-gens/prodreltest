@@ -567,13 +567,13 @@ app.controller('workersController', function($scope, $route, $http, $location, e
     $scope.setFreshnessLabel = function(worker) {
 
         worker.defunct = false;
-        if(worker.minutesSinceLast < 2) {
-            worker.freshness = "label-success";
-        } else if(worker.minutesSinceLast < 5) {
-            worker.freshness = "label-warning";
-        } else {
+        if(worker.minutesSinceLast < -10) {
             worker.freshness = "label-default";
             worker.defunct = true;
+        } else if(worker.minutesSinceLast < -5) {
+            worker.freshness = "label-warning";
+        } else {
+            worker.freshness = "label-success";
         }
     };
 
@@ -582,6 +582,7 @@ app.controller('workersController', function($scope, $route, $http, $location, e
         for(var w in $scope.workers) {
             var worker = $scope.workers[w];
             worker.showFormatted = true;
+            worker.showContents = false;
             if(formatUtil.isJSON(worker.specification)) {
                 worker.specification = JSON.parse(worker.specification);
             }
@@ -635,8 +636,12 @@ app.controller('workflowInitiationController', function($scope, $route, $http, $
                    });
     };
 
-    $scope.addLabel = function() {
+    $scope.addTag = function() {
       $scope.tags.push({text : ""});
+    };
+
+    $scope.removeTag = function(tag) {
+        $scope.tags.splice($scope.tags.indexOf(tag), 1);
     };
 
     $scope.restart = function() {

@@ -6,23 +6,35 @@
         <div ng-show="loading">
             <img src="img/loading.gif">
         </div>
-        <form role="form" ng-show="!runId">
-            <div class="form-group">
-                <label>Workflow Id</label>
-                <input type="text" class="form-control" ng-model="workflowId" placeholder="Name your workflow..">
-            </div>
-            <div class="form-group">
-                <label for="inputJson">JSON</label>
-                <textarea rows="20" class="form-control json" id="inputJson" placeholder="Paste JSON Here.." ng-model="inputJson"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Tags</label>
-                <input type="text" class="form-control" ng-repeat="tag in tags" ng-model="tag.text">
-                <br/>
-                <button class="btn pull-right" ng-click="initiateWorkflow()">Start</button>
-                <button class="btn btn-sm" ng-click="addLabel()">Add Tag</button>
-            </div>
-        </form>
+        <div ng-show="!runId">
+            <form role="form">
+                <div class="form-group">
+                    <label>Workflow Id</label>
+                    <input type="text" class="form-control" ng-model="workflowId" placeholder="Name your workflow..">
+                </div>
+                <div class="form-group">
+                    <label for="inputJson">JSON</label>
+                    <textarea rows="20" class="form-control json" id="inputJson" placeholder="Paste JSON Here.." ng-model="inputJson"></textarea>
+                </div>
+            </form>
+            <form class="form-inline" role="form">
+                <div class="form-group">
+                    <label>Tags</label>
+                        <span ng-repeat="tag in tags">
+                            <div class="input-group">
+
+                                <input type="text" class="form-control" ng-model="tag.text">
+                                <div class="input-group-addon"><i class="fa fa-minus muted action" ng-click="removeTag(tag)"></i></div>
+                            </div>
+                        </span>
+                    <button class="btn btn-sm" ng-click="addTag()">
+                        <i class="fa fa-plus muted action"></i>
+                    </button>
+                    <br/>
+                </div>
+            </form>
+            <button class="btn pull-right" ng-click="initiateWorkflow()">Start</button>
+        </div>
         <div ng-show="runId">
             <h5>Run {{runId}} initiated...</h5>
             <br/>
