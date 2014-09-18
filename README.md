@@ -57,7 +57,8 @@ Running
   * When using the deployment script, workers, decider and dashboard all run on EC2 instances automatically.
   * To run locally, use ```python launcher.py``` in the project root to run some or all of the classes
     * Usage: ```$python ./launcher [-j <jar name>] [<main name> ...]```
-    * Example, ```$ ./launch_fulfillment -j myff.jar com.balihoo.fulfillment.decider``` would run just the decider from myff.jar
+    * class name resolution will try to match the name to the list of defaults. This allows you to abbreviate by leaving a lot of namespace out. Ambiguous names result in the selection of the first match.
+    * Example, ```$ ./launch_fulfillment -j myff.jar decider htmlrenderer``` would run just the decider and htmlrenderer from myff.jar
   * Without the launcher, the jar in contains all that is needed to run the code. Run the desired main using, for example:
     * ```java -cp target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar com.balihoo.fulfillment.workers.sendemailworker```
     * This will run the sendemail worker using the "config/sendemailworker.properties" as the config file
