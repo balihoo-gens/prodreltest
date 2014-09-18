@@ -13,12 +13,10 @@ import scala.collection.JavaConversions._
 /**
  * Typical workflow
  * ****************
- * 1. Use a FacebookPost worker to validate the post data.  This should happen without delay.
+ * 1. Use a FacebookPoster worker to validate the post data.  This should happen as soon as possible after the order is
+ * created.
  *
- * 2. Use a RESTClient worker to get the targeting data from the Facebook Geo Service. The worker should wait almost
- * until the scheduled publication time to start.  12 hours early would be reasonable.
- *
- * 3. Use a FacebookPost worker to publish the post.
+ * 2. Use a FacebookPoster worker to publish the post at the desired time.
  */
 abstract class AbstractFacebookPoster extends FulfillmentWorker {
   this: LoggingWorkflowAdapter

@@ -2,11 +2,8 @@ package com.balihoo.fulfillment.workers
 
 import java.net.URL
 import javax.ws.rs._
-import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.config.PropertiesLoader
-import com.balihoo.fulfillment.util.Splogger
 import com.balihoo.socialmedia.facebook.FacebookConnection
 import com.balihoo.socialmedia.facebook.model.Target
 import org.glassfish.jersey.server.ResourceConfig
@@ -27,25 +24,9 @@ class TestFacebookPoster extends Specification with Mockito {
    */
   class TestableFacebookPoster(_facebookAdapter: FacebookAdapter)
     extends AbstractFacebookPoster
-    with LoggingWorkflowAdapter
+    with LoggingWorkflowAdapterTestImpl
     with FacebookAdapterComponent {
 
-    def splog = mock[Splogger]
-    def dynamoAdapter = mock[DynamoAdapter]
-    def swfAdapter = {
-      val _config = mock[PropertiesLoader]
-      _config.getString(anyString) returns "mock"
-      _config.getString("name") returns "workername"
-
-      val _client = mock[AmazonSimpleWorkflowAsyncClient]
-
-      val _swfAdapter = mock[SWFAdapter]
-      _swfAdapter.domain returns "mockdomain"
-      _swfAdapter.config returns _config
-      _swfAdapter.client returns _client
-
-      _swfAdapter
-    }
     def facebookAdapter = _facebookAdapter
     task = mock[ActivityTask]
   }

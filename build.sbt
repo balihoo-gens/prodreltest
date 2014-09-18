@@ -29,7 +29,7 @@ libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.3",
   //json. Using play's implementation because its already known to the team
   "com.typesafe.play" % "play-json_2.10" % "2.2.0",
-  "org.specs2" %% "specs2" % "2.3.12" % "test",
+  "org.specs2" %% "specs2" % "2.3.12" % Test,
   "commons-io" % "commons-io" % "2.4",
   "commons-configuration" % "commons-configuration" % "1.10",
   "commons-beanutils" % "commons-beanutils" % "1.9.2",
