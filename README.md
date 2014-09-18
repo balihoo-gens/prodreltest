@@ -62,7 +62,7 @@ Running
     * ```java -cp target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar com.balihoo.fulfillment.workers.sendemailworker```
     * This will run the sendemail worker using the "config/sendemailworker.properties" as the config file
     * you can use a different properties file, or look for it in a different directory:
-      * ```java -cp <jarname> <classname> [-p <propfile>] [-d <propdir>]
+      * ```java -cp <jarname> <classname> [-p <propfile>] [-d <propdir>]```
   * Or you can just run from sbt: run ```sbt run``` from the project root and select the main to run
 
 Development
