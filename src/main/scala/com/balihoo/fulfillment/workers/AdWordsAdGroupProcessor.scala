@@ -5,8 +5,8 @@ import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
 import com.balihoo.fulfillment.util.Splogger
 
-import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201402.cm._
+import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201406.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 import scala.collection.mutable
@@ -25,7 +25,7 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    try {
+    adWordsAdapter.withErrorsHandled[Any]("AdGroup Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val adGroup = adGroupCreator.getAdGroup(params) match {
@@ -36,17 +36,7 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
       }
 
       completeTask(String.valueOf(adGroup.getId))
-
-    } catch {
-      case rateExceeded: RateExceededException =>
-        // Whoops! We've hit the rate limit! Let's sleep!
-        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
-        throw rateExceeded
-      case exception: Exception =>
-        throw exception
-      case throwable: Throwable =>
-        throw new Exception(throwable.getMessage)
-    }
+    })
   }
 }
 
@@ -61,6 +51,11 @@ extends AbstractAdWordsAdGroupProcessor
 trait AdGroupCreatorComponent {
   def adGroupCreator: AbstractAdGroupCreator with AdWordsAdapterComponent
 
+  // https://developers.google.com/adwords/api/docs/appendix/platforms
+  val PLATFORM_DESKTOP:Long = 30000
+  val PLATFORM_MOBILE:Long = 30001
+  val PLATFORM_TABLET:Long = 30002
+
   abstract class AbstractAdGroupCreator {
     this: AdWordsAdapterComponent
       with CampaignCreatorComponent =>
@@ -73,6 +68,7 @@ trait AdGroupCreatorComponent {
         new ActivityParameter("name", "string", "Name of this AdGroup"),
         new ActivityParameter("campaignId", "int", "AdWords Campaign ID"),
         new ActivityParameter("bidDollars", "float", "Bid amount in dollars"),
+        new ActivityParameter("mobile bid modifier", "float", "Proportion of bidDollars to be bid for mobile", false),
         new ActivityParameter("status", "ENABLED|PAUSED|DELETED", ""),
         new ActivityParameter("target", "JSON", "Mysterious and magical Form Builder output!", false),
         new ActivityParameter("interests", "<interest>,<interest>,..", "List of Interests\nhttps://developers.google.com/adwords/api/docs/appendix/verticals", false),
@@ -376,6 +372,64 @@ trait AdGroupCreatorComponent {
       }
     }
 
+    def _getExistingBidModifier(adGroup: AdGroup, platformId:Long): Option[AdGroupBidModifier] = {
+
+      val existingSelector = new SelectorBuilder()
+        .fields("AdGroupId", "BidModifier", "Id")
+        .equals("AdGroupId", String.valueOf(adGroup.getId))
+        .equals("Id", String.valueOf(platformId))
+        .build()
+
+      try {
+        val existing: AdGroupBidModifierPage = adWordsAdapter.adGroupBidModifierService.get(existingSelector)
+        if(existing.getTotalNumEntries == 0) {
+          return None
+        } else if(existing.getEntries(0).getBidModifier == null) {
+          return None
+        }
+
+        Some(existing.getEntries(0))
+      } catch {
+        case e:Exception =>
+          if(e.getMessage.contains("INVALID_ID")) {
+            None
+          } else {
+            throw e
+          }
+      }
+    }
+
+    def _processBidModifier(adGroup:AdGroup, modifier:String, platformId:Long) = {
+
+      val operations = new mutable.ArrayBuffer[AdGroupBidModifierOperation]()
+
+      val platform = new Platform()
+      platform.setId(platformId)
+
+      var operator:Operator = Operator.SET
+      val bidModifier =  _getExistingBidModifier(adGroup, platformId) match {
+        case m:Some[AdGroupBidModifier] =>
+          m.get
+        case _ =>
+          operator = Operator.ADD
+          new AdGroupBidModifier()
+      }
+
+      bidModifier.setAdGroupId(adGroup.getId)
+      bidModifier.setBidModifier(modifier.toDouble)
+      bidModifier.setCriterion(platform)
+
+      val operation = new AdGroupBidModifierOperation()
+      operation.setOperand(bidModifier)
+      operation.setOperator(operator)
+
+      operations += operation
+
+      adWordsAdapter.withErrorsHandled[Any](s"${operator.getValue} bid modifier $modifier", {
+        adWordsAdapter.adGroupBidModifierService.mutate(operations.toArray)
+      })
+    }
+
     /**
      * This function is the unfortunate collision of not enough planning and stuff.
      * TODO Compell them to stop using this.
@@ -414,6 +468,8 @@ trait AdGroupCreatorComponent {
             _processKeywords(adGroup, value.split(","), KeywordMatchType.PHRASE)
           case "negative keywords" =>
             _processNegativeKeywords(adGroup, value.split(","))
+          case "mobile bid modifier" =>
+            _processBidModifier(adGroup, value, PLATFORM_MOBILE)
           case _ =>
         }
       }

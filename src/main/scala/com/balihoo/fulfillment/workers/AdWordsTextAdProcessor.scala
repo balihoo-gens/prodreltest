@@ -2,8 +2,8 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201402.cm._
+import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201406.cm._
 
 import com.balihoo.fulfillment.util.Splogger
 
@@ -16,7 +16,7 @@ abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    try {
+    adWordsAdapter.withErrorsHandled[Any]("Text Ad Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val textAd = adCreator.getTextAd(params) match {
@@ -27,16 +27,7 @@ abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
       }
       completeTask(String.valueOf(textAd.getId))
 
-    } catch {
-      case rateExceeded: RateExceededException =>
-        // Whoops! We've hit the rate limit! Let's sleep!
-        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
-        throw rateExceeded
-      case exception: Exception =>
-        throw exception
-      case throwable: Throwable =>
-        throw new Exception(throwable.getMessage)
-    }
+    })
   }
 }
 

@@ -2,8 +2,8 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201402.cm._
+import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201406.cm._
 
 import com.balihoo.fulfillment.util.Splogger
 
@@ -16,7 +16,7 @@ abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    try {
+    adWordsAdapter.withErrorsHandled[Any]("Image Ad Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val imageAd = adCreator.getImageAd(params) match {
@@ -27,16 +27,7 @@ abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
       }
       completeTask(String.valueOf(imageAd.getId))
 
-    } catch {
-      case rateExceeded: RateExceededException =>
-        // Whoops! We've hit the rate limit! Let's sleep!
-        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
-        throw rateExceeded
-      case exception: Exception =>
-        throw exception
-      case throwable: Throwable =>
-        throw new Exception(throwable.getMessage)
-    }
+    })
   }
 }
 
@@ -95,9 +86,11 @@ trait ImageAdCreatorComponent {
       val imageUrl = params("imageUrl")
 
       val image = new Image()
-      image.setData(
-        com.google.api.ads.common.lib.utils.Media.getMediaDataFromUrl(imageUrl))
-      image.setType(MediaMediaType.IMAGE)
+      adWordsAdapter.withErrorsHandled[Any]("Fetching image data", {
+        image.setData(
+          com.google.api.ads.common.lib.utils.Media.getMediaDataFromUrl(imageUrl))
+        image.setType(MediaMediaType.IMAGE)
+      })
 
       val ad = new ImageAd()
       ad.setImage(image)
@@ -137,7 +130,7 @@ trait ImageAdCreatorComponent {
       operation.setOperand(aga)
       operation.setOperator(Operator.ADD)
 
-      val context = s"Adding a Image Ad $params"
+      val context = s"Adding an Image Ad $params"
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
@@ -156,7 +149,7 @@ trait ImageAdCreatorComponent {
       operation.setOperand(aga)
       operation.setOperator(Operator.REMOVE)
 
-      val context = s"Removing a Image Ad $params"
+      val context = s"Removing an Image Ad $params"
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)

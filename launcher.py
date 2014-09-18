@@ -20,7 +20,6 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.adwords_campaignprocessor",
         "com.balihoo.fulfillment.workers.adwords_imageadprocessor",
         "com.balihoo.fulfillment.workers.adwords_textadprocessor",
-        "com.balihoo.fulfillment.workers.chaos",
         "com.balihoo.fulfillment.workers.email_addressverifier",
         "com.balihoo.fulfillment.workers.email_sender",
         "com.balihoo.fulfillment.workers.email_verifiedaddresslister",
@@ -28,7 +27,7 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.ftp_uploadvalidator",
         "com.balihoo.fulfillment.workers.geonames_timezoneretriever",
         "com.balihoo.fulfillment.workers.htmlrenderer",
-        "com.balihoo.fulfillment.workers.noop",
+        "com.balihoo.fulfillment.workers.layoutrenderer",
     ]
 
     def __init__(self, jar, logfile):
