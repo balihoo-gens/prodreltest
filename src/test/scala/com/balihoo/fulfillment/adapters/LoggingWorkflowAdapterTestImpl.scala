@@ -9,8 +9,8 @@ import org.mockito.Matchers._
 /**
  * This is a place to put stuff commonly used for test classes that extend LoggingWorkflowAdapter.
  *
- * You can't use Mockito the specs2 way in a trait file or you'll get a NullPointerException.  You need to call Mockito
- * directly.  That's why this file is the way it is.
+ * You can't use Mockito via specs2 in a trait file or you'll get a NullPointerException.  This is likely due to a bug
+ * in specs2.  As a workaround, we need to call Mockito directly.  That's why this file is the way it is.
  */
 trait LoggingWorkflowAdapterTestImpl
   extends LoggingWorkflowAdapter {
@@ -21,6 +21,12 @@ trait LoggingWorkflowAdapterTestImpl
   private lazy val _dynamoAdapter = mock(classOf[DynamoAdapter])
   def dynamoAdapter = _dynamoAdapter
 
+  /**
+   * This is far from ideal because the mock objects defined in this method get recreated every time the swfAdapter is
+   * called for.  However, moving the definitions out of this method breaks Mockito because it doesn't understand the
+   * non-Java structure of the resulting objects.  If you can figure out a better way to handle this, please fix it.
+   * @return a mock AmazonSimpleWorkflowAsyncClient
+   */
   def swfAdapter = {
     val _config = mock(classOf[PropertiesLoader])
     when(_config.getString(anyString)).thenReturn("mock")

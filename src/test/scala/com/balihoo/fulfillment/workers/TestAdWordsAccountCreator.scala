@@ -33,15 +33,15 @@ class TestAdWordsAccountCreator extends Specification with Mockito
     with LoggingAdwordsWorkflowAdapter
     with AccountCreatorComponent {
 
-      /**
-       * Mock objects for the LoggingAdwordsWorkflowAdapter mixins
-       */
-      def adWordsAdapter = mock[AdWordsAdapter]
+    /**
+     * Mock objects for the LoggingAdwordsWorkflowAdapter mixins
+     */
+    def adWordsAdapter = mock[AdWordsAdapter]
 
     /**
-       * instantiate a REAL Account creator
-       */
-      def accountCreator = new AccountCreator(adWordsAdapter)
+     * instantiate a REAL Account creator
+     */
+    def accountCreator = new AccountCreator(adWordsAdapter)
   }
 
   /**
