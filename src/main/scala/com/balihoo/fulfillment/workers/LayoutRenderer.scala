@@ -75,9 +75,9 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
         ("ignore", "undefined")
       }
 
-      val endPoint = params.getOrElse("endpoint", formBuilderSite)
+      val endPoint = params.getOrElse("endpoint", s"$formBuilderSite/forms/$id/render-layout")
       val cleaninput = Json.stringify(Json.toJson(Map(
-        "source" -> s"$endPoint/forms/$id/render-layout",
+        "source" -> endPoint,
         "data" -> s"inputdata=$bdata&inputdata=$idata",
         "target" -> params("target"),
         cliptuple
