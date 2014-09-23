@@ -4,6 +4,7 @@ import java.net.URL
 import javax.ws.rs._
 import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.socialmedia.facebook.FacebookConnection
 import com.balihoo.socialmedia.facebook.model.Target
 import org.glassfish.jersey.server.ResourceConfig
@@ -22,12 +23,17 @@ class TestFacebookPoster extends Specification with Mockito {
    * A testable version of FacebookPoster with mocks
    * @param _facebookAdapter
    */
-  class TestableFacebookPoster(_facebookAdapter: FacebookAdapter)
+  class TestableFacebookPoster(_facebookAdapter: FacebookAdapter)(implicit webServer: MockPhotoServer)
     extends AbstractFacebookPoster
     with LoggingWorkflowAdapterTestImpl
-    with FacebookAdapterComponent {
+    with FacebookAdapterComponent
+    with HTTPAdapterComponent {
 
     def facebookAdapter = _facebookAdapter
+    def httpAdapter = new HTTPAdapter(5)
+    val _cfg = mock[PropertiesLoader]
+    _cfg.getString("geoServiceUrl") returns server.getBaseUrlString
+
     task = mock[ActivityTask]
   }
 
@@ -70,7 +76,13 @@ class TestFacebookPoster extends Specification with Mockito {
   val publishAction = "publish"
 
   // We'll need a web server to host a photo.
-  val server = new MockPhotoServer
+  implicit val server = new MockPhotoServer
+
+// Fire up web server for the mock geo service and for hosting a mock photo.
+  step {
+    server.setUp()
+    success
+  }
 
   "FacebookPoster" should {
     "validate a link post" in {
@@ -119,12 +131,6 @@ class TestFacebookPoster extends Specification with Mockito {
 
       // Verify that the task completed.
       poster.completedTasks mustEqual 1
-    }
-
-    // Fire up the web server for the photo tests.
-    step {
-      server.setUp()
-      success
     }
 
     "validate a photo post" in {
@@ -178,4 +184,6 @@ class MockPhotoServer extends JerseyTest {
   }
 
   def getPhotoUrl = new URL(getBaseUri.toURL, photoPath).toString
+
+  def getBaseUrlString = getBaseUri.toString
 }
