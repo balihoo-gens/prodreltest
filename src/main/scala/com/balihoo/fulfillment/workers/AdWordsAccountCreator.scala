@@ -2,10 +2,10 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201402.cm.Operator
-import com.google.api.ads.adwords.axis.v201402.cm.Selector
-import com.google.api.ads.adwords.axis.v201402.mcm.{ManagedCustomerPage, ManagedCustomerOperation, ManagedCustomer}
+import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201406.cm.Operator
+import com.google.api.ads.adwords.axis.v201406.cm.Selector
+import com.google.api.ads.adwords.axis.v201406.mcm.{ManagedCustomerOperation, ManagedCustomer}
 import com.balihoo.fulfillment.util.Splogger
 
 /*
@@ -20,7 +20,7 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    try {
+    adWordsAdapter.withErrorsHandled[Any]("Account Creator", {
       adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
       val account = accountCreator.getAccount(params) match {
@@ -29,16 +29,7 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
           accountCreator.createAccount(params)
       }
       completeTask(String.valueOf(account.getCustomerId))
-    } catch {
-      case rateExceeded: RateExceededException =>
-        // Whoops! We've hit the rate limit! Let's sleep!
-        Thread.sleep(rateExceeded.error.getRetryAfterSeconds * 1200) // 120% of the the recommended wait time
-        throw rateExceeded
-      case exception: Exception =>
-        throw exception
-      case throwable: Throwable =>
-        throw new Exception(throwable.getMessage)
-    }
+    })
   }
 }
 

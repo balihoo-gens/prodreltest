@@ -9,6 +9,7 @@ import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 
 import scala.collection.mutable
+import scala.util.matching.Regex
 
 object SectionStatus extends Enumeration {
   val READY = Value("READY")
@@ -77,7 +78,7 @@ class FulfillmentSection(val name: String
   val timeline = new Timeline
   var value: String = ""
 
-  var status = SectionStatus.READY
+  var status = SectionStatus.CONTINGENT
 
   var essential = false
   var fixable = true
@@ -88,9 +89,10 @@ class FulfillmentSection(val name: String
   var canceledCount: Int = 0
   var failedCount: Int = 0
 
-  val failureParams = new ActionParams(0, 0)
-  val timeoutParams = new ActionParams(0, 0)
-  val cancelationParams = new ActionParams(0, 0)
+  // 3 events of each type. 10 minute wait.
+  val failureParams = new ActionParams(3, 600)
+  val timeoutParams = new ActionParams(3, 600)
+  val cancelationParams = new ActionParams(3, 600)
 
   var startToCloseTimeout: Option[String] = None
   var scheduleToStartTimeout: Option[String] = None
@@ -129,7 +131,7 @@ class FulfillmentSection(val name: String
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
-          timeline.note(s"$key : ${v.as[String]}", Some(creationDate))
+          timeline.note(s"$key : $v", Some(creationDate))
       }
     }
   }
@@ -194,6 +196,15 @@ class FulfillmentSection(val name: String
     }
   }
 
+  def setReady(reason:String, when:DateTime) = {
+    if(status == SectionStatus.TERMINAL) {
+      timeline.error("Can't set status to READY because section is TERMINAL!", Some(when))
+    } else {
+      status = SectionStatus.READY
+      timeline.note("READY: "+reason, Some(when))
+    }
+  }
+
   def setStarted(when:DateTime) = {
     startedCount += 1
     status = SectionStatus.STARTED
@@ -215,19 +226,61 @@ class FulfillmentSection(val name: String
   def setFailed(reason:String, details:String, when:DateTime) = {
     failedCount += 1
     timeline.warning(s"Failed because:$reason $details", Some(when))
-    status = if(failedCount > failureParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.FAILED
+    status = SectionStatus.FAILED
+    if(failedCount > failureParams.maxRetries) {
+      setTerminal(s"Failed too many times! ($failedCount > ${failureParams.maxRetries})", when)
+    }
   }
 
   def setCanceled(details:String, when:DateTime) = {
     canceledCount += 1
     timeline.warning(s"Canceled because: $details", Some(when))
-    status = if(canceledCount > cancelationParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.CANCELED
+    status = SectionStatus.CANCELED
+    if(canceledCount > cancelationParams.maxRetries) {
+      setTerminal(s"Canceled too many times! ($canceledCount > ${cancelationParams.maxRetries})", when)
+    }
   }
 
-  def setTimedOut(when:DateTime) = {
+  def setTimedOut(tot:String, details:String, when:DateTime) = {
     timedoutCount += 1
-    timeline.warning("Timed out!", Some(when))
-    status = if(timedoutCount > timeoutParams.maxRetries) SectionStatus.TERMINAL else SectionStatus.TIMED_OUT
+    timeline.warning("Timed out! "+tot+" "+details, Some(when))
+    status = SectionStatus.TIMED_OUT
+    if(timedoutCount > timeoutParams.maxRetries) {
+      setTerminal(s"Timed out too many times! ($timedoutCount > ${timeoutParams.maxRetries})", when)
+    }
+  }
+
+  def setContingent(reason:String, when:DateTime) = {
+    status = SectionStatus.CONTINGENT
+    timeline.note("Contingent: "+reason, Some(when))
+  }
+
+  def setImpossible(reason:String, when:DateTime) = {
+    status = SectionStatus.IMPOSSIBLE
+    timeline.error(reason, Some(when))
+  }
+
+  def setTerminal(reason:String, when:DateTime) = {
+    status = SectionStatus.TERMINAL
+    timeline.error(reason, Some(when))
+  }
+
+  def setDeferred(note:String, when:DateTime) = {
+    status = SectionStatus.DEFERRED
+    timeline.note("Deferred: "+note, Some(when))
+  }
+
+  def setStatus(ss:String, message:String, when:DateTime) = {
+    SectionStatus.withName(ss) match {
+      case SectionStatus.READY =>
+        setReady(message, when)
+      case SectionStatus.FAILED =>
+        setFailed("FAILED", message, when)
+      case SectionStatus.TERMINAL =>
+        setTerminal(message, when)
+      case _ =>
+        throw new Exception(s"Can't generically set status to '$ss'!")
+    }
   }
 
   def resolveReferences(map:FulfillmentSections):Boolean = {
@@ -300,18 +353,127 @@ class FulfillmentSection(val name: String
   }
 }
 
-class SectionReference(val name:String) {
+class ReferencePathComponent(val key:Option[String] = None, val index:Option[Int] = None) {
+
+  if((key.isEmpty && index.isEmpty) || (key.isDefined && index.isDefined))
+    throw new Exception("PathComponent must have a key xor index!") // Exclusive OR
+
+  override def toString = {
+    Json.stringify(toJson)
+  }
+
+  def toJson: JsValue = {
+    val obj = mutable.Map[String, String]()
+    if(key.isDefined) {
+      obj("key") = key.get
+    } else {
+      obj("index") = index.get.toString
+    }
+    Json.toJson(obj.toMap)
+  }
+}
+
+object ReferencePath {
+
+  def isJsonPath(candidate:String):Boolean = {
+    candidate.matches(".*[/\\[\\]]+.*")
+  }
+}
+
+class ReferencePath(path:String) {
+
+  val components = mutable.MutableList[ReferencePathComponent]()
+  private val pattern = new Regex("""([^\[\]/]+)|(\[\d+\])""")
+  private val matches = (for(m <- pattern.findAllIn(path)) yield m).toList
+  val sectionName = matches.head
+  for(part <- matches.slice(1, matches.length)) {
+    components += (part contains "[" match {
+      case true =>
+        new ReferencePathComponent(None, Some(part.substring(1, part.length - 1).toInt))
+      case _ =>
+        new ReferencePathComponent(Some(part), None)
+    })
+  }
+
+  def getValue(jsonString:String):String = {
+    var current:JsValue = Json.parse(jsonString)
+    for(component <- components) {
+      component.key.isDefined match {
+        case true =>
+          current match {
+            case jObj:JsObject =>
+              current = jObj.value(component.key.get)
+            case _ =>
+              throw new Exception(s"Expected JSON Object with key '${component.key.get}'!")
+          }
+        case _ =>
+          current match {
+            case jArr:JsArray =>
+              val l = jArr.as[List[JsValue]]
+              current = l(component.index.get)
+            case _ =>
+              throw new Exception(s"Expected JSON Array to index with ${component.index.get}!")
+
+          }
+      }
+    }
+
+    current.as[String]
+  }
+
+  override def toString = {
+    Json.stringify(toJson)
+  }
+
+  def toJson: JsValue = {
+    Json.toJson(for(component <- components) yield component.toJson)
+  }
+}
+
+class SectionReference(referenceString:String) {
+
+  protected var _sectionName = "-undefined-"
   var dismissed:Boolean = false
   var section:Option[FulfillmentSection] = None
+  var path:Option[ReferencePath] = None
+
+  ReferencePath.isJsonPath(referenceString) match {
+    case false => _sectionName = referenceString
+    case _ =>
+      path = Some(new ReferencePath(referenceString))
+      _sectionName = path.get.sectionName
+  }
+
+  def getValue:String = {
+    if(section.isEmpty) { return null; }
+    path.isEmpty match {
+      case true => section.get.value
+      case _ =>
+        path.get.getValue(section.get.value)
+    }
+  }
 
   def isValid:Boolean = {
     section.isDefined
   }
 
+  def name:String = {
+    _sectionName
+  }
+
   def toJson:JsValue = {
     Json.toJson(Map(
       "name" -> Json.toJson(name),
-      "dismissed" -> Json.toJson(dismissed)
+      "dismissed" -> Json.toJson(dismissed),
+      "path" -> (path.isDefined match {
+        case true => path.get.toJson
+        case _ => new JsArray
+      }),
+      "resolved" -> (section.isDefined match {
+        case true => Json.toJson(section.get.status == SectionStatus.COMPLETE)
+        case _ => Json.toJson(false)
+      }),
+      "value" -> Json.toJson(getValue)
     ))
   }
 }
@@ -343,7 +505,7 @@ class SectionReferences(sectionNames:List[String]) {
 
                   // The prior section didn't complete successfully.. let's
                   // let the next section have a try
-                  sectionRef.section.get.status = SectionStatus.READY
+                  sectionRef.section.get.setReady("Promoted from Contingent", DateTime.now)
                   sectionRef.section.get.resolveReferences(map) // <-- recurse
                 }
               case _ => // We don't care about other status until a TERMINAL case is hit
@@ -379,7 +541,7 @@ class SectionReferences(sectionNames:List[String]) {
 
     for(sectionRef <- sections) {
       if(sectionRef.isValid && sectionRef.section.get.status == SectionStatus.COMPLETE) {
-        return sectionRef.section.get.value
+        return sectionRef.getValue
       }
     }
 

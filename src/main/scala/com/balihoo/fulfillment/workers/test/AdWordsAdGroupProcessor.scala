@@ -4,8 +4,8 @@ import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
-import com.google.api.ads.adwords.axis.utils.v201402.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201402.cm._
+import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201406.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 abstract class AdGroupTest(cfg: PropertiesLoader)
@@ -122,6 +122,37 @@ object adwordsAdGroupSetKeywords {
       adGroupCreator._processKeywords(adgroup, Array("alpaca", "camel", "dromedary"), KeywordMatchType.PHRASE)
       adGroupCreator._processKeywords(adgroup, Array("orange", "apple"), KeywordMatchType.EXACT)
       adGroupCreator._processNegativeKeywords(adgroup, Array("applesauce", "gravel"))
+    }
+  }
+}
+
+object adwordsAdGroupSetBidModifier {
+  def main(args: Array[String]) {
+    val cfg = PropertiesLoader(args, "adwords_adgroupprocessor")
+    val test = new TestAdGroupSetBM(cfg)
+    test.run
+  }
+
+  class TestAdGroupSetBM(cfg: PropertiesLoader) extends AdGroupTest(cfg) {
+
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
+
+      val campaignParams = new ActivityParameters(Map(
+        "name" -> "fulfillment Campaign",
+        "channel" -> "DISPLAY"
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
+
+      val adgroupParams = new ActivityParameters(Map(
+        "name" -> "GROUP A",
+        "campaignId" -> s"${campaign.getId}"
+
+      ))
+      val adgroup = adGroupCreator.getAdGroup(adgroupParams)
+
+      adGroupCreator._processBidModifier(adgroup, "0.35", 30001)
     }
   }
 }
