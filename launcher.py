@@ -1,8 +1,10 @@
+#!/usr/bin/env python
 import sys, os
 import subprocess
 import argparse
 import time
 
+running_local = False
 try:
     from splogger import Splogger
 except ImportError:
@@ -10,6 +12,7 @@ except ImportError:
     # because these are elsewhere on the EC2 instance
     sys.path.append(os.path.join(os.path.dirname(__file__), 'deployment', 'deployment'))
     from splogger import Splogger
+    running_local = True
 
 class Launcher(object):
     ALL_CLASSES = [
@@ -66,15 +69,29 @@ class Launcher(object):
             time.sleep(0.2)
         self._log.info("Done: no processes left to monitor")
 
+    def resolve_classname(self, classname):
+        """ try to find the classname in the list and return the properly
+            qualified name if matched. If the name cannot be found, it may
+            refer to a main that is not in the default list, so try to run
+            it anyway
+        """
+        for path in self.ALL_CLASSES:
+            if path.find(classname) > -1:
+                return path
+        return classname
+
     def launch(self, classes=None, pipe=False):
         if classes == None or len(classes) < 1:
             classes = self.ALL_CLASSES
+        else:
+            classes = [self.resolve_classname(classname) for classname in classes]
+
         for path in classes:
             procname = path.split('.')[-1]
             proc = subprocess.Popen(
                 ["java", "-cp", self._jar, path],
-                #run in the jar dir, config uses relative paths from cwd
-                cwd=os.path.dirname(self._jar),
+                #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...
+                cwd=os.path.dirname(self._jar if not running_local else os.path.realpath(__file__)),
                 #if output is piped, it HAS to be consumed to avoid deadlock due to full pipes
                 stdout=subprocess.PIPE if pipe else None,
                 stderr=subprocess.PIPE if pipe else None,
@@ -86,7 +103,7 @@ class Launcher(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Launch the Fulfillment application")
     thisdir = os.path.dirname(os.path.realpath(__file__))
-    jar = os.path.join(thisdir, "fulfillment.jar")
+    jar = os.path.join(thisdir, "fulfillment.jar" if not running_local else "target/scala-2.10/fulfillment-assembly-1.0-SNAPSHOT.jar")
 
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
     parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
