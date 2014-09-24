@@ -102,37 +102,68 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
   private def intsToIntegers(input: Seq[Int]): Seq[Integer] = input.map(Integer.valueOf(_))
 
   /**
-   * Converts a JSON string into a Target object.
+   * Converts a JSON string into a Target object.  The JSON object has several optional attributes for different types
+   * of geographic data, as follows:
+   * - countryCodes is an array of two character ISO country codes.
+   * - regionIds is an array of Facebook region IDs.  A region is a state, province, or equivalent area.
+   * - subregions is an array of names of counties or county equivalent areas, which will be resolved to city IDs by the worker.
+   * - cityIds is an array of Facebook city IDs.
+   * - cities is an array of city names, which will be resolved to city IDs by the worker.
    * @param jsonString the input
    * @return the output
    */
   private def createTarget(jsonString: String): Target = {
     // Parse the JSON
     val json = Json.parse(jsonString).as[JsObject]
-    val countryCodes = (json \ "countryCodes").as[Seq[String]]
-    val regionIds = (json \ "regionIds").as[Seq[Int]]
-    val subregions = (json \ "subregions").as[Seq[String]]
-    val cityIds = (json \ "cityIds").as[Seq[Int]]
-    val cities = (json \ "cities").as[Seq[String]]
+    val countryCodes = (json \ "countryCodes").asOpt[Seq[String]]
+    val regionIds = (json \ "regionIds").asOpt[Seq[Int]]
+    val subregions = (json \ "subregions").asOpt[Seq[String]]
+    val cityIds = (json \ "cityIds").asOpt[Seq[Int]]
+    val cityNames = (json \ "cities").asOpt[Seq[String]]
 
     // If the list of country codes is exactly one element long, that's the country code we'll use for resolving city IDs.
     // Otherwise, we won't be able to resolve city IDs.
     val countryCode = countryCodes match {
-      case s :: Nil => Some(s)
+      case Some(s :: Nil) => Some(s)
       case _ => None
     }
 
-    // Resolve subregions and cities into city IDs
-    val subregionCityIds = subregions.map(lookupSubregion(countryCode, _)).flatten
-    val cityCityIds = cities.map(lookupCity(countryCode, _)).flatten
-    val allCities = cityIds ++ subregionCityIds ++ cityCityIds
+    // Resolve countries
+    val countries = countryCodes match {
+      case Some(data) => data
+      case _ => Seq()
+    }
+
+    // Resolve regions
+    val regions = regionIds match {
+      case Some(data) => data
+      case _ => Seq()
+    }
+
+    // Resolve cities
+    val cityIdsFromSubregions = subregions match {
+      case Some(data) => data.map(lookupSubregion(countryCode, _)).flatten
+      case _ => Seq()
+    }
+    val cityIdsFromCityNames = cityNames match {
+      case Some(data) => {
+        val aaa = data.map(lookupCity(countryCode, _))
+        data.map(lookupCity(countryCode, _)).flatten
+      }
+      case _ => Seq()
+    }
+    val baseCityIds = cityIds match {
+      case Some(data) => data
+      case _ => Seq()
+    }
+    val cities = baseCityIds ++ cityIdsFromSubregions ++ cityIdsFromCityNames
 
     // Bundle all the data together into a Target
-    new Target(countryCodes, intsToIntegers(regionIds), intsToIntegers(allCities))
+    new Target(countries, intsToIntegers(regions), intsToIntegers(cities))
   }
 
   // A regular expression that matches one or more digits
-  private val digitsRegEx = "\\d+".r
+  private val digitsRegEx = "^(\\d+)$".r
 
   /**
    * Looks up a city by name and returns the Facebook city ID.
@@ -149,6 +180,9 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
 
     // Split the string on commas
     val splitString = city.split(",")
+    if (splitString.length < 3) {
+      throw new FacebookPosterException(s"Unable to parse city name: $city")
+    }
 
     // Identify the region
     val regionCode = splitString.last
@@ -163,12 +197,13 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
 
     // Query the geo service for the city
     val url = new URL(geoServiceUrl, s"countries/$countryCode/regions/$regionCode/subregions/$subregionName/facebookcities/$cityName")
-    val result = httpAdapter.get(url)
-    (result.code.code, result.bodyString) match {
-      case (200, digitsRegEx(id)) => Some(id.toInt)
-      case (200, _) => None // Handle non-numeric string response ("null")
-      case _ => throw new FacebookPosterException(s"Geo service responded with $result")
+    val queryResult = httpAdapter.get(url)
+    val cityId = (queryResult.code.code, queryResult.bodyString.trim) match {
+      case (200, digitsRegEx(id)) if id.toInt > 0 => Some(id.toInt)
+      case (200, _) => None // Matches 0 and "null"
+      case _ => throw new FacebookPosterException(s"Geo service responded with $queryResult")
     }
+    cityId
   }
 
   /**
@@ -187,18 +222,19 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     // Identify the region and subregion
     val splitString = subregion.split(",")
     if (splitString.length != 2) {
-      throw new IllegalArgumentException(s"Unable to parse subregion: $subregion")
+      throw new IllegalArgumentException(s"Unable to parse subregion name: $subregion")
     }
-    val subregionName = splitString(1).trim
+    val subregionName = splitString(0).trim
     val regionCode = splitString(1).trim
 
     // Query the geo service for all cities in the subregion
     val url = new URL(geoServiceUrl, s"countries/$countryCode/regions/$regionCode/subregions/$subregionName/facebookcities")
-    val result = httpAdapter.get(url)
-    result.code.code match {
-      case 200 => Json.parse(result.bodyString).as[Seq[Int]]
-      case _ => throw new FacebookPosterException(s"Geo service responded with $result")
+    val queryResult = httpAdapter.get(url)
+    val cityIds = queryResult.code.code match {
+      case 200 => Json.parse(queryResult.bodyString).as[Seq[Int]]
+      case _ => throw new FacebookPosterException(s"Geo service responded with $queryResult")
     }
+    cityIds
   }
 
   private def geoServiceUrl = new URL(_cfg.getString("geoServiceUrl"))

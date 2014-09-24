@@ -5,6 +5,7 @@ import javax.ws.rs._
 import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.workers.TestFacebookPoster.MockWebServer
 import com.balihoo.socialmedia.facebook.FacebookConnection
 import com.balihoo.socialmedia.facebook.model.Target
 import org.glassfish.jersey.server.ResourceConfig
@@ -21,23 +22,34 @@ class TestFacebookPoster extends Specification with Mockito {
 
   /**
    * A testable version of FacebookPoster with mocks
-   * @param _facebookAdapter
+   * @param webServer
    */
-  class TestableFacebookPoster(_facebookAdapter: FacebookAdapter)(implicit webServer: MockPhotoServer)
+  class TestableFacebookPoster(implicit webServer: MockWebServer)
     extends AbstractFacebookPoster
     with LoggingWorkflowAdapterTestImpl
     with FacebookAdapterComponent
     with HTTPAdapterComponent {
 
-    def facebookAdapter = _facebookAdapter
-    def httpAdapter = new HTTPAdapter(5)
-    val _cfg = mock[PropertiesLoader]
-    _cfg.getString("geoServiceUrl") returns server.getBaseUrlString
+    val _facebookAdapter = mock[FacebookAdapter]
+    _facebookAdapter.publishLinkPost(any, any, any, any, any) returns linkPostId
+    _facebookAdapter.publishPhotoPost(any, any, any, any, any, any) returns photoPostId
+    _facebookAdapter.publishStatusUpdate(any, any, any, any) returns statusUpdatePostId
 
-    task = mock[ActivityTask]
+    def facebookAdapter = _facebookAdapter
+
+    def httpAdapter = new HTTPAdapter(1)
+
+    val _cfg = mock[PropertiesLoader]
+    _cfg.getString("geoServiceUrl") returns server.getBaseUrl.toString
+
+    // This will change after the task completes successfully.
+    var result: Option[String] = None
+
+    // Override this method to simplify testing and to avoid swallowing exceptions.
+    override def withTaskHandling(code: => String): Unit = result = Some(code)
   }
 
-  // Implicitly convert List[Int] to java.util.List[Integer]
+  // Implicitly convert List[Int] to java.util.List[Integer] for the sake of the Java libraries
   implicit def listOfIntToJavaListOfInteger(list: List[Int]): java.util.List[Integer] = list.map(Integer.valueOf(_))
 
   // Constants
@@ -45,18 +57,29 @@ class TestFacebookPoster extends Specification with Mockito {
   val appSecret = "09340934fopijfpioj34f0t934poijwe5gpoijrfpokefa4wp9k34fvpoke4f"
   val accessToken = "98349834lkidflkj3q4f0934094flke0p9w4f4opij34f9j34f0934fmervlgkjergf5opji34op9j345io34fjio3498043to0we4rtsdrf"
   val pageId = "43984984380349034095905309354"
+  val linkPostId = pageId + "_94834589258902309234092340990"
+  val photoPostId = pageId + "_2398234298489040420239049493"
+  val statusUpdatePostId = pageId + "_89498598324903490234939943"
   val message = "What's up?"
-
-  // Mock FacebookAdapter
-  val facebookAdapter = mock[FacebookAdapter]
+  val boise = "Boise,Ada,ID"
+  val boiseId = TestFacebookPoster.boiseId
+  val meridian = "Meridian,Ada,ID"
+  val meridianId = TestFacebookPoster.meridianId
+  val nampa = "Nampa,Canyon,ID"
+  val nampaId = TestFacebookPoster.nampaId
+  val ada = "Ada,ID"
+  val canyon = "Canyon,ID"
+  val idahoId = 16
+  val washingtonId = 53
+  val usa = "US"
+  val canada = "CA"
 
   // Expected FacebookConnection
-  val connection = new FacebookConnection(appId, appSecret, accessToken)
   val connectionMatcher: Matcher[FacebookConnection] = (c: FacebookConnection) =>
     (appId.equals(c.getAppId) && appSecret.equals(c.getAppSecret) && accessToken.equals(c.getAccessToken), "Connection doesn't match")
 
-  // Expected Target
-  val target = new Target(List("US", "CA"), List(12, 34), List(56, 78, 90))
+  // Expected Target for most tests
+  val target = new Target(List(usa, canada), List(idahoId, washingtonId), List(boiseId, meridianId, nampaId))
 
   // Parameters that all tests have in common
   val baseParams = Map(
@@ -64,21 +87,22 @@ class TestFacebookPoster extends Specification with Mockito {
     "appSecret" -> appSecret,
     "accessToken" -> accessToken,
     "pageId" -> pageId,
-    "target" -> "{\"countryCodes\": [\"US\",\"CA\"], \"regionIds\": [12,34], \"cityIds\": [56,78,90]}",
+    "target" -> s"""{"countryCodes": ["$usa","$canada"], "regionIds": [$idahoId,$washingtonId], "cityIds": [$boiseId,$meridianId,$nampaId]}""",
     "message" -> message)
 
   // Optional parameter values
   val linkUrl = "http://balihoo.com/test"
-  val photoUrl = ""
+  def photoUrl = new URL(server.getBaseUrl, "photos/something.jpg").toString
+  val photoName = "something.jpg"
 
   // Available actions
   val validateAction = "validate"
   val publishAction = "publish"
 
-  // We'll need a web server to host a photo.
-  implicit val server = new MockPhotoServer
+  // We'll need a web server to host a geo service and a photo.
+  implicit val server = new MockWebServer
 
-// Fire up web server for the mock geo service and for hosting a mock photo.
+  // Fire up web server.
   step {
     server.setUp()
     success
@@ -86,75 +110,149 @@ class TestFacebookPoster extends Specification with Mockito {
 
   "FacebookPoster" should {
     "validate a link post" in {
-      val poster = new TestableFacebookPoster(facebookAdapter)
-      val params = new ActivityParameters(baseParams + ("postType" -> "link", "linkUrl" -> linkUrl, "action" -> validateAction))
-      val result = poster.handleTask(params)
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "link", "linkUrl" -> linkUrl, "action" -> validateAction))
+      poster.handleTask(params)
 
-      // Verify that the post was processed.
-      there was one(facebookAdapter).validateLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl), ===(message))
-
-      // Verify that the task completed.
-      poster.completedTasks mustEqual 1
+      there was one(poster.facebookAdapter).validateLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl), ===(message))
+      
+      poster.result must beSome("OK")
     }
 
     "publish a link post" in {
-      val poster = new TestableFacebookPoster(facebookAdapter)
-      val params = new ActivityParameters(baseParams + ("postType" -> "link", "linkUrl" -> linkUrl, "action" -> publishAction))
-      val result = poster.handleTask(params)
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "link", "linkUrl" -> linkUrl, "action" -> publishAction))
+      poster.handleTask(params)
 
-      // Verify that the post was processed.
-      there was one(facebookAdapter).publishLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl), ===(message))
+      there was one(poster.facebookAdapter).publishLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl), ===(message))
 
-      // Verify that the task completed.
-      poster.completedTasks mustEqual 1
+      poster.result must beSome(linkPostId)
     }
 
     "validate a status update" in {
-      val poster = new TestableFacebookPoster(facebookAdapter)
-      val params = new ActivityParameters(baseParams + ("postType" -> "status update", "action" -> validateAction))
-      val result = poster.handleTask(params)
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> validateAction))
+      poster.handleTask(params)
 
-      // Verify that the post was processed.
-      there was one(facebookAdapter).validateStatusUpdate(connectionMatcher, ===(pageId), ===(target), ===(message))
-
-      // Verify that the task completed.
-      poster.completedTasks mustEqual 1
+      there was one(poster.facebookAdapter).validateStatusUpdate(connectionMatcher, ===(pageId), ===(target), ===(message))
+     
+      poster.result must beSome("OK")
     }
 
     "publish a status update" in {
-      val poster = new TestableFacebookPoster(facebookAdapter)
-      val params = new ActivityParameters(baseParams + ("postType" -> "status update", "action" -> publishAction))
-      val result = poster.handleTask(params)
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction))
+      poster.handleTask(params)
 
-      // Verify that the post was processed.
-      there was one(facebookAdapter).publishStatusUpdate(connectionMatcher, ===(pageId), ===(target), ===(message))
-
-      // Verify that the task completed.
-      poster.completedTasks mustEqual 1
+      there was one(poster.facebookAdapter).publishStatusUpdate(connectionMatcher, ===(pageId), ===(target), ===(message))
+     
+      poster.result must beSome(statusUpdatePostId)
     }
 
     "validate a photo post" in {
-      val poster = new TestableFacebookPoster(facebookAdapter)
-      val params = new ActivityParameters(baseParams + ("postType" -> "photo", "photoUrl" -> server.getPhotoUrl, "action" -> validateAction))
-      val result = poster.handleTask(params)
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "photo", "photoUrl" -> photoUrl, "action" -> validateAction))
+      poster.handleTask(params)
+      
+      there was one(poster.facebookAdapter).validatePhotoPost(connectionMatcher, ===(pageId), ===(target),
+        ===(server.getPhotoFileContents), ===(photoName), ===(message))
 
-      // Verify that the post was processed.
-      there was one(facebookAdapter).validatePhotoPost(connectionMatcher, ===(pageId), ===(target), ===(server.photoFileContents), ===(server.photoName), ===(message))
-
-      // Verify that the task completed.
-      poster.completedTasks mustEqual 1
+      poster.result must beSome("OK")
     }
 
     "publish a photo post" in {
-      val poster = new TestableFacebookPoster(facebookAdapter)
-      val params = new ActivityParameters(baseParams + ("postType" -> "photo", "photoUrl" -> server.getPhotoUrl, "action" -> publishAction))
-      val result = poster.handleTask(params)
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "photo", "photoUrl" -> photoUrl, "action" -> publishAction))
+      poster.handleTask(params)
+      
+      there was one(poster.facebookAdapter).publishPhotoPost(connectionMatcher, ===(pageId), ===(target),
+        ===(server.getPhotoFileContents), ===(photoName), ===(message))
+     
+      poster.result must beSome(photoPostId)
+    }
 
-      // Verify that the post was processed.
-      there was one(facebookAdapter).publishPhotoPost(connectionMatcher, ===(pageId), ===(target), ===(server.photoFileContents), ===(server.photoName), ===(message))
+    "resolve subregions" in {
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+        "target" -> s"""{"countryCodes": ["$usa"], "subregions": ["$ada","$canyon"]}"""))
+      poster.handleTask(params)
+      
+      val expectedTarget = new Target(List(usa), List(), List(boiseId, meridianId, nampaId))
+      there was one(poster.facebookAdapter).publishStatusUpdate(connectionMatcher, ===(pageId), ===(expectedTarget), ===(message))
+     
+      poster.result must beSome(statusUpdatePostId)
+    }
 
-      // Verify that the task completed.
-      poster.completedTasks mustEqual 1
+    "reject subregions if there are multiple countries" in {
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+        "target" -> s"""{"countryCodes": ["$usa","$canada"], "subregions": ["$ada"]}"""))
+
+      try {
+        poster.handleTask(params)
+        failure("Expected an exception")
+      } catch {
+        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+      }
+      
+      there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)
+    }
+
+    "reject subregions if there are no countries" in {
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+        "target" -> s"""{"countryCodes": [], "subregions": ["$ada"]}"""))
+
+      try {
+        poster.handleTask(params)
+        failure("Expected an exception")
+      } catch {
+        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+      }
+      
+      there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)
+    }
+
+    "resolve cities" in {
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+        "target" -> s"""{"countryCodes": ["$usa"], "cities": ["$boise","$meridian","NoSuchCity,Ada,ID"]}"""))
+      poster.handleTask(params)
+      
+      val expectedTarget = new Target(List(usa), List(), List(boiseId, meridianId))
+      there was one(poster.facebookAdapter).publishStatusUpdate(connectionMatcher, ===(pageId), ===(expectedTarget), ===(message))
+     
+      poster.result must beSome(statusUpdatePostId)
+    }
+
+    "reject cities if there are multiple countries" in {
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+        "target" -> s"""{"countryCodes": ["$usa","$canada"], "cities": ["$boise"]}"""))
+
+      try {
+        poster.handleTask(params)
+        failure("Expected an exception")
+      } catch {
+        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+      }
+      
+      there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)
+    }
+
+    "reject cities if there are no countries" in {
+      val poster = new TestableFacebookPoster
+      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+        "target" -> s"""{"countryCodes": [], "cities": ["$boise"]}"""))
+
+      try {
+        poster.handleTask(params)
+        failure("Expected an exception")
+      } catch {
+        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+      }
+
+      there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)
     }
 
     // Stop the web server.
@@ -163,27 +261,60 @@ class TestFacebookPoster extends Specification with Mockito {
       success
     }
   }
-
 }
 
-// This class provides an HTTP server for testing.
-@Path("/")
-class MockPhotoServer extends JerseyTest {
+object TestFacebookPoster {
+  val boiseId = 2436507
+  val meridianId = 2437125
+  val nampaId = 2437176
 
-  val photoName = "airport.jpg"
-  private final val photoPath = "vacation/photos/airport.jpg"
-  val photoFileContents = "Pretend that this is a photograph".getBytes 
+  /**
+   * This class provides an HTTP server for testing.  It's defined in the companion object so the Jersey Test Framework
+   * can instantiate it.
+   */
+  @Path("/")
+  class MockWebServer extends JerseyTest {
 
-  @GET
-  @Path(photoPath)
-  def getPhoto = photoFileContents
+    private val photoFileContents = "Pretend that this is a photograph"
 
-  override def configure = {
-    forceSet(TestProperties.CONTAINER_PORT, "0") // Choose first available port.
-    new ResourceConfig(getClass)
+    @GET
+    @Path("photos/something.jpg")
+    def getPhoto = photoFileContents
+
+    @GET
+    @Path("countries/{countryCode}/regions/{regionCode}/subregions/{subregion}/facebookcities")
+    def getSubregionCities(@PathParam("countryCode") countryCode: String,
+                           @PathParam("regionCode") regionCode: String,
+                           @PathParam("subregion") subregion: String) = {
+      (countryCode.toLowerCase, regionCode.toLowerCase, subregion.toLowerCase) match {
+        case ("us", "id", "ada") => s"[$boiseId,$meridianId]"
+        case ("us", "id", "canyon") => s"[$nampaId]"
+        case _ => "[]"
+      }
+    }
+
+    @GET
+    @Path("countries/{countryCode}/regions/{regionCode}/subregions/{subregion}/facebookcities/{city}")
+    def getSubregionCities(@PathParam("countryCode") countryCode: String,
+                           @PathParam("regionCode") regionCode: String,
+                           @PathParam("subregion") subregion: String,
+                           @PathParam("city") city: String) = {
+      (countryCode.toLowerCase, regionCode.toLowerCase, subregion.toLowerCase, city.toLowerCase) match {
+        case ("us", "id", "ada", "boise") => boiseId
+        case ("us", "id", "ada", "meridian") => meridianId
+        case _ => 0
+      }
+    }
+
+    override def configure = {
+      forceSet(TestProperties.CONTAINER_PORT, "0") // Choose first available port.
+      enable(TestProperties.LOG_TRAFFIC)
+      enable(TestProperties.DUMP_ENTITY)
+      new ResourceConfig(getClass)
+    }
+
+    def getBaseUrl = getBaseUri.toURL
+
+    def getPhotoFileContents = photoFileContents.getBytes
   }
-
-  def getPhotoUrl = new URL(getBaseUri.toURL, photoPath).toString
-
-  def getBaseUrlString = getBaseUri.toString
 }
