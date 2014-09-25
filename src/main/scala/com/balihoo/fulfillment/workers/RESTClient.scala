@@ -21,7 +21,7 @@ class AbstractRESTClient extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
+    splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
     withTaskHandling {
       val url = new URL(params("url"))
       val headers = Json.parse(params.getOrElse("headers", "{}")).as[Map[String, String]].toList

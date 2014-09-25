@@ -33,7 +33,7 @@ libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.4",
   "commons-configuration" % "commons-configuration" % "1.10",
   "commons-beanutils" % "commons-beanutils" % "1.9.2",
-  ("com.balihoo.commons" % "commons-client" % "latest.snapshot")
+  ("com.balihoo.commons" % "commons-client" % "14.19-SNAPSHOT")
     .exclude("com.google.guava", "guava")
     .exclude("com.sun.jersey", "jersey-core"),
   ("com.google.api-ads" % "ads-lib" % "1.32.0").exclude("com.google.guava", "guava-jdk5"), // exclude old guava
@@ -43,7 +43,7 @@ libraryDependencies ++= Seq(
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
   "org.keyczar" % "keyczar" % "0.66",
   "com.stackmob" %% "newman" % "1.3.5",
-  "com.balihoo.socialmedia" % "facebook-client" % "latest.snapshot",
+  "com.balihoo.socialmedia" % "facebook-client" % "14.19-SNAPSHOT",
   "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test
 )
 

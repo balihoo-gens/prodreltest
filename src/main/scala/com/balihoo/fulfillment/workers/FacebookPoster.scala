@@ -68,7 +68,7 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityParameters) = {
-    println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
+    splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
       val appId = params("appId")
@@ -129,33 +129,15 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     }
 
     // Resolve countries
-    val countries = countryCodes match {
-      case Some(data) => data
-      case _ => Seq()
-    }
+    val countries = countryCodes.getOrElse(Seq())
 
     // Resolve regions
-    val regions = regionIds match {
-      case Some(data) => data
-      case _ => Seq()
-    }
+    val regions = regionIds.getOrElse(Seq())
 
     // Resolve cities
-    val cityIdsFromSubregions = subregions match {
-      case Some(data) => data.map(lookupSubregion(countryCode, _)).flatten
-      case _ => Seq()
-    }
-    val cityIdsFromCityNames = cityNames match {
-      case Some(data) => {
-        val aaa = data.map(lookupCity(countryCode, _))
-        data.map(lookupCity(countryCode, _)).flatten
-      }
-      case _ => Seq()
-    }
-    val baseCityIds = cityIds match {
-      case Some(data) => data
-      case _ => Seq()
-    }
+    val cityIdsFromSubregions = subregions.getOrElse(Seq()).map(lookupSubregion(countryCode, _)).flatten
+    val cityIdsFromCityNames = cityNames.getOrElse(Seq()).map(lookupCity(countryCode, _)).flatten
+    val baseCityIds = cityIds.getOrElse(Seq())
     val cities = baseCityIds ++ cityIdsFromSubregions ++ cityIdsFromCityNames
 
     // Bundle all the data together into a Target
@@ -179,21 +161,21 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     }
 
     // Split the string on commas
-    val splitString = city.split(",")
-    if (splitString.length < 3) {
+    val stringParts = city.split(",")
+    if (stringParts.length < 3) {
       throw new FacebookPosterException(s"Unable to parse city name: $city")
     }
 
     // Identify the region
-    val regionCode = splitString.last
-    val sansRegion = splitString.init
+    val regionCode = stringParts.last.trim
+    val sansRegion = stringParts.init
 
     // Identity the subregion
-    val subregionName = sansRegion.last
+    val subregionName = sansRegion.last.trim
     val sansSubregion = sansRegion.init
 
     // Reassemble whatever's left into the city name.  City names may contain commas.
-    val cityName = sansSubregion.mkString(",")
+    val cityName = sansSubregion.mkString(",").trim
 
     // Query the geo service for the city
     val url = new URL(geoServiceUrl, s"countries/$countryCode/regions/$regionCode/subregions/$subregionName/facebookcities/$cityName")

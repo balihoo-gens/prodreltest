@@ -308,8 +308,6 @@ object TestFacebookPoster {
 
     override def configure = {
       forceSet(TestProperties.CONTAINER_PORT, "0") // Choose first available port.
-      enable(TestProperties.LOG_TRAFFIC)
-      enable(TestProperties.DUMP_ENTITY)
       new ResourceConfig(getClass)
     }
 
