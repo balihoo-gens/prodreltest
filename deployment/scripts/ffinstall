@@ -16,6 +16,7 @@ import subprocess
 import time
 import urllib
 import tarfile
+import json
 
 class Installer(object):
     def __init__(self, logfile):
@@ -41,6 +42,7 @@ class Installer(object):
         return proc.returncode
 
     def install_splunk(self, s3bucket, script_name):
+        self._log.info("installing splunk from " + s3bucket)
         s3url = os.path.join(s3bucket, script_name)
         if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
             os.chmod(script_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
@@ -50,6 +52,7 @@ class Installer(object):
             self.run_wait_log([script_path])
 
     def install_phantom(self, version):
+        self._log.info("installing phantomjs version " + version)
         fullname = "phantomjs-%s-linux-x86_64" % (version,)
         tarballname = "%s.tar.bz2" % (fullname,)
         url = "https://bitbucket.org/ariya/phantomjs/downloads/%s" % (tarballname,)
@@ -60,6 +63,26 @@ class Installer(object):
         archive = tarfile.open(tarballname)
         archive.extractall(path=targetdir)
         os.symlink(os.path.join(targetdir,fullname,"bin","phantomjs"), "/usr/bin/phantomjs")
+
+    def associate_eip(self, eip):
+        self._log.info("associating with eip " + eip)
+        try:
+            import boto.ec2.connection as ec2
+        except ImportError:
+            self._log.error("unable to import boto")
+            return
+        #http://stackoverflow.com/questions/625644/find-out-the-instance-id-from-within-an-ec2-machine
+        awsinstanceurl = "http://169.254.169.254/latest/dynamic/instance-identity/document"
+        instance_data = json.loads(urllib.urlopen(awsinstanceurl).read())
+        instance_id = instance_data["instanceId"]
+        access_key = os.environ["AWS_ACCESS_KEY_ID"]
+        secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
+        region = os.environ["AWS_REGION"]
+        ec2conn = ec2.EC2Connection(aws_access_key_id=access_key, aws_secret_access_key=secret_key, region=region)
+        if ec2conn.associate_address(instance_id=instance_id, public_ip=eip, allow_reassociation=True):
+            self._log.info("successfully associated with eip " + eip)
+        else:
+            self._log.error("failed to associate with eip " + eip)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Install the Fulfillment application")
@@ -74,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument('--nosplunk', help='do not install splunk', action='store_true')
     parser.add_argument('--nophantom', help='do not install phantomjs', action='store_true')
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
+    parser.add_argument('--dasheip', help='the eip for the dashboard', default=None)
 
     args = parser.parse_args()
 
@@ -82,4 +106,6 @@ if __name__ == "__main__":
         installer.install_splunk(args.splunks3bucket, args.splunkscript)
     if not args.nophantom:
         installer.install_phantom(args.phantomversion)
+    if args.eip:
+        associate_eip(args.eip)
     installer.launch_app(args.classes)

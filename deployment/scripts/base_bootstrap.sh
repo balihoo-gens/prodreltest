@@ -1,27 +1,47 @@
 #set up vars and init logfiles
 LOGFILE=/tmp/bootstrap.log
 FFDIR=/opt/balihoo/fulfillment
-echo running bootstrap script > ${LOGFILE} 2>&1
-echo ${PATH}>> ${LOGFILE} 2>&1
+echo "running bootstrap script" > ${LOGFILE} 2>&1
+echo "PATH: ${PATH}" >> ${LOGFILE} 2>&1
 
-echo export aws keys >> ${LOGFILE} 2>&1
+log() {
+    echo "executing: $1 $2" >> ${LOGFILE} 2>&1
+}
+
+logdo() {
+    log "executing: $1 $2"
+    $1 >> ${LOGFILE} 2>&1 $2
+}
+
+log "export aws keys"
 export AWS_ACCESS_KEY_ID=${AWSACCESSKEY}
 export AWS_SECRET_ACCESS_KEY=${AWSSECRETKEY}
+export AWS_REGION=${AWSREGION}
 
-echo downloading cli tools >> ${LOGFILE} 2>&1
-curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip >> ${LOGFILE} 2>&1
-unzip awscli-bundle.zip >> ${LOGFILE} 2>&1
-echo unzipped bundle >> ${LOGFILE} 2>&1
-./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws >> ${LOGFILE} 2>&1
-echo installed bundle >> ${LOGFILE} 2>&1
+log "downloading cli tools"
+logdo "curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip"
+logdo "unzip awscli-bundle.zip"
+log "unzipped bundle"
+logdo "./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws"
+log "installed bundle"
 
-echo downloading fulfillment application >> ${LOGFILE} 2>&1
-mkdir -p ${FFDIR} >> ${LOGFILE} 2>&1
-/usr/local/bin/aws s3 sync ${S3BUCKETURL} ${FFDIR} >> ${LOGFILE} 2>&1
+log "downloading fulfillment application"
+logdo "mkdir -p ${FFDIR}"
+logdo "/usr/local/bin/aws s3 sync ${S3BUCKETURL} ${FFDIR}"
 
-echo setting install script execute permissions >> ${LOGFILE} 2>&1
-chmod a+x ${FFDIR}/ffinstall >> ${LOGFILE} 2>&1
+log "installing virtual env"
+logdo "chmod +x ${FFDIR}/vesetup"
+logdo "${FFDIR}/vesetup -d ${VEDIR} -p ${PYVERSION} -v ${VEVERSION}"
 
-echo installing fulfillment application >> ${LOGFILE} 2>&1
-nohup ${FFDIR}/ffinstall ${CLASSNAMES} >> ${LOGFILE} 2>&1 &
-echo done >> ${LOGFILE} 2>&1
+log "activating virtual env"
+logdo "source ${VEDIR}/activate"
+
+log "installing boto"
+logdo "pip install boto"
+
+log "installing fulfillment application"
+logdo "nohup python ${FFDIR}/ffinstall ${DASHEIPOPT} ${CLASSNAMES}" "&"
+
+log "done"
+
+

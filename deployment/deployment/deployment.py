@@ -8,7 +8,11 @@ import json
 import time
 
 class Deployment(object):
-    def __init__(self, log_filename, unattended=False):
+    def __init__(self, log_filename, region, pyversion, veversion, dasheip, unattended=False):
+        self._dasheip = dasheip
+        self._veversion = veversion
+        self._pyversion = pyversion
+        self._region = region
         self._unattended = unattended
         self._log_filename = log_filename
         self.log = Splogger(self._log_filename, component="deployment")
@@ -40,13 +44,13 @@ class Deployment(object):
         self.log.debug("uploading " + pkgpath)
         u = Uploader(
             s3bucket,
-            "us-west-2",
+            self._region,
             os.environ["AWS_ACCESS_KEY_ID"],
             os.environ["AWS_SECRET_ACCESS_KEY"]
         )
         return u.upload_dir(pkgpath)
 
-    def create_stack(self, region, s3url, template_file, script_file):
+    def create_stack(self, s3url, template_file, script_file):
         if not self.check_aws_requirements():
             raise Exception("AWS Credentials not in environment")
 
@@ -59,7 +63,7 @@ class Deployment(object):
         access_key = os.environ["AWS_ACCESS_KEY_ID"]
         secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
         self.log.debug("creating a stack using " + s3url)
-        c = CloudFormer(region, access_key, secret_key)
+        c = CloudFormer(self._region, access_key, secret_key)
 
         parameters = {
             "KeyName" : "paul-ami-pair",
@@ -78,12 +82,19 @@ class Deployment(object):
 
     def gen_script(self, script_file, access_key, secret_key, s3_bucket_url, classes):
         pieces = [
-          "#!/bin/bash",
-          "AWSACCESSKEY=%s" % access_key,
-          "AWSSECRETKEY=%s" % secret_key,
-          "S3BUCKETURL=%s" % s3_bucket_url,
-          "CLASSNAMES=%s" % classes,
+            "#!/bin/bash",
+            "AWSACCESSKEY=%s" % access_key,
+            "AWSSECRETKEY=%s" % secret_key,
+            "AWSREGION=%s" % self._region,
+            "S3BUCKETURL=%s" % s3_bucket_url,
+            "CLASSNAMES=%s" % classes,
+            "VEDIR=/opt/balihoo/virtualenv",
+            "PYVERSION=%s" % self._pyversion,
+            "VEVERSION=%s" % self._veversion,
         ]
+        #optionally add the dashboard eip option.
+        if self._dasheip:
+            pieces.append('DASHEIPOPT="--dasheip %s"' % self._dasheip)
 
         with open(script_file) as f:
             pieces.append(f.read())
