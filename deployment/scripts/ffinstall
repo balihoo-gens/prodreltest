@@ -97,7 +97,7 @@ if __name__ == "__main__":
     parser.add_argument('--nosplunk', help='do not install splunk', action='store_true')
     parser.add_argument('--nophantom', help='do not install phantomjs', action='store_true')
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
-    parser.add_argument('--eip', help='the eip for ththis instance', default=None)
+    parser.add_argument('--eip', help='the eip for this instance', default=None)
 
     args = parser.parse_args()
 
@@ -107,5 +107,5 @@ if __name__ == "__main__":
     if not args.nophantom:
         installer.install_phantom(args.phantomversion)
     if args.eip:
-        associate_eip(args.eip)
+        installer.associate_eip(args.eip)
     installer.launch_app(args.classes)

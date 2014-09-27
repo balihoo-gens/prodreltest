@@ -105,7 +105,7 @@
       "Properties" : {
         "KeyName" : { "Ref" : "KeyName" },
         "ImageId" : { "Fn::FindInMap" : [
-          "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
+          "AWSRegionArch2AMIUbuntu", { "Ref" : "AWS::Region" },
           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "WorkerInstanceType" },
           "Arch" ] } ] },
         "SecurityGroups" : [
@@ -196,7 +196,7 @@
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
         "ImageId" : { "Fn::FindInMap" : [
-          "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
+          "AWSRegionArch2AMIUbuntu", { "Ref" : "AWS::Region" },
           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "DashboardInstanceType" },
           "Arch" ] } ] },
         "KeyName" : { "Ref" : "KeyName" },

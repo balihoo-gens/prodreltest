@@ -94,7 +94,7 @@ class Deployment(object):
         ]
 
         #optionally add the dashboard eip option.
-        if dasheip:
+        if eip:
             pieces.append('EIPOPT="--eip %s"' % eip)
 
         with open(script_file) as f:

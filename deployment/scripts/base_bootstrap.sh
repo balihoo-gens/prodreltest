@@ -18,6 +18,12 @@ export AWS_ACCESS_KEY_ID=${AWSACCESSKEY}
 export AWS_SECRET_ACCESS_KEY=${AWSSECRETKEY}
 export AWS_REGION=${AWSREGION}
 
+log "installing dependencies"
+logdo "apt-get install unzip"
+logdo "apt-get install gcc"
+logdo "apt-get install libssl-dev"
+logdo "apt-get install oracle-java7-jre"
+
 log "downloading cli tools"
 logdo "curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip"
 logdo "unzip awscli-bundle.zip"
