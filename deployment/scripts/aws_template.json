@@ -216,7 +216,7 @@
         "LaunchConfigurationName" : { "Ref" : "DashboardLaunchConfig" },
         "MinSize" : "1",
         "MaxSize" : "1",
-        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Dashboard"} ]
+        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Dashboard", "PropagateAtLaunch" : "true"} ]
       }
     },
 

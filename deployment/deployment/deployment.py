@@ -72,15 +72,15 @@ class Deployment(object):
             "MinInstances" : "1",
             "MaxInstances" : "10",
             "WebPort" : "8080",
-            "WorkerScript" : self.gen_script(script_file, access_key, secret_key, s3url, ""),
-            "DashboardScript" : self.gen_script(script_file, access_key, secret_key, s3url, "com.balihoo.fulfillment.dashboard.dashboard")
+            "WorkerScript" : self.gen_script(script_file, access_key, secret_key, s3url, None, ""),
+            "DashboardScript" : self.gen_script(script_file, access_key, secret_key, s3url, self._dasheip, "com.balihoo.fulfillment.dashboard.dashboard")
         }
 
         #json dump guarantees valid json, but not a valid template per se
         stackname = "fulfillment%d" % (int(time.time()),)
         return c.create_stack(stackname, json.dumps(template_data), parameters)
 
-    def gen_script(self, script_file, access_key, secret_key, s3_bucket_url, classes):
+    def gen_script(self, script_file, access_key, secret_key, s3_bucket_url, eip, classes):
         pieces = [
             "#!/bin/bash",
             "AWSACCESSKEY=%s" % access_key,
@@ -92,9 +92,10 @@ class Deployment(object):
             "PYVERSION=%s" % self._pyversion,
             "VEVERSION=%s" % self._veversion,
         ]
+
         #optionally add the dashboard eip option.
-        if self._dasheip:
-            pieces.append('DASHEIPOPT="--dasheip %s"' % self._dasheip)
+        if dasheip:
+            pieces.append('EIPOPT="--eip %s"' % eip)
 
         with open(script_file) as f:
             pieces.append(f.read())

@@ -5,7 +5,7 @@ echo "running bootstrap script" > ${LOGFILE} 2>&1
 echo "PATH: ${PATH}" >> ${LOGFILE} 2>&1
 
 log() {
-    echo "executing: $1 $2" >> ${LOGFILE} 2>&1
+    echo "$1" >> ${LOGFILE} 2>&1
 }
 
 logdo() {
@@ -40,7 +40,7 @@ log "installing boto"
 logdo "pip install boto"
 
 log "installing fulfillment application"
-logdo "nohup python ${FFDIR}/ffinstall ${DASHEIPOPT} ${CLASSNAMES}" "&"
+logdo "nohup python ${FFDIR}/ffinstall ${EIPOPT} ${CLASSNAMES}" "&"
 
 log "done"
 

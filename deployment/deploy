@@ -27,13 +27,14 @@ def main():
     args = parser.parse_args()
 
     pkgdir = args.pkgdir
-    s3dir = args.s3dir
 
     d = Deployment(args.logfile, args.region, args.pyversion, args.veversion, args.dasheip)
-    if not (pkgdir or s3dir):
+    if not (pkgdir or args.s3dir):
         pkgdir = d.package(args.rootdir)
-    if not (s3dir or args.noupload):
+    if not (args.s3dir or args.noupload):
         s3dir = d.upload(pkgdir, args.s3bucket)
+    else:
+        s3dir = "s3://%s/%s" % (args.s3bucket, args.s3dir)
     if not args.nocf:
         d.create_stack(s3dir, args.template, args.bootstrap)
 
