@@ -333,6 +333,8 @@ class ActivityParameters(val params:Map[String,String], val input:String = "{}")
     default
   }
 
+  def get(param: String): Option[String] = params.get(param)
+
   override def toString:String = {
     params.toString()
   }

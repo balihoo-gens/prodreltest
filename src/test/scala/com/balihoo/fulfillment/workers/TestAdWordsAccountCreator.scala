@@ -29,29 +29,19 @@ class TestAdWordsAccountCreator extends Specification with Mockito
    */
   class AdWordsAccountCreatorTest
     extends AbstractAdWordsAccountCreator
+    with LoggingWorkflowAdapterTestImpl
     with LoggingAdwordsWorkflowAdapter
     with AccountCreatorComponent {
 
-      /**
-       * Mock objects for the LoggingAdwordsWorkflowAdapter mixins
-       */
-      def splog = mock[Splogger]
-      def dynamoAdapter = mock[DynamoAdapter]
-      def adWordsAdapter = mock[AdWordsAdapter]
-      def swfAdapter = {
-        val _swfAdapter = mock[SWFAdapter]
-        val _config = mock[PropertiesLoader]
-        _config.getString(anyString) returns "mock"
-        _config.getString("name") returns "workername"
-        _swfAdapter.domain returns "mockdomain"
-        _swfAdapter.config returns _config
-        _swfAdapter
-      }
+    /**
+     * Mock objects for the LoggingAdwordsWorkflowAdapter mixins
+     */
+    def adWordsAdapter = mock[AdWordsAdapter]
 
-      /**
-       * instantiate a REAL Account creator
-       */
-      def accountCreator = new AccountCreator(adWordsAdapter)
+    /**
+     * instantiate a REAL Account creator
+     */
+    def accountCreator = new AccountCreator(adWordsAdapter)
   }
 
   /**
