@@ -192,7 +192,7 @@ class TestFacebookPoster extends Specification with Mockito {
         poster.handleTask(params)
         failure("Expected an exception")
       } catch {
-        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+        case e: IllegalArgumentException => e.getMessage === "Exactly one country code is required when place names are used."
       }
       
       there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)
@@ -207,7 +207,7 @@ class TestFacebookPoster extends Specification with Mockito {
         poster.handleTask(params)
         failure("Expected an exception")
       } catch {
-        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+        case e: IllegalArgumentException => e.getMessage === "Exactly one country code is required when place names are used."
       }
       
       there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)
@@ -234,7 +234,7 @@ class TestFacebookPoster extends Specification with Mockito {
         poster.handleTask(params)
         failure("Expected an exception")
       } catch {
-        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+        case e: IllegalArgumentException => e.getMessage === "Exactly one country code is required when place names are used."
       }
       
       there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)
@@ -249,7 +249,7 @@ class TestFacebookPoster extends Specification with Mockito {
         poster.handleTask(params)
         failure("Expected an exception")
       } catch {
-        case e: IllegalArgumentException => e.getMessage === "Unable to determine the country code"
+        case e: IllegalArgumentException => e.getMessage === "Exactly one country code is required when place names are used."
       }
 
       there were no(poster.facebookAdapter).publishStatusUpdate(any, any, any, any)

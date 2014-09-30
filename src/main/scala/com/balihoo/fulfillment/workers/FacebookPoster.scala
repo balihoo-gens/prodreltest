@@ -123,9 +123,10 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
 
     // If the list of country codes is exactly one element long, that's the country code we'll use for resolving city IDs.
     // Otherwise, we won't be able to resolve city IDs.
-    val countryCode = countryCodes match {
-      case Some(s :: Nil) => Some(s)
-      case _ => None
+    val countryCode = (countryCodes, subregions.getOrElse(Nil), cityNames.getOrElse(Nil)) match {
+      case (Some(s :: Nil), _, _) => s // Return the one country code.
+      case (_, Nil, Nil) => "" // We could return anything here, because it won't be used without any city or subregion names.
+      case _ => throw new IllegalArgumentException("Exactly one country code is required when place names are used.")
     }
 
     // Resolve countries
@@ -150,16 +151,10 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
   /**
    * Looks up a city by name and returns the Facebook city ID.
    * @param city the city name formatted as "<city name>,<subregion name>,<region code>"
-   * @param countryCodeOption the country code as an Option
+   * @param countryCode the country code
    * @return the city ID or None if the city isn't found
    */
-  private def lookupCity(countryCodeOption: Option[String], city: String): Option[Int] = {
-    // Do we have a country code?
-    val countryCode = countryCodeOption match {
-      case Some(s) => s
-      case _ => throw new IllegalArgumentException("Unable to determine the country code")
-    }
-
+  private def lookupCity(countryCode: String, city: String): Option[Int] = {
     // Split the string on commas
     val stringParts = city.split(",")
     if (stringParts.length < 3) {
@@ -191,16 +186,10 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
   /**
    * Looks up a subregion by name and returns all of the city IDs in the subregion.
    * @param subregion the subregion name formatted as "<subregion name>,<region code>"
-   * @param countryCodeOption the country code as an Option
+   * @param countryCode the country code
    * @return the city IDs
    */
-  private def lookupSubregion(countryCodeOption: Option[String], subregion: String): Seq[Int] = {
-    // Do we have a country code?
-    val countryCode = countryCodeOption match {
-      case Some(s) => s
-      case _ => throw new IllegalArgumentException("Unable to determine the country code")
-    }
-
+  private def lookupSubregion(countryCode: String, subregion: String): Seq[Int] = {
     // Identify the region and subregion
     val splitString = subregion.split(",")
     if (splitString.length != 2) {
