@@ -64,7 +64,7 @@ class Installer(object):
         os.symlink(os.path.join(targetdir,fullname,"bin","phantomjs"), "/usr/bin/phantomjs")
 
     def associate_eip(self, eip):
-        s/elf._log.info("associating with eip " + eip)
+        self._log.info("associating with eip " + eip)
         try:
             import boto.ec2 as ec2
         except ImportError:
