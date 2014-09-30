@@ -88,7 +88,7 @@ class Launcher(object):
             procname = path.split('.')[-1]
             cwd = os.path.dirname(self._jar if not running_local else os.path.realpath(__file__))
             cmdline = ["java", "-cp", self._jar, path]
-            self._log.debug("Launching %s: '%s' in dir '%s'" % (cmdline, cwd))
+            self._log.debug("Launching %s: '%s' in dir '%s'" % (procname, cmdline, cwd))
             proc = subprocess.Popen(
                 cmdline,
                 #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...

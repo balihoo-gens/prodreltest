@@ -66,7 +66,7 @@ class Installer(object):
     def associate_eip(self, eip):
         s/elf._log.info("associating with eip " + eip)
         try:
-            import boto.ec2.connection as ec2
+            import boto.ec2 as ec2
         except ImportError:
             self._log.error("unable to import boto")
             return
@@ -77,8 +77,8 @@ class Installer(object):
         access_key = os.environ["AWS_ACCESS_KEY_ID"]
         secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
         region = os.environ["AWS_REGION"]
-        ec2conn = ec2.EC2Connection(aws_access_key_id=access_key, aws_secret_access_key=secret_key, region=region)
-        if ec2conn.associate_address(instance_id=instance_id, public_ip=eip, allow_reassociation=True):
+        ec2conn = ec2.connect_to_region(region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        if ec2conn.associate_address(instance_id=instance_id, public_ip=eip):
             self._log.info("successfully associated with eip " + eip)
         else:
             self._log.error("failed to associate with eip " + eip)
