@@ -23,7 +23,7 @@ export AWS_REGION=${AWSREGION}
 log "installing dependencies"
 logdo "export DEBIAN_FRONTEND=noninteractive"
 logdo "apt-get update -q"
-logdo "apt-get install -y unzip gcc make autoconf libssl-dev default-jre"
+logdo "apt-get install -y unzip gcc make autoconf libssl-dev libbz2-dev default-jre"
 
 log "downloading cli tools"
 logdo "curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip"
