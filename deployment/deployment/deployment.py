@@ -83,6 +83,7 @@ class Deployment(object):
     def gen_script(self, script_file, access_key, secret_key, s3_bucket_url, eip, classes):
         pieces = [
             "#!/bin/bash",
+            "set -e",
             "AWSACCESSKEY=%s" % access_key,
             "AWSSECRETKEY=%s" % secret_key,
             "AWSREGION=%s" % self._region,
