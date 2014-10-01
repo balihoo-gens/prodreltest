@@ -100,12 +100,12 @@
       }
     },
 
-    "LaunchConfig" : {
+    "WorkerLaunchConfig" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
         "KeyName" : { "Ref" : "KeyName" },
         "ImageId" : { "Fn::FindInMap" : [
-          "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
+          "AWSRegionArch2AMIUbuntu", { "Ref" : "AWS::Region" },
           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "WorkerInstanceType" },
           "Arch" ] } ] },
         "SecurityGroups" : [
@@ -121,7 +121,7 @@
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
         "AvailabilityZones" : { "Fn::GetAZs" : ""},
-        "LaunchConfigurationName" : { "Ref" : "LaunchConfig" },
+        "LaunchConfigurationName" : { "Ref" : "WorkerLaunchConfig" },
         "MinSize" : { "Ref" : "MinInstances" },
         "MaxSize" : { "Ref" : "MaxInstances" },
         "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Decider and Workers", "PropagateAtLaunch" : "true"} ]
@@ -190,6 +190,36 @@
       }
     },
 
+
+
+    "DashboardLaunchConfig" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [
+          "AWSRegionArch2AMIUbuntu", { "Ref" : "AWS::Region" },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "DashboardInstanceType" },
+          "Arch" ] } ] },
+        "KeyName" : { "Ref" : "KeyName" },
+        "SecurityGroups" : [
+          { "Ref" : "DashboardSecurityGroup" },
+          "splunk-access"
+        ],
+        "InstanceType" : { "Ref" : "DashboardInstanceType" },
+        "UserData": { "Fn::Base64" : { "Ref" : "DashboardScript" } }
+      }
+    },
+
+    "DashboardAutoScalingGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : { "Fn::GetAZs" : ""},
+        "LaunchConfigurationName" : { "Ref" : "DashboardLaunchConfig" },
+        "MinSize" : "1",
+        "MaxSize" : "1",
+        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Dashboard", "PropagateAtLaunch" : "true"} ]
+      }
+    },
+
     "DashboardSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
@@ -199,47 +229,6 @@
           { "IpProtocol" : "tcp", "FromPort" : { "Ref": "WebPort" }, "ToPort" : { "Ref": "WebPort" }, "CidrIp" : "0.0.0.0/0" }
         ]
       }
-    },
-
-    "DashboardIP" : {
-      "Type": "AWS::EC2::EIP"
-    },
-
-    "IPAssoc" : {
-      "Type" : "AWS::EC2::EIPAssociation",
-      "Properties" : {
-        "InstanceId": { "Ref": "DashboardInstance" },
-        "EIP" : { "Ref": "DashboardIP" }
-      }
-    },
-
-    "DashboardInstance" : {
-      "Type" : "AWS::EC2::Instance",
-      "Properties" : {
-        "ImageId" : { "Fn::FindInMap" : [
-          "AWSRegionArch2AMIAmazonLinux", { "Ref" : "AWS::Region" },
-          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "DashboardInstanceType" },
-          "Arch" ] } ] },
-        "KeyName" : { "Ref" : "KeyName" },
-        "SecurityGroups" : [
-          { "Ref" : "DashboardSecurityGroup" },
-          "splunk-access"
-        ],
-        "InstanceType" : { "Ref" : "DashboardInstanceType" },
-        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Dashboard"} ],
-        "UserData": { "Fn::Base64" : { "Ref" : "DashboardScript" } }
-      }
-    }
-  },
-
-  "Outputs" : {
-    "DashboardIP" : {
-      "Value" : { "Ref" : "DashboardIP" }
-    },
-
-    "URL" : {
-      "Description" : "Dashboard URL",
-      "Value" : { "Fn::Join" : ["", ["http://", { "Ref" : "DashboardIP" }, ":", { "Ref" : "WebPort" }]] }
     }
   }
 }

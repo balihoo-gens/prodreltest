@@ -8,7 +8,11 @@ import json
 import time
 
 class Deployment(object):
-    def __init__(self, log_filename, unattended=False):
+    def __init__(self, log_filename, region, pyversion, veversion, dasheip, unattended=False):
+        self._dasheip = dasheip
+        self._veversion = veversion
+        self._pyversion = pyversion
+        self._region = region
         self._unattended = unattended
         self._log_filename = log_filename
         self.log = Splogger(self._log_filename, component="deployment")
@@ -40,13 +44,13 @@ class Deployment(object):
         self.log.debug("uploading " + pkgpath)
         u = Uploader(
             s3bucket,
-            "us-west-2",
+            self._region,
             os.environ["AWS_ACCESS_KEY_ID"],
             os.environ["AWS_SECRET_ACCESS_KEY"]
         )
         return u.upload_dir(pkgpath)
 
-    def create_stack(self, region, s3url, template_file, script_file):
+    def create_stack(self, s3url, template_file, script_file):
         if not self.check_aws_requirements():
             raise Exception("AWS Credentials not in environment")
 
@@ -59,7 +63,7 @@ class Deployment(object):
         access_key = os.environ["AWS_ACCESS_KEY_ID"]
         secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
         self.log.debug("creating a stack using " + s3url)
-        c = CloudFormer(region, access_key, secret_key)
+        c = CloudFormer(self._region, access_key, secret_key)
 
         parameters = {
             "KeyName" : "paul-ami-pair",
@@ -68,22 +72,31 @@ class Deployment(object):
             "MinInstances" : "1",
             "MaxInstances" : "10",
             "WebPort" : "8080",
-            "WorkerScript" : self.gen_script(script_file, access_key, secret_key, s3url, ""),
-            "DashboardScript" : self.gen_script(script_file, access_key, secret_key, s3url, "com.balihoo.fulfillment.dashboard.dashboard")
+            "WorkerScript" : self.gen_script(script_file, access_key, secret_key, s3url, None, ""),
+            "DashboardScript" : self.gen_script(script_file, access_key, secret_key, s3url, self._dasheip, "com.balihoo.fulfillment.dashboard.dashboard")
         }
 
         #json dump guarantees valid json, but not a valid template per se
         stackname = "fulfillment%d" % (int(time.time()),)
         return c.create_stack(stackname, json.dumps(template_data), parameters)
 
-    def gen_script(self, script_file, access_key, secret_key, s3_bucket_url, classes):
+    def gen_script(self, script_file, access_key, secret_key, s3_bucket_url, eip, classes):
         pieces = [
-          "#!/bin/bash",
-          "AWSACCESSKEY=%s" % access_key,
-          "AWSSECRETKEY=%s" % secret_key,
-          "S3BUCKETURL=%s" % s3_bucket_url,
-          "CLASSNAMES=%s" % classes,
+            "#!/bin/bash",
+            "set -e",
+            "AWSACCESSKEY=%s" % access_key,
+            "AWSSECRETKEY=%s" % secret_key,
+            "AWSREGION=%s" % self._region,
+            "S3BUCKETURL=%s" % s3_bucket_url,
+            "CLASSNAMES=%s" % classes,
+            "VEDIR=/opt/balihoo/virtualenv",
+            "PYVERSION=%s" % self._pyversion,
+            "VEVERSION=%s" % self._veversion,
         ]
+
+        #optionally add the dashboard eip option.
+        if eip:
+            pieces.append('EIPOPT="--eip %s"' % eip)
 
         with open(script_file) as f:
             pieces.append(f.read())

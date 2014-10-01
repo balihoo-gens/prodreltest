@@ -65,6 +65,10 @@ class Packager:
         splogger = os.path.join(self._rootdir, "deployment/deployment/splogger.py")
         shutil.copy(splogger, tmpdir)
 
+        self.info("gathering virtualenv setup script")
+        vesetup = os.path.join(self._rootdir, "deployment/virtualenv/setup")
+        shutil.copy(vesetup, os.path.join(tmpdir, "vesetup"))
+
         self.info("gathering install script and deps")
         installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall")
         shutil.copy(installscript, tmpdir)
