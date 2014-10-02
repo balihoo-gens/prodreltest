@@ -520,6 +520,10 @@ class SectionReferences(sectionNames:List[String]) {
           priorSectionRef.dismissed = true
         case _ =>
           // This is the first referenced section..
+          if(sectionRef.section.get.status == SectionStatus.CONTINGENT) {
+            sectionRef.section.get.setReady("Promoted from Contingent", DateTime.now)
+            sectionRef.section.get.resolveReferences(map) // <-- recurse
+          }
       }
       priorSectionRef = sectionRef
     }
