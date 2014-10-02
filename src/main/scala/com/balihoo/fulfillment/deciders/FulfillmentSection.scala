@@ -115,7 +115,13 @@ class FulfillmentSection(val name: String
           jsonInitPrereqs(v.as[JsArray])
 
         case "status" =>
-          status = SectionStatus.withName(v.as[String])
+          try {
+            status = SectionStatus.withName(v.as[String])
+          } catch {
+            case nsee:NoSuchElementException =>
+              timeline.error(s"'${v.as[String]}' is an invalid status! Using IMPOSSIBLE by default.", Some(creationDate))
+              status = SectionStatus.IMPOSSIBLE
+          }
 
         case "essential" =>
           essential = v.as[Boolean]

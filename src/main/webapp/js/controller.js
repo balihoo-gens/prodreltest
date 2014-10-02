@@ -197,6 +197,10 @@ app.config(
                       controller : "workflowInitiationController",
                       templateUrl : "partials/workflowInitiate.html",
                       reloadOnSearch: false})
+            .when("/workflow/initiate/:command", {
+                      controller : "workflowInitiationController",
+                      templateUrl : "partials/workflowInitiate.html",
+                      reloadOnSearch: false})
             .when("/history", {
                       controller : "historyController",
                       templateUrl : "partials/history.html",
@@ -308,7 +312,7 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     };
 });
 
-app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil) {
+app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil, environment) {
 
     $scope.formatUtil = formatUtil;
 
@@ -526,6 +530,11 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         $anchorScroll();
     };
 
+    $scope.newWorkflow = function() {
+        environment.existingWorkflow = $scope.workflow;
+        $location.path("workflow/initiate/fromExisting");
+    };
+
     $("#rawInputToggle").click(function() {
         $('#rawInput').slideToggle()
     });
@@ -608,10 +617,31 @@ app.controller('workersController', function($scope, $route, $http, $location, e
 
 });
 
-app.controller('workflowInitiationController', function($scope, $route, $http, $location) {
+app.controller('workflowInitiationController', function($scope, $route, $http, $location, formatUtil, environment) {
 
-    $scope.loading = false;
-    $scope.tags = [ { text: 'Dashboard:Initiated'}];
+    $scope.$on(
+        "$routeChangeSuccess",
+        function($currentRoute, $previousRoute) {
+            $scope.params = $route.current.params;
+            $scope.init();
+        }
+    );
+
+
+    $scope.init = function() {
+        $scope.loading = false;
+        $scope.tags = [
+            { text: 'Dashboard:Initiated'}
+        ];
+        $scope.workflowId = "Manual Run: " + moment().unix();
+
+        if($scope.params.command == "fromExisting") {
+            if(environment.existingWorkflow !== null) {
+                $scope.inputJson = environment.existingWorkflow.input;
+                $scope.workflowId = "Re-run of "+environment.existingWorkflow.workflowId;
+            }
+        }
+    };
 
     $scope.initiateWorkflow = function() {
         $scope.loading = true;
@@ -632,7 +662,7 @@ app.controller('workflowInitiationController', function($scope, $route, $http, $
                      })
             .error(function(error) {
                        $scope.loading = false;
-                       toastr.error(error.details, error.error)
+                       toastr.error(formatUtil.formatWhitespace(error.details), error.error)
                    });
     };
 
