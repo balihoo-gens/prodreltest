@@ -125,12 +125,20 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
     nameToSection isDefinedAt name
   }
 
+  def initializeWithInput(fulfillmentInput:JsObject, when:DateTime) = {
+    for((jk, jv) <- fulfillmentInput.fields) {
+      nameToSection += (jk -> new FulfillmentSection(jk, jv.as[JsObject], when))
+    }
+
+    ensureSanity(when)
+  }
+
   protected def processEvent(event:HistoryEvent) = {
     try {
       eventHandlers.getOrElse(EventType.fromValue(event.getEventType), processUnhandledEventType _)(event)
     } catch {
       case e:Exception =>
-        timeline.error(s"Problem processing ${event.getEventType}: "+e.getMessage, Some(new DateTime(event.getEventTimestamp)))
+        timeline.error(s"Problem processing ${event.getEventType}: ${e.getMessage}", Some(new DateTime(event.getEventTimestamp)))
     }
 
     // We look through the section references to see if anything needs to be promoted from CONTINGENT -> READY.
@@ -153,11 +161,7 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
   protected def processWorkflowExecutionStarted(event: HistoryEvent) = {
     val fulfillmentInput = Json.parse(event.getWorkflowExecutionStartedEventAttributes.getInput).as[JsObject]
 
-    for((jk, jv) <- fulfillmentInput.fields) {
-      nameToSection += (jk -> new FulfillmentSection(jk, jv.as[JsObject], new DateTime(event.getEventTimestamp)))
-    }
-
-    ensureSanity(new DateTime(event.getEventTimestamp))
+    initializeWithInput(fulfillmentInput, new DateTime(event.getEventTimestamp))
   }
 
   protected def processActivityTaskScheduled(event: HistoryEvent) = {

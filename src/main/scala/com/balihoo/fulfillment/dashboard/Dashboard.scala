@@ -1,8 +1,9 @@
 package com.balihoo.fulfillment.dashboard
 
 import java.io.File
+import java.util
 
-import com.balihoo.fulfillment.deciders.{DecisionGenerator, FulfillmentSection, FulfillmentSections}
+import com.balihoo.fulfillment.deciders._
 import com.balihoo.fulfillment.workers.{UTCFormatter, FulfillmentWorkerTable, FulfillmentWorkerEntry}
 import org.joda.time.DateTime
 import play.api.libs.json._
@@ -27,7 +28,25 @@ trait WorkflowInitiatorComponent {
     this: SWFAdapterComponent =>
 
     def initate(id:String, input:String, tags:List[String]): String = {
-      Json.parse(input)
+
+      // First validate the input as best as we can..
+      val fulfillmentInput = Json.parse(input).as[JsObject]
+      val fulfillmentSections = new FulfillmentSections(new util.ArrayList[HistoryEvent]())
+      fulfillmentSections.initializeWithInput(fulfillmentInput, DateTime.now())
+
+      val errors = new util.ArrayList[String]()
+      for((name, section) <- fulfillmentSections.nameToSection) {
+        for(event <- section.timeline.events) {
+          if(event.eventType == TimelineEventType.ERROR) {
+            errors.add(s"$name: ${event.message}")
+          }
+        }
+      }
+
+      if(errors.size > 0) {
+        throw new Exception(errors.mkString("Input has errors!", ",\n\t", ""))
+      }
+
       val executionRequest = new StartWorkflowExecutionRequest()
       executionRequest.setDomain(swfAdapter.config.getString("domain"))
       executionRequest.setWorkflowId(id)
