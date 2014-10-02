@@ -14,6 +14,7 @@ import scala.language.implicitConversions
 import scala.collection.convert.wrapAsJava._
 import scala.collection.mutable
 import com.amazonaws.services.simpleworkflow.model._
+import java.net.URLEncoder
 
 @RunWith(classOf[JUnitRunner])
 class TestFulfillmentCoordinator extends Specification with Mockito
@@ -498,6 +499,74 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       decisions(2).getDecisionType mustEqual "CompleteWorkflowExecution"
     }
 
+
+    "  URL Encode strings using URLEncode" in {
+      val input = "if ((!flip && flap->flop()) || (*deref::ptr)[7]) { return ~(&address); }"
+      val sections = generateSections(
+      s"""{
+        "HumanFoot": {
+            "action": "URLEncode",
+            "params": {
+                "input": "$input"
+            },
+            "status" : "READY"
+        }
+      }"""
+
+      )
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs0 = decisions(0).getRecordMarkerDecisionAttributes
+      attribs0 mustNotEqual null
+      attribs0.getMarkerName mustEqual "OperatorResult##HumanFoot##SUCCESS"
+      attribs0.getDetails mustEqual URLEncoder.encode(input, "UTF-8")
+      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
+    }
+
+    "  URL Encode strings from a format" in {
+      val soulfood = Map(
+        "grits" -> "4# of grits",
+        "fish" -> "a rusty bucket of F*I*S*H heads",
+        //"door" -> "served on a &*^$#W(*&)@#^*&^ cellar d00r!", //Failed because:FAILURE Illegal group reference
+        "door" -> "served on a &*^#W(*&)@#^*&^ cellar d00r!",
+        "gravy" -> "with gravy. period."
+      )
+      val format = "\"{" + soulfood.keys.mkString("}, {") + "}\""
+      val items = for { (k,v) <- soulfood } yield s""" "$k" : "$v" """
+      val input = s"""{
+        "HumanFoot": {
+            "action": "URLEncode",
+            "params": {
+                "input": ["SoulFood"]
+            },
+            "status" : "READY"
+        },
+        "SoulFood": {
+            "action" : "StringFormat",
+            "params" : { "format" : $format,
+                         ${items.mkString(",\n")}
+            },
+            "status" : "READY"
+        }
+      }"""
+      val sections = generateSections(input)
+      val generator = new DecisionGenerator(sections)
+      val decisions = generator.makeDecisions()
+      val attribs0 = decisions(0).getRecordMarkerDecisionAttributes
+      attribs0 mustNotEqual null
+
+      val soulcat = soulfood.values.mkString(", ")
+      attribs0.getMarkerName mustEqual "OperatorResult##SoulFood##SUCCESS"
+      attribs0.getDetails mustEqual soulcat
+
+      val attribs1 = decisions(1).getRecordMarkerDecisionAttributes
+      attribs1 mustNotEqual null
+
+      attribs1.getMarkerName mustEqual "OperatorResult##HumanFoot##SUCCESS"
+      attribs1.getDetails mustEqual URLEncoder.encode(soulcat, "UTF-8")
+
+      decisions(2).getDecisionType mustEqual "CompleteWorkflowExecution"
+    }
   }
 
   "SectionReference" should {
