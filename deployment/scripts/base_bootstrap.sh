@@ -47,7 +47,7 @@ logdo "$ACTIVATE"
 log "installing boto"
 logdo "pip install boto"
 
-FFINSTCMD="python ${FFDIR}/ffinstall ${EIPOPT} ${CLASSNAMES}"
+FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES}"
 echo "#!/bin/bash" > runffinstall
 echo "$ACTIVATE" >> runffinstall
 echo "$FFINSTCMD" >> runffinstall
