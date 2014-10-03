@@ -18,6 +18,7 @@ import play.api.libs.json._
 import com.balihoo.fulfillment.util.{Getch, Splogger, SploggerComponent}
 
 import scala.util.matching.Regex
+import java.net.URLEncoder
 
 object Constants {
   final val delimiter = "##"
@@ -195,6 +196,7 @@ class FulfillmentOperators {
         MessageDigest.getInstance("MD5").digest(parameters("input").getBytes).map("%02X".format(_)).mkString
       })
   )
+
   registerOperator(
     new FulfillmentOperator(
       "StringFormat",
@@ -206,8 +208,22 @@ class FulfillmentOperators {
       ),
       (parameters) => {
         val pattern = new Regex("""\{(\w+)\}""", "token")
-          pattern.replaceAllIn(parameters("format"),
-          m => parameters.getOrElse(m.group("token"), "--"))
+        pattern.replaceAllIn(
+          parameters("format"),
+          m => parameters.getOrElse(m.group("token"), "--")
+        )
+      })
+  )
+
+  registerOperator(
+    new FulfillmentOperator(
+      "URLEncode",
+      new OperatorSpecification(
+        List(new OperatorParameter("input", "string", "The string to URLEncode")),
+        new OperatorResult("string", "URLEncoded form of 'input'")
+      ),
+      (parameters) => {
+        URLEncoder.encode(parameters("input"), "UTF-8")
       })
   )
 

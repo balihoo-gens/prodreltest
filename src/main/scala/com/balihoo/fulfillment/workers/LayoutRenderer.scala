@@ -66,7 +66,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
     try {
       val id = params("formid")
-      val bdata = URLEncoder.encode(params("branddata"))
+      val bdata = URLEncoder.encode(params("branddata"), "UTF-8")
       val idata = URLEncoder.encode(params("inputdata"))
 
       val cliptuple = if (params.has("clipselector")) { (

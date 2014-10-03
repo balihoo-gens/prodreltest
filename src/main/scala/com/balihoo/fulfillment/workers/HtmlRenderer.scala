@@ -6,6 +6,7 @@ import com.balihoo.fulfillment.util.Splogger
 import play.api.libs.json.{Json, JsObject}
 import scala.io.Source
 import java.io._
+import scala.collection.mutable.{Map => MutableMap}
 
 /*
  * this is the dependency-injectable class containing all functionality
@@ -53,27 +54,30 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
       new ActivitySpecification(List(
         new ActivityParameter("source", "string", "The URL of of the page to render"),
         new ActivityParameter("clipselector", "string", "The selector used to clip the image", false),
+        new ActivityParameter("data", "string", "Optional URLEncoded POST data. Not providing this will use GET", false),
         new ActivityParameter("target", "string", "The S3 filename of the resulting image")
       ), new ActivityResult("string", "the target URL if successfully saved"))
   }
 
   override def handleTask(params: ActivityParameters) = {
     try {
-      val cliptuple = if (params.has("clipselector")) { (
-        "clipselector", params("clipselector"))
-      } else {
-        ("ignore", "undefined")
-      }
 
-      val cleaninput = Json.stringify(Json.toJson(Map(
+      val input = MutableMap(
         "action" -> "render",
         "source" -> params("source"),
-        "target" -> params("target"),
-        cliptuple
-      )))
+        "target" -> params("target")
+      )
 
-      splog.debug(s"running process with ${cleaninput}")
-      val result = command.run(cleaninput)
+      //optionally add the optional parameters
+      for (s <- Seq("data", "clipselector")
+        if params.has(s)
+      ) yield {
+        input(s) = params(s)
+      }
+
+      val jsinput = Json.stringify(Json.toJson(input.toMap))
+      splog.debug(s"running process with ${jsinput}")
+      val result = command.run(jsinput)
       splog.debug(s"process out: ${result.out}")
       splog.debug(s"process err: ${result.err}")
       result.code match {
