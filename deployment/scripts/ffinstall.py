@@ -78,6 +78,8 @@ class Installer(object):
         secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
         region = os.environ["AWS_REGION"]
         ec2conn = ec2.connect_to_region(region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        if ec2conn.disassociate_address(public_ip=eip):
+            self._log.info("successfully disassociated eip " + eip)
         if ec2conn.associate_address(instance_id=instance_id, public_ip=eip):
             self._log.info("successfully associated with eip " + eip)
         else:
