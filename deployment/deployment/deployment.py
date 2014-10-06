@@ -37,12 +37,10 @@ class Deployment(object):
         p = Packager(rootdir, log_filename=self._log_filename)
         return p.package()
 
-    def upload(self, pkgpath, s3bucket):
-        if not self.check_aws_requirements():
-            raise Exception("AWS Credentials not in environment")
+    def upload(self, pkgpath):
         self.log.debug("uploading " + pkgpath)
         u = Uploader(
-            s3bucket,
+            self._cfg.s3bucket,
             self._cfg.region,
             self._cfg.access_key,
             self._cfg.secret_key,
@@ -56,7 +54,7 @@ class Deployment(object):
             template_data = json.loads(tf.read())
 
         self.log.debug("creating a stack using " + s3url)
-        c = CloudFormer(self._region, self._cfg.access_key, self._cfg.secret_key)
+        c = CloudFormer(self._cfg.region, self._cfg.access_key, self._cfg.secret_key)
 
         dash_class = "com.balihoo.fulfillment.dashboard.dashboard"
         cfg = self._cfg
@@ -70,7 +68,7 @@ class Deployment(object):
             "AccessIPMask"          : cfg.access_ip_mask,
             "WebPort"               : cfg.web_port,
             "WorkerScript"          : self.gen_script(script_file, s3url, None, ""),
-            "DashboardScript"       : self.gen_script(script_file, s3url, self._dasheip, dash_class),
+            "DashboardScript"       : self.gen_script(script_file, s3url, self._cfg.dasheip, dash_class),
             "Environment"           : cfg.env,
         }
 
