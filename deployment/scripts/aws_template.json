@@ -16,7 +16,6 @@
     "WorkerInstanceType" : {
       "Description" : "WebServer EC2 instance type",
       "Type" : "String",
-      "Default" : "t1.micro",
       "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.large", "m1.xlarge" ],
       "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
     },
@@ -24,7 +23,6 @@
     "DashboardInstanceType" : {
       "Description" : "WebServer EC2 instance type",
       "Type" : "String",
-      "Default" : "t1.micro",
       "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.large", "m1.xlarge" ],
       "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
     },
@@ -33,7 +31,6 @@
       "Description" : "The minimum number of Workers",
       "Type" : "Number",
       "MinValue" : "1",
-      "Default"  : "1",
       "ConstraintDescription" : "Enter a number >0"
     },
 
@@ -41,8 +38,7 @@
       "Description" : "The maximum number of Workers",
       "Type" : "Number",
       "MinValue" : "1",
-      "Default"  : "1",
-      "ConstraintDescription" : "Enter a number >1"
+      "ConstraintDescription" : "Enter a number >0"
     },
 
     "WebPort" : {
@@ -50,8 +46,7 @@
       "Type" : "Number",
       "MinValue" : "1",
       "MaxValue" : "65535",
-      "Default"  : "80",
-      "ConstraintDescription" : "Enter a number between 0 and 256"
+      "ConstraintDescription" : "Enter a number between 0 and 65535"
     },
 
     "WorkerScript" : {
@@ -61,6 +56,16 @@
 
     "DashboardScript" : {
       "Description" : "The bootstrap script for the dashboard instance",
+      "Type" : "String"
+    },
+
+    "AccessIPMask" : {
+      "Description" : "The IP mask for ssh and http access",
+      "Type" : "String"
+    },
+
+    "Environment" : {
+      "Description" : "The environment for the instances: dev, stage, prod, demo, david. Use this to separate this deployment from another in the same region",
       "Type" : "String"
     }
   },
@@ -96,7 +101,7 @@
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
         "GroupDescription" : "Enable SSH access",
-        "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" } ]
+        "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : { "Ref" : "AccessIPMask" } } ]
       }
     },
 
@@ -124,7 +129,11 @@
         "LaunchConfigurationName" : { "Ref" : "WorkerLaunchConfig" },
         "MinSize" : { "Ref" : "MinInstances" },
         "MaxSize" : { "Ref" : "MaxInstances" },
-        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Decider and Workers", "PropagateAtLaunch" : "true"} ]
+        "Tags" : [ {
+            "Key" : "Name",
+            "Value" : { "Fn::Join" : [ "-", [ "balihoo-fulfillment-app", { "Ref" : "Environment" } ] ] },
+            "PropagateAtLaunch" : "true"
+        } ]
       }
     },
 
@@ -151,12 +160,12 @@
     "CPUAlarmHigh": {
       "Type": "AWS::CloudWatch::Alarm",
       "Properties": {
-        "AlarmDescription": "Scale-up if CPU is greater than 90% for 10 minutes",
+        "AlarmDescription": "Scale-up if CPU is greater than 90% for 30 minutes",
         "MetricName": "CPUUtilization",
         "Namespace": "AWS/EC2",
         "Statistic": "Average",
         "Period": "300",
-        "EvaluationPeriods": "2",
+        "EvaluationPeriods": "6",
         "Threshold": "90",
         "AlarmActions": [ { "Ref": "WorkerScaleUpPolicy" } ],
         "Dimensions": [
@@ -202,6 +211,7 @@
         "KeyName" : { "Ref" : "KeyName" },
         "SecurityGroups" : [
           { "Ref" : "DashboardSecurityGroup" },
+          { "Ref" : "InstanceSecurityGroup" },
           "splunk-access"
         ],
         "InstanceType" : { "Ref" : "DashboardInstanceType" },
@@ -216,7 +226,11 @@
         "LaunchConfigurationName" : { "Ref" : "DashboardLaunchConfig" },
         "MinSize" : "1",
         "MaxSize" : "1",
-        "Tags" : [ {"Key" : "Name", "Value" : "Fulfillment Dashboard", "PropagateAtLaunch" : "true"} ]
+        "Tags" : [ {
+            "Key" : "Name",
+            "Value" : { "Fn::Join" : [ "-", [ "balihoo-fulfillment-web", { "Ref" : "Environment" } ] ] },
+            "PropagateAtLaunch" : "true"
+        } ]
       }
     },
 
@@ -225,8 +239,7 @@
       "Properties" : {
         "GroupDescription" : "Enable SSH access",
         "SecurityGroupIngress" : [
-          { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0" },
-          { "IpProtocol" : "tcp", "FromPort" : { "Ref": "WebPort" }, "ToPort" : { "Ref": "WebPort" }, "CidrIp" : "0.0.0.0/0" }
+          { "IpProtocol" : "tcp", "FromPort" : { "Ref": "WebPort" }, "ToPort" : { "Ref": "WebPort" }, "CidrIp" : { "Ref" : "AccessIPMask" } }
         ]
       }
     }

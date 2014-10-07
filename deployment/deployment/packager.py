@@ -70,12 +70,7 @@ class Packager:
         shutil.copy(vesetup, os.path.join(tmpdir, "vesetup"))
 
         self.info("gathering install script and deps")
-        installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall")
+        installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall.py")
         shutil.copy(installscript, tmpdir)
 
-        self.info("setting launch script execute permissions")
-        launchfile = os.path.join(tmpdir, "ffinstall")
-        os.chmod(launchfile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
-                             stat.S_IRGRP |                stat.S_IXGRP |
-                             stat.S_IROTH |                stat.S_IXOTH )
         return tmpdir
