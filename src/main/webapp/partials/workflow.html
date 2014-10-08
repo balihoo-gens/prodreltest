@@ -15,120 +15,144 @@
             <span id="rawInputToggle" class="muted label">Show Input</span>
             <span id="historyViewToggle" class="muted label">Show History</span>
         </div>
-        <h2 ng-show="workflow.timeline">Timeline</h2>
-        <div class="block">
-            <div class="panel panel-default initiallyHidden" id="rawInput">
-                <div class="panel-heading-small">
-                    <button class="btn btn-xs pull-right" ng-click="newWorkflow()">Create New Fulfillment</button>
-                    Fulfillment Input
-                </div>
-                <pre class="json" ng-bind-html="formatUtil.formatJsonBasic(workflow.input)"></pre>
-            </div>
-            <div id="historyView" class="panel panel-default initiallyHidden">
-                <div class="panel-heading-small">
-                    Fulfillment History
-                </div>
-                <div ng-repeat="event in workflow.history">
-                    <span class="label label-default" title="{{event.id}}">{{event.type}} - <span class="muted" title="{{event.timestamp}}">{{event.timestamp | momentFromNow}}</span></span>
-                    <pre class="json" ng-bind-html="formatUtil.formatJsonlike(event.attributes)"></pre>
-                </div>
-            </div>
-            <div ng-repeat="event in workflow.timeline">
-                <span class="pull-right muted" title="{{event.when}}">{{event.when | momentFromNow}}</span>
-                <i class="fa fa-{{figureTimelineIcon(event.eventType)}} {{figureTimelineStyle(event.eventType)}}"></i>&nbsp;<span ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
-            </div>
-        </div>
-        <h2>Sections</h2>
-        <div class="panel panel-default" ng-repeat="(name, section) in workflow.sections">
-            <div id="section_{{name}}" class="panel-heading-small">
-				<span class="pull-right">
-                    <span ng-show="section.input.action.name">
-					    {{section.input.action.name}} : {{section.input.action.version}} &nbsp;&nbsp;
-                    </span>
-                    <span ng-hide="section.input.action.name">
-					    <i class="fa fa-asterisk"></i>&nbsp; {{section.input.action}} &nbsp;&nbsp;
-                    </span>
-                    <span ng-hide="workflow.editable">
-					    <span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
-                    </span>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="row">
+                    <div class="col-md-12 col-sm-6">
+                        <h3>Sections</h3>
+                        <ul class="nav nav-pills nav-stacked">
+                            <li ng-repeat="(name, section) in workflow.sections" ng-class="{active : section.showContents}" >
+                                <a ng-click="showSection(section)" class="action">
+                                    <span class="pull-right">
+                                    <span ng-hide="workflow.editable">
+                                        <span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
+                                    </span>
 
-                    <span ng-show="workflow.editable">
-					    <span ng-hide="section.editingStatus" ng-click="section.editStatus(section)" class="label {{figureStatusLabel(section.status)}}" ng-class="{'status-edited' : section.statusChanged(section)}">{{section.status}}</span>
-                        <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)" ng-blur="section.editingStatus = false">
-                            <option>{{section.originalStatus}}</option>
-                            <option ng-show="section.originalStatus != 'READY'">READY</option>
-                            <option ng-show="section.originalStatus != 'TERMINAL'">TERMINAL</option>
-                        </select>
-                    </span>
+                                    <span ng-show="workflow.editable">
+                                        <span ng-hide="section.editingStatus" ng-click="section.editStatus(section)" class="label {{figureStatusLabel(section.status)}}" ng-class="{'status-edited' : section.statusChanged(section)}">{{section.status}}</span>
+                                        <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)" ng-blur="section.editingStatus = false">
+                                            <option>{{section.originalStatus}}</option>
+                                            <option ng-show="section.originalStatus != 'READY'">READY</option>
+                                            <option ng-show="section.originalStatus != 'TERMINAL'">TERMINAL</option>
+                                        </select>
+                                    </span>
 
-				</span>
-                <img width="20" height="20" src="img/star_gold_256.png" style="margin-bottom:4px;margin-right:4px;" title="This section MUST be successful!!" ng-show="section.essential">
-                <b ng-click="section.showContents = !section.showContents" class="action">{{name}}</b>
-                <span ng-show="section.waitUntil" title="{{section.waitUntil}}">will run {{section.waitUntil | momentFromNow}}</span>
-            </div>
-            <div class="panel-body-small" ng-show="section.showContents">
-
-                <div class="blob" style="width:45%; margin-bottom:20px;">
-                    <h3 ng-show="section.timeline">Timeline</h3>
-                    <div class="block" ng-repeat="event in section.timeline">
-                        <span class="pull-right muted" title="{{event.when}}">{{event.when | momentFromNow}}</span>
-                        <i class="fa fa-{{figureTimelineIcon(event.eventType)}} {{figureTimelineStyle(event.eventType)}}"></i>&nbsp;<span ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
+                                </span>
+                                    <b>{{name}}</b>
+                                    <img width="20" height="20" src="img/star_gold_256.png" style="margin-bottom:4px;margin-right:4px;" title="This section MUST be successful!!" ng-show="section.essential">
+                                    <span ng-show="section.waitUntil" title="{{section.waitUntil}}">will run {{section.waitUntil | momentFromNow}}</span>
+                                </a>
+                            </li>
+                        </ul>
                     </div>
-                    <br/>
-                    <h3>Parameters</h3>
-                    <table class="table table-condensed table-hover block params" style="width:95%">
-                        <tr ng-repeat="(pname, param) in section.params" ng-class="{info : param.edited}">
-                            <td style="width:100px"><b>{{pname}}</b></td>
-                            <td>
-
-                                <div style="width:92%">
-                                    <div ng-if="param.isJson">
-                                <span ng-if="!param.editing">
-                                    <span class="json" ng-bind-html="formatUtil.formatJson(param.value)"></span>
-                                </span>
-                                <span ng-if="param.editing">
-                                        <textarea rows="15" class="form-control" ng-model="param.value"></textarea>
-                                </span>
-                                    </div>
-
-                                    <div ng-if="param.isArray">
-                                <span ng-if="!param.editing">
-                                    <div ng-repeat="item in param.value">
-                                        <span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}<span ng-repeat="pathItem in item.path"><span ng-show="pathItem.key">/{{pathItem.key}}</span><span ng-show="pathItem.index">[{{pathItem.index}}]</span></span></span>&nbsp;<span ng-show="item.resolved" ng-bind-html="formatUtil.formatJson(item.value)"></span></div>
-                                </span>
-                                <span ng-if="param.editing">
-                                    <select ng-repeat="item in param.value" ng-model="item">
-                                        <option ng-repeat="(sectionName, otherSection) in workflow.sections" ng-selected="sectionName == item.name">{{sectionName}}</option>
-                                    </select>
-                                    <i class="fa fa-plus muted action" ng-click="addSection(param.value)"></i>
-                                </span>
-                                    </div>
-
-                                    <div ng-if="param.isString && !param.isJson">
-                                <span ng-if="!param.editing">
-                                    <span ng-bind-html="formatUtil.formatURLs(param.value)"></span>
-                                </span>
-                                <span ng-if="param.editing">
-                                        <input type="text" class="form-control" ng-model="param.value">
-                                </span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                            <span ng-if="!param.editing && param.editable" class="action">
-                                <i class="fa fa-pencil muted action" ng-click="param.editing = true"></i>
-                            </span>
-                            <span ng-if="param.editing" style="vertical-align: middle">
-                                    <span class="fa fa-check muted green action" ng-show="param.value != param.original" ng-click="finishEditing(param)"></span>
-                                    <span class="fa fa-remove muted red action" ng-click="cancelEdit(param)"></span>
-                            </span>
-                            </td>
-                        </tr>
-                    </table>
+                    <div class="col-md-12 col-sm-6">
+                        <h3 ng-show="workflow.timeline">Fulfillment Timeline</h3>
+                        <div class="block">
+                            <div ng-repeat="event in workflow.timeline">
+                                <span class="pull-right muted" title="{{event.when}}">{{event.when | momentFromNow}}</span>
+                                <i class="fa fa-{{figureTimelineIcon(event.eventType)}} {{figureTimelineStyle(event.eventType)}}"></i>&nbsp;<span ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="blob" style="width:40%; margin-left:20px;">
-                    <h3 ng-show="section.value">Result</h3>
-                    <div class="block" ng-bind-html="formatUtil.formatJson(section.value)"></div>
+            </div>
+            <div class="col-md-9">
+                <div class="panel panel-default initiallyHidden" id="rawInput">
+                    <div class="panel-heading-small">
+                        <button class="btn btn-xs pull-right" ng-click="newWorkflow()">Create New Fulfillment</button>
+                        Fulfillment Input
+                    </div>
+                    <pre class="json" ng-bind-html="formatUtil.formatJsonBasic(workflow.input)"></pre>
+                </div>
+                <div id="historyView" class="panel panel-default initiallyHidden">
+                    <div class="panel-heading-small">
+                        Fulfillment History
+                    </div>
+                    <div ng-repeat="event in workflow.history">
+                        <span class="label label-default" title="{{event.id}}">{{event.type}} - <span class="muted" title="{{event.timestamp}}">{{event.timestamp | momentFromNow}}</span></span>
+                        <pre class="json" ng-bind-html="formatUtil.formatJsonlike(event.attributes)"></pre>
+                    </div>
+                </div>
+                <div ng-repeat="(name, section) in workflow.sections" ng-show="section.showContents">
+                    <!--<div class="row">-->
+                        <div class="col-md-12" ng-show="section.timeline">
+
+                            <h3>Section Timeline</h3>
+                            <div class="block" ng-repeat="event in section.timeline">
+                                <span class="pull-right muted" title="{{event.when}}">{{event.when | momentFromNow}}</span>
+                                <i class="fa fa-{{figureTimelineIcon(event.eventType)}} {{figureTimelineStyle(event.eventType)}}"></i>&nbsp;<span ng-bind-html="formatUtil.formatWhitespace(event.message)"></span>
+                            </div>
+                            <br/>
+                            <br/>
+                        </div>
+                        <div class="col-md-12">
+
+                            <div ng-show="section.input.action.name" class="pull-right">
+                                <i class="muted">Worker</i>&nbsp; {{section.input.action.name}} : {{section.input.action.version}} &nbsp;&nbsp;
+                            </div>
+                            <div ng-hide="section.input.action.name" class="pull-right">
+                                <i class="muted">Operator</i>&nbsp; {{section.input.action}} &nbsp;&nbsp;
+                            </div>
+                            <h3>Parameters</h3>
+                            <table class="table table-condensed table-hover block params" style="width:95%">
+                                <tr ng-repeat="(pname, param) in section.params" ng-class="{info : param.edited}">
+                                    <td style="width:100px"><b>{{pname}}</b></td>
+                                    <td>
+
+                                        <div style="width:92%">
+                                            <div ng-if="param.isJson">
+                                    <span ng-if="!param.editing">
+                                        <span class="json" ng-bind-html="formatUtil.formatJson(param.value)"></span>
+                                    </span>
+                                    <span ng-if="param.editing">
+                                                <textarea rows="15" class="form-control" ng-model="param.value"></textarea>
+                                        </span>
+                                            </div>
+
+                                            <div ng-if="param.isArray">
+                                        <span ng-if="!param.editing">
+                                            <div ng-repeat="item in param.value">
+                                                <span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}<span ng-repeat="pathItem in item.path"><span ng-show="pathItem.key">/{{pathItem.key}}</span><span ng-show="pathItem.index">[{{pathItem.index}}]</span></span></span>&nbsp;<span ng-show="item.resolved" ng-bind-html="formatUtil.formatJson(item.value)"></span></div>
+                                        </span>
+                                        <span ng-if="param.editing">
+                                            <select ng-repeat="item in param.value" ng-model="item">
+                                                <option ng-repeat="(sectionName, otherSection) in workflow.sections" ng-selected="sectionName == item.name">{{sectionName}}</option>
+                                            </select>
+                                            <i class="fa fa-plus muted action" ng-click="addSection(param.value)"></i>
+                                        </span>
+                                            </div>
+
+                                            <div ng-if="param.isString && !param.isJson">
+                                        <span ng-if="!param.editing">
+                                            <span ng-bind-html="formatUtil.formatURLs(param.value)"></span>
+                                        </span>
+                                        <span ng-if="param.editing">
+                                                <input type="text" class="form-control" ng-model="param.value">
+                                        </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                    <span ng-if="!param.editing && param.editable" class="action">
+                                        <i class="fa fa-pencil muted action" ng-click="param.editing = true"></i>
+                                    </span>
+                                    <span ng-if="param.editing" style="vertical-align: middle">
+                                            <span class="fa fa-check muted green action" ng-show="param.value != param.original" ng-click="finishEditing(param)"></span>
+                                            <span class="fa fa-remove muted red action" ng-click="cancelEdit(param)"></span>
+                                    </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <br/>
+                            <br/>
+                        </div>
+                        <div class="col-md-12">
+                            <h3 ng-show="section.value">Result</h3>
+                            <div class="block" ng-bind-html="formatUtil.formatJson(section.value)"></div>
+                            <br/>
+                            <br/>
+                        </div>
+                    <!--</div>-->
                 </div>
             </div>
         </div>

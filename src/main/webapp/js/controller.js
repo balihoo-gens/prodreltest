@@ -455,6 +455,13 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         s.push('');
     };
 
+    $scope.showSection = function(ssection) {
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            section.showContents = section == ssection;
+        }
+    };
+
     $scope.cancelWorkflowUpdate = function() {
 
         for(var sname in $scope.workflow.sections) {
