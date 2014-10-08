@@ -149,7 +149,7 @@ object AdWordsPolicy {
   }
 
   def cleanUrl(url:String):String = {
-    val testUrl = s"curl -Is $url"
+    val testUrl = s"curl -Is $url --max-time 2"
     try {
       testUrl.!!
       addProtocol(url)
