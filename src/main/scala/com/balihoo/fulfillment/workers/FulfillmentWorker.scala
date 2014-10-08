@@ -39,9 +39,10 @@ abstract class FulfillmentWorker {
   val instanceId = randomUUID().toString
 
   val domain = swfAdapter.domain
-  val name = new SWFName(swfAdapter.config.getString("name"))
-  val version = new SWFVersion(swfAdapter.config.getString("version"))
-  val taskListName = new SWFName(name+version)
+  val name = swfAdapter.name
+  val version = swfAdapter.version
+  val taskListName = swfAdapter.taskListName
+  val taskList = swfAdapter.taskList
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
@@ -50,7 +51,7 @@ abstract class FulfillmentWorker {
 
   val hostAddress = sys.env.get("EC2_HOME") match {
     case Some(s:String) =>
-      val aws_ec2_identify = "curl -s http://169.254.169.254/latest/meta-data/public-hostname"
+      val aws_ec2_identify = "curl --max-time 2 -s http://169.254.169.254/latest/meta-data/public-hostname"
       aws_ec2_identify.!!
     case None =>
       java.net.InetAddress.getLocalHost.getHostName
@@ -72,12 +73,6 @@ abstract class FulfillmentWorker {
   entry.setStatus("--")
   entry.setResolutionHistory("[]")
   entry.setStart(UTCFormatter.format(DateTime.now))
-
-  val taskList: TaskList = new TaskList().withName(taskListName)
-
-  val taskReq: PollForActivityTaskRequest = new PollForActivityTaskRequest()
-    .withDomain(domain)
-    .withTaskList(taskList)
 
   var completedTasks:Int = 0
   var failedTasks:Int = 0
@@ -107,18 +102,21 @@ abstract class FulfillmentWorker {
         done = true
       }
     )
-
-    var pollopt:Option[Future[ActivityTask]] = None
+    //echo a dot
+    getch.addMapping(Seq("."), () => {
+      print(".")
+    }
 
     getch.doWith {
       while(!done) {
+        val jfut = swfAdapter.client
+        val jfut = swfAdapter.client.pollForActivityTaskAsync(taskReq)
         if (pollopt.isEmpty || pollopt.get.isCompleted) {
 
           //create a future for the poll, so the loop stays responsive
           val pollfut = future {
             updateStatus("Polling")
             //SWF creates a Java future for
-            val jfut = swfAdapter.client.pollForActivityTaskAsync(taskReq)
             while (!jfut.isDone) {
               if (done) {
                 jfut.cancel(true)
