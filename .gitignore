@@ -3,6 +3,7 @@
 # sbt specific
 dist/*
 target/
+src/target
 lib_managed/
 src_managed/
 project/boot/
@@ -36,3 +37,5 @@ atlassian-ide-plugin.xml
 
 #vi
 .*.sw?
+
+*.log

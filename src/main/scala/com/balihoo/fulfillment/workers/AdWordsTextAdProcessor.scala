@@ -81,11 +81,11 @@ trait TextAdCreatorComponent {
 
     def newTextAd(params:ActivityParameters): TextAd = {
 
-      val headline = params("headline")
-      val desc1 = params("description1")
-      val desc2 = params("description2")
-      val displayUrl = params("displayUrl")
-      val url = params("url")
+      val headline = AdWordsPolicy.fixUpperCaseViolations(params("headline"))
+      val desc1 = AdWordsPolicy.fixUpperCaseViolations(params("description1"))
+      val desc2 = AdWordsPolicy.fixUpperCaseViolations(params("description2"))
+      val displayUrl = AdWordsPolicy.noWWW(params("displayUrl"))
+      val url = AdWordsPolicy.cleanUrl(params("url"))
 
       val tad = new TextAd()
       tad.setHeadline(headline)

@@ -209,11 +209,8 @@ app.config(
                       controller : "workersController",
                       templateUrl : "partials/workers.html",
                       reloadOnSearch: false})
-            .when("/start", {
-                      controller : "envController",
-                      templateUrl : "partials/start.html",
-                      reloadOnSearch: false})
-            .otherwise({redirectTo : "/start"})
+            .when("/start", { redirectTo: "/history"})
+            .otherwise({redirectTo : "/history"})
         ;
     }
 );

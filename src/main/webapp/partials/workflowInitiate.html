@@ -1,6 +1,6 @@
 <div class="panel panel-default">
     <div class="panel-heading">
-        <h1>Workflow Initiation</h1>
+        <h1>Start a New Fulfillment</h1>
     </div>
     <div class="panel-body">
         <div ng-show="loading">
@@ -9,8 +9,8 @@
         <div ng-show="!runId">
             <form role="form">
                 <div class="form-group">
-                    <label>Workflow Id</label>
-                    <input type="text" class="form-control" ng-model="workflowId" placeholder="Name your workflow..">
+                    <label>Fulfillment Name</label>
+                    <input type="text" class="form-control" ng-model="workflowId" placeholder="Name this fulfillment..">
                 </div>
                 <div class="form-group">
                     <label for="inputJson">JSON</label>
@@ -36,11 +36,11 @@
             <button class="btn pull-right" ng-click="initiateWorkflow()">Start</button>
         </div>
         <div ng-show="runId">
-            <h5>Run {{runId}} initiated...</h5>
+            <h5>Fulfillment {{workflowId}} : {{runId}} initiated...</h5>
             <br/>
-            <a ng-click="seeWorkflow()">View Workflow</a>
+            <a ng-click="seeWorkflow()">View Fulfillment</a>
             <br/>
-            <a ng-click="restart()">Start Another Workflow</a>
+            <a ng-click="restart()">Start Another Fulfillment</a>
         </div>
     </div>
 </div>

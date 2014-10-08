@@ -141,7 +141,7 @@ img.constrained {
 /* ========================================= */
 /* GENERAL LAYOUT ========================== */
 #wrap > .container-fluid {
-    padding: 110px 0 30px;
+    padding: 130px 10px 30px;
 }
 
 #wrap {
@@ -310,7 +310,7 @@ h2.panel-title {
 /**/
 /* Pills w/ Content*/
 .nav-pills {
-    margin: 0 0 20px 0;
+    /*margin: 0 0 20px 0;*/
 }
 
 .nav-pills > li > a {

@@ -322,6 +322,11 @@ trait CampaignCreatorComponent {
 
       val context = s"Setting target zips for campaign ${campaign.getId}"
 
+      val newLocationCriteria = lookupLocationsByZips(zipString.split(","))
+      if(newLocationCriteria.length == 0) {
+        throw new Exception(s"Target zips codes '$zipString' didn't resolve to a valid list of zips!")
+      }
+
       val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
       // First we query the existing zips
@@ -350,8 +355,7 @@ trait CampaignCreatorComponent {
       }
 
       // Make the get request.
-      val locationCriteria = lookupLocationsByZips(zipString.split(","))
-      for(loc <- locationCriteria) {
+      for(loc <- newLocationCriteria) {
         val campaignCriterion = new CampaignCriterion()
         campaignCriterion.setCampaignId(campaign.getId)
         campaignCriterion.setCriterion(loc.getLocation)
