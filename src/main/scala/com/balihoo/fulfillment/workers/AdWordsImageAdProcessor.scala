@@ -82,8 +82,8 @@ trait ImageAdCreatorComponent {
 
       val name = params("name")
       val url = params("url")
-      val displayUrl = params("displayUrl")
-      val imageUrl = params("imageUrl")
+      val displayUrl = AdWordsPolicy.noWWW(params("displayUrl"))
+      val imageUrl = AdWordsPolicy.cleanUrl(params("imageUrl"))
 
       val image = new Image()
       adWordsAdapter.withErrorsHandled[Any]("Fetching image data", {

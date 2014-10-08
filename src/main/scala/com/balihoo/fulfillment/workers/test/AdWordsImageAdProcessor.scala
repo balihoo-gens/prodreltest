@@ -33,7 +33,7 @@ object adWordsGetAdGroupImageAd {
   class TestGetAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
     def run = {
       adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("100-019-2687")
+      adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | fulfillment test ( Client ID: 100-019-2687 )
 
       val campaignParams = new ActivityParameters(Map(
          "name" -> "fulfillment Campaign",
@@ -67,7 +67,8 @@ object adWordsAdGroupImageAd {
   class TestAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
     def run = {
       adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("100-019-2687")
+      adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | fulfillment test ( Client ID: 100-019-2687 )
+
 
       val campaignParams = Map(
          "name" -> "fulfillment Campaign",
@@ -88,7 +89,9 @@ object adWordsAdGroupImageAd {
           "imageUrl" -> "http://lorempixel.com/300/100/nature/"
       )
 
-      adCreator.createImageAd(new ActivityParameters(imageAdParams))
+      val imageAd = adCreator.createImageAd(new ActivityParameters(imageAdParams))
+      println(imageAd.getName)
+
     }
   }
 }
@@ -103,7 +106,7 @@ object adWordsUpdateAdGroupImageAd {
   class TestUpdateAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
     def run = {
       adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("100-019-2687")
+      adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | fulfillment test ( Client ID: 100-019-2687 )
 
       val campaignParams = Map(
          "name" -> "fulfillment Campaign",
@@ -127,7 +130,8 @@ object adWordsUpdateAdGroupImageAd {
 
       val ad = adCreator.getImageAd(new ActivityParameters(imageAdParams))
 
-      adCreator.updateImageAd(ad, new ActivityParameters(imageAdParams))
+      val imageAd = adCreator.updateImageAd(ad, new ActivityParameters(imageAdParams))
+      println(imageAd.getName)
     }
   }
 }

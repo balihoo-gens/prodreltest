@@ -12,6 +12,8 @@ import com.google.api.ads.adwords.axis.factory.AdWordsServices
 import com.google.api.ads.adwords.axis.v201406.cm._
 import com.google.api.ads.adwords.axis.v201406.mcm._
 import scala.collection.mutable
+import scala.sys.process._
+import scala.util.matching.Regex
 
 //typical cake would nest the adapter inside the provider
 // but that causes issues here for nested injection, i.e.
@@ -114,6 +116,7 @@ abstract class AbstractAdWordsAdapter {
   def addOrSet(operatorId:Long): Operator = {
     if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
   }
+
 }
 
 class AdWordsAdapter(cfg: PropertiesLoader)
@@ -125,5 +128,49 @@ class AdWordsAdapter(cfg: PropertiesLoader)
 
 class RateExceededException(e:RateExceededError) extends Exception {
   val error = e
+}
+
+object AdWordsPolicy {
+
+  def escapeSpaces(text:String):String = {
+    text.replace(" ", "%20")
+  }
+
+  def noProtocol(text:String):String = {
+    text.replace("http://", "").replace("https://", "")
+  }
+
+  def addProtocol(text:String, protocol:String = "http"):String = {
+    s"$protocol://${noProtocol(text)}"
+  }
+
+  def noWWW(text:String):String = {
+    noProtocol(text.replaceFirst("""^www\.""", ""))
+  }
+
+  def cleanUrl(url:String):String = {
+    val testUrl = s"curl -Is $url"
+    try {
+      testUrl.!!
+      addProtocol(url)
+    } catch {
+      case e:Exception =>
+        throw new Exception(s"URL:$url does NOT resolve!")
+        "URL_DOES_NOT_RESOLVE"
+    }
+  }
+
+  def fixUpperCaseViolations(text:String) = {
+    val upperMatcher = new Regex("""[A-Z]{2}""", "token")
+    (for(part:String <- text.split("""\s+""") if part.length > 0)
+    yield upperMatcher.findFirstIn(part) match { // check to see if we match two consecutive upper case letters...
+        case d:Some[String] =>
+          part.toLowerCase.capitalize
+        case None =>
+          part
+      }
+      ).mkString(" ")
+  }
+
 }
 
