@@ -1,25 +1,36 @@
 package com.balihoo.fulfillment.workers
 
-import java.util.Date
-import java.util.UUID.randomUUID
-
-import com.amazonaws.services.dynamodbv2.datamodeling._
-import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
-import org.joda.time.{Minutes, DateTime}
-import org.joda.time.format.ISODateTimeFormat
-import org.keyczar.Crypter
-
+//scala imports
 import scala.collection.mutable
 import scala.sys.process._
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
+import scala.util.{Success, Failure}
+import scala.concurrent.{Future, future}
+import scala.concurrent.ExecutionContext.Implicits.global
+
+//java imports
+import java.util.Date
+import java.util.UUID.randomUUID
+import java.util.concurrent.{Future => JFuture}
+import java.util.concurrent.TimeUnit
+
+//aws imports
+import com.amazonaws.services.dynamodbv2.datamodeling._
+import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
+import com.amazonaws.services.simpleworkflow.model._
+
+//play imports
 import play.api.libs.json._
 
+//other external
+import org.joda.time.{Minutes, DateTime}
+import org.joda.time.format.ISODateTimeFormat
+import org.keyczar.Crypter
+
+//local imports
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-
-import com.amazonaws.services.simpleworkflow.model._
-import play.api.libs.json.{Json, JsObject}
 import com.balihoo.fulfillment.util._
 
 abstract class FulfillmentWorker {
@@ -76,8 +87,7 @@ abstract class FulfillmentWorker {
 
   declareWorker()
 
-  var task:ActivityTask = null
-
+  var _lastTaskToken: String = ""
 
   def work() = {
 
@@ -91,41 +101,75 @@ abstract class FulfillmentWorker {
     val getch = new Getch
     getch.addMapping(
       Seq("q", "Q", "Exit"), () => {
+        //stdin received quit request. Respond on stdout
+        println("Quitting...")
         updateStatus("Terminated by user", "WARN")
         done = true
       }
     )
 
+    var pollopt:Option[Future[ActivityTask]] = None
+
     getch.doWith {
       while(!done) {
-        updateStatus("Polling")
-        task = new ActivityTask
-        try {
-          task = swfAdapter.client.pollForActivityTask(taskReq)
-          if(task.getTaskToken != null) {
-            updateStatus("Processing task.." + (task.getTaskToken takeRight 10))
-            try {
-              handleTask(specification.getParameters(task.getInput))
-            } catch {
-              case e: Exception =>
-                failTask(e.getClass.getCanonicalName, e.getMessage)
+        if (pollopt.isEmpty || pollopt.get.isCompleted) {
+
+          //create a future for the poll, so the loop stays responsive
+          val pollfut = future {
+            updateStatus("Polling")
+            //SWF creates a Java future for
+            val jfut = swfAdapter.client.pollForActivityTaskAsync(taskReq)
+            while (!jfut.isDone) {
+              if (done) {
+                jfut.cancel(true)
+                throw new Exception("User Termination")
+              }
+              if (jfut.isCancelled) {
+                throw new Exception("Polling Cancelled")
+              }
+              //wait for the java future to complete or be interrupted
+              Thread.sleep(100)
             }
+            //polling is done here, return the task
+            jfut.get
           }
-        } catch {
-          case e:Exception =>
-            if(task.getTaskToken != null) {
-              failTask(e.getClass.getCanonicalName, e.getMessage)
-            }
-            updateStatus(s"Polling Exception ${e.getMessage}", "EXCEPTION")
-          case t:Throwable =>
-            if(task.getTaskToken != null) {
-              failTask(t.getClass.getCanonicalName, t.getMessage)
-            }
-            updateStatus(s"Polling Throwable ${t.getMessage}", "ERROR")
+
+          //store the new future
+          pollopt = Some(pollfut)
+
+          //complete handler for the polling future
+          pollfut onComplete {
+            case Success(task) =>
+              _lastTaskToken = task.getTaskToken
+              if(_lastTaskToken != null) {
+                val shortToken = (_lastTaskToken takeRight 10)
+                try {
+                  updateStatus("Processing task.." + shortToken )
+                  handleTask(specification.getParameters(task.getInput))
+                } catch {
+                  case e:Exception =>
+                    failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
+                }
+              } else {
+                splog.info("no task available")
+              }
+            case Failure(e) =>
+              updateStatus(s"Polling Exception ${e.getMessage}", "EXCEPTION")
+          }
+        } else {
+          //wait for our scala polling future to complete
+          Thread.sleep(100)
         }
       }
     }
     updateStatus("Exiting")
+    val excsvc = swfAdapter.client.getExecutorService()
+    excsvc.shutdown
+    if (!excsvc.awaitTermination(3, TimeUnit.SECONDS)) {
+      val tasks = excsvc.shutdownNow()
+      println("remaining tasks: " + tasks.length)
+      swfAdapter.client.shutdown
+    }
   }
 
   def getSpecification: ActivitySpecification
@@ -137,8 +181,8 @@ abstract class FulfillmentWorker {
       val result:String = code
       completeTask(s"""{"$name": "$result"}""")
     } catch {
-      case exception:Exception =>
-        failTask(s"""{"$name": "${exception.toString}"}""", exception.getMessage)
+      case e:Exception =>
+        failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
       case t:Throwable =>
         failTask(s"""{"$name": "Caught a Throwable"}""", t.getMessage)
     }
@@ -180,7 +224,7 @@ abstract class FulfillmentWorker {
   def completeTask(result:String) = {
     completedTasks += 1
     val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
-    response.setTaskToken(task.getTaskToken)
+    response.setTaskToken(_lastTaskToken)
     response.setResult(getSpecification.result.sensitive match {
       case true => getSpecification.crypter.encrypt(result)
       case _ => result
@@ -192,7 +236,7 @@ abstract class FulfillmentWorker {
   def failTask(reason:String, details:String) = {
     failedTasks += 1
     val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
-    response.setTaskToken(task.getTaskToken)
+    response.setTaskToken(_lastTaskToken)
     response.setReason(reason)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskFailed(response)
@@ -202,7 +246,7 @@ abstract class FulfillmentWorker {
   def cancelTask(details:String) = {
     canceledTasks += 1
     val response:RespondActivityTaskCanceledRequest = new RespondActivityTaskCanceledRequest
-    response.setTaskToken(task.getTaskToken)
+    response.setTaskToken(_lastTaskToken)
     response.setDetails(details)
     swfAdapter.client.respondActivityTaskCanceled(response)
     _resolveTask(new TaskResolution("Canceled", details))
@@ -496,12 +540,14 @@ abstract class FulfillmentWorkerApp {
       val cfg = PropertiesLoader(args, name)
       val worker = createWorker(cfg, splog)
       worker.work()
+      println("done")
     }
     catch {
       case t:Throwable =>
         splog("ERROR", t.getMessage)
     }
     splog("INFO", s"Terminated $name")
+    println("really done")
   }
 }
 
