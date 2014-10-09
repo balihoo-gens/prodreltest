@@ -3,8 +3,6 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201406.cm._
 
 abstract class ImageAdTest(cfg: PropertiesLoader)
     extends AdWordsAdapterComponent
@@ -82,11 +80,11 @@ object adWordsAdGroupImageAd {
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
       val imageAdParams = Map(
-         "name" -> "Majestic",
+         "name" -> "Tasty",
           "adGroupId" -> s"${adgroup.getId}",
           "url" -> "http://balihoo.com",
           "displayUrl" ->    "http://balihoo.com",
-          "imageUrl" -> "http://lorempixel.com/300/100/nature/"
+          "imageUrl" -> "http://lorempixel.com/300/100/food/"
       )
 
       val imageAd = adCreator.createImageAd(new ActivityParameters(imageAdParams))

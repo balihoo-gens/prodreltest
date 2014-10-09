@@ -79,6 +79,14 @@ trait AdGroupCreatorComponent {
       ), new ActivityResult("int", "AdGroup ID"))
     }
 
+    def getAdGroup(params:String):AdGroup = {
+      getAdGroup(Json.parse(params).as[JsObject])
+    }
+
+    def getAdGroup(params:JsObject):AdGroup = {
+      getAdGroup(getSpecification.getParameters(params))
+    }
+
     def getAdGroup(params: ActivityParameters): AdGroup = {
 
       val name = params("name")
@@ -101,6 +109,14 @@ trait AdGroupCreatorComponent {
       })
     }
 
+    def createAdGroup(params:String):AdGroup = {
+      createAdGroup(Json.parse(params).as[JsObject])
+    }
+
+    def createAdGroup(params:JsObject):AdGroup = {
+      createAdGroup(getSpecification.getParameters(params))
+    }
+
     /*
      * uses 'campaignCreator' from mixed in CampaignCreatorComponent
      */
@@ -111,7 +127,7 @@ trait AdGroupCreatorComponent {
       val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
 
       // We look up the campaign so we can follow it's Bidding strategy
-      val campaign = campaignCreator.getCampaign(campaignId)
+      val campaign = campaignCreator.lookupCampaign(campaignId)
 
       val adGroup = new AdGroup()
       adGroup.setName(name)
@@ -149,6 +165,14 @@ trait AdGroupCreatorComponent {
       _processOptionalParams(newGroup, params)
 
       newGroup
+    }
+
+    def updateAdGroup(adGroup: AdGroup, params:String):AdGroup = {
+      updateAdGroup(adGroup, Json.parse(params).as[JsObject])
+    }
+
+    def updateAdGroup(adGroup: AdGroup, params:JsObject):AdGroup = {
+      updateAdGroup(adGroup, getSpecification.getParameters(params))
     }
 
     def updateAdGroup(adGroup: AdGroup, params: ActivityParameters): AdGroup = {
@@ -255,7 +279,7 @@ trait AdGroupCreatorComponent {
       val nkeywords = new mutable.MutableList[Keyword]()
       for(keyword <- keywords) {
         val nkeyword = new Keyword()
-        nkeyword.setText(keyword)
+        nkeyword.setText(AdWordsPolicy.validateKeyword(keyword))
         nkeyword.setMatchType(matchType)
         nkeywords += nkeyword
       }
@@ -434,7 +458,7 @@ trait AdGroupCreatorComponent {
      * This function is the unfortunate collision of not enough planning and stuff.
      * TODO Compell them to stop using this.
      * @param adGroup AdGroup
-     * @param targetJson String JSON straight from the bowls of formbuilder, not an ideal format.
+     * @param targetJson String JSON straight from the bowels of formbuilder, not an ideal format.
      * @return
      */
     def _processTargetingDeprecatedYucky(adGroup: AdGroup, targetJson: String) = {

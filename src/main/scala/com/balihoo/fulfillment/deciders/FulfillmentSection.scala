@@ -1,7 +1,5 @@
 package com.balihoo.fulfillment.deciders
 
-import java.security.MessageDigest
-
 import com.balihoo.fulfillment.workers.UTCFormatter
 import org.joda.time.{Seconds, DateTime}
 
@@ -27,6 +25,12 @@ object SectionStatus extends Enumeration {
 }
 
 class ActionParams(var maxRetries:Int, var delaySeconds:Int) {
+  def toJson: JsValue = {
+    Json.toJson(Map(
+      "maxRetries" -> Json.toJson(maxRetries),
+      "delaySeconds" -> Json.toJson(delaySeconds)
+    ))
+  }
 }
 
 object TimelineEventType extends Enumeration {
@@ -349,6 +353,9 @@ class FulfillmentSection(val name: String
       "timedoutCount" -> Json.toJson(timedoutCount),
       "canceledCount" -> Json.toJson(canceledCount),
       "failedCount" -> Json.toJson(failedCount),
+      "failureParams" -> failureParams.toJson,
+      "timeoutParams" -> timeoutParams.toJson,
+      "cancelationParams" -> cancelationParams.toJson,
       "waitUntil" ->
         Json.toJson(waitUntil.isDefined match {
           case true =>

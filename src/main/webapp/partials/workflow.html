@@ -88,6 +88,15 @@
                         <div class="col-md-12">
 
                             <div ng-show="section.input.action.name" class="pull-right">
+
+                                  <i class="fa fa-retweet muted action" title="Cancelation Retry: {{section.cancelationParams.delaySeconds}} Delay Seconds"></i>
+                                {{section.canceledCount}}/{{section.cancelationParams.maxRetries}}&nbsp;&nbsp;
+                                <i class="fa fa-clock-o muted action" title="Timeout Retry: {{section.timeoutParams.delaySeconds}} Delay Seconds"></i>
+                                {{section.timedoutCount}}/{{section.timeoutParams.maxRetries}}&nbsp;&nbsp;
+                                <i class="fa fa-exclamation-triangle muted action" title="Failure Retry: {{section.failureParams.delaySeconds}} Delay Seconds"></i>
+                                {{section.failedCount}}/{{section.failureParams.maxRetries}}&nbsp;&nbsp;
+
+
                                 <i class="muted">Worker</i>&nbsp; {{section.input.action.name}} : {{section.input.action.version}} &nbsp;&nbsp;
                             </div>
                             <div ng-hide="section.input.action.name" class="pull-right">

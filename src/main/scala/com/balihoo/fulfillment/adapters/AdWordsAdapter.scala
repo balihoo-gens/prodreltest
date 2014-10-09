@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
+import java.net.URL
+
 import scala.language.implicitConversions
 
 import com.balihoo.fulfillment.config._
@@ -149,7 +151,7 @@ object AdWordsPolicy {
   }
 
   def cleanUrl(url:String):String = {
-    val testUrl = s"curl -Is $url --max-time 2"
+    val testUrl = s"curl -Is $url --max-time 2 --retry 3"
     try {
       testUrl.!!
       addProtocol(url)
@@ -160,7 +162,28 @@ object AdWordsPolicy {
     }
   }
 
-  def fixUpperCaseViolations(text:String) = {
+  def displayUrl(url:String):String = {
+    limitString(noWWW(url), 255)
+  }
+
+  def destinationUrl(url:String):String = {
+    limitString(cleanUrl(url), 2047)
+  }
+
+  /**
+   *
+   * @param displayUrl String
+   * @param destUrl String
+   */
+  def matchDomains(displayUrl:String, destUrl:String) = {
+    val dispHost = new URL(addProtocol(displayUrl)).getHost
+    val destHost = new URL(addProtocol(destUrl)).getHost
+    if(dispHost != destHost) {
+      throw new Exception(s"Domains for destination and display URLs must match! ($destHost =/= $dispHost)")
+    }
+  }
+
+  def fixUpperCaseViolations(text:String):String = {
     val upperMatcher = new Regex("""[A-Z]{2}""", "token")
     (for(part:String <- text.split("""\s+""") if part.length > 0)
     yield upperMatcher.findFirstIn(part) match { // check to see if we match two consecutive upper case letters...
@@ -170,6 +193,41 @@ object AdWordsPolicy {
           part
       }
       ).mkString(" ")
+  }
+
+  /**
+   * AdWords has lots of rules related to string length
+   * @param text
+   * @param maxLength
+   * @return
+   */
+  def limitString(text:String, maxLength:Int):String = {
+    if(text.length > maxLength) {
+      throw new Exception(s"'$text' is too long! (max $maxLength)")
+    }
+
+    text
+  }
+
+  /**
+   *
+   * https://developers.google.com/adwords/api/docs/reference/v201406/AdGroupCriterionService.Keyword
+   * @param text String
+   */
+  def validateKeyword(text:String):String = {
+    if(text.length > 80) {
+      throw new Exception(s"Keyword '$text' is too long! (max 80)")
+    }
+
+    if(text.split("""\s+""").length > 10) {
+      throw new Exception(s"Keyword '$text' has too many words! (max 10)")
+    }
+
+    text
+  }
+
+  def removeIllegalCharacters(text:String):String = {
+    text.replaceAll("""[^a-zA-Z0-9\s\.&-+]""", "")
   }
 
 }

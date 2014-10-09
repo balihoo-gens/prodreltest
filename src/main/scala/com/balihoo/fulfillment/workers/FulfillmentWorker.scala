@@ -285,7 +285,7 @@ class ActivityParameter(val name:String, val ptype:String, val description:Strin
   }
 }
 
-class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult) {
+class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult, val description:String = "") {
 
   val crypter = new Crypter("config/crypto")
   val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
@@ -293,7 +293,8 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
   def getSpecification:JsValue = {
     Json.toJson(Map(
       "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
-      "result" -> result.toJson
+      "result" -> result.toJson,
+      "description" -> Json.toJson(description)
     ))
   }
 
@@ -302,7 +303,10 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
   }
 
   def getParameters(input:String):ActivityParameters = {
-    val inputObject:JsObject = Json.parse(input).as[JsObject]
+    getParameters(Json.parse(input).as[JsObject])
+  }
+
+  def getParameters(inputObject:JsObject):ActivityParameters = {
     for((name, value) <- inputObject.fields) {
       if(paramsMap contains name) {
         val param = paramsMap(name)
@@ -322,7 +326,7 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
 
     new ActivityParameters(
       (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap
-      ,input)
+      ,Json.stringify(inputObject))
   }
 
 }
