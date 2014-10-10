@@ -52,6 +52,61 @@ class TestAdWordsPolicy extends Specification with Mockito
       AdWordsPolicy.fixUpperCaseViolations("there ARE some wORds WIth vioLATIONS") mustEqual "there Are some Words With Violations"
     }
 
+    "  match domains" in {
+      try {
+        AdWordsPolicy.matchDomains("randomdomainname.net/stork/angle/possum/spine", "https://randomdomainname.net/")
+      } catch {
+        case e:Exception =>
+          failure("That should have worked! "+e.getMessage)
+      }
+
+      success
+    }
+
+    "  NOT match domains" in {
+      try {
+        AdWordsPolicy.matchDomains("http://superspecificname.net/stork/angle/possum/spine", "https://randomdomainname.net/")
+        failure("That should NOT have worked! ")
+      } catch {
+        case e:Exception =>
+          e.getMessage mustEqual "Domains for destination and display URLs must match! (randomdomainname.net =/= superspecificname.net)"
+      }
+
+      true
+
+    }
+
+    "  validate keyword" in {
+      try {
+        AdWordsPolicy.validateKeyword("this is a valid keyword")
+        success
+      } catch {
+        case e:Exception =>
+          failure("This should be valid! "+e.getMessage)
+      }
+    }
+
+    "  NOT validate too many word keyword" in {
+      try {
+        AdWordsPolicy.validateKeyword("this is NOT a valid keyword because it has more than 10 words")
+        failure("That should have been too long!")
+      } catch {
+        case e:Exception =>
+          e.getMessage mustEqual "Keyword 'this is NOT a valid keyword because it has more than 10 words' has too many words! (max 10)"
+      }
+      true
+    }
+
+    "  NOT validate too long keyword" in {
+      try {
+        AdWordsPolicy.validateKeyword("this isNOTavalidkeywordbecauseithasmorethan80characters whichistoomanyyeahitsureis")
+        failure("That should have been too long!")
+      } catch {
+        case e:Exception =>
+          e.getMessage mustEqual "Keyword 'this isNOTavalidkeywordbecauseithasmorethan80characters whichistoomanyyeahitsureis' is too long! (max 80)"
+      }
+      true
+    }
   }
 
 }

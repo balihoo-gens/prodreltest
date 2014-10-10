@@ -49,12 +49,13 @@ trait TextAdCreatorComponent {
       new ActivitySpecification(List(
         new ActivityParameter("account", "int", "Participant AdWords account ID"),
         new ActivityParameter("adGroupId", "int", "AdWords AdGroup ID"),
-        new ActivityParameter("headline", "string", "Headline of the ad"),
-        new ActivityParameter("description1", "string", "First line of ad text"),
-        new ActivityParameter("description2", "string", "Second line of ad text"),
-        new ActivityParameter("url", "string", "Landing page URL"),
+        new ActivityParameter("headline", "string", "Headline of the ad (25 chars)"),
+        new ActivityParameter("description1", "string", "First line of ad text (35 chars)"),
+        new ActivityParameter("description2", "string", "Second line of ad text (35 chars)"),
+        new ActivityParameter("url", "string", "Landing page URL (domain must match displayUrl)"),
         new ActivityParameter("displayUrl", "string", "Visible Ad URL")
-      ), new ActivityResult("int", "TextAd ID"))
+      ), new ActivityResult("int", "TextAd ID"),
+        "Create a Google AdWords Text Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.TextAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad" )
     }
 
     def getTextAd(params: ActivityParameters): TextAd = {
@@ -81,11 +82,13 @@ trait TextAdCreatorComponent {
 
     def newTextAd(params:ActivityParameters): TextAd = {
 
-      val headline = AdWordsPolicy.fixUpperCaseViolations(params("headline"))
-      val desc1 = AdWordsPolicy.fixUpperCaseViolations(params("description1"))
-      val desc2 = AdWordsPolicy.fixUpperCaseViolations(params("description2"))
-      val displayUrl = AdWordsPolicy.noWWW(params("displayUrl"))
-      val url = AdWordsPolicy.cleanUrl(params("url"))
+      val headline = AdWordsPolicy.limitString(params("headline"), 25)
+      val desc1 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params("description1"), 35))
+      val desc2 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params("description2"), 35))
+      val displayUrl = AdWordsPolicy.displayUrl(params("displayUrl"))
+      val url = AdWordsPolicy.destinationUrl(params("url"))
+
+      AdWordsPolicy.matchDomains(url, displayUrl)
 
       val tad = new TextAd()
       tad.setHeadline(headline)
