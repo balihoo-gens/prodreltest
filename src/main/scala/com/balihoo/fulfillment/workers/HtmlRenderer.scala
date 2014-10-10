@@ -93,7 +93,11 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
         val filename = render(input)
         filesize = new File(filename).length
         imageFileName = Some(filename)
-        quality = math.max(quality-10,minquality)
+        quality = if (quality > minquality) {
+          math.max(quality-10,minquality)
+        } else {
+          minquality - 1
+        }
       }
 
       imageFileName match {
