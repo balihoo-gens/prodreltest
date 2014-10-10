@@ -26,10 +26,10 @@ object SectionStatus extends Enumeration {
 
 class ActionParams(var maxRetries:Int, var delaySeconds:Int) {
   def toJson: JsValue = {
-    Json.toJson(Map(
-      "maxRetries" -> Json.toJson(maxRetries),
-      "delaySeconds" -> Json.toJson(delaySeconds)
-    ))
+    Json.obj(
+      "maxRetries" -> maxRetries,
+      "delaySeconds" -> delaySeconds
+    )
   }
 }
 
@@ -43,11 +43,11 @@ object TimelineEventType extends Enumeration {
 class TimelineEvent(val eventType:TimelineEventType.Value, val message:String, val when:Option[DateTime]) {
 
   def toJson: JsValue = {
-    Json.toJson(Map(
-      "eventType" -> Json.toJson(eventType.toString),
-      "message" -> Json.toJson(message),
-      "when" -> Json.toJson(if(when.isDefined) UTCFormatter.format(when.get) else "--")
-    ))
+    Json.obj(
+      "eventType" -> eventType.toString,
+      "message" -> message,
+      "when" -> (if(when.isDefined) UTCFormatter.format(when.get) else "--")
+    )
   }
 }
 
@@ -340,29 +340,29 @@ class FulfillmentSection(val name: String
 
     val jtimeline = Json.toJson(for(entry <- timeline.events) yield entry.toJson)
 
-    Json.toJson(Map(
-      "status" -> Json.toJson(status.toString),
-      "timeline" -> Json.toJson(jtimeline),
-      "value" -> Json.toJson(value),
-      "input" -> Json.toJson(jsonNode),
+    Json.obj(
+      "status" -> status.toString,
+      "timeline" -> jtimeline,
+      "value" -> value,
+      "input" -> jsonNode,
       "params" -> Json.toJson(jparams.toMap),
-      "essential" -> Json.toJson(essential),
-      "fixable" -> Json.toJson(fixable),
-      "scheduledCount" -> Json.toJson(scheduledCount),
-      "startedCount" -> Json.toJson(startedCount),
-      "timedoutCount" -> Json.toJson(timedoutCount),
-      "canceledCount" -> Json.toJson(canceledCount),
-      "failedCount" -> Json.toJson(failedCount),
+      "essential" -> essential,
+      "fixable" -> fixable,
+      "scheduledCount" -> scheduledCount,
+      "startedCount" -> startedCount,
+      "timedoutCount" -> timedoutCount,
+      "canceledCount" -> canceledCount,
+      "failedCount" -> failedCount,
       "failureParams" -> failureParams.toJson,
       "timeoutParams" -> timeoutParams.toJson,
       "cancelationParams" -> cancelationParams.toJson,
       "waitUntil" ->
-        Json.toJson(waitUntil.isDefined match {
+        (waitUntil.isDefined match {
           case true =>
             UTCFormatter.format(waitUntil.get)
           case _ => ""
         })
-    ))
+    )
   }
 }
 
@@ -475,19 +475,19 @@ class SectionReference(referenceString:String) {
   }
 
   def toJson:JsValue = {
-    Json.toJson(Map(
-      "name" -> Json.toJson(name),
-      "dismissed" -> Json.toJson(dismissed),
+    Json.obj(
+      "name" -> name,
+      "dismissed" -> dismissed,
       "path" -> (path.isDefined match {
         case true => path.get.toJson
         case _ => new JsArray
       }),
       "resolved" -> (section.isDefined match {
-        case true => Json.toJson(section.get.status == SectionStatus.COMPLETE)
-        case _ => Json.toJson(false)
+        case true => section.get.status == SectionStatus.COMPLETE
+        case _ => false
       }),
-      "value" -> Json.toJson(getValue)
-    ))
+      "value" -> getValue
+    )
   }
 }
 

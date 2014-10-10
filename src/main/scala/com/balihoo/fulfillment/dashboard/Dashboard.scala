@@ -99,16 +99,16 @@ trait WorkflowInspectorComponent {
     this: SWFAdapterComponent =>
 
     def infoToJson(info: WorkflowExecutionInfo): JsValue = {
-      Json.toJson(Map(
-        "workflowId" -> Json.toJson(info.getExecution.getWorkflowId),
-        "runId" -> Json.toJson(info.getExecution.getRunId),
-        "closeStatus" -> Json.toJson(info.getCloseStatus),
-        "closeTimestamp" -> Json.toJson(Option(info.getCloseTimestamp) match {
-            case Some(ts) => UTCFormatter.format(ts);
+      Json.obj(
+        "workflowId" -> info.getExecution.getWorkflowId,
+        "runId" -> info.getExecution.getRunId,
+        "closeStatus" -> info.getCloseStatus,
+        "closeTimestamp" -> (Option(info.getCloseTimestamp) match {
+            case Some(ts) => UTCFormatter.format(ts)
             case None => "--" }),
-        "startTimestamp" -> Json.toJson(UTCFormatter.format(info.getStartTimestamp)),
-        "tagList" -> Json.toJson(info.getTagList.asScala)
-      ))
+        "startTimestamp" -> UTCFormatter.format(info.getStartTimestamp),
+        "tagList" -> info.getTagList.asScala
+      )
     }
 
     /**
@@ -204,8 +204,6 @@ trait WorkflowInspectorComponent {
 
     def workflowSections(runId:String, workflowId:String):Map[String, JsValue] = {
 
-      val top = collection.mutable.Map[String, JsValue]()
-
       val exec = new WorkflowExecution
       exec.setRunId(runId)
       exec.setWorkflowId(workflowId)
@@ -232,22 +230,23 @@ trait WorkflowInspectorComponent {
       }
 
       val jtimeline = Json.toJson(for(entry <- sections.timeline.events) yield entry.toJson)
-      val executionHistory = Json.toJson(for(event:HistoryEvent <- collectionAsScalaIterable(events)) yield Json.toJson(Map(
-        "type" -> Json.toJson(event.getEventType),
-        "id" -> Json.toJson(event.getEventId.toString),
-        "timestamp" -> Json.toJson(UTCFormatter.format(event.getEventTimestamp)),
-        "attributes" -> Json.toJson(_getEventAttribs(event))
-      )))
+      val executionHistory = Json.toJson(for(event:HistoryEvent <- collectionAsScalaIterable(events)) yield Json.obj(
+        "type" -> event.getEventType,
+        "id" -> event.getEventId.toString,
+        "timestamp" -> UTCFormatter.format(event.getEventTimestamp),
+        "attributes" -> _getEventAttribs(event)
+      ))
 
-      top("timeline") = jtimeline
-      top("sections") = Json.toJson(sectionsJson.toMap)
-      top("workflowId") = Json.toJson(workflowId)
-      top("runId") = Json.toJson(runId)
-      top("input") = Json.toJson(events.get(0).getWorkflowExecutionStartedEventAttributes.getInput)
-      top("resolution") = Json.toJson(sections.resolution)
-      top("history") = executionHistory
+      Map(
+        "timeline" -> jtimeline,
+        "sections" -> Json.toJson(sectionsJson.toMap),
+        "workflowId" -> Json.toJson(workflowId),
+        "runId" -> Json.toJson(runId),
+        "input" -> Json.toJson(events.get(0).getWorkflowExecutionStartedEventAttributes.getInput),
+        "resolution" -> Json.toJson(sections.resolution),
+        "history" -> executionHistory
+      )
 
-      top.toMap
     }
 
     def environment() = {

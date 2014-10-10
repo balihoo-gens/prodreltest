@@ -86,11 +86,11 @@ abstract class AbstractFulfillmentCoordinator {
 
 class OperatorResult(val rtype:String, description:String, val sensitive:Boolean = false) {
   def toJson:JsValue = {
-    Json.toJson(Map(
-      "type" -> Json.toJson(rtype),
-      "description" -> Json.toJson(description),
-      "sensitive" -> Json.toJson(sensitive)
-    ))
+    Json.obj(
+      "type" -> rtype,
+      "description" -> description,
+      "sensitive" -> sensitive
+    )
   }
 }
 
@@ -98,13 +98,13 @@ class OperatorParameter(val name:String, val ptype:String, val description:Strin
   var value:Option[String] = None
 
   def toJson:JsValue = {
-    Json.toJson(Map(
-      "name" -> Json.toJson(name),
-      "type" -> Json.toJson(ptype),
-      "description" -> Json.toJson(description),
-      "required" -> Json.toJson(required),
-      "sensitive" -> Json.toJson(sensitive)
-    ))
+    Json.obj(
+      "name" -> name,
+      "type" -> ptype,
+      "description" -> description,
+      "required" -> required,
+      "sensitive" -> sensitive
+    )
   }
 }
 
@@ -114,10 +114,10 @@ class OperatorSpecification(val params:List[OperatorParameter], val result:Opera
   val paramsMap:Map[String,OperatorParameter] = (for(param <- params) yield param.name -> param).toMap
 
   def toJson:JsValue = {
-    Json.toJson(Map(
+    Json.obj(
       "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
       "result" -> result.toJson
-    ))
+    )
   }
 
   override def toString:String = {

@@ -471,19 +471,19 @@ class FulfillmentWorkerEntry() {
   var tableName:String = "_MUST_BE_SET_"
 
   def toJson:JsValue = {
-    Json.toJson(Map(
-      "instance" -> Json.toJson(instance),
-      "hostAddress" -> Json.toJson(hostAddress),
-      "domain" -> Json.toJson(domain),
-      "activityName" -> Json.toJson(activityName),
-      "activityVersion" -> Json.toJson(activityVersion),
-      "specification" -> Json.toJson(specification),
-      "status" -> Json.toJson(status),
-      "resolutionHistory" -> Json.toJson(resolutionHistory),
-      "start" -> Json.toJson(start),
-      "last" -> Json.toJson(last),
-      "minutesSinceLast" -> Json.toJson(minutesSinceLast)
-    ))
+    Json.obj(
+      "instance" -> instance,
+      "hostAddress" -> hostAddress,
+      "domain" -> domain,
+      "activityName" -> activityName,
+      "activityVersion" -> activityVersion,
+      "specification" -> specification,
+      "status" -> status,
+      "resolutionHistory" -> resolutionHistory,
+      "start" -> start,
+      "last" -> last,
+      "minutesSinceLast" -> minutesSinceLast
+    )
 
   }
 
