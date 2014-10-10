@@ -93,7 +93,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
         imageFileName = Some(filename)
         if (quality <= minquality)
           throw new Exception("Unable to render image within size and quality constraints")
-        quality = math.min(quality-10,minquality)
+        quality = math.max(quality-10,minquality)
       }
 
       imageFileName match {

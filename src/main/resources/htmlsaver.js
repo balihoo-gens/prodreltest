@@ -40,7 +40,6 @@ function render_page(page, filename, quality) {
   var reason = "";
   try {
     options = {}
-    console.log("quality" + quality)
     if (quality) {
       options.quality = quality
     }
