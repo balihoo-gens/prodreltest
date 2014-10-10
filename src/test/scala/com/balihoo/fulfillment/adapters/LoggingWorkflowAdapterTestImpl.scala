@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
+import com.amazonaws.services.dynamodbv2.model.{DescribeTableResult, TableDescription}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -17,9 +19,6 @@ trait LoggingWorkflowAdapterTestImpl
 
   private lazy val _splog = mock(classOf[Splogger])
   def splog = _splog
-
-  private lazy val _dynamoAdapter = mock(classOf[DynamoAdapter])
-  def dynamoAdapter = _dynamoAdapter
 
   /**
    * This is far from ideal because the mock objects defined in this method get recreated every time the swfAdapter is
@@ -40,5 +39,23 @@ trait LoggingWorkflowAdapterTestImpl
     when(_swfAdapter.client).thenReturn(_client)
 
     _swfAdapter
+  }
+
+  def dynamoAdapter = {
+    val _config = mock(classOf[PropertiesLoader])
+    when(_config.getString(anyString)).thenReturn("mock")
+
+    val tableResult = new DescribeTableResult
+    val tableDesc = new TableDescription
+    tableDesc.setTableStatus("ACTIVE")
+    tableResult.setTable(tableDesc)
+    val _client = mock(classOf[AmazonDynamoDBAsyncClient])
+    when(_client.describeTable(anyString)).thenReturn(tableResult)
+
+    val _dynamoAdapter = mock(classOf[DynamoAdapter])
+    when(_dynamoAdapter.config).thenReturn(_config)
+    when(_dynamoAdapter.client).thenReturn(_client)
+    _dynamoAdapter
+
   }
 }

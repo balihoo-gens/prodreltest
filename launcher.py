@@ -48,7 +48,7 @@ class Launcher(object):
 
         line = p.stderr.readline()
         while len(line) > 0:
-            self._log.info("pid %d stderr %s" % (p.pid, line))
+            self._log.error("pid %d stderr %s" % (p.pid, line))
             line = p.stderr.readline()
 
     def monitor(self):

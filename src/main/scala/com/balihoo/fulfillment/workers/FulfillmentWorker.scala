@@ -16,8 +16,9 @@ import java.util.concurrent.{Future => JFuture}
 import java.util.concurrent.TimeUnit
 
 //aws imports
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig.TableNameOverride
 import com.amazonaws.services.dynamodbv2.datamodeling._
-import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ComparisonOperator, Condition}
+import com.amazonaws.services.dynamodbv2.model._
 import com.amazonaws.services.simpleworkflow.model._
 
 //play imports
@@ -55,7 +56,16 @@ abstract class FulfillmentWorker {
       val aws_ec2_identify = "curl -s $url --max-time 2 --retry 3"
       aws_ec2_identify.!!
     case None =>
-      java.net.InetAddress.getLocalHost.getHostName
+      try {
+        // This might throw an exception if the local DNS doesn't know about the system hostname.
+        // At this point we're looking for some kind of identifier. It doesn't have to actually
+        // be reachable.
+        java.net.InetAddress.getLocalHost.getHostName
+      } catch {
+        case e:Exception =>
+          // If all else fails..
+          "hostname".!!
+      }
   }
 
   val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
@@ -65,6 +75,7 @@ abstract class FulfillmentWorker {
   val taskResolutions = new mutable.Queue[TaskResolution]()
 
   val entry = new FulfillmentWorkerEntry
+  entry.tableName = workerTable.dynamoAdapter.config.getString("worker_status_table")
   entry.setInstance(instanceId)
   entry.setHostAddress(hostAddress)
   entry.setActivityName(name)
@@ -317,7 +328,7 @@ class ActivityParameter(val name:String, val ptype:String, val description:Strin
   }
 }
 
-class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult) {
+class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult, val description:String = "") {
 
   val crypter = new Crypter("config/crypto")
   val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
@@ -325,7 +336,8 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
   def getSpecification:JsValue = {
     Json.toJson(Map(
       "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
-      "result" -> result.toJson
+      "result" -> result.toJson,
+      "description" -> Json.toJson(description)
     ))
   }
 
@@ -334,7 +346,10 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
   }
 
   def getParameters(input:String):ActivityParameters = {
-    val inputObject:JsObject = Json.parse(input).as[JsObject]
+    getParameters(Json.parse(input).as[JsObject])
+  }
+
+  def getParameters(inputObject:JsObject):ActivityParameters = {
     for((name, value) <- inputObject.fields) {
       if(paramsMap contains name) {
         val param = paramsMap(name)
@@ -354,7 +369,7 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
 
     new ActivityParameters(
       (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap
-      ,input)
+      ,Json.stringify(inputObject))
   }
 
 }
@@ -374,6 +389,18 @@ class ActivityParameters(val params:Map[String,String], val input:String = "{}")
       return params(param)
     }
     default
+  }
+
+  def getOrElse(param:String, default:Int):Int = {
+    if(has(param)) {
+      try {
+        params(param).toInt
+      } catch {
+        case _: Exception => default
+      }
+    } else {
+        default
+    }
   }
 
   def get(param: String): Option[String] = params.get(param)
@@ -405,6 +432,53 @@ object UTCFormatter {
 class FulfillmentWorkerTable {
   this: DynamoAdapterComponent =>
 
+  waitForActiveTable()
+
+  def waitForActiveTable() = {
+
+    var active = false
+    while(!active) {
+      try {
+        println(s"Checking for worker status table ${dynamoAdapter.tableName}")
+        val tableDesc = dynamoAdapter.client.describeTable(dynamoAdapter.tableName)
+
+        // I didn't see any constants for these statuses..
+        tableDesc.getTable.getTableStatus match {
+          case "CREATING" =>
+            println("\tWorker status table is being created. Let's wait a while")
+            Thread.sleep(5000)
+          case "UPDATING" =>
+            println("\tWorker status table is being updated. Let's wait a while")
+            Thread.sleep(5000)
+          case "DELETING" =>
+            throw new Exception("ERROR! The worker status table is being deleted!")
+          case "ACTIVE" =>
+            active = true
+
+        }
+      } catch {
+        case rnfe:ResourceNotFoundException =>
+          println(s"\tTable not found! Creating it!")
+          createWorkerTable()
+
+      }
+    }
+  }
+
+  def createWorkerTable() = {
+    val ctr = new CreateTableRequest()
+    ctr.setTableName(dynamoAdapter.tableName)
+    ctr.setProvisionedThroughput(new ProvisionedThroughput(dynamoAdapter.readCapacity, dynamoAdapter.writeCapacity))
+    ctr.setAttributeDefinitions(List(new AttributeDefinition("instance", "S")))
+    ctr.setKeySchema(List( new KeySchemaElement("instance", "HASH")))
+    try {
+      dynamoAdapter.client.createTable(ctr)
+    } catch {
+      case e:Exception =>
+        println(e)
+    }
+  }
+
   def insert(entry:FulfillmentWorkerEntry) = {
     dynamoAdapter.put(entry.getDynamoItem)
   }
@@ -423,7 +497,8 @@ class FulfillmentWorkerTable {
         .withComparisonOperator(ComparisonOperator.GT)
         .withAttributeValueList(new AttributeValue().withS(UTCFormatter.format(oldest))))
 
-    val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp)
+    val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp,
+      new DynamoDBMapperConfig(new TableNameOverride(dynamoAdapter.tableName)))
     for(worker:FulfillmentWorkerEntry <- list) {
       worker.minutesSinceLast = Minutes.minutesBetween(DateTime.now, new DateTime(worker.last)).getMinutes
     }
@@ -433,8 +508,8 @@ class FulfillmentWorkerTable {
 
 }
 
-@DynamoDBTable(tableName="fulfillment_worker_status")
-class FulfillmentWorkerEntry {
+@DynamoDBTable(tableName="_CONFIGURED_IN_WORKER_PROPERTIES_")
+class FulfillmentWorkerEntry() {
   var instance:String = ""
   var hostAddress:String = ""
   var domain:String = ""
@@ -448,20 +523,22 @@ class FulfillmentWorkerEntry {
 
   var minutesSinceLast:Long = 0
 
+  var tableName:String = "_MUST_BE_SET_"
+
   def toJson:JsValue = {
-    Json.toJson(Map(
-      "instance" -> Json.toJson(instance),
-      "hostAddress" -> Json.toJson(hostAddress),
-      "domain" -> Json.toJson(domain),
-      "activityName" -> Json.toJson(activityName),
-      "activityVersion" -> Json.toJson(activityVersion),
-      "specification" -> Json.toJson(specification),
-      "status" -> Json.toJson(status),
-      "resolutionHistory" -> Json.toJson(resolutionHistory),
-      "start" -> Json.toJson(start),
-      "last" -> Json.toJson(last),
-      "minutesSinceLast" -> Json.toJson(minutesSinceLast)
-    ))
+    Json.obj(
+      "instance" -> instance,
+      "hostAddress" -> hostAddress,
+      "domain" -> domain,
+      "activityName" -> activityName,
+      "activityVersion" -> activityVersion,
+      "specification" -> specification,
+      "status" -> status,
+      "resolutionHistory" -> resolutionHistory,
+      "start" -> start,
+      "last" -> last,
+      "minutesSinceLast" -> minutesSinceLast
+    )
 
   }
 
@@ -506,7 +583,7 @@ class FulfillmentWorkerEntry {
   def setLast(last:String) { this.last = last; }
 
   def getDynamoItem:DynamoItem = {
-    new DynamoItem("fulfillment_worker_status")
+    new DynamoItem(tableName)
       .addString("instance", instance)
       .addString("hostAddress", hostAddress)
       .addString("domain", domain)
@@ -520,7 +597,7 @@ class FulfillmentWorkerEntry {
   }
 
   def getDynamoUpdate:DynamoUpdate = {
-    new DynamoUpdate("fulfillment_worker_status")
+    new DynamoUpdate(tableName)
       .forKey("instance", instance)
       .addString("status", status)
       .addString("resolutionHistory", resolutionHistory)

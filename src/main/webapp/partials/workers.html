@@ -30,6 +30,12 @@
                             <tr>
                                 <td>Started</td><td title="{{worker.start}}">{{worker.start | momentFromNow}}</td>
                             </tr>
+                            <tr ng-show="worker.specification.description">
+                                <td>Description</td>
+                                <td>
+                                    {{worker.specifiction.description}}
+                                </td>
+                            </tr>
                             <tr ng-show="worker.specification">
                                 <td ng-click="worker.showFormatted = !worker.showFormatted">Params</td>
                                 <td>

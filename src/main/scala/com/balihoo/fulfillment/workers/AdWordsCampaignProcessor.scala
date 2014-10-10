@@ -6,6 +6,7 @@ import com.balihoo.fulfillment.util.Splogger
 
 import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201406.cm._
+import play.api.libs.json._
 
 import scala.collection.mutable
 
@@ -122,6 +123,14 @@ trait CampaignCreatorComponent {
       ), new ActivityResult("int", "AdWords Campaign ID"))
     }
 
+    def getCampaign(params:String):Campaign = {
+      getCampaign(Json.parse(params).as[JsObject])
+    }
+
+    def getCampaign(params:JsObject):Campaign = {
+      getCampaign(getSpecification.getParameters(params))
+    }
+
     def getCampaign(params: ActivityParameters):Campaign = {
 
       val name = params("name")
@@ -144,9 +153,9 @@ trait CampaignCreatorComponent {
       })
     }
 
-    def getCampaign(id:String):Campaign = {
+    def lookupCampaign(id:String):Campaign = {
 
-      val context = s"getCampaign(id='$id')"
+      val context = s"lookupCampaign(id='$id')"
 
       val selector = new SelectorBuilder()
         .fields("Id", "ServingStatus", "Name", "AdvertisingChannelType", "BiddingStrategyType")
@@ -161,6 +170,14 @@ trait CampaignCreatorComponent {
           case _ => throw new Exception(s"Campaign id $id is ambiguous!")
         }
       })
+    }
+
+    def createCampaign(params:String):Campaign = {
+      createCampaign(Json.parse(params).as[JsObject])
+    }
+
+    def createCampaign(params:JsObject):Campaign = {
+      createCampaign(getSpecification.getParameters(params))
     }
 
     def createCampaign(params:ActivityParameters):Campaign = {
@@ -236,6 +253,14 @@ trait CampaignCreatorComponent {
       setTargetZips(madeCampaign, params("targetzips"))
       setAdSchedule(madeCampaign, params("adschedule"))
       madeCampaign
+    }
+
+    def updateCampaign(campaign: Campaign, params:String):Campaign = {
+      updateCampaign(campaign, Json.parse(params).as[JsObject])
+    }
+
+    def updateCampaign(campaign: Campaign, params:JsObject):Campaign = {
+      updateCampaign(campaign, getSpecification.getParameters(params))
     }
 
     def updateCampaign(campaign: Campaign, params: ActivityParameters) = {
@@ -322,6 +347,11 @@ trait CampaignCreatorComponent {
 
       val context = s"Setting target zips for campaign ${campaign.getId}"
 
+      val newLocationCriteria = lookupLocationsByZips(zipString.split(","))
+      if(newLocationCriteria.length == 0) {
+        throw new Exception(s"Target zips codes '$zipString' didn't resolve to a valid list of zips!")
+      }
+
       val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
       // First we query the existing zips
@@ -350,8 +380,7 @@ trait CampaignCreatorComponent {
       }
 
       // Make the get request.
-      val locationCriteria = lookupLocationsByZips(zipString.split(","))
-      for(loc <- locationCriteria) {
+      for(loc <- newLocationCriteria) {
         val campaignCriterion = new CampaignCriterion()
         campaignCriterion.setCampaignId(campaign.getId)
         campaignCriterion.setCriterion(loc.getLocation)

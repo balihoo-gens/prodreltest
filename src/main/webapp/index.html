@@ -30,11 +30,11 @@
 
             <!-- Nav bar -->
             <nav ng-controller="envController" class="navbar navbar-default navbar-fixed-top" role="navigation">
-                <div class="container">
+                <div class="">
                     <div class="collapse navbar-collapse navbar-ex1-collapse">
                         <div class="navbar-text pull-right" style="text-align: right;">
 
-                            <h1 style="display:table-cell; vertical-align: bottom; height:100%;"><a href="/">Fulfillment</a></h1>
+                            <div style="font-size:40px"><a href="/">Fulfillment</a></div>
 								<span title="SWF Domain">
 									<b>{{environment.domain}}</b>
 								</span>
@@ -43,11 +43,19 @@
 									<b>{{environment.region}}</b>
 								</span>
                         </div>
-					<span class="balihoo-logo">
-						<a href="/">
-                            <img src="/img/balihoo-beta-logo.png" alt="Balihoo - Local Marketing. Automated.">
-                        </a>
-					</span>
+                        <span class="brand-logo">
+                            <a href="/">
+                                <img height="80" src="/img/balihoo-beta-logo.png" alt="Balihoo - Local Marketing. Automated.">
+                            </a>
+                        </span>
+                        <span>
+                            <ul class="nav nav-tabs" style="position:absolute; bottom:0px; left:140px;">
+                                <li><a ng-click="go('workers')">Workers</a></li>
+                                <li><a ng-click="go('history')">Fulfillments</a></li>
+                                <li><a ng-click="go('workflow/initiate')">Start A Fulfillment</a></li>
+                            </ul>
+                        </span>
+
                     </div>
                 </div>
                 <div class="color-bar">
@@ -60,7 +68,7 @@
             <!-- End nav bar -->
 
             <!-- Body -->
-            <div class="container main-content">
+            <div class="container-fluid main-content">
                 <div ng-view></div>
             </div>
             <!-- End body -->

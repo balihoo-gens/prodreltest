@@ -209,11 +209,8 @@ app.config(
                       controller : "workersController",
                       templateUrl : "partials/workers.html",
                       reloadOnSearch: false})
-            .when("/start", {
-                      controller : "envController",
-                      templateUrl : "partials/start.html",
-                      reloadOnSearch: false})
-            .otherwise({redirectTo : "/start"})
+            .when("/start", { redirectTo: "/history"})
+            .otherwise({redirectTo : "/history"})
         ;
     }
 );
@@ -453,6 +450,13 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
     $scope.addSection = function(s) {
         s.push('');
+    };
+
+    $scope.showSection = function(ssection) {
+        for(var sname in $scope.workflow.sections) {
+            var section = $scope.workflow.sections[sname];
+            section.showContents = section == ssection;
+        }
     };
 
     $scope.cancelWorkflowUpdate = function() {

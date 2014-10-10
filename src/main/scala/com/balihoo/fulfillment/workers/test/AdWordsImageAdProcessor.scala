@@ -3,8 +3,6 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201406.cm._
 
 abstract class ImageAdTest(cfg: PropertiesLoader)
     extends AdWordsAdapterComponent
@@ -33,7 +31,7 @@ object adWordsGetAdGroupImageAd {
   class TestGetAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
     def run = {
       adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("100-019-2687")
+      adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | fulfillment test ( Client ID: 100-019-2687 )
 
       val campaignParams = new ActivityParameters(Map(
          "name" -> "fulfillment Campaign",
@@ -67,7 +65,8 @@ object adWordsAdGroupImageAd {
   class TestAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
     def run = {
       adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("100-019-2687")
+      adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | fulfillment test ( Client ID: 100-019-2687 )
+
 
       val campaignParams = Map(
          "name" -> "fulfillment Campaign",
@@ -81,14 +80,16 @@ object adWordsAdGroupImageAd {
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
       val imageAdParams = Map(
-         "name" -> "Majestic",
+         "name" -> "Tasty",
           "adGroupId" -> s"${adgroup.getId}",
           "url" -> "http://balihoo.com",
           "displayUrl" ->    "http://balihoo.com",
-          "imageUrl" -> "http://lorempixel.com/300/100/nature/"
+          "imageUrl" -> "http://lorempixel.com/300/100/food/"
       )
 
-      adCreator.createImageAd(new ActivityParameters(imageAdParams))
+      val imageAd = adCreator.createImageAd(new ActivityParameters(imageAdParams))
+      println(imageAd.getName)
+
     }
   }
 }
@@ -103,7 +104,7 @@ object adWordsUpdateAdGroupImageAd {
   class TestUpdateAdGroupImageAd(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
     def run = {
       adWordsAdapter.setValidateOnly(false)
-      adWordsAdapter.setClientId("100-019-2687")
+      adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | fulfillment test ( Client ID: 100-019-2687 )
 
       val campaignParams = Map(
          "name" -> "fulfillment Campaign",
@@ -127,7 +128,8 @@ object adWordsUpdateAdGroupImageAd {
 
       val ad = adCreator.getImageAd(new ActivityParameters(imageAdParams))
 
-      adCreator.updateImageAd(ad, new ActivityParameters(imageAdParams))
+      val imageAd = adCreator.updateImageAd(ad, new ActivityParameters(imageAdParams))
+      println(imageAd.getName)
     }
   }
 }

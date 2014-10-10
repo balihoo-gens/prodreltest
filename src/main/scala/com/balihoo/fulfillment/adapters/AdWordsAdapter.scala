@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
+import java.net.URL
+
 import scala.language.implicitConversions
 
 import com.balihoo.fulfillment.config._
@@ -12,6 +14,8 @@ import com.google.api.ads.adwords.axis.factory.AdWordsServices
 import com.google.api.ads.adwords.axis.v201406.cm._
 import com.google.api.ads.adwords.axis.v201406.mcm._
 import scala.collection.mutable
+import scala.sys.process._
+import scala.util.matching.Regex
 
 //typical cake would nest the adapter inside the provider
 // but that causes issues here for nested injection, i.e.
@@ -114,6 +118,7 @@ abstract class AbstractAdWordsAdapter {
   def addOrSet(operatorId:Long): Operator = {
     if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
   }
+
 }
 
 class AdWordsAdapter(cfg: PropertiesLoader)
@@ -125,5 +130,105 @@ class AdWordsAdapter(cfg: PropertiesLoader)
 
 class RateExceededException(e:RateExceededError) extends Exception {
   val error = e
+}
+
+object AdWordsPolicy {
+
+  def escapeSpaces(text:String):String = {
+    text.replace(" ", "%20")
+  }
+
+  def noProtocol(text:String):String = {
+    text.replace("http://", "").replace("https://", "")
+  }
+
+  def addProtocol(text:String, protocol:String = "http"):String = {
+    s"$protocol://${noProtocol(text)}"
+  }
+
+  def noWWW(text:String):String = {
+    noProtocol(text.replaceFirst("""^www\.""", ""))
+  }
+
+  def cleanUrl(url:String):String = {
+    val testUrl = s"curl -Is $url --max-time 2 --retry 3"
+    try {
+      testUrl.!!
+      addProtocol(url)
+    } catch {
+      case e:Exception =>
+        throw new Exception(s"URL:$url does NOT resolve!")
+        "URL_DOES_NOT_RESOLVE"
+    }
+  }
+
+  def displayUrl(url:String):String = {
+    limitString(noWWW(url), 255)
+  }
+
+  def destinationUrl(url:String):String = {
+    limitString(cleanUrl(url), 2047)
+  }
+
+  /**
+   *
+   * @param displayUrl String
+   * @param destUrl String
+   */
+  def matchDomains(displayUrl:String, destUrl:String) = {
+    val dispHost = new URL(addProtocol(displayUrl)).getHost
+    val destHost = new URL(addProtocol(destUrl)).getHost
+    if(dispHost != destHost) {
+      throw new Exception(s"Domains for destination and display URLs must match! ($destHost =/= $dispHost)")
+    }
+  }
+
+  def fixUpperCaseViolations(text:String):String = {
+    val upperMatcher = new Regex("""[A-Z]{2}""", "token")
+    (for(part:String <- text.split("""\s+""") if part.length > 0)
+    yield upperMatcher.findFirstIn(part) match { // check to see if we match two consecutive upper case letters...
+        case d:Some[String] =>
+          part.toLowerCase.capitalize
+        case None =>
+          part
+      }
+      ).mkString(" ")
+  }
+
+  /**
+   * AdWords has lots of rules related to string length
+   * @param text
+   * @param maxLength
+   * @return
+   */
+  def limitString(text:String, maxLength:Int):String = {
+    if(text.length > maxLength) {
+      throw new Exception(s"'$text' is too long! (max $maxLength)")
+    }
+
+    text
+  }
+
+  /**
+   *
+   * https://developers.google.com/adwords/api/docs/reference/v201406/AdGroupCriterionService.Keyword
+   * @param text String
+   */
+  def validateKeyword(text:String):String = {
+    if(text.length > 80) {
+      throw new Exception(s"Keyword '$text' is too long! (max 80)")
+    }
+
+    if(text.split("""\s+""").length > 10) {
+      throw new Exception(s"Keyword '$text' has too many words! (max 10)")
+    }
+
+    text
+  }
+
+  def removeIllegalCharacters(text:String):String = {
+    text.replaceAll("""[^a-zA-Z0-9\s\.&-+]""", "")
+  }
+
 }
 

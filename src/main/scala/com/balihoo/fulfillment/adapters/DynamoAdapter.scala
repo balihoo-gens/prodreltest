@@ -17,6 +17,9 @@ trait DynamoAdapterComponent {
 abstract class AbstractDynamoAdapter extends AWSAdapter[AmazonDynamoDBAsyncClient] {
   this: PropertiesLoaderComponent =>
   val mapper = new DynamoDBMapper(client)
+  val tableName = config.getString("worker_status_table")
+  val readCapacity = config.getOptInt("worker_status_read_capacity", 3)
+  val writeCapacity = config.getOptInt("worker_status_write_capacity", 5)
 
   def put(item:DynamoItem) = {
     def log(s: String) = println(s"DynamoAdapter.put: $s\n$item")

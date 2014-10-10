@@ -18,26 +18,37 @@ import tarfile
 import json
 
 class Installer(object):
-    def __init__(self, logfile):
+    def __init__(self, logfile, distro="ubuntu"):
         self._log = Splogger(logfile)
+        self._distro = distro
 
     def launch_app(self, classes):
         thisdir = os.path.dirname(os.path.realpath(__file__))
         proc = subprocess.Popen(["python", "launcher.py"] + classes, cwd=thisdir)
         self._log.info("started launcher process with pid %d" % (proc.pid,))
 
-    def run_wait_log(self, cmd):
+    def run_wait_log(self, cmd, cwd=None, raise_on_err=False):
         self._log.info("running " + " ".join(cmd))
+        kwargs = {}
+        if not cwd is None:
+          kwargs["cwd"] = cwd
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
+            stderr=subprocess.PIPE,
+            **kwargs
+        )
+        self._log.info("%s process started with pid %d" % (cmd[0], proc.pid))
         #block and accumulate output
         out, err = proc.communicate()
         if len(out) > 0:
+            print(out)
             self._log.info(out)
         if len(err) > 0:
-            self._log.error(out)
+            print(err)
+            self._log.error(err)
+        if raise_on_err and (proc.returncode != 0):
+            raise Exception("process %d returned %d" % (proc.pid, proc.returncode))
         return proc.returncode
 
     def install_splunk(self, s3bucket, script_name):
@@ -50,8 +61,27 @@ class Installer(object):
             script_path = os.path.join(".", script_name)
             self.run_wait_log([script_path])
 
+
+    def install_package(self, package_name):
+        installer = "apt-get" if self._distro in ["ubuntu", "debian"] else "yum"
+        self.run_wait_log([installer, "install", "-y", package_name], raise_on_err=True)
+
     def install_phantom(self, version):
-        self._log.info("installing phantomjs version " + version)
+        self._install_phantom_custom()
+
+    def _install_phantom_custom(self):
+        s3bucket = "s3://balihoo.dev.fulfillment"
+        s3url = os.path.join(s3bucket, "phantomjs/builtfromsource/master/bin", "phantomjs")
+        try:
+            self.run_wait_log(["aws", "s3","cp", s3url, "/usr/bin/phantomjs"], raise_on_err=True)
+            self.install_package("libjpeg8")
+            self.install_package("libfontconfig1")
+        except Exception as e:
+            self._log.error("Failed to install phantom: %s" % (e.message,))
+
+    def _install_phantom_official(self, version):
+        self._log.info("installing phantomjs binary version " + version)
+
         fullname = "phantomjs-%s-linux-x86_64" % (version,)
         tarballname = "%s.tar.bz2" % (fullname,)
         url = "https://bitbucket.org/ariya/phantomjs/downloads/%s" % (tarballname,)
@@ -78,6 +108,8 @@ class Installer(object):
         secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
         region = os.environ["AWS_REGION"]
         ec2conn = ec2.connect_to_region(region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        if ec2conn.disassociate_address(public_ip=eip):
+            self._log.info("successfully disassociated eip " + eip)
         if ec2conn.associate_address(instance_id=instance_id, public_ip=eip):
             self._log.info("successfully associated with eip " + eip)
         else:
@@ -95,6 +127,7 @@ if __name__ == "__main__":
     parser.add_argument('--splunkscript', help='the script name used to install splunk', default=splunkscript)
     parser.add_argument('--nosplunk', help='do not install splunk', action='store_true')
     parser.add_argument('--nophantom', help='do not install phantomjs', action='store_true')
+    parser.add_argument('--nolaunch', help='do not launch the app', action='store_true')
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
     parser.add_argument('--eip', help='the eip for this instance', default=None)
 
@@ -107,4 +140,5 @@ if __name__ == "__main__":
         installer.install_phantom(args.phantomversion)
     if args.eip:
         installer.associate_eip(args.eip)
-    installer.launch_app(args.classes)
+    if not args.nolaunch:
+        installer.launch_app(args.classes)

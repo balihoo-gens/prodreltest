@@ -53,7 +53,8 @@ trait ImageAdCreatorComponent {
         new ActivityParameter("url", "string", "Landing page URL"),
         new ActivityParameter("displayUrl", "string", "Visible Ad URL"),
         new ActivityParameter("imageUrl", "string", "URL Location of image data for this ad")
-      ), new ActivityResult("int", "ImageAd ID"))
+      ), new ActivityResult("int", "ImageAd ID"),
+      "Create a Google AdWords Image Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.ImageAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad")
     }
 
     def getImageAd(params: ActivityParameters): ImageAd = {
@@ -81,9 +82,11 @@ trait ImageAdCreatorComponent {
     def newImageAd(params:ActivityParameters): ImageAd = {
 
       val name = params("name")
-      val url = params("url")
-      val displayUrl = params("displayUrl")
+      val url = AdWordsPolicy.destinationUrl(params("url"))
+      val displayUrl = AdWordsPolicy.displayUrl(params("displayUrl"))
       val imageUrl = params("imageUrl")
+
+      AdWordsPolicy.matchDomains(url, displayUrl)
 
       val image = new Image()
       adWordsAdapter.withErrorsHandled[Any]("Fetching image data", {
