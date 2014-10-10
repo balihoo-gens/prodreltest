@@ -485,11 +485,13 @@ class SectionReference(referenceString:String) {
         case true => Json.toJson(section.get.status == SectionStatus.COMPLETE)
         case _ => Json.toJson(false)
       }),
-      "value" -> Json.toJson(try { getValue }
-                  catch {
-                    case e: Exception =>
-                      "--ERROR--"
-                  })
+      "value" -> Json.toJson(
+        try {
+          getValue
+        } catch {
+          case e: Exception =>
+            "--ERROR--"
+        })
     ))
   }
 }
@@ -566,7 +568,7 @@ class SectionReferences(sectionNames:List[String]) {
         } catch {
           case e: Exception =>
 
-            val gripe = s"Referenced section ${sectionRef.section.get.name} is comlpete but the JSON could not be parsed! "+e.getMessage
+            val gripe = s"Referenced section ${sectionRef.section.get.name} is complete but the JSON could not be parsed! "+e.getMessage
             map.timeline.error(gripe, None)
 
             throw new Exception(gripe)

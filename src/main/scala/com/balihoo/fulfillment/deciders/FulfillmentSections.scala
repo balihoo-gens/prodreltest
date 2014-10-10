@@ -163,8 +163,9 @@ class FulfillmentSections(history: java.util.List[HistoryEvent]) {
       Json.parse(event.getWorkflowExecutionStartedEventAttributes.getInput).as[JsObject]
     } catch {
       case e:Exception =>
-        timeline.error("CATASTROPHIC ERROR! Input JSON could not be parsed!", Some(new DateTime(event.getEventTimestamp)))
-        throw new Exception("Input JSON could not be parsed! "+e.getMessage)
+        val message = "CATASTROPHIC ERROR! Input JSON could not be parsed!"
+        timeline.error(message, Some(new DateTime(event.getEventTimestamp)))
+        throw new Exception(message+e.getMessage)
     }
 
     initializeWithInput(fulfillmentInput, new DateTime(event.getEventTimestamp))
