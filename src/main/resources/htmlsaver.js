@@ -36,10 +36,14 @@ function clip_page(page, clipSelector) {
   }
 }
 
-function render_page(page, filename) {
+function render_page(page, filename, quality) {
   var reason = "";
   try {
-    if (page.render(filename)) {
+    options = {}
+    if (quality) {
+      options.quality = quality
+    }
+    if (page.render(filename, options)) {
       prog.log("rendered page to " + filename);
       return true;
     }
@@ -50,7 +54,7 @@ function render_page(page, filename) {
   return false;
 }
 
-function save_page(page, filename) {
+function save_page(page, filename, _) {
   var reason = "";
   try {
     var fs = require('fs');
@@ -64,7 +68,7 @@ function save_page(page, filename) {
   return false;
 }
 
-function get_page(url, data, filename, action, clipSelector) {
+function get_page(url, data, filename, action, clipSelector, quality) {
   webpage = require("webpage");
 
   var ret = 0;
@@ -75,7 +79,7 @@ function get_page(url, data, filename, action, clipSelector) {
     if (status === "success") {
       prog.log("page " + url + " retrieved");
       if (clipSelector) clip_page(page, clipSelector);
-      if (action(page, filename)) {
+      if (action(page, filename, quality)) {
         prog.setRes(filename);
       } else {
         ret = 2;
@@ -105,7 +109,8 @@ function main() {
       input.data,
       input.target,
       action,
-      input.clipselector);
+      input.clipselector,
+      input.quality);
   } catch(e) {
     prog.log(" exception: " + e.message);
     prog.exit(4);
