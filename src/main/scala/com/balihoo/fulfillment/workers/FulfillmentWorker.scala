@@ -12,7 +12,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 //java imports
 import java.util.Date
 import java.util.UUID.randomUUID
-import java.util.concurrent.{Future => JFuture}
 import java.util.concurrent.TimeUnit
 
 //aws imports
@@ -115,61 +114,31 @@ abstract class FulfillmentWorker {
       }
     )
     //echo a dot
-    getch.addMapping(Seq("."), () => {
-      print(".")
-    }
+    getch.addMapping(Seq("."), () => { print(".") } )
 
     getch.doWith {
       while(!done) {
-        val jfut = swfAdapter.client
-        val jfut = swfAdapter.client.pollForActivityTaskAsync(taskReq)
-        if (pollopt.isEmpty || pollopt.get.isCompleted) {
+        val taskFuture = swfAdapter.getTask
 
-          //create a future for the poll, so the loop stays responsive
-          val pollfut = future {
-            updateStatus("Polling")
-            //SWF creates a Java future for
-            while (!jfut.isDone) {
-              if (done) {
-                jfut.cancel(true)
-                throw new Exception("User Termination")
+        taskFuture onComplete {
+          case Success(task) =>
+            _lastTaskToken = task.getTaskToken
+            if(_lastTaskToken != null) {
+              val shortToken = (_lastTaskToken takeRight 10)
+              try {
+                updateStatus("Processing task.." + shortToken )
+                handleTask(specification.getParameters(task.getInput))
+              } catch {
+                case e:Exception =>
+                  failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
               }
-              if (jfut.isCancelled) {
-                throw new Exception("Polling Cancelled")
-              }
-              //wait for the java future to complete or be interrupted
-              Thread.sleep(100)
+            } else {
+              splog.info("no task available")
             }
-            //polling is done here, return the task
-            jfut.get
-          }
-
-          //store the new future
-          pollopt = Some(pollfut)
-
-          //complete handler for the polling future
-          pollfut onComplete {
-            case Success(task) =>
-              _lastTaskToken = task.getTaskToken
-              if(_lastTaskToken != null) {
-                val shortToken = (_lastTaskToken takeRight 10)
-                try {
-                  updateStatus("Processing task.." + shortToken )
-                  handleTask(specification.getParameters(task.getInput))
-                } catch {
-                  case e:Exception =>
-                    failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
-                }
-              } else {
-                splog.info("no task available")
-              }
-            case Failure(e) =>
-              updateStatus(s"Polling Exception ${e.getMessage}", "EXCEPTION")
-          }
-        } else {
-          //wait for our scala polling future to complete
-          Thread.sleep(100)
+          case Failure(e) =>
+            updateStatus(s"Polling Exception ${e.getMessage}", "EXCEPTION")
         }
+        Thread.sleep(100)
       }
     }
     updateStatus("Exiting")
@@ -177,7 +146,8 @@ abstract class FulfillmentWorker {
     excsvc.shutdown
     if (!excsvc.awaitTermination(3, TimeUnit.SECONDS)) {
       val tasks = excsvc.shutdownNow()
-      println("remaining tasks: " + tasks.length)
+      splog.warning("Performing hard shutdown with remaining tasks: " + tasks.length)
+      Thread.sleep(100)
       swfAdapter.client.shutdown
     }
   }

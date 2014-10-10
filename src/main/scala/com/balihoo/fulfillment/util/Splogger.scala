@@ -132,8 +132,8 @@ class Splogger(filename:String) {
   /**
    * shorthand for warning messages
    */
-  def warn(msg:String) = {
-    log("WARN", msg)
+  def warning(msg:String) = {
+    log("WARNING", msg)
   }
 
   /**
