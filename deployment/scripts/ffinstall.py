@@ -69,16 +69,17 @@ class Installer(object):
     def install_phantom(self, version):
         self._install_phantom_custom()
 
-    def install_phantom_custom(self):
+    def _install_phantom_custom(self):
+        s3bucket = "s3://balihoo.dev.fulfillment"
         s3url = os.path.join(s3bucket, "phantomjs/builtfromsource/master/bin", "phantomjs")
         try:
             self.run_wait_log(["aws", "s3","cp", s3url, "/usr/bin/phantomjs"], raise_on_err=True)
-            install_package("libjpeg8")
-            install_package("libfontconfig1")
+            self.install_package("libjpeg8")
+            self.install_package("libfontconfig1")
         except Exception as e:
             self._log.error("Failed to install phantom: %s" % (e.message,))
 
-    def install_phantom_official(self, version):
+    def _install_phantom_official(self, version):
         self._log.info("installing phantomjs binary version " + version)
 
         fullname = "phantomjs-%s-linux-x86_64" % (version,)
