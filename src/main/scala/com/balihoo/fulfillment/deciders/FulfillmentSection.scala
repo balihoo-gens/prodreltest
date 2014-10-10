@@ -409,7 +409,13 @@ class ReferencePath(path:String) {
   }
 
   def getValue(jsonString:String):String = {
-    var current:JsValue = Json.parse(jsonString)
+    var current:JsValue = try {
+      Json.parse(jsonString)
+    } catch {
+      case e:Exception =>
+        throw new Exception(s"Failed to parse JSON '$jsonString':"+e.getMessage)
+    }
+
     for(component <- components) {
       component.key.isDefined match {
         case true =>
@@ -486,7 +492,13 @@ class SectionReference(referenceString:String) {
         case true => section.get.status == SectionStatus.COMPLETE
         case _ => false
       }),
-      "value" -> getValue
+      "value" -> Json.toJson(
+        try {
+          getValue
+        } catch {
+          case e: Exception =>
+            "--ERROR--"
+        })
     )
   }
 }
@@ -558,7 +570,16 @@ class SectionReferences(sectionNames:List[String]) {
 
     for(sectionRef <- sections) {
       if(sectionRef.isValid && sectionRef.section.get.status == SectionStatus.COMPLETE) {
-        return sectionRef.getValue
+        try {
+          return sectionRef.getValue
+        } catch {
+          case e: Exception =>
+
+            val gripe = s"Referenced section ${sectionRef.section.get.name} is complete but the JSON could not be parsed! "+e.getMessage
+            map.timeline.error(gripe, None)
+
+            throw new Exception(gripe)
+        }
       }
     }
 
