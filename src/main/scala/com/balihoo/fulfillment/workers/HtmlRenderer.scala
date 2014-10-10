@@ -87,12 +87,12 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
       var filesize: Long = Long.MaxValue
       var imageFileName: Option[String] = None
       while (filesize > maxsize) {
+        if (quality < minquality)
+          throw new Exception("Unable to render image within size and quality constraints")
         input("quality") = quality.toString
         val filename = render(input)
         filesize = new File(filename).length
         imageFileName = Some(filename)
-        if (quality <= minquality)
-          throw new Exception("Unable to render image within size and quality constraints")
         quality = math.max(quality-10,minquality)
       }
 
