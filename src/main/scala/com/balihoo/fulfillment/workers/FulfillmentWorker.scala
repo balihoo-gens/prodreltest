@@ -51,7 +51,8 @@ abstract class FulfillmentWorker {
 
   val hostAddress = sys.env.get("EC2_HOME") match {
     case Some(s:String) =>
-      val aws_ec2_identify = "curl --max-time 2 -s http://169.254.169.254/latest/meta-data/public-hostname"
+      val url = "http://169.254.169.254/latest/meta-data/public-hostname"
+      val aws_ec2_identify = "curl -s $url --max-time 2 --retry 3"
       aws_ec2_identify.!!
     case None =>
       java.net.InetAddress.getLocalHost.getHostName

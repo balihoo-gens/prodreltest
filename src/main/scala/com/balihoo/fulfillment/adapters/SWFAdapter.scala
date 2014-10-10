@@ -3,6 +3,9 @@ package com.balihoo.fulfillment.adapters
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.balihoo.fulfillment.config._
 
+import scala.concurrent.Promise
+import scala.concurrent.ExecutionContext.Implicits.global
+
 //for the cake pattern dependency injection
 trait SWFAdapterComponent {
   def swfAdapter: AbstractSWFAdapter with PropertiesLoaderComponent
@@ -28,25 +31,32 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   def version = _version
   def taskList = _taskList
 
-  object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
-    override def onSuccess(req:PollForActivityTaskRequest, task:ActivityTask) {
-    }
-    override def onError(e:Exception) {
-    }
-  }
+  def getTask(): Future[ActivityTask]  = {
+    val taskPromise = Promise[ActivityTask]()
 
-  object activityCountHandler extends AsyncHandler[CountPendingActivityTaskRequest, PendingTaskCount] {
-    override def onSuccess(req:CountPendingActivityTaskRequest, count:PendingTaskCount) {
-      if (count.getCount > 0) {
-        swfAdapter.client.pollForActivityTaskAsync(taskReq)
+    object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
+      override def onSuccess(req:PollForActivityTaskRequest, task:ActivityTask) {
+        taskPromise.success(task)
+      }
+      override def onError(e:Exception) {
+        taskPromise.failure(e)
       }
     }
-    override def onError(e:Exception) {
-    }
-  }
 
-  def getTask: Option[ActivityTask] = {
+    object activityCountHandler extends AsyncHandler[CountPendingActivityTaskRequest, PendingTaskCount] {
+      override def onSuccess(req:CountPendingActivityTaskRequest, count:PendingTaskCount) {
+        if (count.getCount > 0) {
+          swfAdapter.client.pollForActivityTaskAsync(taskReq)
+        }
+      }
+      override def onError(e:Exception) {
+        taskPromise.failure(e)
+      }
+    }
+
     swfAdapter.client.countPendingActivityTasksAsync(countReq, activityCountHandler)
+
+    p.future
   }
 }
 
