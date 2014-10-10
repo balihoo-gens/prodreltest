@@ -82,6 +82,8 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
       val maxsize = params.getOrElse("maxsize", maxsizeDefault )
       val minquality = params.getOrElse("minquality", minqualityDefault)
+      if (maxsize < 0) throw new Exception("max size must be > 0")
+      if (minquality < 0) throw new Exception("min quality must be > 0")
 
       var quality = 100
       var filesize: Long = Long.MaxValue
