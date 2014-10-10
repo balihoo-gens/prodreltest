@@ -344,6 +344,18 @@ class ActivityParameters(val params:Map[String,String], val input:String = "{}")
     default
   }
 
+  def getOrElse(param:String, default:Int):Int = {
+    if(has(param)) {
+      try {
+        params(param).toInt
+      } catch {
+        case _: Exception => default
+      }
+    } else {
+        default
+    }
+  }
+
   def get(param: String): Option[String] = params.get(param)
 
   override def toString:String = {
