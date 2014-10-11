@@ -51,13 +51,16 @@ class Installer(object):
             raise Exception("process %d returned %d" % (proc.pid, proc.returncode))
         return proc.returncode
 
+    def make_executable(self, path):
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
+                              stat.S_IRGRP |                stat.S_IXGRP |
+                              stat.S_IROTH |                stat.S_IXOTH )
+
     def install_splunk(self, s3bucket, script_name):
         self._log.info("installing splunk from " + s3bucket)
         s3url = os.path.join(s3bucket, script_name)
         if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
-            os.chmod(script_name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
-                                 stat.S_IRGRP |                stat.S_IXGRP |
-                                 stat.S_IROTH |                stat.S_IXOTH )
+            self.make_executable(script_name)
             script_path = os.path.join(".", script_name)
             self.run_wait_log([script_path])
 
@@ -74,6 +77,7 @@ class Installer(object):
         s3url = os.path.join(s3bucket, "phantomjs/builtfromsource/master/bin", "phantomjs")
         try:
             self.run_wait_log(["aws", "s3","cp", s3url, "/usr/bin/phantomjs"], raise_on_err=True)
+            self.make_executable("/usr/bin/phantomjs")
             self.install_package("libjpeg8")
             self.install_package("libfontconfig1")
         except Exception as e:
