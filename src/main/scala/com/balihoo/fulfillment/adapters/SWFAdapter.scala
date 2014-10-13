@@ -17,10 +17,10 @@ trait SWFAdapterComponent {
 abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncClient] {
   this: PropertiesLoaderComponent =>
 
-  protected val _taskListName = new SWFName(name+version)
-  protected val _name = new SWFName(config.getString("name"))
-  protected val _version = new SWFVersion(config.getString("version"))
-  protected val _taskList: TaskList = new TaskList().withName(taskListName)
+  protected lazy val _taskListName = new SWFName(name+version)
+  protected lazy val _name = new SWFName(config.getString("name"))
+  protected lazy val _version = new SWFVersion(config.getString("version"))
+  protected lazy val _taskList: TaskList = new TaskList().withName(taskListName)
 
   protected val taskReq: PollForActivityTaskRequest = new PollForActivityTaskRequest()
     .withDomain(domain)

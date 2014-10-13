@@ -107,7 +107,7 @@ abstract class FulfillmentWorker {
     val doneFuture = setupQuitKey(getch)
     getch.doWith {
       handleTaskFuture(swfAdapter.getTask)
-      Await.result(doneFuture, 0 nanos)
+      Await.result(doneFuture, 1000 seconds )
     }
     shutdown
   }
@@ -597,12 +597,17 @@ abstract class FulfillmentWorkerApp {
     val splog = new Splogger(Splogger.mkFFName(name))
     splog("INFO", s"Started $name")
     try {
+      println("config")
       val cfg = PropertiesLoader(args, name)
+      println("config")
       val worker = createWorker(cfg, splog)
+      println("config")
       worker.work()
       println("done")
     }
     catch {
+      case e:Exception =>
+        println(e.toString)
       case t:Throwable =>
         splog("ERROR", t.getMessage)
     }
