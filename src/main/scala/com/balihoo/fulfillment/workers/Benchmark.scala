@@ -5,6 +5,7 @@ import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
 import play.api.libs.json._
 import org.joda.time._
+import scala.collection.JavaConverters._
 
 import com.amazonaws.services.simpleworkflow.model.{
   StartWorkflowExecutionRequest,
@@ -32,7 +33,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
       val newcount = count -1
       for (i <- 1 to multiply) {
         val input = createInput(newcount, i, multiply, token)
-        val runid = submitTask(input, new List[String](s"Token: $token"))
+        val runid = submitTask(input, List(s"Token: $token"))
         splog.info(s"submitted $runid: $count, ($i of $multiply), token: $token")
       }
     }
