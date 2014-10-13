@@ -6,8 +6,9 @@ import scala.sys.process._
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
 import scala.util.{Success, Failure}
-import scala.concurrent.{Future, future}
+import scala.concurrent.{Future, Await, Promise, future}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 //java imports
 import java.util.Date
@@ -101,46 +102,32 @@ abstract class FulfillmentWorker {
 
     updateStatus("Starting")
 
-    val specification = getSpecification
 
-    var done = false
     val getch = new Getch
+    val doneFuture = setupQuitKey(getch)
+    getch.doWith {
+      handleTaskFuture(swfAdapter.getTask)
+      Await.result(doneFuture, 0 nanos)
+    }
+    shutdown
+  }
+
+  def setupQuitKey(getch: Getch): Future[Boolean] = {
+    var donePromise = Promise[Boolean]()
     getch.addMapping(
       Seq("q", "Q", "Exit"), () => {
         //stdin received quit request. Respond on stdout
         println("Quitting...")
         updateStatus("Terminated by user", "WARN")
-        done = true
+        donePromise.success(true)
       }
     )
     //echo a dot
     getch.addMapping(Seq("."), () => { print(".") } )
+    donePromise.future
+  }
 
-    getch.doWith {
-      while(!done) {
-        val taskFuture = swfAdapter.getTask
-
-        taskFuture onComplete {
-          case Success(task) =>
-            _lastTaskToken = task.getTaskToken
-            if(_lastTaskToken != null) {
-              val shortToken = (_lastTaskToken takeRight 10)
-              try {
-                updateStatus("Processing task.." + shortToken )
-                handleTask(specification.getParameters(task.getInput))
-              } catch {
-                case e:Exception =>
-                  failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
-              }
-            } else {
-              splog.info("no task available")
-            }
-          case Failure(e) =>
-            updateStatus(s"Polling Exception ${e.getMessage}", "EXCEPTION")
-        }
-        Thread.sleep(100)
-      }
-    }
+  def shutdown() = {
     updateStatus("Exiting")
     val excsvc = swfAdapter.client.getExecutorService()
     excsvc.shutdown
@@ -149,6 +136,33 @@ abstract class FulfillmentWorker {
       splog.warning("Performing hard shutdown with remaining tasks: " + tasks.length)
       Thread.sleep(100)
       swfAdapter.client.shutdown
+    }
+  }
+
+  def handleTaskFuture(taskFuture: Future[Option[ActivityTask]]):Unit = {
+    taskFuture onComplete {
+      case Success(taskopt) =>
+        taskopt match {
+          case Some(task) =>
+            try {
+              _lastTaskToken = task.getTaskToken
+                val shortToken = (_lastTaskToken takeRight 10)
+                updateStatus("Processing task.." + shortToken )
+                handleTask(getSpecification.getParameters(task.getInput))
+            } catch {
+              case e:Exception =>
+                failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
+            }
+          case None =>
+            splog.info("no task available")
+        }
+        //get the next one
+        handleTaskFuture(swfAdapter.getTask)
+      case Failure(e) =>
+        val ms = 1000
+        updateStatus(s"Polling Exception ${e.getMessage}: waiting ${ms}ms before retrying", "EXCEPTION")
+        Thread.sleep(ms)
+        handleTaskFuture(swfAdapter.getTask)
     }
   }
 

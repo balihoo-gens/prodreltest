@@ -34,12 +34,12 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   def version = _version
   def taskList = _taskList
 
-  def getTask(): Future[ActivityTask]  = {
-    val taskPromise = Promise[ActivityTask]()
+  def getTask(): Future[Option[ActivityTask]]  = {
+    val taskPromise = Promise[Option[ActivityTask]]()
 
     object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
       override def onSuccess(req:PollForActivityTaskRequest, task:ActivityTask) {
-        taskPromise.success(task)
+        taskPromise.success(if (task != null) Some(task) else None)
       }
       override def onError(e:Exception) {
         taskPromise.failure(e)
@@ -50,6 +50,8 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
       override def onSuccess(req:CountPendingActivityTasksRequest, count:PendingTaskCount) {
         if (count.getCount > 0) {
           client.pollForActivityTaskAsync(taskReq)
+        } else {
+          taskPromise.success(None)
         }
       }
       override def onError(e:Exception) {
