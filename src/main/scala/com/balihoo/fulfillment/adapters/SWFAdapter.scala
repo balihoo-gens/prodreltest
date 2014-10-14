@@ -22,7 +22,12 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   protected lazy val _version = new SWFVersion(config.getString("version"))
   protected lazy val _taskList: TaskList = new TaskList().withName(taskListName)
 
-  protected val _longPoll = config.getOrElse("longpoll",false)
+  protected val _longPoll = config.getOrElse("longpoll",true)
+
+  def taskListName = _taskListName
+  def name = _name
+  def version = _version
+  def taskList = _taskList
 
   protected val taskReq: PollForActivityTaskRequest = new PollForActivityTaskRequest()
     .withDomain(domain)
@@ -30,11 +35,6 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   protected val countReq: CountPendingActivityTasksRequest = new CountPendingActivityTasksRequest()
     .withDomain(domain)
     .withTaskList(taskList)
-
-  def taskListName = _taskListName
-  def name = _name
-  def version = _version
-  def taskList = _taskList
 
   def getTask(): Future[Option[ActivityTask]]  = {
     val taskPromise = Promise[Option[ActivityTask]]()
