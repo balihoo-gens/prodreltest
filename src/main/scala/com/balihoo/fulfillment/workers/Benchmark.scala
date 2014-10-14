@@ -41,7 +41,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
       case Some(timeSubmittedString) =>
         try {
           val timeSubmitted = DateTime.parse(timeSubmittedString)
-          Some(new Duration(timeReceived, timeSubmitted))
+          Some(new Duration(timeSubmitted, timeReceived))
         } catch {
           case e:Exception =>
             None
@@ -55,7 +55,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
         params.get("avg_duration") match {
           case Some(durationAvgPrevious) =>
             val prevMillis = durationAvgPrevious.toLong
-            val curMillis = timeReceived.getMillis
+            val curMillis = duration.getMillis
             val avgMillis = ((countPrevious * prevMillis) + curMillis) / count
             Some(new Duration(avgMillis))
           case None =>

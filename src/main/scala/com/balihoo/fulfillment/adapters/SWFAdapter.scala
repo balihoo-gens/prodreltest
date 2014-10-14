@@ -22,6 +22,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   protected lazy val _version = new SWFVersion(config.getString("version"))
   protected lazy val _taskList: TaskList = new TaskList().withName(taskListName)
 
+  //longpoll by default, unless config says "longpoll=false"
   protected val _longPoll = config.getOrElse("longpoll",true)
 
   def taskListName = _taskListName
@@ -41,7 +42,11 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
 
     object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
       override def onSuccess(req:PollForActivityTaskRequest, task:ActivityTask) {
-        taskPromise.success(if (task != null) Some(task) else None)
+        if (task != null && task.getTaskToken != null) {
+          taskPromise.success(Some(task))
+        } else {
+          taskPromise.success(None)
+        }
       }
       override def onError(e:Exception) {
         taskPromise.failure(e)
@@ -51,9 +56,9 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     object activityCountHandler extends AsyncHandler[CountPendingActivityTasksRequest, PendingTaskCount] {
       override def onSuccess(req:CountPendingActivityTasksRequest, count:PendingTaskCount) {
         if (count.getCount > 0) {
-          client.pollForActivityTaskAsync(taskReq)
+          client.pollForActivityTaskAsync(taskReq, activityPollHandler)
         } else {
-          Thread.sleep(100)
+          Thread.sleep(1000)
           taskPromise.success(None)
         }
       }
@@ -63,7 +68,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     }
 
     if (_longPoll) {
-      client.pollForActivityTaskAsync(taskReq)
+      client.pollForActivityTaskAsync(taskReq, activityPollHandler)
     } else {
       client.countPendingActivityTasksAsync(countReq, activityCountHandler)
     }

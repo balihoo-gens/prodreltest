@@ -96,6 +96,7 @@ abstract class FulfillmentWorker {
   declareWorker()
 
   var _lastTaskToken: String = ""
+  var _doneFuture: Option[Future[Boolean]] = None
 
   def work() = {
 
@@ -103,12 +104,11 @@ abstract class FulfillmentWorker {
 
     updateStatus("Starting")
 
-
     val getch = new Getch
-    val doneFuture = setupQuitKey(getch)
+    _doneFuture = Some(setupQuitKey(getch))
     getch.doWith {
       handleTaskFuture(swfAdapter.getTask)
-      Await.result(doneFuture, 1000 seconds )
+      Await.result(_doneFuture.get, Duration.Inf )
     }
     shutdown
   }
@@ -125,6 +125,8 @@ abstract class FulfillmentWorker {
     )
     //echo a dot
     getch.addMapping(Seq("."), () => { print(".") } )
+
+    //return the future that will succeed when termination is requested
     donePromise.future
   }
 
@@ -141,15 +143,16 @@ abstract class FulfillmentWorker {
   }
 
   def handleTaskFuture(taskFuture: Future[Option[ActivityTask]]):Unit = {
+    updateStatus("Polling")
     taskFuture onComplete {
       case Success(taskopt) =>
         taskopt match {
           case Some(task) =>
             try {
               _lastTaskToken = task.getTaskToken
-                val shortToken = (_lastTaskToken takeRight 10)
-                updateStatus("Processing task.." + shortToken )
-                handleTask(getSpecification.getParameters(task.getInput))
+              val shortToken = (_lastTaskToken takeRight 10)
+              updateStatus("Processing task.." + shortToken )
+              handleTask(getSpecification.getParameters(task.getInput))
             } catch {
               case e:Exception =>
                 failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
@@ -157,13 +160,25 @@ abstract class FulfillmentWorker {
           case None =>
             splog.info("no task available")
         }
-        //get the next one
-        handleTaskFuture(swfAdapter.getTask)
+
+        if (!_doneFuture.isEmpty || _doneFuture.get.isCompleted) {
+          //get the next one
+          handleTaskFuture(swfAdapter.getTask)
+        } else {
+          updateStatus("Termination requested; not getting a new task", "WARNING")
+        }
+
+      //this is unusual; when no task is available, success is returned above with None
       case Failure(e) =>
         val ms = 1000
         updateStatus(s"Polling Exception ${e.getMessage}: waiting ${ms}ms before retrying", "EXCEPTION")
-        Thread.sleep(ms)
-        handleTaskFuture(swfAdapter.getTask)
+        if (!_doneFuture.isEmpty || _doneFuture.get.isCompleted) {
+          Thread.sleep(ms)
+          //get the next one
+          handleTaskFuture(swfAdapter.getTask)
+        } else {
+          updateStatus("Termination requested; not getting a new task", "WARNING")
+        }
     }
   }
 
@@ -218,23 +233,41 @@ abstract class FulfillmentWorker {
 
   def completeTask(result:String) = {
     completedTasks += 1
-    val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
-    response.setTaskToken(_lastTaskToken)
-    response.setResult(getSpecification.result.sensitive match {
-      case true => getSpecification.crypter.encrypt(result)
-      case _ => result
-    })
-    swfAdapter.client.respondActivityTaskCompleted(response)
+    try {
+      if (_lastTaskToken != null && !_lastTaskToken.isEmpty) {
+        val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
+        response.setTaskToken(_lastTaskToken)
+        response.setResult(getSpecification.result.sensitive match {
+          case true => getSpecification.crypter.encrypt(result)
+          case _ => result
+        })
+        swfAdapter.client.respondActivityTaskCompleted(response)
+      } else {
+        throw new Exception("empty task token")
+      }
+    } catch {
+      case e:Exception =>
+        splog.error(s"error completing task: ${e.getMessage}")
+    }
     _resolveTask(new TaskResolution("Completed", result))
   }
 
   def failTask(reason:String, details:String) = {
     failedTasks += 1
-    val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
-    response.setTaskToken(_lastTaskToken)
-    response.setReason(reason)
-    response.setDetails(details)
-    swfAdapter.client.respondActivityTaskFailed(response)
+    try {
+      if (_lastTaskToken != null && !_lastTaskToken.isEmpty) {
+        val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
+        response.setTaskToken(_lastTaskToken)
+        response.setReason(reason)
+        response.setDetails(details)
+        swfAdapter.client.respondActivityTaskFailed(response)
+      } else {
+        throw new Exception("empty task token")
+      }
+    } catch {
+      case e:Exception =>
+        splog.error(s"error failing task: ${e.getMessage}")
+    }
     _resolveTask(new TaskResolution("Failed", s"$reason $details"))
   }
 
