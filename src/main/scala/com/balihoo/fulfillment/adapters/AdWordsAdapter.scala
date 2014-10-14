@@ -109,14 +109,15 @@ abstract class AbstractAdWordsAdapter {
         }
         throw new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
       case e:Exception =>
-        throw new Exception(s"Exception during $context :${e.getMessage}", e)
+        e.getMessage match {
+          case null =>
+            throw new Exception(s"Exception during $context :${e.getStackTraceString.substring(0, 150)}", e)
+          case _ =>
+            throw new Exception(s"Exception during $context :${e.getMessage}", e)
+        }
       case e:Throwable =>
         throw new Exception(s"THROWABLE during $context :${e.getMessage}", e)
     }
-  }
-
-  def addOrSet(operatorId:Long): Operator = {
-    if(Option(operatorId).isEmpty) Operator.ADD else Operator.SET
   }
 
 }

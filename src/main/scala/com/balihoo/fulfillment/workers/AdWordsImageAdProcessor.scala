@@ -52,7 +52,8 @@ trait ImageAdCreatorComponent {
         new ActivityParameter("adGroupId", "int", "AdWords AdGroup ID"),
         new ActivityParameter("url", "string", "Landing page URL"),
         new ActivityParameter("displayUrl", "string", "Visible Ad URL"),
-        new ActivityParameter("imageUrl", "string", "URL Location of image data for this ad")
+        new ActivityParameter("imageUrl", "string", "URL Location of image data for this ad"),
+        new ActivityParameter("status", "string", "ENABLED|PAUSED|DISABLED - ENABLED by default", false)
       ), new ActivityResult("int", "ImageAd ID"),
       "Create a Google AdWords Image Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.ImageAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad")
     }
@@ -79,6 +80,18 @@ trait ImageAdCreatorComponent {
       })
     }
 
+    def makeImageFromUrl(imageUrl:String):Image = {
+      val bytes =  adWordsAdapter.withErrorsHandled[Array[Byte]]("Fetching image data", {
+        com.google.api.ads.common.lib.utils.Media.getMediaDataFromUrl(imageUrl)
+      })
+
+      val image = new Image()
+      image.setData(bytes)
+      image.setType(MediaMediaType.IMAGE)
+      image
+    }
+
+
     def newImageAd(params:ActivityParameters): ImageAd = {
 
       val name = params("name")
@@ -88,12 +101,7 @@ trait ImageAdCreatorComponent {
 
       AdWordsPolicy.matchDomains(url, displayUrl)
 
-      val image = new Image()
-      adWordsAdapter.withErrorsHandled[Any]("Fetching image data", {
-        image.setData(
-          com.google.api.ads.common.lib.utils.Media.getMediaDataFromUrl(imageUrl))
-        image.setType(MediaMediaType.IMAGE)
-      })
+      val image = makeImageFromUrl(imageUrl)
 
       val ad = new ImageAd()
       ad.setImage(image)
@@ -110,30 +118,61 @@ trait ImageAdCreatorComponent {
 
     def updateImageAd(existingAd:ImageAd, params:ActivityParameters): ImageAd = {
 
-      val newAd = newImageAd(params)
+      val url = AdWordsPolicy.destinationUrl(params("url"))
+      val displayUrl = AdWordsPolicy.displayUrl(params("displayUrl"))
 
-      if(newAd.equals(existingAd)) {
-        // The existing add is exactly the same..
-        return existingAd
+      var doUpdate = false
+      if(existingAd.getUrl != url) {
+        doUpdate = true
+        existingAd.setUrl(url)
       }
 
-      _remove(existingAd, params)
-      _add(newAd, params)
+      if(existingAd.getDisplayUrl != displayUrl) {
+       doUpdate = true
+        existingAd.setDisplayUrl(displayUrl)
+      }
 
-      newAd
+      if(doUpdate) {
+        _update(existingAd, params)
+      } else {
+        existingAd
+      }
 
+    }
+
+    def _update(iad:ImageAd, params:ActivityParameters):ImageAd = {
+      val ad = new Ad()
+      ad.setId(iad.getId)
+      ad.setDisplayUrl(iad.getDisplayUrl)
+      ad.setUrl(iad.getUrl)
+
+      val aga = new AdGroupAd()
+      aga.setAd(ad)
+      aga.setAdGroupId(params("adGroupId").toLong)
+      aga.setStatus(AdGroupAdStatus.fromString(params.getOrElse("status", "ENABLED").toUpperCase))
+
+      val operation = new AdGroupAdOperation()
+      operation.setOperand(aga)
+      operation.setOperator(Operator.SET)
+
+      val context = s"(${operation.getOperator.getValue}) an Image Ad $params"
+
+      adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
+        adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
+      }).getAd.asInstanceOf[ImageAd]
     }
 
     def _add(iad:ImageAd, params:ActivityParameters):ImageAd = {
       val aga = new AdGroupAd()
       aga.setAd(iad)
       aga.setAdGroupId(params("adGroupId").toLong)
+      aga.setStatus(AdGroupAdStatus.fromString(params.getOrElse("status", "ENABLED").toUpperCase))
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)
       operation.setOperator(Operator.ADD)
 
-      val context = s"Adding an Image Ad $params"
+      val context = s"(${operation.getOperator.getValue}) an Image Ad $params"
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
