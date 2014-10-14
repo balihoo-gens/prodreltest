@@ -16,6 +16,7 @@ import javax.servlet.http.HttpServletResponse
 import com.amazonaws.services.simpleworkflow.model._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util._
 
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
@@ -266,7 +267,8 @@ class AbstractWorkflowServlet extends RestServlet {
   this: SWFAdapterComponent
     with WorkflowInspectorComponent
     with WorkflowInitiatorComponent
-    with WorkflowUpdaterComponent =>
+    with WorkflowUpdaterComponent
+    with SploggerComponent =>
 
   get("/workflow/history", (rsq:RestServletQuery) => {
     rsq.respondJson(HttpServletResponse.SC_OK
@@ -310,12 +312,13 @@ class AbstractWorkflowServlet extends RestServlet {
 
 }
 
-class WorkflowServlet(swf: SWFAdapter)
+class WorkflowServlet(swf: SWFAdapter, splg: Splogger)
   extends AbstractWorkflowServlet
     with WorkflowInspectorComponent
     with WorkflowInitiatorComponent
     with WorkflowUpdaterComponent
-    with SWFAdapterComponent {
+    with SWFAdapterComponent
+    with SploggerComponent {
   private val _inspector = new WorkflowInspector(swf)
   private val _initiator = new WorkflowInitiator(swf)
   private val _updater = new WorkflowUpdater(swf)
@@ -323,14 +326,16 @@ class WorkflowServlet(swf: SWFAdapter)
   def workflowInspector = _inspector
   def workflowInitiator = _initiator
   def workflowUpdater = _updater
+  def splog = splg
 }
 
 class AbstractWorkerServlet extends RestServlet {
-  this: DynamoAdapterComponent =>
+  this: DynamoAdapterComponent
+    with SploggerComponent =>
 
-  val da = dynamoAdapter
-  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
-    def dynamoAdapter = da
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent with SploggerComponent {
+    def dynamoAdapter = AbstractWorkerServlet.this.dynamoAdapter
+    def splog = AbstractWorkerServlet.this.splog
   }
 
   get("/worker", (rsq:RestServletQuery) => {
@@ -348,13 +353,20 @@ class AbstractWorkerServlet extends RestServlet {
 
 }
 
-class WorkerServlet(dyn: DynamoAdapter) extends AbstractWorkerServlet with DynamoAdapterComponent {
+class WorkerServlet(dyn: DynamoAdapter, splg: Splogger)
+  extends AbstractWorkerServlet
+    with DynamoAdapterComponent
+    with SploggerComponent {
   def dynamoAdapter = dyn
+  def splog = splg
 }
 
 object dashboard {
   def main(args: Array[String]) {
 
+    val name = getClass.getSimpleName.stripSuffix("$")
+    val splog = new Splogger(Splogger.mkFFName(name))
+    splog.info(s"Started $name")
     val cfg = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
 
     val context = new WebAppContext()
@@ -366,8 +378,8 @@ object dashboard {
     }
     context.setWelcomeFiles(Array[String]("index.html"))
 
-    val workerServlet = new WorkerServlet(new DynamoAdapter(cfg))
-    val workflowServlet = new WorkflowServlet(new SWFAdapter(cfg))
+    val workerServlet = new WorkerServlet(new DynamoAdapter(cfg), splog)
+    val workflowServlet = new WorkflowServlet(new SWFAdapter(cfg), splog)
 
     context.addServlet(new ServletHolder(workerServlet), "/worker/*")
     context.addServlet(new ServletHolder(workflowServlet), "/workflow/*")
@@ -376,6 +388,7 @@ object dashboard {
     server.setHandler(context)
     server.start()
     server.join()
+    splog.info(s"Terminated $name")
   }
 
   def isRunningFromJar:Boolean = {

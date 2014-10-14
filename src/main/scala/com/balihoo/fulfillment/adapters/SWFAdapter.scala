@@ -22,6 +22,8 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   protected lazy val _version = new SWFVersion(config.getString("version"))
   protected lazy val _taskList: TaskList = new TaskList().withName(taskListName)
 
+  protected val _longPoll = config.getOrElse("longpoll",false)
+
   protected val taskReq: PollForActivityTaskRequest = new PollForActivityTaskRequest()
     .withDomain(domain)
     .withTaskList(taskList)
@@ -51,6 +53,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
         if (count.getCount > 0) {
           client.pollForActivityTaskAsync(taskReq)
         } else {
+          Thread.sleep(100)
           taskPromise.success(None)
         }
       }
@@ -59,7 +62,11 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
       }
     }
 
-    client.countPendingActivityTasksAsync(countReq, activityCountHandler)
+    if (_longPoll) {
+      client.pollForActivityTaskAsync(taskReq)
+    } else {
+      client.countPendingActivityTasksAsync(countReq, activityCountHandler)
+    }
 
     taskPromise.future
   }

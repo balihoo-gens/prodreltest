@@ -68,8 +68,9 @@ abstract class FulfillmentWorker {
       }
   }
 
-  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent {
+  val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent with SploggerComponent {
     def dynamoAdapter = FulfillmentWorker.this.dynamoAdapter
+    def splog = FulfillmentWorker.this.splog
   }
 
   val taskResolutions = new mutable.Queue[TaskResolution]()
@@ -414,7 +415,8 @@ object UTCFormatter {
 }
 
 class FulfillmentWorkerTable {
-  this: DynamoAdapterComponent =>
+  this: DynamoAdapterComponent
+    with SploggerComponent =>
 
   waitForActiveTable()
 
@@ -423,28 +425,29 @@ class FulfillmentWorkerTable {
     var active = false
     while(!active) {
       try {
-        println(s"Checking for worker status table ${dynamoAdapter.tableName}")
+        splog.info(s"Checking for worker status table ${dynamoAdapter.tableName}")
         val tableDesc = dynamoAdapter.client.describeTable(dynamoAdapter.tableName)
 
         // I didn't see any constants for these statuses..
         tableDesc.getTable.getTableStatus match {
           case "CREATING" =>
-            println("\tWorker status table is being created. Let's wait a while")
+            splog.info("Worker status table is being created. Let's wait a while")
             Thread.sleep(5000)
           case "UPDATING" =>
-            println("\tWorker status table is being updated. Let's wait a while")
+            splog.info("Worker status table is being updated. Let's wait a while")
             Thread.sleep(5000)
           case "DELETING" =>
-            throw new Exception("ERROR! The worker status table is being deleted!")
+            val errstr = "The worker status table is being deleted!"
+            splog.error(errstr)
+            throw new Exception(s"ERROR! $errstr")
           case "ACTIVE" =>
+            splog.info("Worker status table is active")
             active = true
-
         }
       } catch {
         case rnfe:ResourceNotFoundException =>
-          println(s"\tTable not found! Creating it!")
+          splog.warning(s"Table not found! Creating it!")
           createWorkerTable()
-
       }
     }
   }
@@ -459,7 +462,7 @@ class FulfillmentWorkerTable {
       dynamoAdapter.client.createTable(ctr)
     } catch {
       case e:Exception =>
-        println(e)
+        splog.error("Error creating worker table: " + e.getMessage)
     }
   }
 
@@ -597,22 +600,17 @@ abstract class FulfillmentWorkerApp {
     val splog = new Splogger(Splogger.mkFFName(name))
     splog("INFO", s"Started $name")
     try {
-      println("config")
       val cfg = PropertiesLoader(args, name)
-      println("config")
       val worker = createWorker(cfg, splog)
-      println("config")
       worker.work()
-      println("done")
     }
     catch {
       case e:Exception =>
-        println(e.toString)
+        splog.exception(e.getMessage)
       case t:Throwable =>
-        splog("ERROR", t.getMessage)
+        splog.error(t.getMessage)
     }
-    splog("INFO", s"Terminated $name")
-    println("really done")
+    splog.info(s"Terminated $name")
   }
 }
 
