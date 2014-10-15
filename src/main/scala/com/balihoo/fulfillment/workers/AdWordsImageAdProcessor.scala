@@ -121,21 +121,12 @@ trait ImageAdCreatorComponent {
       val url = AdWordsPolicy.destinationUrl(params("url"))
       val displayUrl = AdWordsPolicy.displayUrl(params("displayUrl"))
 
-      var doUpdate = false
-      if(existingAd.getUrl != url) {
-        doUpdate = true
-        existingAd.setUrl(url)
-      }
-
-      if(existingAd.getDisplayUrl != displayUrl) {
-       doUpdate = true
-        existingAd.setDisplayUrl(displayUrl)
-      }
-
-      if(doUpdate) {
-        _update(existingAd, params)
-      } else {
+      if (existingAd.getUrl == url && existingAd.getDisplayUrl == displayUrl) {
         existingAd
+      } else {
+        existingAd.setUrl(url)
+        existingAd.setDisplayUrl(displayUrl)
+        _update(existingAd, params)
       }
 
     }
@@ -159,7 +150,12 @@ trait ImageAdCreatorComponent {
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
-      }).getAd.asInstanceOf[ImageAd]
+      }).getAd match {
+        case imageAd:ImageAd =>
+          imageAd
+        case _ =>
+          throw new Exception(s"Expected to get an ImageAd! $context")
+      }
     }
 
     def _add(iad:ImageAd, params:ActivityParameters):ImageAd = {
@@ -176,7 +172,12 @@ trait ImageAdCreatorComponent {
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
-      }).getAd.asInstanceOf[ImageAd]
+      }).getAd match {
+        case imageAd:ImageAd =>
+          imageAd
+        case _ =>
+          throw new Exception(s"Expected to add an ImageAd! $context")
+      }
     }
 
     def _remove(iad:ImageAd, params:ActivityParameters) = {
@@ -193,8 +194,8 @@ trait ImageAdCreatorComponent {
 
       val context = s"Removing an Image Ad $params"
 
-      adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
-        adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
+      adWordsAdapter.withErrorsHandled[Any](context, {
+        adWordsAdapter.adGroupAdService.mutate(Array(operation))
       })
     }
   }
