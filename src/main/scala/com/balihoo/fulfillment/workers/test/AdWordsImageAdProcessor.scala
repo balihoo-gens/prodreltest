@@ -80,11 +80,11 @@ object adWordsAdGroupImageAd {
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
       val imageAdParams = Map(
-         "name" -> "Tasty",
+         "name" -> "Test 5",
           "adGroupId" -> s"${adgroup.getId}",
           "url" -> "http://balihoo.com",
           "displayUrl" ->    "http://balihoo.com",
-          "imageUrl" -> "http://lorempixel.com/300/100/food/"
+          "imageUrl" -> "http://placehold.it/200x200"
       )
 
       val imageAd = adCreator.createImageAd(new ActivityParameters(imageAdParams))
@@ -119,11 +119,12 @@ object adWordsUpdateAdGroupImageAd {
       val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
 
       val imageAdParams = Map(
-         "name" -> "Majestic",
+         "name" -> "Drab",
           "adGroupId" -> s"${adgroup.getId}",
           "url" -> "http://balihoo.com",
-          "displayUrl" ->    "http://balihoo.com",
-          "imageUrl" -> "http://lorempixel.com/300/100/nature/"
+          "displayUrl" ->    "http://balihoo.com/stuff",
+//          "imageUrl" -> "http://lorempixel.com/300/100/nature/"
+            "imageUrl" -> "http://dummyimage.com/200x200/000/1f1"
         )
 
       val ad = adCreator.getImageAd(new ActivityParameters(imageAdParams))
@@ -133,3 +134,60 @@ object adWordsUpdateAdGroupImageAd {
     }
   }
 }
+
+/*
+object adWordsLookupMedia {
+  def main(args: Array[String]) {
+    val cfg = PropertiesLoader(args, "adwords_imageadprocessor")
+    val test = new TestLookupMedia(cfg)
+    test.run
+  }
+
+  class TestLookupMedia(cfg: PropertiesLoader) extends ImageAdTest(cfg) {
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | fulfillment test ( Client ID: 100-019-2687 )
+
+      val ad = adCreator.lookupMedia("D1C938E03C7D5A448C9FFA8619875E5B")
+
+    }
+  }
+}
+  */
+
+     /*
+     * This method DOES NOT WORK. We can't query images we've uploaded by name because
+     * ADWORDS doesn't actually populate the Name field! This is a major bummer!
+     *
+    def lookupMedia(name:String):Media = {
+
+      val context = s"lookupMedia(name='$name')"
+
+      val selector = new SelectorBuilder()
+        .fields("Name", "MediaId", "FileSize", "Dimensions", "SourceUrl", "ReferenceId")
+        .equals("Name", name)
+        .equals("Type", "IMAGE")
+        .build()
+
+      adWordsAdapter.withErrorsHandled[Media](context, {
+        val page = adWordsAdapter.mediaService.get(selector)
+        println(s"There are ${page.getTotalNumEntries} entries!")
+        page.getTotalNumEntries.intValue() match {
+          case 0 => null
+          case _ =>
+            for(item:Media <- page.getEntries) {
+              println(s" -- ${item.getName} ${item.getSourceUrl} ${item.getFileSize} ${item.getMediaId} ${item.getReferenceId}")
+            }
+            page.getEntries(0)
+//          case _ => throw new Exception(s"sourceUrl $name is ambiguous!")
+        }
+      })
+    } */
+
+    /*
+    val uploadedImage = adWordsAdapter.withErrorsHandled[Array[Media]]("Uploading new image", {
+      adWordsAdapter.mediaService.upload(Array(image))
+    })(0).asInstanceOf[Image]
+
+    image.setMediaId(uploadedImage.getMediaId)
+    */
