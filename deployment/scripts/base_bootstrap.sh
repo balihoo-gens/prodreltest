@@ -32,13 +32,28 @@ log "unzipped bundle"
 logdo "./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws"
 log "installed bundle"
 
+S3APPURL="s3://${S3BUCKET}/${S3DIR}"
 log "downloading fulfillment application"
 logdo "mkdir -p ${FFDIR}"
-logdo "/usr/local/bin/aws s3 sync ${S3BUCKETURL} ${FFDIR}"
+logdo "/usr/local/bin/aws s3 sync ${S3APPURL} ${FFDIR}"
 
-log "installing virtual env"
-logdo "chmod +x ${FFDIR}/vesetup"
-logdo "${FFDIR}/vesetup -d ${VEDIR} -p ${PYVERSION} -v ${VEVERSION}"
+S3VEURL_BASE="s3://${S3BUCKET}/VirtualEnv/${VEVERSION}/${PYVERSION}"
+CHECKFILE="check"
+S3VEURL_CHECK="${S3VEURL_BASE}/${CHECKFILE}"
+S3VEURL_INSTALL="${S3VEURL_BASE}/install"
+VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL_CHECK})"
+if [ -z "${VEFILE}" ]; then
+    logdo "touch ${CHECKFILE}"
+    logdo "/usr/local/bin/aws s3 cp ${CHECKFILE} ${S3VEURL_CHECK}"
+    log "installing virtual env"
+    logdo "chmod +x ${FFDIR}/vesetup"
+    logdo "${FFDIR}/vesetup -d ${VEDIR} -p ${PYVERSION} -v ${VEVERSION}"
+    log "uploading virtual env install to S3"
+    logdo "/usr/local/bin/aws s3 sync ${VEDIR} ${S3VEURL_INSTALL}"
+else
+    log "using virtual env version found on S3"
+    logdo "/usr/local/bin/aws s3 sync ${S3VEURL_INSTALL} ${VEDIR}"
+fi
 
 log "activating virtual env"
 ACTIVATE="source ${VEDIR}/activate"

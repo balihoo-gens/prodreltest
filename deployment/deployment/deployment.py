@@ -47,7 +47,7 @@ class Deployment(object):
         )
         return u.upload_dir(pkgpath)
 
-    def create_stack(self, s3url, template_file, script_file):
+    def create_stack(self, s3dir, template_file, script_file):
         template_data = None
         with open(template_file) as tf:
             #validate json here by loading it
@@ -67,8 +67,8 @@ class Deployment(object):
             "MaxInstances"          : cfg.max_instances,
             "AccessIPMask"          : cfg.access_ip_mask,
             "WebPort"               : cfg.web_port,
-            "WorkerScript"          : self.gen_script(script_file, s3url, None, ""),
-            "DashboardScript"       : self.gen_script(script_file, s3url, self._cfg.dasheip, dash_class),
+            "WorkerScript"          : self.gen_script(script_file, s3dir, None, ""),
+            "DashboardScript"       : self.gen_script(script_file, s3dir, self._cfg.dasheip, dash_class),
             "Environment"           : cfg.env,
         }
 
@@ -76,14 +76,15 @@ class Deployment(object):
         stackname = "fulfillment%d" % (int(time.time()),)
         return c.create_stack(stackname, json.dumps(template_data), parameters)
 
-    def gen_script(self, script_file, s3_bucket_url, eip, classes):
+    def gen_script(self, script_file, s3dir, eip, classes):
         pieces = [
             "#!/bin/bash",
             "set -e",
             "AWSACCESSKEY=%s" % self._cfg.access_key,
             "AWSSECRETKEY=%s" % self._cfg.secret_key,
             "AWSREGION=%s"    % self._cfg.region,
-            "S3BUCKETURL=%s"  % s3_bucket_url,
+            "S3BUCKET=%s"     % self._cfg.s3bucket,
+            "S3DIR=%s"        % s3dir,
             "CLASSNAMES=%s"   % classes,
             "VEDIR=%s"        % "/opt/balihoo/virtualenv",
             "PYVERSION=%s"    % self._cfg.pyversion,
