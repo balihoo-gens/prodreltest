@@ -379,7 +379,7 @@ object dashboard {
     context.setWelcomeFiles(Array[String]("index.html"))
 
     val workerServlet = new WorkerServlet(new DynamoAdapter(cfg), splog)
-    val workflowServlet = new WorkflowServlet(new SWFAdapter(cfg), splog)
+    val workflowServlet = new WorkflowServlet(new SWFAdapter(cfg, splog, true), splog)
 
     context.addServlet(new ServletHolder(workerServlet), "/worker/*")
     context.addServlet(new ServletHolder(workflowServlet), "/workflow/*")

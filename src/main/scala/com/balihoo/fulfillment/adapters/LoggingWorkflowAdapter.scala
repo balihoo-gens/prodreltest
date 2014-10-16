@@ -23,7 +23,7 @@ trait LoggingWorkflowAdapterImpl
 
   def splog = _splog
 
-  lazy private val _swf = new SWFAdapter(_cfg)
+  lazy private val _swf = new SWFAdapter(_cfg, _splog, true)
   def swfAdapter = _swf
 
   lazy private val _dyn = new DynamoAdapter(_cfg)

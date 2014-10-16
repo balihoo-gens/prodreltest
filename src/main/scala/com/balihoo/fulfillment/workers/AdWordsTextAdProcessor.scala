@@ -132,7 +132,12 @@ trait TextAdCreatorComponent {
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
-      }).getAd.asInstanceOf[TextAd]
+      }).getAd match {
+        case textAd:TextAd =>
+          textAd
+        case _ =>
+          throw new Exception(s"Expected to add an TextAd! $context")
+      }
     }
 
     def _remove(tad:TextAd, params:ActivityParameters) = {
@@ -146,8 +151,8 @@ trait TextAdCreatorComponent {
 
       val context = s"Removing a Text Ad $params"
 
-      adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
-        adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
+      adWordsAdapter.withErrorsHandled[Any](context, {
+        adWordsAdapter.adGroupAdService.mutate(Array(operation))
       })
     }
   }
