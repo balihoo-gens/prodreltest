@@ -87,12 +87,12 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     ddr.setName(domain)
 
     try {
-      println(s"Checking for domain '$domain'..")
+      splog.info(s"Checking for domain '$domain'..")
       client.describeDomain(ddr)
-      println("Found it!")
+      splog.info("Found it!")
     } catch {
       case ure:UnknownResourceException =>
-        println(s"The domain '$domain' doesn't exist!")
+        splog.warning(s"The domain '$domain' doesn't exist!")
         if(autoRegister) { registerDomain() }
     }
   }
@@ -104,7 +104,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     rdr.setDescription(config.getString("domainDescription"))
 
     try {
-      println(s"Trying to register domain '$domain'")
+      splog.info(s"Trying to register domain '$domain'")
       client.registerDomain(rdr)
     } catch {
       case daee:DomainAlreadyExistsException =>
@@ -128,12 +128,12 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     wtr.setWorkflowType(wt)
 
     try {
-      println(s"Checking for workflow type '$workflowName:$workflowVersion'..")
+      splog.info(s"Checking for workflow type '$workflowName:$workflowVersion'..")
       client.describeWorkflowType(wtr)
-      println("Found it!")
+      splog.info("Found it!")
     } catch {
       case ure:UnknownResourceException =>
-        println(s"The workflow type '${wt.getName}:${wt.getVersion}' doesn't exist!")
+        splog.warning(s"The workflow type '${wt.getName}:${wt.getVersion}' doesn't exist!")
         if(autoRegister) { registerWorkflowType() }
 
     }
@@ -149,7 +149,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     rwtr.setDefaultTaskList(taskList)
 
     try {
-      println(s"Trying to register workflow type '$workflowName:$workflowVersion'")
+      splog.info(s"Trying to register workflow type '$workflowName:$workflowVersion'")
       client.registerWorkflowType(rwtr)
     } catch {
       case taee:TypeAlreadyExistsException =>
