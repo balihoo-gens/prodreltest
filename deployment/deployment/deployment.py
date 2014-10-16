@@ -53,7 +53,7 @@ class Deployment(object):
             #validate json here by loading it
             template_data = json.loads(tf.read())
 
-        self.log.debug("creating a stack using " + s3url)
+        self.log.debug("creating a stack using " + s3dir)
         c = CloudFormer(self._cfg.region, self._cfg.access_key, self._cfg.secret_key)
 
         dash_class = "com.balihoo.fulfillment.dashboard.dashboard"
