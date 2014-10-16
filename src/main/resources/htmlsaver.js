@@ -68,13 +68,19 @@ function save_page(page, filename, _) {
   return false;
 }
 
-function get_page(url, data, filename, action, clipSelector, quality) {
+function get_page(url, data, headers, filename, action, clipSelector, quality) {
   webpage = require("webpage");
 
   var ret = 0;
 
   page = webpage.create();
   page.settings.userAgent = "Balihoo Html Saver";
+
+  if (headers) {
+    prog.log("using custom headers: " + headers);
+    page.customHeaders = JSON.parse(headers);
+  }
+
   function process_page(status) {
     if (status === "success") {
       prog.log("page " + url + " retrieved");
@@ -107,6 +113,7 @@ function main() {
     get_page(
       input.source,
       input.data,
+      input.headers,
       input.target,
       action,
       input.clipselector,
