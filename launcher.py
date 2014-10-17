@@ -126,7 +126,7 @@ class Launcher(object):
         for line in component.stderr():
             self._log.error("stderr: %s" % (line,), additional_fields=proc_data)
 
-    def monitor(self):
+    def monitor(self, seconds_between_launch):
         count = len(self._components)
         self._log.info("Monitoring %d components" % (count,))
         while True:
@@ -134,10 +134,13 @@ class Launcher(object):
                 component = self._components[name]
                 self.log_component(component)
                 if not component.is_alive():
-                    runtime = time.time() - component.launchtime
+                    time_since_last_launch = time.time() - component.launchtime
                     if not component.waiting:
-                        self._log.error("%s died after %f seconds" % (component, runtime))
-                    if runtime > 600:
+                        self._log.error(
+                            "died after %f seconds" % (time_since_last_launch),
+                            additional_fields={ "pid" : str(component.pid), "procname" : name }
+                        )
+                    if time_since_last_launch > seconds_between_launch:
                         pid = component.launch()
                         self._log.warn("relaunched", additional_fields={ "pid" : str(pid), "procname" : name })
                     else:
@@ -176,11 +179,12 @@ if __name__ == "__main__":
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
     parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/launcher.log')
+    parser.add_argument('-s','--seconds', help='minumum number of seconds between launch of the same process', default='600')
 
     args = parser.parse_args()
 
     launcher = Launcher(args.jarname, args.logfile)
     launcher.launch(args.classes)
-    launcher.monitor()
+    launcher.monitor(int(args.seconds))
 
 
