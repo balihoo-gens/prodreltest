@@ -86,25 +86,25 @@ class Splogger:
             return getframeinfo(of[self._indirection][0])
         return None
 
-    def debug(self, event):
+    def debug(self, event, **kwargs):
         with self.increased_indirection():
-            self.log("DEBUG", event)
+            self.log("DEBUG", event, **kwargs)
 
-    def info(self, event):
+    def info(self, event, **kwargs):
         with self.increased_indirection():
-            self.log("INFO", event)
+            self.log("INFO", event, **kwargs)
 
-    def warn(self, event):
+    def warn(self, event, **kwargs):
         with self.increased_indirection():
-            self.log("WARN", event)
+            self.log("WARN", event, **kwargs)
 
-    def error(self, event):
+    def error(self, event, **kwargs):
         with self.increased_indirection():
-            self.log("ERROR", event)
+            self.log("ERROR", event, **kwargs)
 
-    def exception(self, event):
+    def exception(self, event, **kwargs):
         with self.increased_indirection():
-            self.log("EXCEPTION", event)
+            self.log("EXCEPTION", event, **kwargs)
 
     def log(self, level, event, additional_fields=None):
         """ logs in splunk compliant format
