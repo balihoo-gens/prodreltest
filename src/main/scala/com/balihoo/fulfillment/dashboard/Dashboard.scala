@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.dashboard
 import java.io.File
 import java.util
 
+import com.balihoo.fulfillment.SWFHistoryConvertor
 import com.balihoo.fulfillment.deciders._
 import com.balihoo.fulfillment.workers.{UTCFormatter, FulfillmentWorkerTable, FulfillmentWorkerEntry}
 import org.joda.time.DateTime
@@ -31,7 +32,7 @@ trait WorkflowInitiatorComponent {
 
       // First validate the input as best as we can..
       val fulfillmentInput = Json.parse(input).as[JsObject]
-      val fulfillmentSections = new FulfillmentSections(new util.ArrayList[HistoryEvent]())
+      val fulfillmentSections = new Fulfillment(List())
       fulfillmentSections.initializeWithInput(fulfillmentInput, DateTime.now())
 
       val errors = new util.ArrayList[String]()
@@ -84,6 +85,29 @@ trait WorkflowUpdaterComponent {
 
       "success"
     }
+
+    def cancel(runId:String, workflowId:String) = {
+      val req = new RequestCancelWorkflowExecutionRequest
+      req.setDomain(swfAdapter.config.getString("domain"))
+      req.setRunId(runId)
+      req.setWorkflowId(workflowId)
+      swfAdapter.client.requestCancelWorkflowExecution(req)
+
+      "success"
+    }
+
+    def terminate(runId:String, workflowId:String, reason:String, details:String) = {
+      val treq = new TerminateWorkflowExecutionRequest
+      treq.setDomain(swfAdapter.config.getString("domain"))
+      treq.setRunId(runId)
+      treq.setWorkflowId(workflowId)
+      treq.setReason(reason)
+      treq.setDetails(details)
+//      treq.setChildPolicy(ChildPolicy.fromValue())
+      swfAdapter.client.terminateWorkflowExecution(treq)
+
+      "success"
+    }
   }
 
   class WorkflowUpdater(swf: SWFAdapter) extends AbstractWorkflowUpdater with SWFAdapterComponent {
@@ -109,69 +133,6 @@ trait WorkflowInspectorComponent {
         "startTimestamp" -> UTCFormatter.format(info.getStartTimestamp),
         "tagList" -> info.getTagList.asScala
       )
-    }
-
-    /**
-     * This function is still a bummer.
-     * @param event: HistoryEvent
-     * @return String
-     */
-    def _getEventAttribs(event:HistoryEvent):String = {
-
-      for(f <- List(event.getWorkflowExecutionStartedEventAttributes _
-        ,event.getWorkflowExecutionCompletedEventAttributes _
-        ,event.getCompleteWorkflowExecutionFailedEventAttributes _
-        ,event.getWorkflowExecutionFailedEventAttributes _
-        ,event.getFailWorkflowExecutionFailedEventAttributes _
-        ,event.getWorkflowExecutionTimedOutEventAttributes _
-        ,event.getWorkflowExecutionCanceledEventAttributes _
-        ,event.getCancelWorkflowExecutionFailedEventAttributes _
-        ,event.getWorkflowExecutionContinuedAsNewEventAttributes _
-        ,event.getContinueAsNewWorkflowExecutionFailedEventAttributes _
-        ,event.getWorkflowExecutionTerminatedEventAttributes _
-        ,event.getWorkflowExecutionCancelRequestedEventAttributes _
-        ,event.getDecisionTaskScheduledEventAttributes _
-        ,event.getDecisionTaskStartedEventAttributes _
-        ,event.getDecisionTaskCompletedEventAttributes _
-        ,event.getDecisionTaskTimedOutEventAttributes _
-        ,event.getActivityTaskScheduledEventAttributes _
-        ,event.getActivityTaskStartedEventAttributes _
-        ,event.getActivityTaskCompletedEventAttributes _
-        ,event.getActivityTaskFailedEventAttributes _
-        ,event.getActivityTaskTimedOutEventAttributes _
-        ,event.getActivityTaskCanceledEventAttributes _
-        ,event.getActivityTaskCancelRequestedEventAttributes _
-        ,event.getWorkflowExecutionSignaledEventAttributes _
-        ,event.getMarkerRecordedEventAttributes _
-        ,event.getRecordMarkerFailedEventAttributes _
-        ,event.getTimerStartedEventAttributes _
-        ,event.getTimerFiredEventAttributes _
-        ,event.getTimerCanceledEventAttributes _
-        ,event.getStartChildWorkflowExecutionInitiatedEventAttributes _
-        ,event.getChildWorkflowExecutionStartedEventAttributes _
-        ,event.getChildWorkflowExecutionCompletedEventAttributes _
-        ,event.getChildWorkflowExecutionFailedEventAttributes _
-        ,event.getChildWorkflowExecutionTimedOutEventAttributes _
-        ,event.getChildWorkflowExecutionCanceledEventAttributes _
-        ,event.getChildWorkflowExecutionTerminatedEventAttributes _
-        ,event.getSignalExternalWorkflowExecutionInitiatedEventAttributes _
-        ,event.getExternalWorkflowExecutionSignaledEventAttributes _
-        ,event.getSignalExternalWorkflowExecutionFailedEventAttributes _
-        ,event.getExternalWorkflowExecutionCancelRequestedEventAttributes _
-        ,event.getRequestCancelExternalWorkflowExecutionInitiatedEventAttributes _
-        ,event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes _
-        ,event.getScheduleActivityTaskFailedEventAttributes _
-        ,event.getRequestCancelActivityTaskFailedEventAttributes _
-        ,event.getStartTimerFailedEventAttributes _
-        ,event.getCancelTimerFailedEventAttributes _
-        ,event.getStartChildWorkflowExecutionFailedEventAttributes _
-      )) {
-        f() match {
-          case o:AnyRef => return o.toString
-          case _ =>
-        }
-      }
-      "Unknown event type!"
     }
 
     def executionHistory(oldest:DateTime, latest:DateTime):List[JsValue] = {
@@ -221,8 +182,9 @@ trait WorkflowInspectorComponent {
         history = swfAdapter.client.getWorkflowExecutionHistory(req)
         events.addAll(history.getEvents)
       }
-      val sections = new FulfillmentSections(events)
-      new DecisionGenerator(sections).makeDecisions(false)
+      val historyJson = SWFHistoryConvertor.historyToJson(events)
+      val sections = new Fulfillment(SWFHistoryConvertor.jsonToSWFEvents(historyJson))
+      new DecisionGenerator(sections).makeDecisions(runOperations=false)
 
       val sectionsJson = collection.mutable.Map[String, JsValue]()
       for((name, section:FulfillmentSection) <- sections.nameToSection) {
@@ -230,21 +192,14 @@ trait WorkflowInspectorComponent {
       }
 
       val jtimeline = Json.toJson(for(entry <- sections.timeline.events) yield entry.toJson)
-      val executionHistory = Json.toJson(for(event:HistoryEvent <- collectionAsScalaIterable(events)) yield Json.obj(
-        "type" -> event.getEventType,
-        "id" -> event.getEventId.toString,
-        "timestamp" -> UTCFormatter.format(event.getEventTimestamp),
-        "attributes" -> _getEventAttribs(event)
-      ))
 
       Map(
         "timeline" -> jtimeline,
         "sections" -> Json.toJson(sectionsJson.toMap),
         "workflowId" -> Json.toJson(workflowId),
         "runId" -> Json.toJson(runId),
-        "input" -> Json.toJson(events.get(0).getWorkflowExecutionStartedEventAttributes.getInput),
-        "resolution" -> Json.toJson(sections.resolution),
-        "history" -> executionHistory
+        "status" -> Json.toJson(sections.status.toString),
+        "history" -> historyJson
       )
 
     }
@@ -290,6 +245,24 @@ class AbstractWorkflowServlet extends RestServlet {
         rsq.getRequiredParameter("runId")
         ,rsq.getRequiredParameter("workflowId")
         ,rsq.getRequiredParameter("input")
+      ))))
+  })
+
+  post("/workflow/cancel", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(workflowUpdater.cancel(
+        rsq.getRequiredParameter("runId")
+        ,rsq.getRequiredParameter("workflowId")
+      ))))
+  })
+
+  post("/workflow/terminate", (rsq:RestServletQuery) => {
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(workflowUpdater.terminate(
+        rsq.getRequiredParameter("runId")
+        ,rsq.getRequiredParameter("workflowId")
+        ,rsq.getOptionalParameter("reason", "no reason specified")
+        ,rsq.getOptionalParameter("details", "")
       ))))
   })
 

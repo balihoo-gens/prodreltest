@@ -31,7 +31,7 @@ angular.module('filters', []).
                };
            });
 
-var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize', 'filters', 'angular-moment']);
+var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize', 'ngDialog', 'filters', 'angular-moment']);
 
 toastr.options = {
     "closeButton" : true,
@@ -85,6 +85,9 @@ app.factory('formatUtil', function() {
                 body += _div("<span><b>" + key + "</b></span> : " + _jsonFormat(json[key], "block"));
             }
             return _div(body, "block " + divclass);
+        }
+        if(_isJSON(json)) {
+            return _jsonFormat(JSON.parse(json), "json");
         }
         if (_isString(json)) {
             return _span(_formatURLs(json), "jsonvalue");
@@ -143,6 +146,7 @@ app.factory('formatUtil', function() {
     }
 
     function _formatURLs(param) {
+        if(param === null) { return ""; }
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
 
         return param.replace(urlRegex, function (url) {
@@ -159,6 +163,7 @@ app.factory('formatUtil', function() {
     }
 
     function _isJSON(j) {
+        if(j === null) { return false; }
         return j[0] == '{' || j[0] == '[';
     }
 
@@ -297,7 +302,7 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 
     $scope.formatStatus = function(closeStatus) {
         if(closeStatus == null) {
-            return "IN PROGRESS";
+            return "IN_PROGRESS";
         }
 
         return closeStatus;
@@ -309,7 +314,8 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     };
 });
 
-app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil, environment) {
+
+app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil, environment, ngDialog) {
 
     $scope.formatUtil = formatUtil;
 
@@ -358,8 +364,54 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
     };
 
+    $scope.promptCancelWorkflow = function() {
+        ngDialog.open({
+                          template : "confirmCancel",
+                          controller : "workflowController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.cancelWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
+        $http.post('workflow/cancel', params )
+            .success(function(data) {
+                         toastr.info(data, "Cancel Requested!")
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
+    $scope.promptTerminateWorkflow = function() {
+        ngDialog.open({
+                          template : "confirmTerminate",
+                          controller : "workflowController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.terminateWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
+        params['reason'] = $scope.terminateReason;
+        params['details'] = $scope.terminateDetails;
+        $http.post('workflow/terminate', params )
+            .success(function(data) {
+                       toastr.info(data, "Workflow Terminated!")
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
     $scope.prepWorkflow = function() {
-        $scope.workflow.editable = $scope.workflow.resolution == "IN PROGRESS" || $scope.workflow.resolution == "BLOCKED";
+        $scope.workflow.editable = $scope.workflow.status == "IN_PROGRESS" || $scope.workflow.status == "BLOCKED";
         $scope.workflow.edited = false;
 
         for(var s in $scope.workflow.sections) {
@@ -475,11 +527,12 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.workflowStatusMap = {
-        "IN PROGRESS" : "label-info",
+        "IN_PROGRESS" : "label-info",
+        "CANCEL_REQUESTED" : "label-warning",
         "BLOCKED" : "label-warning",
         "CANCELLED" : "label-warning",
         "FAILED" : "label-danger",
-        "TIMED OUT" : "label-danger",
+        "TIMED_OUT" : "label-danger",
         "TERMINATED" : "label-danger",
         "COMPLETED" : "label-success"
     };
@@ -489,7 +542,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "SCHEDULED" : "label-info",
         "STARTED" : "label-info",
         "FAILED" : "label-warning",
-        "TIMED OUT" : "label-warning",
+        "TIMED_OUT" : "label-warning",
         "CANCELED" : "label-warning",
         "TERMINAL" : "label-danger",
         "COMPLETE" : "label-success",
@@ -539,11 +592,11 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         $location.path("workflow/initiate/fromExisting");
     };
 
-    $("#rawInputToggle").click(function() {
+    $(".rawInputToggle").click(function() {
         $('#rawInput').slideToggle()
     });
 
-    $("#historyViewToggle").click(function() {
+    $(".historyViewToggle").click(function() {
         $('#historyView').slideToggle()
     });
 });
@@ -641,7 +694,7 @@ app.controller('workflowInitiationController', function($scope, $route, $http, $
 
         if($scope.params.command == "fromExisting") {
             if(environment.existingWorkflow !== null) {
-                $scope.inputJson = environment.existingWorkflow.input;
+                $scope.inputJson = environment.existingWorkflow.history[0].input;
                 $scope.workflowId = "Re-run of "+environment.existingWorkflow.workflowId;
             }
         }

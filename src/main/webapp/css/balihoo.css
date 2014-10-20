@@ -200,7 +200,7 @@ a .caption {
 }
 
 .panel-heading {
-    padding: 25px 20px;
+    padding: 15px 20px;
     border-top-left-radius: 10px;
     border-top-right-radius: 0;
     color:white;
@@ -797,6 +797,14 @@ footer .container-fluid {
     height: auto;
 }
 
+.f20 {
+    font-size:20px;
+}
+
+.f30 {
+    font-size:30px;
+}
+
 .label {
     cursor: pointer;
 }
@@ -871,6 +879,10 @@ footer .container-fluid {
     color: #aa1111;
 }
 
+.muted.blue:hover {
+    color: #428bca;
+}
+
 .muted.green:hover {
     color: #11aa11;
 }
@@ -925,3 +937,4 @@ footer .container-fluid {
 .jsonvalue:hover {
     color:black;
 }
+
