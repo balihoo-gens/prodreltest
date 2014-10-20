@@ -66,12 +66,12 @@ def main():
 
     d = Deployment(args.logfile, config)
 
+    s3dir = args.s3dir
+
     if not (pkgdir or args.s3dir):
         pkgdir = d.package(args.rootdir)
     if not (args.s3dir or args.noupload):
         s3dir = d.upload(pkgdir)
-    else:
-        s3dir = "s3://%s/%s" % (args.s3bucket, args.s3dir)
     if not args.nocf:
         d.create_stack(s3dir, args.template, args.bootstrap)
 

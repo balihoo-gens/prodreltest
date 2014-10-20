@@ -23,7 +23,7 @@ export AWS_REGION=${AWSREGION}
 log "installing dependencies"
 logdo "export DEBIAN_FRONTEND=noninteractive"
 logdo "apt-get update -q"
-logdo "apt-get install -y unzip gcc make autoconf libssl-dev libbz2-dev default-jre"
+logdo "apt-get install -y unzip default-jre"
 
 log "downloading cli tools"
 logdo "curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip"
@@ -32,24 +32,48 @@ log "unzipped bundle"
 logdo "./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws"
 log "installed bundle"
 
+S3APPURL="s3://${S3BUCKET}/${S3DIR}"
 log "downloading fulfillment application"
 logdo "mkdir -p ${FFDIR}"
-logdo "/usr/local/bin/aws s3 sync ${S3BUCKETURL} ${FFDIR}"
+logdo "/usr/local/bin/aws s3 sync ${S3APPURL} ${FFDIR}"
 
-log "installing virtual env"
-logdo "chmod +x ${FFDIR}/vesetup"
-logdo "${FFDIR}/vesetup -d ${VEDIR} -p ${PYVERSION} -v ${VEVERSION}"
+OSID=$(uname -srvm | sed "s/\W/_/g")
+VEACTIVATE="source ${VEDIR}/activate"
+VEARCHIVENAME="ve.tar.gz"
+S3VEURL="s3://${S3BUCKET}/VirtualEnv/${OSID}/ve-${VEVERSION}/py-${PYVERSION}/${VEARCHIVENAME}"
+#check for the presence of the VE check file on S3
+log "checking ${S3VEURL}"
+VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})"
+if [ -z "${VEFILE}" ]; then
+    log "no installation found: installing virtual env"
+    logdo "apt-get install -y gcc make autoconf libssl-dev libbz2-dev"
+    logdo "chmod +x ${FFDIR}/vesetup"
+    logdo "${FFDIR}/vesetup -d ${VEDIR} -p ${PYVERSION} -v ${VEVERSION}"
 
-log "activating virtual env"
-ACTIVATE="source ${VEDIR}/activate"
-logdo "$ACTIVATE"
+    #install boto into this environment
+    logdo "$VEACTIVATE"
+    logdo "pip install boto"
 
-log "installing boto"
-logdo "pip install boto"
+    # recheck for the check file, in case someone was building simultaneously
+    VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})"
+    if [ -z "${VEFILE}" ]; then
+        log "uploading virtual env install to S3"
+        logdo "$(cd ${VEDIR} && tar -czf ${VEARCHIVENAME} *)"
+        logdo "/usr/local/bin/aws s3 cp ${VEDIR}/${VEARCHIVENAME} ${S3VEURL}"
+    else
+        log "not uploading built version, another instance beat us to it"
+    fi
+else
+    log "using virtual env version found on S3"
+    logdo "/usr/local/bin/aws s3 cp ${S3VEURL} ${VEARCHIVENAME}"
+    logdo "mkdir -p ${VEDIR}"
+    logdo "tar -xzf ${VEARCHIVENAME} -C ${VEDIR}"
+    logdo "$VEACTIVATE"
+fi
 
 FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES}"
 echo "#!/bin/bash" > runffinstall
-echo "$ACTIVATE" >> runffinstall
+echo "$VEACTIVATE" >> runffinstall
 echo "$FFINSTCMD" >> runffinstall
 echo "deactivate" >> runffinstall
 logdo "cat runffinstall"

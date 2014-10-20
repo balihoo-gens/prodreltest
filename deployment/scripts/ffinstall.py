@@ -53,8 +53,8 @@ class Installer(object):
 
     def make_executable(self, path):
         os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
-                              stat.S_IRGRP |                stat.S_IXGRP |
-                              stat.S_IROTH |                stat.S_IXOTH )
+                       stat.S_IRGRP |                stat.S_IXGRP |
+                       stat.S_IROTH |                stat.S_IXOTH )
 
     def install_splunk(self, s3bucket, script_name):
         self._log.info("installing splunk from " + s3bucket)

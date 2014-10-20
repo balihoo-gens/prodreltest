@@ -30,6 +30,6 @@ class Uploader(object):
                     s3key = self._s3bucket.new_key(s3path)
                     s3key.set_contents_from_filename(localpath)
                     print("uploaded %s to %s" % (localpath, s3path))
-            return "s3://" + self._s3bucket_name + "/" + dirname
+            return dirname
         else:
             raise Exception("Unable to upload: %s is not a directory" % (srcpath,))
