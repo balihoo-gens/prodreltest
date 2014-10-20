@@ -3,7 +3,8 @@ package com.balihoo.fulfillment.adapters
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient
 import com.amazonaws.services.dynamodbv2.model.{DescribeTableResult, TableDescription}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.amazonaws.services.simpleworkflow.model._
+import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
 import org.mockito.Mockito._
 import org.mockito.Matchers._
@@ -37,6 +38,17 @@ trait LoggingWorkflowAdapterTestImpl
     when(_swfAdapter.domain).thenReturn("mockdomain")
     when(_swfAdapter.config).thenReturn(_config)
     when(_swfAdapter.client).thenReturn(_client)
+
+    when(_swfAdapter.name).thenReturn(new SWFName("workername"))
+    when(_swfAdapter.version).thenReturn(new SWFVersion("MockVersion"))
+    when(_swfAdapter.taskListName).thenReturn(new SWFName("MockTaskListName"))
+
+    val _taskList = mock(classOf[TaskList])
+
+    when(_swfAdapter.taskList).thenReturn(_taskList)
+    when(_swfAdapter.workflowName).thenReturn(new SWFName("MockWorkflowName"))
+    when(_swfAdapter.workflowVersion).thenReturn(new SWFVersion("MockWorkflowVersion"))
+    when(_swfAdapter.workflowTaskListName).thenReturn(new SWFName("MockWorkflowTaskListName"))
 
     _swfAdapter
   }

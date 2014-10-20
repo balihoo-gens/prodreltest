@@ -39,11 +39,11 @@ abstract class FulfillmentWorker {
 
   val instanceId = randomUUID().toString
 
-  val domain = swfAdapter.domain
-  val name = swfAdapter.name
-  val version = swfAdapter.version
-  val taskListName = swfAdapter.taskListName
-  val taskList = swfAdapter.taskList
+  def domain = swfAdapter.domain
+  def name = swfAdapter.name
+  def version = swfAdapter.version
+  def taskListName = swfAdapter.taskListName
+  def taskList = swfAdapter.taskList
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")

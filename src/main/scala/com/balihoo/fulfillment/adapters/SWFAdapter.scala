@@ -23,10 +23,9 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   private lazy val _version = new SWFVersion(config.getString("version"))
   private lazy val _taskListName = new SWFName(_name + _version)
   private lazy val _taskList: TaskList = new TaskList().withName(_taskListName)
-
-  val workflowName = new SWFName(config.getString("workflowName"))
-  val workflowVersion = new SWFVersion(config.getString("workflowVersion"))
-  val workflowTaskListName = new SWFName(workflowName+workflowVersion)
+  private lazy val _workflowName = new SWFName(config.getString("workflowName"))
+  private lazy val _workflowVersion = new SWFVersion(config.getString("workflowVersion"))
+  private lazy val _workflowTaskListName = new SWFName(workflowName+workflowVersion)
 
   //longpoll by default, unless config says "longpoll=false"
   protected val _longPoll = config.getOrElse("longpoll",true)
@@ -35,6 +34,9 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   def name = _name
   def version = _version
   def taskList = _taskList
+  def workflowName = _workflowName
+  def workflowVersion = _workflowVersion
+  def workflowTaskListName = _workflowTaskListName
 
   protected val taskReq: PollForActivityTaskRequest = new PollForActivityTaskRequest()
     .withDomain(domain)
