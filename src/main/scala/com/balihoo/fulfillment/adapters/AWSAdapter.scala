@@ -12,9 +12,9 @@ abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] 
   //can't have constructor code using the self type reference
   // unless it was declared 'lazy'. If not, config is still null
   // and will throw a NullPointerException at this time.
-  val domain = config.getString("domain")
-  val region:Region = getRegion
-  val client:T = createClient
+  lazy val domain = config.getString("domain")
+  lazy val region:Region = getRegion
+  lazy val client:T = createClient
 
   //put this all in a method rather than just in the constructor to
   // make it easier to Mock this

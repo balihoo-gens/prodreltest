@@ -32,7 +32,7 @@ class Getch {
   }
 
   def _createFuture: Future[Unit] = {
-    future { blocking {
+    future {
       while (_go) {
         if (_con.getInput.available > 0) {
           _keysPressed += _con.readVirtualKey.toChar
@@ -45,7 +45,7 @@ class Getch {
           Thread.sleep(10)
         }
       }
-    }}
+    }
   }
 
   def addMapping(strings: Seq[String], function: () => Unit): Unit = {

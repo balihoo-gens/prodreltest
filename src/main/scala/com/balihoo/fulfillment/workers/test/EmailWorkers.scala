@@ -84,7 +84,7 @@ object email {
 
       if (input.length() > 0) {
         val cfg = PropertiesLoader(args, "email_sender")
-        val swfAdapter = new SWFAdapter(cfg)
+        val swfAdapter = new SWFAdapter(cfg, splog)
         swfAdapter.client.startWorkflowExecution(
           new StartWorkflowExecutionRequest()
             .withDomain(swfAdapter.domain)

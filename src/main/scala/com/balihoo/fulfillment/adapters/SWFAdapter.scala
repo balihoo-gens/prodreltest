@@ -3,7 +3,12 @@ package com.balihoo.fulfillment.adapters
 import com.amazonaws.{AmazonServiceException, AmazonClientException}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.services.simpleworkflow.model._
+import com.amazonaws.handlers.AsyncHandler
+
+import scala.concurrent.{Promise, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util._
 
 //for the cake pattern dependency injection
 trait SWFAdapterComponent {
@@ -11,23 +16,83 @@ trait SWFAdapterComponent {
 }
 
 abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncClient] {
-  this: PropertiesLoaderComponent =>
+  this: PropertiesLoaderComponent
+    with SploggerComponent =>
+
+  private lazy val _name = new SWFName(config.getString("name"))
+  private lazy val _version = new SWFVersion(config.getString("version"))
+  private lazy val _taskListName = new SWFName(_name + _version)
+  private lazy val _taskList: TaskList = new TaskList().withName(_taskListName)
 
   val workflowName = new SWFName(config.getString("workflowName"))
   val workflowVersion = new SWFVersion(config.getString("workflowVersion"))
   val workflowTaskListName = new SWFName(workflowName+workflowVersion)
+
+  //longpoll by default, unless config says "longpoll=false"
+  protected val _longPoll = config.getOrElse("longpoll",true)
+
+  def taskListName = _taskListName
+  def name = _name
+  def version = _version
+  def taskList = _taskList
+
+  protected val taskReq: PollForActivityTaskRequest = new PollForActivityTaskRequest()
+    .withDomain(domain)
+    .withTaskList(taskList)
+  protected val countReq: CountPendingActivityTasksRequest = new CountPendingActivityTasksRequest()
+    .withDomain(domain)
+    .withTaskList(taskList)
+
+  def getTask(): Future[Option[ActivityTask]]  = {
+    val taskPromise = Promise[Option[ActivityTask]]()
+
+    object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
+      override def onSuccess(req:PollForActivityTaskRequest, task:ActivityTask) {
+        if (task != null && task.getTaskToken != null) {
+          taskPromise.success(Some(task))
+        } else {
+          taskPromise.success(None)
+        }
+      }
+      override def onError(e:Exception) {
+        taskPromise.failure(e)
+      }
+    }
+
+    object activityCountHandler extends AsyncHandler[CountPendingActivityTasksRequest, PendingTaskCount] {
+      override def onSuccess(req:CountPendingActivityTasksRequest, count:PendingTaskCount) {
+        if (count.getCount > 0) {
+          client.pollForActivityTaskAsync(taskReq, activityPollHandler)
+        } else {
+          Thread.sleep(1000)
+          taskPromise.success(None)
+        }
+      }
+      override def onError(e:Exception) {
+        taskPromise.failure(e)
+      }
+    }
+
+    if (_longPoll) {
+      client.pollForActivityTaskAsync(taskReq, activityPollHandler)
+    } else {
+      client.countPendingActivityTasksAsync(countReq, activityCountHandler)
+    }
+
+    taskPromise.future
+  }
 
   def verifyDomain(autoRegister:Boolean = false) = {
     val ddr = new DescribeDomainRequest
     ddr.setName(domain)
 
     try {
-      println(s"Checking for domain '$domain'..")
+      splog.info(s"Checking for domain '$domain'..")
       client.describeDomain(ddr)
-      println("Found it!")
+      splog.info("Found it!")
     } catch {
       case ure:UnknownResourceException =>
-        println(s"The domain '$domain' doesn't exist!")
+        splog.warning(s"The domain '$domain' doesn't exist!")
         if(autoRegister) { registerDomain() }
     }
   }
@@ -39,7 +104,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     rdr.setDescription(config.getString("domainDescription"))
 
     try {
-      println(s"Trying to register domain '$domain'")
+      splog.info(s"Trying to register domain '$domain'")
       client.registerDomain(rdr)
     } catch {
       case daee:DomainAlreadyExistsException =>
@@ -63,12 +128,12 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     wtr.setWorkflowType(wt)
 
     try {
-      println(s"Checking for workflow type '$workflowName:$workflowVersion'..")
+      splog.info(s"Checking for workflow type '$workflowName:$workflowVersion'..")
       client.describeWorkflowType(wtr)
-      println("Found it!")
+      splog.info("Found it!")
     } catch {
       case ure:UnknownResourceException =>
-        println(s"The workflow type '${wt.getName}:${wt.getVersion}' doesn't exist!")
+        splog.warning(s"The workflow type '${wt.getName}:${wt.getVersion}' doesn't exist!")
         if(autoRegister) { registerWorkflowType() }
 
     }
@@ -84,7 +149,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     rwtr.setDefaultTaskList(taskList)
 
     try {
-      println(s"Trying to register workflow type '$workflowName:$workflowVersion'")
+      splog.info(s"Trying to register workflow type '$workflowName:$workflowVersion'")
       client.registerWorkflowType(rwtr)
     } catch {
       case taee:TypeAlreadyExistsException =>
@@ -102,8 +167,13 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   }
 }
 
-class SWFAdapter(cfg: PropertiesLoader, autoRegister:Boolean = false) extends AbstractSWFAdapter with PropertiesLoaderComponent {
+class SWFAdapter(cfg: PropertiesLoader, _splog: Splogger, autoRegister:Boolean = false)
+  extends AbstractSWFAdapter
+  with SploggerComponent
+  with PropertiesLoaderComponent {
+
   def config = cfg
+  def splog = _splog
 
   verifyDomain(autoRegister)
   verifyWorkflowType(autoRegister)

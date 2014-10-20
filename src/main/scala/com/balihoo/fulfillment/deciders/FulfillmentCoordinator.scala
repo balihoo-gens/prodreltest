@@ -536,7 +536,7 @@ object coordinator {
     try {
       val config = PropertiesLoader(args, getClass.getSimpleName.stripSuffix("$"))
       splog.debug("Created PropertiesLoader")
-      val swf = new SWFAdapter(config, true)
+      val swf = new SWFAdapter(config, splog, true)
       splog.debug("Created SWFAdapter")
       val fc = new FulfillmentCoordinator(swf, splog)
       splog.debug("Created FulfillmentCoordinator")
