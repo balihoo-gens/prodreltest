@@ -2,18 +2,22 @@
     <div class="panel-heading">
 				<span class="pull-right">
 					<h1 style="display:table-cell;vertical-align: middle">
+                        <i ng-show="workflow.editable" class="fa fa-gear muted blue action" ng-click="toolsVisible = !toolsVisible"></i>
                         <i ng-show="workflow.editable" class="fa fa-refresh muted red action" ng-click="getWorkflow()"></i>
-                        <span class="label {{figureWorkflowStatusLabel(workflow.resolution)}}">{{workflow.resolution}}</span></h1>
+                        <span class="label {{figureWorkflowStatusLabel(workflow.status)}}">{{workflow.status}}</span>
+                    </h1>
 				</span>
         <h1>Workflow » {{workflow.workflowId}}</h1>
+        <div ng-show="toolsVisible">
+            <span>
+                <span class="muted red label" ng-click="promptCancelWorkflow()">Cancel</span>
+                <span class="muted red label" ng-click="promptTerminateWorkflow()">Terminate</span>
+            </span>
+        </div>
     </div>
     <div class="panel-body">
         <div ng-show="loading">
             <img src="img/loading.gif">
-        </div>
-        <div class="pull-right">
-            <span id="rawInputToggle" class="muted label">Show Input</span>
-            <span id="historyViewToggle" class="muted label">Show History</span>
         </div>
         <div class="row">
             <div class="col-md-3">
@@ -44,8 +48,13 @@
                                 </a>
                             </li>
                         </ul>
+                        <br/>
                     </div>
                     <div class="col-md-12 col-sm-6">
+                        <div class="pull-right">
+                            <span class="rawInputToggle muted label">Show Input</span>
+                            <span class="historyViewToggle muted label">Show History</span>
+                        </div>
                         <h3 ng-show="workflow.timeline">Fulfillment Timeline</h3>
                         <div class="block">
                             <div ng-repeat="event in workflow.timeline">
@@ -58,19 +67,26 @@
             </div>
             <div class="col-md-9">
                 <div class="panel panel-default initiallyHidden" id="rawInput">
-                    <div class="panel-heading-small">
+                    <div class="panel-heading-small rawInputToggle">
                         <button class="btn btn-xs pull-right" ng-click="newWorkflow()">Create New Fulfillment</button>
-                        Fulfillment Input
+                        <b>Fulfillment Input</b>
                     </div>
-                    <pre class="json" ng-bind-html="formatUtil.formatJsonBasic(workflow.input)"></pre>
+                    <pre class="json" ng-bind-html="formatUtil.formatJsonBasic(workflow.history[0].input)"></pre>
                 </div>
                 <div id="historyView" class="panel panel-default initiallyHidden">
-                    <div class="panel-heading-small">
-                        Fulfillment History
+                    <div class="panel-heading-small historyViewToggle">
+                        <b>Fulfillment History</b>
                     </div>
                     <div ng-repeat="event in workflow.history">
-                        <span class="label label-default" title="{{event.id}}">{{event.type}} - <span class="muted" title="{{event.timestamp}}">{{event.timestamp | momentFromNow}}</span></span>
-                        <pre class="json" ng-bind-html="formatUtil.formatJsonlike(event.attributes)"></pre>
+                        <span class="label label-default" title="{{event.eventId}}">{{event.eventType}} - <span class="muted" title="{{event.eventDateTime}}">{{event.eventDateTime | momentFromNow}}</span></span>
+                        <table class="table table-condensed table-hover block params" style="width:95%">
+                            <tr ng-repeat="(key, value) in event" ng-class="{info : param.edited}">
+                                <td style="width:200px"><b>{{key}}</b></td>
+                                <td>
+                                    <span class="json" ng-bind-html="formatUtil.jsonFormat(value)"></span>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                 </div>
                 <div ng-repeat="(name, section) in workflow.sections" ng-show="section.showContents">
@@ -172,5 +188,37 @@
                 <i class="fa fa-remove muted red action" ng-click="cancelWorkflowUpdate()"></i>
             </h2>
         </span>
+        <script type="text/ng-template" id="confirmCancel">
+            <div class="ngdialog-message">
+                <h2><span class="fa fa-exclamation-triangle"></span>&nbsp;Confirm Cancelation</h2>
+                <span class="pull-right">
+                    <i class="fa fa-check muted green action f30" ng-click="cancelWorkflow() && closeThisDialog()"></i>
+                    <i class="fa fa-remove muted red action f30" ng-click="closeThisDialog()"></i>
+                </span>
+                <i>{{workflowId}}</i><br/>
+                Do you really want to cancel this Fulfillment?
+            </div>
+        </script>
+        <script type="text/ng-template" id="confirmTerminate">
+            <div class="ngdialog-message">
+                <h2><span class="fa fa-exclamation-triangle timeline-ERROR"></span>&nbsp;Confirm Termination</h2>
+                <i>{{workflowId}}</i><br/>
+                <form role="form">
+                    <div class="form-group">
+                        <label>Reason</label>
+                        <input type="text" class="form-control" ng-model="terminateReason" placeholder="Reason for termination.." >
+                    </div>
+                    <div class="form-group">
+                        <label>Details</label>
+                        <textarea rows="2" class="form-control" placeholder="Termination Details.." ng-model="terminateDetails"></textarea>
+                    </div>
+                </form>
+                Do you really want to terminate this Fulfillment?
+                <span class="pull-right">
+                    <i class="fa fa-check muted green action f30" ng-click="terminateWorkflow() && closeThisDialog()"></i>
+                    <i class="fa fa-remove muted red action f30" ng-click="closeThisDialog()"></i>
+                </span>
+            </div>
+        </script>
     </div>
 </div>

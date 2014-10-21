@@ -14,7 +14,7 @@ object SectionStatus extends Enumeration {
   val SCHEDULED = Value("SCHEDULED")
   val STARTED = Value("STARTED")
   val FAILED = Value("FAILED")
-  val TIMED_OUT = Value("TIMED OUT")
+  val TIMED_OUT = Value("TIMED_OUT")
   val CANCELED = Value("CANCELED")
   val TERMINAL = Value("TERMINAL") // Section has FAILED/CANCELED/TIMED OUT too many times!
   val COMPLETE = Value("COMPLETE")
@@ -293,7 +293,7 @@ class FulfillmentSection(val name: String
     }
   }
 
-  def resolveReferences(map:FulfillmentSections):Boolean = {
+  def resolveReferences(map:Fulfillment):Boolean = {
     if(status == SectionStatus.READY) {
       for((pname, param) <- params) {
         param match {
@@ -507,7 +507,7 @@ class SectionReferences(sectionNames:List[String]) {
 
   val sections = for(name <- sectionNames) yield new SectionReference(name)
 
-  def hydrate(map:FulfillmentSections) = {
+  def hydrate(map:Fulfillment) = {
     for(sectionRef <- sections) {
       if(map.hasSection(sectionRef.name)) {
         sectionRef.section = Some(map.getSectionByName(sectionRef.name))
@@ -515,7 +515,7 @@ class SectionReferences(sectionNames:List[String]) {
     }
   }
 
-  def processReferences(map:FulfillmentSections) = {
+  def processReferences(map:Fulfillment) = {
     hydrate(map)
 
     var priorSectionRef:SectionReference = null
@@ -548,7 +548,7 @@ class SectionReferences(sectionNames:List[String]) {
     }
   }
 
-  def resolved(map:FulfillmentSections):Boolean = {
+  def resolved(map:Fulfillment):Boolean = {
     hydrate(map)
 
     for(sectionRef <- sections) {
@@ -565,7 +565,7 @@ class SectionReferences(sectionNames:List[String]) {
     false
   }
 
-  def getValue(map:FulfillmentSections):String = {
+  def getValue(map:Fulfillment):String = {
     hydrate(map)
 
     for(sectionRef <- sections) {

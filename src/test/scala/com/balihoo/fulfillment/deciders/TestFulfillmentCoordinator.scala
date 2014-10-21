@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.deciders
 
 import java.util.Date
+import com.balihoo.fulfillment.SWFHistoryConvertor
 import org.joda.time.DateTime
 
 import org.specs2.mock.Mockito
@@ -199,20 +200,26 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       val event1:HistoryEvent = new HistoryEvent
       val event1Attribs = new WorkflowExecutionStartedEventAttributes
       event1.setEventType(EventType.WorkflowExecutionStarted)
+      event1.setEventId(1)
+      event1.setEventTimestamp(new Date())
       event1Attribs.setInput(json)
+      event1Attribs.setParentInitiatedEventId(1)
+      event1Attribs.setTaskList((new TaskList).withName("blah"))
       event1.setWorkflowExecutionStartedEventAttributes(event1Attribs)
       events += event1
 
       val event2:HistoryEvent = new HistoryEvent
       val event2Attribs = new ActivityTaskScheduledEventAttributes
       event2.setEventType(EventType.ActivityTaskScheduled)
+      event2.setEventId(2)
+      event2.setEventTimestamp(new Date())
       event2Attribs.setActivityId("cake##blah")
       event2.setActivityTaskScheduledEventAttributes(event2Attribs)
       events += event2
 
-      val map = new FulfillmentSections(mutableSeqAsJavaList(events))
+      val map = new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
 
-      map.getClass mustEqual classOf[FulfillmentSections]
+      map.getClass mustEqual classOf[Fulfillment]
 
       map.size mustEqual 3
 
@@ -269,20 +276,41 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       val event1:HistoryEvent = new HistoryEvent
       val event1Attribs = new WorkflowExecutionStartedEventAttributes
       event1.setEventType(EventType.WorkflowExecutionStarted)
+      event1.setEventId(1)
+      event1.setEventTimestamp(new Date())
       event1Attribs.setInput(json)
+      event1Attribs.setParentInitiatedEventId(3)
+      event1Attribs.setTaskList((new TaskList).withName("blah"))
       event1.setWorkflowExecutionStartedEventAttributes(event1Attribs)
       events += event1
 
       val event2:HistoryEvent = new HistoryEvent
-      val event2Attribs = new ActivityTaskStartedEventAttributes
-      event2.setEventType(EventType.ActivityTaskStarted)
-      event2Attribs.setScheduledEventId(100)
-      event2.setActivityTaskStartedEventAttributes(event2Attribs)
+      val event2Attribs = new ActivityTaskScheduledEventAttributes
+      event2.setEventType(EventType.ActivityTaskScheduled)
+      event2.setEventId(2)
+      event2.setEventTimestamp(new Date())
+      event2Attribs.setActivityId("batter")
+      event2.setActivityTaskScheduledEventAttributes(event2Attribs)
       events += event2
 
-      val map = new FulfillmentSections(mutableSeqAsJavaList(events))
+      val event3:HistoryEvent = new HistoryEvent
+      val event3Attribs = new ActivityTaskStartedEventAttributes
+      event3.setEventType(EventType.ActivityTaskStarted)
+      event3.setEventId(3)
+      event3.setEventTimestamp(new Date())
+      event3Attribs.setScheduledEventId(2)
+      event3.setActivityTaskStartedEventAttributes(event3Attribs)
+      events += event3
 
-      map.getClass mustEqual classOf[FulfillmentSections]
+      var map:Fulfillment = null
+      try {
+        map = new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
+      } catch {
+        case e:Exception =>
+          println(e.getMessage)
+      }
+
+      map.getClass mustEqual classOf[Fulfillment]
 
       map.size mustEqual 3
 
@@ -313,11 +341,15 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       val event:HistoryEvent = new HistoryEvent
       val eventAttribs = new WorkflowExecutionStartedEventAttributes
       event.setEventType(EventType.WorkflowExecutionStarted)
+      event.setEventId(1)
+      event.setEventTimestamp(new Date())
       eventAttribs.setInput(json)
+      eventAttribs.setParentInitiatedEventId(2)
+      eventAttribs.setTaskList((new TaskList).withName("blah"))
       event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
       events += event
 
-      val sections = new FulfillmentSections(mutableSeqAsJavaList(events))
+      val sections = new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
       val generator = new DecisionGenerator(sections)
       generator.makeDecisions(false)
     }
@@ -350,11 +382,15 @@ class TestFulfillmentCoordinator extends Specification with Mockito
       val event:HistoryEvent = new HistoryEvent
       val eventAttribs = new WorkflowExecutionStartedEventAttributes
       event.setEventType(EventType.WorkflowExecutionStarted)
+      event.setEventId(1)
+      event.setEventTimestamp(new Date())
       eventAttribs.setInput(json)
+      eventAttribs.setParentInitiatedEventId(2)
+      eventAttribs.setTaskList((new TaskList).withName("blah"))
       event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
       events += event
 
-      new FulfillmentSections(mutableSeqAsJavaList(events))
+      new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
     }
 
     "  be upset about missing 'input'" in {

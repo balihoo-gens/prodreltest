@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.deciders
 import java.security.MessageDigest
 import java.util.UUID.randomUUID
 
+import com.balihoo.fulfillment.SWFHistoryConvertor
 import org.joda.time.DateTime
 import org.keyczar.Crypter
 
@@ -61,7 +62,7 @@ abstract class AbstractFulfillmentCoordinator {
           if(task.getTaskToken != null) {
 
             splog.info(s"processing token ${task.getTaskToken.toString}")
-            val sections = new FulfillmentSections(task.getEvents)
+            val sections = new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(task.getEvents))
             val decisions = new DecisionGenerator(sections).makeDecisions()
 
             val response: RespondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest
@@ -244,12 +245,12 @@ class FulfillmentOperators {
  *
  * @param sections A Name -> Section mapping helper
  */
-class DecisionGenerator(sections: FulfillmentSections) {
+class DecisionGenerator(sections: Fulfillment) {
 
   val operators = new FulfillmentOperators
 
   protected def gatherParameters(section: FulfillmentSection
-                                ,sections: FulfillmentSections):Map[String,String] = {
+                                ,sections: Fulfillment):Map[String,String] = {
 
     val params = mutable.Map[String, String]()
 
@@ -378,6 +379,24 @@ class DecisionGenerator(sections: FulfillmentSections) {
     None
   }
 
+  /**
+   * This route is taken if the workflow receives a cancelation request.
+   * We can use this notification to cleanly stop processing.
+   * @return
+   */
+  def _checkCancelRequested():Option[Decision] = {
+    if(sections.status != FulfillmentStatus.CANCEL_REQUESTED) { return None }
+
+    val attribs = new CancelWorkflowExecutionDecisionAttributes
+    attribs.setDetails("Cancel Requested. Shutting down.")
+
+    val decision = new Decision
+    decision.setDecisionType(DecisionType.CancelWorkflowExecution)
+    decision.setCancelWorkflowExecutionDecisionAttributes(attribs)
+
+    Some(decision)
+  }
+
   def makeDecisions(runOperations:Boolean = true): List[Decision] = {
 
     _checkComplete() match {
@@ -386,11 +405,16 @@ class DecisionGenerator(sections: FulfillmentSections) {
     }
 
     if(sections.terminal()) {
-      sections.timeline.error(s"Workflow is TERMINAL (${sections.resolution})", None)
+      sections.timeline.error(s"Workflow is TERMINAL (${sections.status})", None)
       return List()
     }
 
     _checkFailed() match {
+      case d:Some[Decision] => return List(d.get)
+      case _ =>
+    }
+
+    _checkCancelRequested() match {
       case d:Some[Decision] => return List(d.get)
       case _ =>
     }
@@ -457,7 +481,7 @@ class DecisionGenerator(sections: FulfillmentSections) {
     if(decisions.length == 0 && !sections.categorized.hasPendingSections) {
 
       // We aren't making any progress...
-      sections.resolution = "BLOCKED"
+      sections.status = FulfillmentStatus.BLOCKED
 
       if(sections.categorized.terminal.length > 0) {
         sections.timeline.error(

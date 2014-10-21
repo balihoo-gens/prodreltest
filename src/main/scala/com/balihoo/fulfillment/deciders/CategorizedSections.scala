@@ -3,9 +3,9 @@ package com.balihoo.fulfillment.deciders
 import scala.collection.mutable
 /**
  * Bin the sections by status. So we can make decisions
- * @param sections SectionMap
+ * @param fulfillment SectionMap
  */
-class CategorizedSections(sections: FulfillmentSections) {
+class CategorizedSections(fulfillment: Fulfillment) {
   val complete = mutable.MutableList[FulfillmentSection]()
   val inprogress = mutable.MutableList[FulfillmentSection]()
   val timedout = mutable.MutableList[FulfillmentSection]()
@@ -40,7 +40,7 @@ class CategorizedSections(sections: FulfillmentSections) {
     ready.clear()
     impossible.clear()
 
-    for((name, section) <- sections.nameToSection) {
+    for((name, section) <- fulfillment.nameToSection) {
       if(section.essential) { essentialTotal += 1 }
       section.status match {
         case SectionStatus.COMPLETE =>
@@ -83,7 +83,7 @@ class CategorizedSections(sections: FulfillmentSections) {
     for((name, value) <- section.params) {
       value match {
         case sectionReferences: SectionReferences =>
-          paramsReady &= sectionReferences.resolved(sections)
+          paramsReady &= sectionReferences.resolved(fulfillment)
         case _ =>
           // non-reference params are automatically ready..
       }
@@ -91,7 +91,7 @@ class CategorizedSections(sections: FulfillmentSections) {
 
     var prereqsReady: Boolean = true
     for(prereq: String <- section.prereqs) {
-      val referencedSection: FulfillmentSection = sections.getSectionByName(prereq)
+      val referencedSection: FulfillmentSection = fulfillment.getSectionByName(prereq)
       referencedSection.status match {
         case SectionStatus.COMPLETE =>
           // println("Section is complete")
@@ -112,12 +112,12 @@ class CategorizedSections(sections: FulfillmentSections) {
   }
 
   def workComplete() : Boolean = {
-    if(sections.size == 0) { return false; }
+    if(fulfillment.size == 0) { return false; }
 
     essentialTotal match {
       case 0 =>
         // No essential sections.. we just want everything complete or contingent
-        sections.size == (complete.length + contingent.length)
+        fulfillment.size == (complete.length + contingent.length)
       case _ =>
         // If there are essential sections.. they MUST ALL be COMPLETE
         essentialComplete == essentialTotal
