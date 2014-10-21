@@ -248,7 +248,7 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 });
 
-app.controller('historyController', function($scope, $route, $http, $location) {
+app.controller('historyController', function($scope, $route, $http, $location, ngDialog) {
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -286,11 +286,23 @@ app.controller('historyController', function($scope, $route, $http, $location) {
         $location.path("workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(execution.runId));
     };
 
+    $scope.linkWorkflow = function(execution) {
+        return "#/workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(execution.runId);
+    };
+
     $scope.statusMap = {
+        // These are all SWF Workflow Close Statii
         "FAILED" : "label-danger",
         "COMPLETED" : "label-success",
         "TIMED_OUT" : "label-warning",
-        "TERMINATED" : "label-danger"
+        "TERMINATED" : "label-danger",
+        "CANCELED" : "label-warning",
+        "CONTINUTED_AS_NEW" : "label-default",
+
+        "IN_PROGRESS" : "label-info",
+        "BLOCKED" : "label-warning",
+        "CANCEL_REQUESTED" : "label-warning"
+
     };
 
     $scope.figureStatusLabel = function(status) {
@@ -311,6 +323,56 @@ app.controller('historyController', function($scope, $route, $http, $location) {
     $scope.formatTag = function(tag) {
         var parts = tag.split(':');
         return "<b>"+parts[0]+"</b>&nbsp;:&nbsp;"+parts[1];
+    };
+
+    $scope.promptCancelWorkflow = function(ex) {
+        $scope.ex = ex;
+        ngDialog.open({
+                          template : "confirmCancel",
+                          controller : "historyController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.cancelWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.ex.runId;
+        params['workflowId'] = $scope.ex.workflowId;
+        $http.post('workflow/cancel', params )
+            .success(function(data) {
+                         toastr.info(data, "Cancel Requested!");
+                         $scope.ex.closeStatus = "CANCEL_REQUESTED";
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
+    $scope.promptTerminateWorkflow = function(ex) {
+        $scope.ex = ex;
+        ngDialog.open({
+                          template : "confirmTerminate",
+                          controller : "historyController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.terminateWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.ex.runId;
+        params['workflowId'] = $scope.ex.workflowId;
+        params['reason'] = $scope.terminateReason;
+        params['details'] = $scope.terminateDetails;
+        $http.post('workflow/terminate', params )
+            .success(function(data) {
+                         toastr.info(data, "Workflow Terminated!");
+                         $scope.ex.closeStatus = "TERMINATED";
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
     };
 });
 
@@ -694,7 +756,7 @@ app.controller('workflowInitiationController', function($scope, $route, $http, $
 
         if($scope.params.command == "fromExisting") {
             if(environment.existingWorkflow !== null) {
-                $scope.inputJson = environment.existingWorkflow.history[0].input;
+                $scope.inputJson = JSON.stringify(JSON.parse(environment.existingWorkflow.history[0].input), null, 4);
                 $scope.workflowId = "Re-run of "+environment.existingWorkflow.workflowId;
             }
         }

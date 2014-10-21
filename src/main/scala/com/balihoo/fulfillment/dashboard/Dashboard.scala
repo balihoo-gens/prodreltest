@@ -91,6 +91,7 @@ trait WorkflowUpdaterComponent {
       req.setDomain(swfAdapter.config.getString("domain"))
       req.setRunId(runId)
       req.setWorkflowId(workflowId)
+
       swfAdapter.client.requestCancelWorkflowExecution(req)
 
       "success"
@@ -104,6 +105,7 @@ trait WorkflowUpdaterComponent {
       treq.setReason(reason)
       treq.setDetails(details)
 //      treq.setChildPolicy(ChildPolicy.fromValue())
+
       swfAdapter.client.terminateWorkflowExecution(treq)
 
       "success"

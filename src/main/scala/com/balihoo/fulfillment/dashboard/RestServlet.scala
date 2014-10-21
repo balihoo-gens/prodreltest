@@ -58,7 +58,7 @@ abstract class RestServlet extends HttpServlet {
           ,_errorJson("Internal Server Error", npe.getMessage))
       case e:Exception =>
         rsq.respondJson(HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          ,_errorJson("Internal Server Error("+e.getClass.toString+")", s"${e.getMessage} ${e.getStackTraceString.substring(0, 150)}"))
+          ,_errorJson("Internal Server Error("+e.getClass.toString+")", s"${e.getMessage} ${e.getStackTraceString take 150}"))
     }
   }
 

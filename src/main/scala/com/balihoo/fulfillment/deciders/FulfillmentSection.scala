@@ -14,7 +14,7 @@ object SectionStatus extends Enumeration {
   val SCHEDULED = Value("SCHEDULED")
   val STARTED = Value("STARTED")
   val FAILED = Value("FAILED")
-  val TIMED_OUT = Value("TIMED OUT")
+  val TIMED_OUT = Value("TIMED_OUT")
   val CANCELED = Value("CANCELED")
   val TERMINAL = Value("TERMINAL") // Section has FAILED/CANCELED/TIMED OUT too many times!
   val COMPLETE = Value("COMPLETE")

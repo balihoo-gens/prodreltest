@@ -192,28 +192,30 @@
             <div class="ngdialog-message">
                 <h2><span class="fa fa-exclamation-triangle"></span>&nbsp;Confirm Cancelation</h2>
                 <span class="pull-right">
-                    <i class="fa fa-check muted green action f30" ng-click="cancelWorkflow()"></i>
+                    <i class="fa fa-check muted green action f30" ng-click="cancelWorkflow() && closeThisDialog()"></i>
                     <i class="fa fa-remove muted red action f30" ng-click="closeThisDialog()"></i>
                 </span>
+                <i>{{workflowId}}</i><br/>
                 Do you really want to cancel this Fulfillment?
             </div>
         </script>
         <script type="text/ng-template" id="confirmTerminate">
             <div class="ngdialog-message">
                 <h2><span class="fa fa-exclamation-triangle timeline-ERROR"></span>&nbsp;Confirm Termination</h2>
+                <i>{{workflowId}}</i><br/>
                 <form role="form">
                     <div class="form-group">
                         <label>Reason</label>
-                        <input type="text" class="form-control" ng-model="terminateReason" placeholder="Reason for termination.." ng-maxlength="256">
+                        <input type="text" class="form-control" ng-model="terminateReason" placeholder="Reason for termination.." >
                     </div>
                     <div class="form-group">
                         <label>Details</label>
-                        <textarea rows="2" class="form-control" placeholder="Termination Details.." ng-model="terminateDetails" ng-maxlength="32768"></textarea>
+                        <textarea rows="2" class="form-control" placeholder="Termination Details.." ng-model="terminateDetails"></textarea>
                     </div>
                 </form>
                 Do you really want to terminate this Fulfillment?
                 <span class="pull-right">
-                    <i class="fa fa-check muted green action f30" ng-click="terminateWorkflow()"></i>
+                    <i class="fa fa-check muted green action f30" ng-click="terminateWorkflow() && closeThisDialog()"></i>
                     <i class="fa fa-remove muted red action f30" ng-click="closeThisDialog()"></i>
                 </span>
             </div>
