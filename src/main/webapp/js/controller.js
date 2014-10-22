@@ -175,6 +175,14 @@ app.factory('formatUtil', function() {
         return typeof s === "string";
     }
 
+    function _escapeSlash(s) {
+        return s.replace("/", "++++");
+    }
+
+    function _unEscapeSlash(s) {
+        return s.replace("++++", "/");
+    }
+
     return {
         formatWhitespace: _formatWhitespace,
         div: _div,
@@ -186,7 +194,9 @@ app.factory('formatUtil', function() {
         formatURLs: _formatURLs,
         isJSON: _isJSON,
         isArray: _isArray,
-        isString: _isString
+        isString: _isString,
+        escapeSlash: _escapeSlash,
+        unEscapeSlash: _unEscapeSlash
     }
 
 });
@@ -248,7 +258,7 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 });
 
-app.controller('historyController', function($scope, $route, $http, $location, ngDialog) {
+app.controller('historyController', function($scope, $route, $http, $location, ngDialog, formatUtil) {
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -287,7 +297,7 @@ app.controller('historyController', function($scope, $route, $http, $location, n
     };
 
     $scope.linkWorkflow = function(execution) {
-        return "#/workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(execution.runId);
+        return "#/workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(formatUtil.escapeSlash(execution.runId));
     };
 
     $scope.statusMap = {
@@ -385,6 +395,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
             $scope.params = $route.current.params;
+            $scope.params.runId = formatUtil.unEscapeSlash($scope.params.runId);
             $scope.getWorkflow();
         }
     );
