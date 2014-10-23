@@ -3,13 +3,17 @@ package com.balihoo.fulfillment.deciders
 import java.security.MessageDigest
 import java.util.UUID.randomUUID
 
-import com.balihoo.fulfillment.SWFHistoryConvertor
-import org.joda.time.DateTime
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig.TableNameOverride
+import com.amazonaws.services.dynamodbv2.datamodeling._
+import com.amazonaws.services.dynamodbv2.model._
+import com.balihoo.fulfillment.{UTCFormatter, SWFHistoryConvertor}
+import org.joda.time.{Minutes, DateTime}
 import org.keyczar.Crypter
 
 import scala.language.implicitConversions
-import scala.collection.convert.wrapAsJava._
+import scala.collection.JavaConversions._
 import scala.collection.mutable
+import scala.sys.process._
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
@@ -27,7 +31,10 @@ object Constants {
 
 abstract class AbstractFulfillmentCoordinator {
   this: SploggerComponent
-  with SWFAdapterComponent =>
+  with SWFAdapterComponent
+  with DynamoAdapterComponent =>
+
+  val instanceId = randomUUID().toString
 
   //can't have constructor code using the self type reference
   // unless it was declared 'lazy'. If not, swfAdapter is still null
@@ -46,9 +53,49 @@ abstract class AbstractFulfillmentCoordinator {
 
   val operators = new FulfillmentOperators
 
+  val hostAddress = sys.env.get("EC2_HOME") match {
+    case Some(s:String) =>
+      val url = "http://169.254.169.254/latest/meta-data/public-hostname"
+      val aws_ec2_identify = "curl -s $url --max-time 2 --retry 3"
+      aws_ec2_identify.!!
+    case None =>
+      try {
+        // This might throw an exception if the local DNS doesn't know about the system hostname.
+        // At this point we're looking for some kind of identifier. It doesn't have to actually
+        // be reachable.
+        java.net.InetAddress.getLocalHost.getHostName
+      } catch {
+        case e:Exception =>
+          // If all else fails..
+          "hostname".!!
+      }
+  }
+
+  val coordinatorTable = new FulfillmentCoordinatorTable with DynamoAdapterComponent with SploggerComponent {
+    def dynamoAdapter = AbstractFulfillmentCoordinator.this.dynamoAdapter
+    def splog = AbstractFulfillmentCoordinator.this.splog
+  }
+
+// TODO Implement me!
+//  val taskResolutions = new mutable.Queue[TaskResolution]()
+
+  val entry = new FulfillmentCoordinatorEntry
+  entry.tableName = coordinatorTable.dynamoAdapter.config.getString("coordinator_status_table")
+  entry.setInstance(instanceId)
+  entry.setHostAddress(hostAddress)
+  entry.setWorkflowName(workflowName)
+  entry.setWorkflowVersion(workflowVersion)
+  entry.setSpecification(Json.stringify(operators.toJson))
+  entry.setDomain(domain)
+  entry.setStatus("--")
+  entry.setResolutionHistory("[]")
+  entry.setStart(UTCFormatter.format(DateTime.now))
+
   def coordinate() = {
 
     splog.info(s"$domain $taskListName")
+
+    declareCoordinator()
 
     var done = false
     val getch = new Getch
@@ -57,11 +104,13 @@ abstract class AbstractFulfillmentCoordinator {
     getch.doWith {
       while(!done) {
         try {
+          updateStatus("Polling")
           val task: DecisionTask = swfAdapter.client.pollForDecisionTask(taskReq)
 
           if(task.getTaskToken != null) {
 
-            splog.info(s"processing token ${task.getTaskToken.toString}")
+            updateStatus("Processing "+ task.getTaskToken takeRight 12)
+            splog.info(s"processing token ${task.getTaskToken}")
             val sections = new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(task.getEvents))
             val decisions = new DecisionGenerator(sections).makeDecisions()
 
@@ -81,6 +130,27 @@ abstract class AbstractFulfillmentCoordinator {
       }
     }
     splog.info("Done. Cleaning up...")
+  }
+
+  def declareCoordinator() = {
+    val status = s"Declaring $domain $taskListName"
+    splog("INFO",status)
+    entry.setLast(UTCFormatter.format(DateTime.now))
+    entry.setStatus(status)
+    coordinatorTable.insert(entry)
+  }
+
+  def updateStatus(status:String, level:String="INFO") = {
+    try {
+      entry.setLast(UTCFormatter.format(DateTime.now))
+      entry.setStatus(status)
+      coordinatorTable.update(entry)
+      splog(level,status)
+    } catch {
+      case e:Exception =>
+        //splog will print to stdout on any throwable, or log to the default logfile
+        splog("ERROR", s"Failed to update status: ${e.toString}")
+    }
   }
 }
 
@@ -544,11 +614,195 @@ class DecisionGenerator(sections: Fulfillment) {
   }
 }
 
-class FulfillmentCoordinator(swf: SWFAdapter, splogger: Splogger)
+class FulfillmentCoordinatorTable {
+  this: DynamoAdapterComponent
+    with SploggerComponent =>
+
+  val tableName = dynamoAdapter.config.getString("coordinator_status_table")
+  val readCapacity = dynamoAdapter.config.getOrElse("coordinator_status_read_capacity", 3)
+  val writeCapacity = dynamoAdapter.config.getOrElse("coordinator_status_write_capacity", 5)
+
+  waitForActiveTable()
+
+  def waitForActiveTable() = {
+
+    var active = false
+    while(!active) {
+      try {
+        splog.info(s"Checking for coordinator status table $tableName")
+        val tableDesc = dynamoAdapter.client.describeTable(tableName)
+
+        // I didn't see any constants for these statuses..
+        tableDesc.getTable.getTableStatus match {
+          case "CREATING" =>
+            splog.info("Coordinator status table is being created. Let's wait a while")
+            Thread.sleep(5000)
+          case "UPDATING" =>
+            splog.info("Coordinator status table is being updated. Let's wait a while")
+            Thread.sleep(5000)
+          case "DELETING" =>
+            val errstr = "The coordinator status table is being deleted!"
+            splog.error(errstr)
+            throw new Exception(s"ERROR! $errstr")
+          case "ACTIVE" =>
+            splog.info("Coordinator status table is active")
+            active = true
+        }
+      } catch {
+        case rnfe:ResourceNotFoundException =>
+          splog.warning(s"Table not found! Creating it!")
+          createCoordinatorTable()
+      }
+    }
+  }
+
+  def createCoordinatorTable() = {
+    val ctr = new CreateTableRequest()
+    ctr.setTableName(tableName)
+    ctr.setProvisionedThroughput(new ProvisionedThroughput(readCapacity, writeCapacity))
+    ctr.setAttributeDefinitions(List(new AttributeDefinition("instance", "S")))
+    ctr.setKeySchema(List( new KeySchemaElement("instance", "HASH")))
+    try {
+      dynamoAdapter.client.createTable(ctr)
+    } catch {
+      case e:Exception =>
+        splog.error("Error creating coordinator table: " + e.getMessage)
+    }
+  }
+
+  def insert(entry:FulfillmentCoordinatorEntry) = {
+    dynamoAdapter.put(entry.getDynamoItem)
+  }
+
+  def update(entry:FulfillmentCoordinatorEntry) = {
+    dynamoAdapter.update(entry.getDynamoUpdate)
+  }
+
+  def get() = {
+    val scanExp:DynamoDBScanExpression = new DynamoDBScanExpression()
+
+    val oldest = DateTime.now.minusDays(1)
+
+    scanExp.addFilterCondition("last",
+      new Condition()
+        .withComparisonOperator(ComparisonOperator.GT)
+        .withAttributeValueList(new AttributeValue().withS(UTCFormatter.format(oldest))))
+
+    val list = dynamoAdapter.mapper.scan(classOf[FulfillmentCoordinatorEntry], scanExp,
+      new DynamoDBMapperConfig(new TableNameOverride(tableName)))
+    for(coordinator:FulfillmentCoordinatorEntry <- list) {
+      coordinator.minutesSinceLast = Minutes.minutesBetween(DateTime.now, new DateTime(coordinator.last)).getMinutes
+    }
+
+    list.toList
+  }
+
+}
+
+@DynamoDBTable(tableName="_CONFIGURED_IN_COORDINATOR_PROPERTIES_")
+class FulfillmentCoordinatorEntry() {
+  var instance:String = ""
+  var hostAddress:String = ""
+  var domain:String = ""
+  var workflowName:String = ""
+  var workflowVersion:String = ""
+  var specification:String = ""
+  var status:String = ""
+  var resolutionHistory:String = ""
+  var start:String = ""
+  var last:String = ""
+
+  var minutesSinceLast:Long = 0
+
+  var tableName:String = "_MUST_BE_SET_"
+
+  def toJson:JsValue = {
+    Json.obj(
+      "instance" -> instance,
+      "hostAddress" -> hostAddress,
+      "domain" -> domain,
+      "workflowName" -> workflowName,
+      "workflowVersion" -> workflowVersion,
+      "specification" -> specification,
+      "status" -> status,
+      "resolutionHistory" -> resolutionHistory,
+      "start" -> start,
+      "last" -> last,
+      "minutesSinceLast" -> minutesSinceLast
+    )
+
+  }
+
+  @DynamoDBHashKey(attributeName="instance")
+  def getInstance():String = { instance }
+  def setInstance(ins:String) = { this.instance = ins }
+
+  @DynamoDBHashKey(attributeName="hostAddress")
+  def getHostAddress:String = { hostAddress }
+  def setHostAddress(ha:String) = { this.hostAddress = ha }
+
+  @DynamoDBAttribute(attributeName="domain")
+  def getDomain:String = { domain }
+  def setDomain(domain:String) { this.domain = domain; }
+
+  @DynamoDBAttribute(attributeName="workflowName")
+  def getWorkflowName:String = { workflowName }
+  def setWorkflowName(workflowName:String) { this.workflowName = workflowName; }
+
+  @DynamoDBAttribute(attributeName="workflowVersion")
+  def getWorkflowVersion:String = { workflowVersion }
+  def setWorkflowVersion(workflowVersion:String) { this.workflowVersion = workflowVersion; }
+
+  @DynamoDBAttribute(attributeName="specification")
+  def getSpecification:String = { specification }
+  def setSpecification(specification:String) { this.specification = specification; }
+
+  @DynamoDBAttribute(attributeName="status")
+  def getStatus:String = { status }
+  def setStatus(status:String) { this.status = status; }
+
+  @DynamoDBAttribute(attributeName="resolutionHistory")
+  def getResolutionHistory:String = { resolutionHistory }
+  def setResolutionHistory(resolutionHistory:String) { this.resolutionHistory = resolutionHistory; }
+
+  @DynamoDBAttribute(attributeName="start")
+  def getStart:String = { start }
+  def setStart(start:String) { this.start = start; }
+
+  @DynamoDBAttribute(attributeName="last")
+  def getLast:String = { last }
+  def setLast(last:String) { this.last = last; }
+
+  def getDynamoItem:DynamoItem = {
+    new DynamoItem(tableName)
+      .addString("instance", instance)
+      .addString("hostAddress", hostAddress)
+      .addString("domain", domain)
+      .addString("workflowName", workflowName)
+      .addString("workflowVersion", workflowVersion)
+      .addString("specification", specification)
+      .addString("status", status)
+      .addString("resolutionHistory", resolutionHistory)
+      .addString("start", start)
+      .addString("last", last)
+  }
+
+  def getDynamoUpdate:DynamoUpdate = {
+    new DynamoUpdate(tableName)
+      .forKey("instance", instance)
+      .addString("status", status)
+      .addString("resolutionHistory", resolutionHistory)
+      .addString("last", last)
+  }
+}
+
+class FulfillmentCoordinator(swf: SWFAdapter, dyn:DynamoAdapter, splogger: Splogger)
   extends AbstractFulfillmentCoordinator
   with SploggerComponent
-  with SWFAdapterComponent {
+  with SWFAdapterComponent
+  with DynamoAdapterComponent {
     def swfAdapter = swf
+    def dynamoAdapter = dyn
     def splog = splogger
 }
 
@@ -562,7 +816,9 @@ object coordinator {
       splog.debug("Created PropertiesLoader")
       val swf = new SWFAdapter(config, splog, true)
       splog.debug("Created SWFAdapter")
-      val fc = new FulfillmentCoordinator(swf, splog)
+      val dyn = new DynamoAdapter(config)
+      splog.debug("Created DynamoAdapter")
+      val fc = new FulfillmentCoordinator(swf, dyn, splog)
       splog.debug("Created FulfillmentCoordinator")
       fc.coordinate()
     }

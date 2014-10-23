@@ -7,10 +7,69 @@
         <h1>Workers</h1>
     </div>
     <div class="panel-body">
-        <div ng-show="loading">
+        <div ng-show="coordinatorsLoading">
             <img src="img/loading.gif">
         </div>
-        <div class="panel panel-default" ng-repeat="(activityName, activities) in domains[currentDomain]">
+        <div class="panel panel-default" ng-repeat="(workflowName, workflows) in coordsByDomain[currentDomain]">
+            <div class="panel-heading-small">
+                <b>Coordinator - {{workflowName}}</b>
+            </div>
+            <div class="panel-body-small">
+                <div class="blob shadow lightbox" style="max-width:100%" ng-repeat="coordinator in workflows" ng-show="!coordinator.defunct || (coordinator.defunct && showDefunct)">
+                    <span ng-click="coordinator.showContents = !coordinator.showContents">
+					<span class="pull-right">
+						<span title="Last seen {{coordinator.minutesSinceLast}} minutes ago" class="label {{coordinator.freshness}}">{{coordinator.status}}</span>
+					</span>
+                    <b>{{coordinator.workflowName}} - {{coordinator.workflowVersion}}</b>
+                    </span>
+                    <div ng-show="coordinator.showContents">
+                        <table class="table table-condensed params">
+                            <tr>
+                                <td>Host</td><td>{{coordinator.hostAddress}}</td>
+                            </tr>
+                            <tr>
+                                <td>Started</td><td title="{{coordinator.start}}">{{coordinator.start | momentFromNow}}</td>
+                            </tr>
+                            <tr>
+                                <td>Last Update</td><td title="{{coordinator.last}}">{{coordinator.last | momentFromNow}}</td>
+                            </tr>
+                            <tr ng-show="coordinator.resolutionHistory">
+                                <td>History</td>
+                                <td>
+                                    <div ng-repeat="resolution in coordinator.resolutionHistory" style="max-width:460px;">
+                                        <span class="muted pull-right" title="{{resolution.when}}">{{resolution.when | momentFromNow}}</span>
+                                        <b>{{resolution.resolution}}</b>
+                                        <div class="block">{{resolution.details|truncate:90}}</div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr ng-repeat="(opname, operator) in coordinator.operators">
+                                <td>{{opname}}</td>
+                                <td>
+                                    <div ng-repeat="(name, param) in operator.parameters">
+                                        <i class="fa fa-flash muted" ng-show="param.required" title="Parameter is REQUIRED"></i>&nbsp;<i class="fa fa-eye-slash muted" ng-show="param.sensitive" title="Parameter will be ENCRYPTED"></i>&nbsp;<b>{{param.name}}</b>&nbsp;&nbsp;{{param.type}}<br/>
+                                        <div class="block">
+                                            <span ng-bind-html="formatUtil.formatURLs(param.description)"></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <b>returns</b>
+                                    <i class="fa fa-eye-slash muted" ng-show="param.sensitive" title="Result will be ENCRYPTED"></i>&nbsp;
+                                    {{operator.result.type}}
+                                    <br/>
+                                    {{operator.result.description}}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div ng-show="workersLoading">
+            <img src="img/loading.gif">
+        </div>
+        <div class="panel panel-default" ng-repeat="(activityName, activities) in workersByDomain[currentDomain]">
             <div class="panel-heading-small">
                 <b>{{activityName}}</b>
             </div>
@@ -30,6 +89,9 @@
                             <tr>
                                 <td>Started</td><td title="{{worker.start}}">{{worker.start | momentFromNow}}</td>
                             </tr>
+                            <tr>
+                                <td>Last Update</td><td title="{{worker.last}}">{{worker.last | momentFromNow}}</td>
+                            </tr>
                             <tr ng-show="worker.specification.description">
                                 <td>Description</td>
                                 <td>
@@ -48,7 +110,7 @@
                                         </div>
                                     </div>
                                     <div ng-hide="worker.showFormatted">
-                                        <pre ng-bind-html="formatUtil.formatJsonBasic(worker.specification)"></pre>
+                                        <pre ng-bind-html="formatUtil.prettyJson(worker.specification)"></pre>
                                     </div>
                                 </td>
                             </tr>
