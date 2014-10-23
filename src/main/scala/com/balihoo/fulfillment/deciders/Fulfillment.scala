@@ -377,4 +377,19 @@ class Fulfillment(val history:List[SWFEvent]) {
     (for((k, s) <- nameToSection) yield s"$k\t${s.status.toString}").mkString("\n")
   }
 
+  def toJson:JsObject = {
+
+    val sectionsJson = collection.mutable.Map[String, JsValue]()
+    for((name, section:FulfillmentSection) <- nameToSection) {
+      sectionsJson(name) = section.toJson
+    }
+
+    val jtimeline = Json.toJson(for(entry <- timeline.events) yield entry.toJson)
+
+    Json.obj(
+      "timeline" -> jtimeline,
+      "sections" -> Json.toJson(sectionsJson.toMap),
+      "status" -> Json.toJson(status.toString)
+    )
+  }
 }

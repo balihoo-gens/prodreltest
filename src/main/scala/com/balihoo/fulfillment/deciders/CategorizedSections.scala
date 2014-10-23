@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.deciders
 
+import org.joda.time.DateTime
+
 import scala.collection.mutable
 /**
  * Bin the sections by status. So we can make decisions
@@ -62,6 +64,8 @@ class CategorizedSections(fulfillment: Fulfillment) {
           deferred += section
         case SectionStatus.TERMINAL =>
           terminal += section
+        case SectionStatus.BLOCKED =>
+          categorizeReadySection(section)
         case SectionStatus.READY =>
           categorizeReadySection(section)
         case SectionStatus.IMPOSSIBLE =>
@@ -83,7 +87,8 @@ class CategorizedSections(fulfillment: Fulfillment) {
     for((name, value) <- section.params) {
       value match {
         case sectionReferences: SectionReferences =>
-          paramsReady &= sectionReferences.resolved(fulfillment)
+          val resolved = sectionReferences.resolved(fulfillment)
+          paramsReady &= resolved
         case _ =>
           // non-reference params are automatically ready..
       }
@@ -102,7 +107,16 @@ class CategorizedSections(fulfillment: Fulfillment) {
       }
     }
 
-    if(!paramsReady || !prereqsReady) {
+    if(!paramsReady) {
+      if(section.resolvable(fulfillment)) {
+        section.setBlocked("Not all parameters are resolved!", DateTime.now())
+        blocked += section
+      } else {
+        section.setImpossible("Impossible because some parameters can never be resolved!", DateTime.now())
+        impossible += section
+      }
+    } else if(!prereqsReady) {
+      section.setBlocked("Not all prerequisites are complete!", DateTime.now())
       blocked += section
     } else {
       // Whoohoo! we're ready to run!
