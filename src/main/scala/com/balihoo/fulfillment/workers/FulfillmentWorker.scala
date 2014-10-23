@@ -52,9 +52,9 @@ abstract class FulfillmentWorker {
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
   val hostAddress = sys.env.get("EC2_HOME") match {
-    case Some(s:String) =>
+    case Some(_:String) =>
       val url = "http://169.254.169.254/latest/meta-data/public-hostname"
-      val aws_ec2_identify = "curl -s $url --max-time 2 --retry 3"
+      val aws_ec2_identify = s"curl -s $url --max-time 2 --retry 3"
       aws_ec2_identify.!!
     case None =>
       try {
