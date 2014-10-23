@@ -51,7 +51,8 @@ abstract class AbstractFulfillmentCoordinator {
 
     var done = false
     val getch = new Getch
-    getch.addMapping(Seq("q", "Q", "Exit"), () => {splog.info("\nExiting...\n");done = true})
+    getch.addMapping(Seq("quit", "Quit", "exit", "Exit"), () => {splog.info("\nExiting...\n");done = true})
+    getch.addMapping(Seq("ping"), () => { println("pong") } )
 
     getch.doWith {
       while(!done) {

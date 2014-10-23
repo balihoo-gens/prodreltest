@@ -387,8 +387,22 @@ object dashboard {
     val server = new Server(cfg.getInt("port"))
     server.setHandler(context)
     server.start()
+    checkPing
     server.join()
     splog.info(s"Terminated $name")
+  }
+
+  def checkPing = {
+    var done = false
+    val getch = new Getch
+    getch.addMapping(Seq("quit", "Quit", "exit", "Exit"), () => { println("\nExiting...\n");done = true})
+    getch.addMapping(Seq("ping"), () => { println("pong") } )
+
+    getch.doWith {
+      while(!done) {
+        Thread.sleep(100)
+      }
+    }
   }
 
   def isRunningFromJar:Boolean = {
