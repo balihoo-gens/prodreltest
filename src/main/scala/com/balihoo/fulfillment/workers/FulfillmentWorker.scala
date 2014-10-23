@@ -116,15 +116,15 @@ abstract class FulfillmentWorker {
   def setupQuitKey(getch: Getch): Future[Boolean] = {
     var donePromise = Promise[Boolean]()
     getch.addMapping(
-      Seq("q", "Q", "Exit"), () => {
+      Seq("quit", "Quit", "exit", "Exit"), () => {
         //stdin received quit request. Respond on stdout
         println("Quitting...")
         updateStatus("Terminated by user", "WARN")
         donePromise.success(true)
       }
     )
-    //echo a dot
-    getch.addMapping(Seq("."), () => { print(".") } )
+    //respond to ping
+    getch.addMapping(Seq("ping"), () => { println("pong") } )
 
     //return the future that will succeed when termination is requested
     donePromise.future
