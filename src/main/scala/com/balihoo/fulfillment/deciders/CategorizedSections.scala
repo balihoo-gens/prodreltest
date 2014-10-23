@@ -87,8 +87,7 @@ class CategorizedSections(fulfillment: Fulfillment) {
     for((name, value) <- section.params) {
       value match {
         case sectionReferences: SectionReferences =>
-          val resolved = sectionReferences.resolved(fulfillment)
-          paramsReady &= resolved
+          paramsReady &= sectionReferences.resolved(fulfillment)
         case _ =>
           // non-reference params are automatically ready..
       }
