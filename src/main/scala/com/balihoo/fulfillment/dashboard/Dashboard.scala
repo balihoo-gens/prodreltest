@@ -3,9 +3,9 @@ package com.balihoo.fulfillment.dashboard
 import java.io.File
 import java.util
 
-import com.balihoo.fulfillment.SWFHistoryConvertor
+import com.balihoo.fulfillment.{UTCFormatter, SWFHistoryConvertor}
 import com.balihoo.fulfillment.deciders._
-import com.balihoo.fulfillment.workers.{UTCFormatter, FulfillmentWorkerTable, FulfillmentWorkerEntry}
+import com.balihoo.fulfillment.workers.{FulfillmentWorkerTable, FulfillmentWorkerEntry}
 import org.joda.time.DateTime
 import play.api.libs.json._
 
@@ -336,6 +336,38 @@ class WorkerServlet(dyn: DynamoAdapter, splg: Splogger)
   def splog = splg
 }
 
+class AbstractCoordinatorServlet extends RestServlet {
+  this: DynamoAdapterComponent
+    with SploggerComponent =>
+
+  val coordinatorTable = new FulfillmentCoordinatorTable with DynamoAdapterComponent with SploggerComponent {
+    def dynamoAdapter = AbstractCoordinatorServlet.this.dynamoAdapter
+    def splog = AbstractCoordinatorServlet.this.splog
+  }
+
+  get("/coordinator", (rsq:RestServletQuery) => {
+
+    val coordinators = coordinatorTable.get()
+
+    val coordinatorMap = collection.mutable.Map[String, JsValue]()
+    for(coordinator:FulfillmentCoordinatorEntry <- coordinators) {
+      coordinatorMap(coordinator.getInstance()) = coordinator.toJson
+    }
+
+    rsq.respondJson(HttpServletResponse.SC_OK
+      ,Json.stringify(Json.toJson(coordinatorMap.toMap)))
+  })
+
+}
+
+class CoordinatorServlet(dyn: DynamoAdapter, splg: Splogger)
+  extends AbstractCoordinatorServlet
+  with DynamoAdapterComponent
+  with SploggerComponent {
+  def dynamoAdapter = dyn
+  def splog = splg
+}
+
 object dashboard {
   def main(args: Array[String]) {
 
@@ -354,9 +386,11 @@ object dashboard {
     context.setWelcomeFiles(Array[String]("index.html"))
 
     val workerServlet = new WorkerServlet(new DynamoAdapter(cfg), splog)
+    val coordinatorServlet = new CoordinatorServlet(new DynamoAdapter(cfg), splog)
     val workflowServlet = new WorkflowServlet(new SWFAdapter(cfg, splog, true), splog)
 
     context.addServlet(new ServletHolder(workerServlet), "/worker/*")
+    context.addServlet(new ServletHolder(coordinatorServlet), "/coordinator/*")
     context.addServlet(new ServletHolder(workflowServlet), "/workflow/*")
 
     val server = new Server(cfg.getInt("port"))

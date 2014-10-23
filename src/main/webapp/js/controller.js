@@ -96,14 +96,7 @@ app.factory('formatUtil', function() {
         return _span(json, "jsonvalue");
     }
 
-    function _formatJson(jsonString) {
-        if(_isJSON(jsonString)) {
-            return _jsonFormat(JSON.parse(jsonString), "json");
-        }
-        return _span(_formatURLs(jsonString), "");
-    }
-
-    function _formatJsonBasic(jsonString) {
+    function _prettyJson(jsonString) {
         if (undefined == jsonString) {
             return jsonString;
         }
@@ -116,33 +109,6 @@ app.factory('formatUtil', function() {
         }
 
         return JSON.stringify(jsonString, undefined, 4);
-    }
-
-    function _indent(n) {
-        return Array(n).join('\t');
-    }
-
-    function _formatJsonlike(str) {
-        if (undefined == str) {
-            return str;
-        }
-        var out = "";
-        var indent = 0;
-        for (var i = 0, len = str.length; i < len; i++) {
-            var c = str[i];
-            if(c == '{') {
-                c += " ";
-                out += "\n" + _indent(indent);
-                indent++;
-            }
-            if(c == '}') {
-                indent--;
-            }
-
-            out += c;
-        }
-
-        return _formatWhitespace(out);
     }
 
     function _formatURLs(param) {
@@ -188,9 +154,7 @@ app.factory('formatUtil', function() {
         div: _div,
         span: _span,
         jsonFormat: _jsonFormat,
-        formatJson: _formatJson,
-        formatJsonBasic: _formatJsonBasic,
-        formatJsonlike: _formatJsonlike,
+        prettyJson: _prettyJson,
         formatURLs: _formatURLs,
         isJSON: _isJSON,
         isArray: _isArray,
@@ -221,7 +185,7 @@ app.config(
                       templateUrl : "partials/history.html",
                       reloadOnSearch: false})
             .when("/workers", {
-                      controller : "workersController",
+                      controller : "processController",
                       templateUrl : "partials/workers.html",
                       reloadOnSearch: false})
             .when("/start", { redirectTo: "/history"})
@@ -495,7 +459,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             for(pname in section.params) {
                 var param = section.params[pname];
                 if(formatUtil.isJSON(param)) {
-                    param = formatUtil.formatJsonBasic(param);
+                    param = formatUtil.prettyJson(param);
                 }
                 section.params[pname] = {
                     "original" : param,
@@ -674,50 +638,62 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     });
 });
 
-app.controller('workersController', function($scope, $route, $http, $location, environment, formatUtil) {
+app.controller('processController', function($scope, $route, $http, $location, environment, formatUtil) {
 
     $scope.showDefunct = false;
     $scope.formatUtil = formatUtil;
 
+
     $scope.$on(
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
-            $scope.getWorkers();
+            $scope.getProcesses();
         }
     );
 
 
-    $scope.getWorkers = function() {
+    $scope.getProcesses = function() {
         $scope.loading = true;
         var params = {};
         $http.get('worker', { params : params})
             .success(function(data) {
-                         $scope.loading = false;
+                         $scope.loadingWorkers = false;
                          $scope.workers = data;
                          $scope.categorizeWorkers();
                          $scope.currentDomain = environment.data.domain;
                      })
             .error(function(error) {
-                       $scope.loading = false;
+                       $scope.loadingWorkers = false;
+                       toastr.error(error.details, error.error)
+                   });
+        $http.get('coordinator', { params : params})
+            .success(function(data) {
+                         $scope.loadingCoords = false;
+                         $scope.coordinators = data;
+                         $scope.categorizeCoordinators();
+                         $scope.currentDomain = environment.data.domain;
+                     })
+            .error(function(error) {
+                       $scope.loadingCoords = false;
                        toastr.error(error.details, error.error)
                    });
     };
 
-    $scope.setFreshnessLabel = function(worker) {
+    $scope.setFreshnessLabel = function(process) {
 
-        worker.defunct = false;
-        if(worker.minutesSinceLast < -10) {
-            worker.freshness = "label-default";
-            worker.defunct = true;
-        } else if(worker.minutesSinceLast < -5) {
-            worker.freshness = "label-warning";
+        process.defunct = false;
+        if(process.minutesSinceLast < -10) {
+            process.freshness = "label-default";
+            process.defunct = true;
+        } else if(process.minutesSinceLast < -5) {
+            process.freshness = "label-warning";
         } else {
-            worker.freshness = "label-success";
+            process.freshness = "label-success";
         }
     };
 
     $scope.categorizeWorkers = function() {
-        $scope.domains = {};
+        $scope.workersByDomain = {};
         for(var w in $scope.workers) {
             var worker = $scope.workers[w];
             worker.showFormatted = true;
@@ -732,15 +708,44 @@ app.controller('workersController', function($scope, $route, $http, $location, e
 
             $scope.setFreshnessLabel(worker);
 
-            if(!$scope.domains.hasOwnProperty(worker.domain)) {
-                $scope.domains[worker.domain] = {};
+            if(!$scope.workersByDomain.hasOwnProperty(worker.domain)) {
+                $scope.workersByDomain[worker.domain] = {};
             }
-            var domain = $scope.domains[worker.domain];
+            var domain = $scope.workersByDomain[worker.domain];
             if(!domain.hasOwnProperty(worker.activityName)) {
                 domain[worker.activityName] = [];
             }
 
             domain[worker.activityName].push(worker);
+
+        }
+    };
+
+    $scope.categorizeCoordinators = function() {
+        $scope.coordsByDomain = {};
+        for(var w in $scope.coordinators) {
+            var coordinator = $scope.coordinators[w];
+            coordinator.showFormatted = true;
+            coordinator.showContents = false;
+            if(formatUtil.isJSON(coordinator.specification)) {
+                coordinator.operators = JSON.parse(coordinator.specification);
+            }
+// TODO Implement me!
+//            if(formatUtil.isJSON(coordinator.resolutionHistory)) {
+//                coordinator.resolutionHistory = JSON.parse(coordinator.resolutionHistory);
+//            }
+
+            $scope.setFreshnessLabel(coordinator);
+
+            if(!$scope.coordsByDomain.hasOwnProperty(coordinator.domain)) {
+                $scope.coordsByDomain[coordinator.domain] = {};
+            }
+            var domain = $scope.coordsByDomain[coordinator.domain];
+            if(!domain.hasOwnProperty(coordinator.workflowName)) {
+                domain[coordinator.workflowName] = [];
+            }
+
+            domain[coordinator.workflowName].push(coordinator);
 
         }
     };
