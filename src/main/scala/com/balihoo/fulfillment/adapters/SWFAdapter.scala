@@ -50,6 +50,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
 
     object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
       override def onSuccess(req:PollForActivityTaskRequest, task:ActivityTask) {
+        splog.debug("poll returned")
         if (task != null && task.getTaskToken != null) {
           taskPromise.success(Some(task))
         } else {
@@ -57,12 +58,14 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
         }
       }
       override def onError(e:Exception) {
+        splog.debug("poll failed")
         taskPromise.failure(e)
       }
     }
 
     object activityCountHandler extends AsyncHandler[CountPendingActivityTasksRequest, PendingTaskCount] {
       override def onSuccess(req:CountPendingActivityTasksRequest, count:PendingTaskCount) {
+        splog.debug("count poll returned")
         if (count.getCount > 0) {
           client.pollForActivityTaskAsync(taskReq, activityPollHandler)
         } else {
@@ -71,13 +74,16 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
         }
       }
       override def onError(e:Exception) {
+        splog.debug("count poll failed")
         taskPromise.failure(e)
       }
     }
 
     if (_longPoll) {
+      splog.debug("using longpoll")
       client.pollForActivityTaskAsync(taskReq, activityPollHandler)
     } else {
+      splog.debug("checking queue count")
       client.countPendingActivityTasksAsync(countReq, activityCountHandler)
     }
 
@@ -137,7 +143,6 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
       case ure:UnknownResourceException =>
         splog.warning(s"The workflow type '${wt.getName}:${wt.getVersion}' doesn't exist!")
         if(autoRegister) { registerWorkflowType() }
-
     }
   }
 
