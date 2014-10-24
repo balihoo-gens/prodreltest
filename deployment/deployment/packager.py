@@ -73,4 +73,7 @@ class Packager:
         installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall.py")
         shutil.copy(installscript, tmpdir)
 
+        # used locally to test setup
+        shutil.copy(os.path.join(self._rootdir, "deployment/scripts/Dockerfile"), tmpdir)
+
         return tmpdir
