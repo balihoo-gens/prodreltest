@@ -1,5 +1,6 @@
 package com.balihoo.fulfillment
 
+import com.balihoo.fulfillment.util.UTCFormatter
 import org.joda.time.DateTime
 
 import scala.collection.convert.wrapAsScala._

@@ -2,20 +2,16 @@ package com.balihoo.fulfillment.workers
 
 //scala imports
 
-import com.balihoo.fulfillment.UTCFormatter
-
 import scala.collection.mutable
-import scala.sys.process._
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
 import scala.util.{Success, Failure}
-import scala.concurrent.{Future, Await, Promise}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Future, Await, Promise, ExecutionContext}
 import scala.concurrent.duration._
 
 //java imports
 import java.util.UUID.randomUUID
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{TimeUnit, Executors}
 
 //aws imports
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig.TableNameOverride
@@ -38,6 +34,8 @@ import com.balihoo.fulfillment.util._
 abstract class FulfillmentWorker {
   this: LoggingWorkflowAdapter =>
 
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
+
   val instanceId = randomUUID().toString
 
   def domain = swfAdapter.domain
@@ -51,24 +49,6 @@ abstract class FulfillmentWorker {
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
-  val hostAddress = sys.env.get("EC2_HOME") match {
-    case Some(_:String) =>
-      val url = "http://169.254.169.254/latest/meta-data/public-hostname"
-      val aws_ec2_identify = s"curl -s $url --max-time 2 --retry 3"
-      aws_ec2_identify.!!
-    case None =>
-      try {
-        // This might throw an exception if the local DNS doesn't know about the system hostname.
-        // At this point we're looking for some kind of identifier. It doesn't have to actually
-        // be reachable.
-        java.net.InetAddress.getLocalHost.getHostName
-      } catch {
-        case e:Exception =>
-          // If all else fails..
-          "hostname".!!
-      }
-  }
-
   val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent with SploggerComponent {
     def dynamoAdapter = FulfillmentWorker.this.dynamoAdapter
     def splog = FulfillmentWorker.this.splog
@@ -79,7 +59,7 @@ abstract class FulfillmentWorker {
   val entry = new FulfillmentWorkerEntry
   entry.tableName = workerTable.dynamoAdapter.config.getString("worker_status_table")
   entry.setInstance(instanceId)
-  entry.setHostAddress(hostAddress)
+  entry.setHostAddress(HostIdentity.getHostAddress)
   entry.setActivityName(name)
   entry.setActivityVersion(version)
   entry.setSpecification(getSpecification.toString)
@@ -111,11 +91,11 @@ abstract class FulfillmentWorker {
       handleTaskFuture(swfAdapter.getTask)
       Await.result(_doneFuture.get, Duration.Inf )
     }
-    shutdown
+    shutdown()
   }
 
   def setupQuitKey(getch: Getch): Future[Boolean] = {
-    var donePromise = Promise[Boolean]()
+    val donePromise = Promise[Boolean]()
     getch.addMapping(
       Seq("quit", "Quit", "exit", "Exit"), () => {
         //stdin received quit request. Respond on stdout
@@ -133,13 +113,13 @@ abstract class FulfillmentWorker {
 
   def shutdown() = {
     updateStatus("Exiting")
-    val excsvc = swfAdapter.client.getExecutorService()
-    excsvc.shutdown
+    val excsvc = swfAdapter.client.getExecutorService
+    excsvc.shutdown()
     if (!excsvc.awaitTermination(3, TimeUnit.SECONDS)) {
       val tasks = excsvc.shutdownNow()
       splog.warning("Performing hard shutdown with remaining tasks: " + tasks.length)
       Thread.sleep(100)
-      swfAdapter.client.shutdown
+      swfAdapter.client.shutdown()
     }
   }
 
@@ -151,7 +131,7 @@ abstract class FulfillmentWorker {
           case Some(task) =>
             try {
               _lastTaskToken = task.getTaskToken
-              val shortToken = (_lastTaskToken takeRight 10)
+              val shortToken = _lastTaskToken takeRight 10
               updateStatus("Processing task.." + shortToken )
               handleTask(getSpecification.getParameters(task.getInput))
             } catch {
@@ -162,7 +142,7 @@ abstract class FulfillmentWorker {
             splog.info("no task available")
         }
 
-        if (!_doneFuture.isEmpty || _doneFuture.get.isCompleted) {
+        if (_doneFuture.nonEmpty || _doneFuture.get.isCompleted) {
           //get the next one
           handleTaskFuture(swfAdapter.getTask)
         } else {
@@ -173,7 +153,7 @@ abstract class FulfillmentWorker {
       case Failure(e) =>
         val ms = 1000
         updateStatus(s"Polling Exception ${e.getMessage}: waiting ${ms}ms before retrying", "EXCEPTION")
-        if (!_doneFuture.isEmpty || _doneFuture.get.isCompleted) {
+        if (_doneFuture.nonEmpty || _doneFuture.get.isCompleted) {
           Thread.sleep(ms)
           //get the next one
           handleTaskFuture(swfAdapter.getTask)
@@ -194,8 +174,6 @@ abstract class FulfillmentWorker {
     } catch {
       case e:Exception =>
         failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
-      case t:Throwable =>
-        failTask(s"""{"$name": "Caught a Throwable"}""", t.getMessage)
     }
   }
 
@@ -235,7 +213,7 @@ abstract class FulfillmentWorker {
   def completeTask(result:String) = {
     completedTasks += 1
     try {
-      if (_lastTaskToken != null && !_lastTaskToken.isEmpty) {
+      if (_lastTaskToken != null && _lastTaskToken.nonEmpty) {
         val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
         response.setTaskToken(_lastTaskToken)
         response.setResult(getSpecification.result.sensitive match {
@@ -256,7 +234,7 @@ abstract class FulfillmentWorker {
   def failTask(reason:String, details:String) = {
     failedTasks += 1
     try {
-      if (_lastTaskToken != null && !_lastTaskToken.isEmpty) {
+      if (_lastTaskToken != null && _lastTaskToken.nonEmpty) {
         val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
         response.setTaskToken(_lastTaskToken)
         response.setReason(reason)
@@ -627,8 +605,6 @@ abstract class FulfillmentWorkerApp {
     catch {
       case e:Exception =>
         splog.exception(e.getMessage)
-      case t:Throwable =>
-        splog.error(t.getMessage)
     }
     splog.info(s"Terminated $name")
   }

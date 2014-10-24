@@ -6,21 +6,20 @@ import java.util.UUID.randomUUID
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig.TableNameOverride
 import com.amazonaws.services.dynamodbv2.datamodeling._
 import com.amazonaws.services.dynamodbv2.model._
-import com.balihoo.fulfillment.{UTCFormatter, SWFHistoryConvertor}
+import com.balihoo.fulfillment.SWFHistoryConvertor
 import org.joda.time.{Minutes, DateTime}
 import org.keyczar.Crypter
 
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
 import scala.collection.mutable
-import scala.sys.process._
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
-import com.balihoo.fulfillment.util.{Getch, Splogger, SploggerComponent}
+import com.balihoo.fulfillment.util._
 
 import scala.util.matching.Regex
 import java.net.URLEncoder
@@ -53,24 +52,6 @@ abstract class AbstractFulfillmentCoordinator {
 
   val operators = new FulfillmentOperators
 
-  val hostAddress = sys.env.get("EC2_HOME") match {
-    case Some(_:String) =>
-      val url = "http://169.254.169.254/latest/meta-data/public-hostname"
-      val aws_ec2_identify = s"curl -s $url --max-time 2 --retry 3"
-      aws_ec2_identify.!!
-    case None =>
-      try {
-        // This might throw an exception if the local DNS doesn't know about the system hostname.
-        // At this point we're looking for some kind of identifier. It doesn't have to actually
-        // be reachable.
-        java.net.InetAddress.getLocalHost.getHostName
-      } catch {
-        case e:Exception =>
-          // If all else fails..
-          "hostname".!!
-      }
-  }
-
   val coordinatorTable = new FulfillmentCoordinatorTable with DynamoAdapterComponent with SploggerComponent {
     def dynamoAdapter = AbstractFulfillmentCoordinator.this.dynamoAdapter
     def splog = AbstractFulfillmentCoordinator.this.splog
@@ -82,7 +63,7 @@ abstract class AbstractFulfillmentCoordinator {
   val entry = new FulfillmentCoordinatorEntry
   entry.tableName = coordinatorTable.dynamoAdapter.config.getString("coordinator_status_table")
   entry.setInstance(instanceId)
-  entry.setHostAddress(hostAddress)
+  entry.setHostAddress(HostIdentity.getHostAddress)
   entry.setWorkflowName(workflowName)
   entry.setWorkflowVersion(workflowVersion)
   entry.setSpecification(Json.stringify(operators.toJson))
@@ -125,8 +106,6 @@ abstract class AbstractFulfillmentCoordinator {
           // these happen.. no biggie.
           case e: Exception =>
             splog.error(e.getMessage)
-          case t: Throwable =>
-            splog.error(t.getMessage)
         }
       }
     }
@@ -819,8 +798,6 @@ object coordinator {
     catch {
       case e:Exception =>
         splog.error(e.getMessage)
-      case t:Throwable =>
-        splog.error(t.getMessage)
     }
     splog("INFO", s"Terminated $name")
   }

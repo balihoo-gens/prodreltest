@@ -20,6 +20,23 @@ import java.net.URLEncoder
 @RunWith(classOf[JUnitRunner])
 class TestFulfillmentCoordinator extends Specification with Mockito
 {
+  def generateSections(json:String) = {
+    var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
+
+    val event:HistoryEvent = new HistoryEvent
+    val eventAttribs = new WorkflowExecutionStartedEventAttributes
+    event.setEventType(EventType.WorkflowExecutionStarted)
+    event.setEventId(1)
+    event.setEventTimestamp(new Date())
+    eventAttribs.setInput(json)
+    eventAttribs.setParentInitiatedEventId(2)
+    eventAttribs.setTaskList((new TaskList).withName("blah"))
+    event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
+    events += event
+
+    new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
+  }
+
   "FulfillmentSection" should {
     "  be initialized without error" in {
 
@@ -376,22 +393,6 @@ class TestFulfillmentCoordinator extends Specification with Mockito
   }
 
   "FulfillmentOperators" should {
-    def generateSections(json:String) = {
-      var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
-
-      val event:HistoryEvent = new HistoryEvent
-      val eventAttribs = new WorkflowExecutionStartedEventAttributes
-      event.setEventType(EventType.WorkflowExecutionStarted)
-      event.setEventId(1)
-      event.setEventTimestamp(new Date())
-      eventAttribs.setInput(json)
-      eventAttribs.setParentInitiatedEventId(2)
-      eventAttribs.setTaskList((new TaskList).withName("blah"))
-      event.setWorkflowExecutionStartedEventAttributes(eventAttribs)
-      events += event
-
-      new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
-    }
 
     "  be upset about missing 'input'" in {
       val sections = generateSections("""{
@@ -655,5 +656,26 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       reference2.getValue mustEqual "o'brien"
     }
+  }
+
+  "Foreach Operator" should {
+
+    "  parse properly" in {
+
+      val input = s"""{
+        "HumanFoot * foodItem": {
+            "action": "StringFormat",
+            "params": {
+                "format": "You want gravy on that {foodItem}",
+                "foodItem": ["cellar door", "stork ankles"]
+            },
+            "status" : "READY"
+        }
+      }"""
+      val sections = generateSections(input)
+
+      true
+    }
+
   }
 }
