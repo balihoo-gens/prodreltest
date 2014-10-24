@@ -18,7 +18,7 @@ import tarfile
 import json
 
 class Installer(object):
-    def __init__(self, logfile, distro="ubuntu"):
+    def __init__(self, logfile, distro):
         self._log = Splogger(logfile)
         self._distro = distro
 
@@ -134,10 +134,11 @@ if __name__ == "__main__":
     parser.add_argument('--nolaunch', help='do not launch the app', action='store_true')
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
     parser.add_argument('--eip', help='the eip for this instance', default=None)
+    parser.add_argument('--distro', help='the inux distribution to use for this instance', default="ubuntu")
 
     args = parser.parse_args()
 
-    installer = Installer(args.logfile)
+    installer = Installer(args.logfile, args.distro)
     if not args.nosplunk:
         installer.install_splunk(args.splunks3bucket, args.splunkscript)
     if not args.nophantom:
