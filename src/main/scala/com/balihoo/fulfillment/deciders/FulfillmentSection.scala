@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.deciders
 
-import com.balihoo.fulfillment.UTCFormatter
+import com.balihoo.fulfillment.util.UTCFormatter
 import org.joda.time.{Seconds, DateTime}
 
 import com.amazonaws.services.simpleworkflow.model._

@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment
+package com.balihoo.fulfillment.util
 
 import java.util.Date
 
