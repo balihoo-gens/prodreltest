@@ -14,9 +14,9 @@
     },
 
     "WorkerInstanceType" : {
-      "Description" : "WebServer EC2 instance type",
+      "Description" : "Worker EC2 instance type",
       "Type" : "String",
-      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.small", "m1.large", "m1.xlarge" ],
+      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.medium", "m1.small", "m1.large", "m1.xlarge" ],
       "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
     },
 
