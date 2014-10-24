@@ -8,7 +8,6 @@ import json
 import time
 
 class Deployment(object):
-    #
     Config = namedtuple('DeploymentConfig', [
         "access_key",
         "secret_key",
@@ -24,6 +23,7 @@ class Deployment(object):
         "pyversion",
         "veversion",
         "dasheip",
+        "distro",
         "env"
     ])
 
