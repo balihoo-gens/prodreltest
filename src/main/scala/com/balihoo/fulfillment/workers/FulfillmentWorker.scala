@@ -1,17 +1,19 @@
 package com.balihoo.fulfillment.workers
 
 //scala imports
+
+import com.balihoo.fulfillment.UTCFormatter
+
 import scala.collection.mutable
 import scala.sys.process._
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
 import scala.util.{Success, Failure}
-import scala.concurrent.{Future, Await, Promise, future}
+import scala.concurrent.{Future, Await, Promise}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 //java imports
-import java.util.Date
 import java.util.UUID.randomUUID
 import java.util.concurrent.TimeUnit
 
@@ -26,7 +28,6 @@ import play.api.libs.json._
 
 //other external
 import org.joda.time.{Minutes, DateTime}
-import org.joda.time.format.ISODateTimeFormat
 import org.keyczar.Crypter
 
 //local imports
@@ -51,9 +52,9 @@ abstract class FulfillmentWorker {
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
   val hostAddress = sys.env.get("EC2_HOME") match {
-    case Some(s:String) =>
+    case Some(_:String) =>
       val url = "http://169.254.169.254/latest/meta-data/public-hostname"
-      val aws_ec2_identify = "curl -s $url --max-time 2 --retry 3"
+      val aws_ec2_identify = s"curl -s $url --max-time 2 --retry 3"
       aws_ec2_identify.!!
     case None =>
       try {
@@ -428,28 +429,14 @@ class ActivityParameters(val params:Map[String,String], val input:String = "{}")
   }
 }
 
-object UTCFormatter {
-
-  val SEC_IN_MS = 1000
-  val MIN_IN_MS = SEC_IN_MS * 60
-  val HOUR_IN_MS = MIN_IN_MS * 60
-  val DAY_IN_MS = HOUR_IN_MS * 24
-
-  val dateTimeFormatter = ISODateTimeFormat.dateTime().withZoneUTC()
-
-  def format(dateTime:DateTime): String = {
-    dateTimeFormatter.print(dateTime)
-  }
-  def format(date:Date): String = {
-    dateTimeFormatter.print(new DateTime(date))
-  }
-
-
-}
 
 class FulfillmentWorkerTable {
   this: DynamoAdapterComponent
     with SploggerComponent =>
+
+  val tableName = dynamoAdapter.config.getString("worker_status_table")
+  val readCapacity = dynamoAdapter.config.getOrElse("worker_status_read_capacity", 3)
+  val writeCapacity = dynamoAdapter.config.getOrElse("worker_status_write_capacity", 5)
 
   waitForActiveTable()
 
@@ -458,8 +445,8 @@ class FulfillmentWorkerTable {
     var active = false
     while(!active) {
       try {
-        splog.info(s"Checking for worker status table ${dynamoAdapter.tableName}")
-        val tableDesc = dynamoAdapter.client.describeTable(dynamoAdapter.tableName)
+        splog.info(s"Checking for worker status table $tableName")
+        val tableDesc = dynamoAdapter.client.describeTable(tableName)
 
         // I didn't see any constants for these statuses..
         tableDesc.getTable.getTableStatus match {
@@ -487,8 +474,8 @@ class FulfillmentWorkerTable {
 
   def createWorkerTable() = {
     val ctr = new CreateTableRequest()
-    ctr.setTableName(dynamoAdapter.tableName)
-    ctr.setProvisionedThroughput(new ProvisionedThroughput(dynamoAdapter.readCapacity, dynamoAdapter.writeCapacity))
+    ctr.setTableName(tableName)
+    ctr.setProvisionedThroughput(new ProvisionedThroughput(readCapacity, writeCapacity))
     ctr.setAttributeDefinitions(List(new AttributeDefinition("instance", "S")))
     ctr.setKeySchema(List( new KeySchemaElement("instance", "HASH")))
     try {
@@ -518,7 +505,7 @@ class FulfillmentWorkerTable {
         .withAttributeValueList(new AttributeValue().withS(UTCFormatter.format(oldest))))
 
     val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp,
-      new DynamoDBMapperConfig(new TableNameOverride(dynamoAdapter.tableName)))
+      new DynamoDBMapperConfig(new TableNameOverride(tableName)))
     for(worker:FulfillmentWorkerEntry <- list) {
       worker.minutesSinceLast = Minutes.minutesBetween(DateTime.now, new DateTime(worker.last)).getMinutes
     }

@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.deciders
 
-import com.balihoo.fulfillment.workers.UTCFormatter
+import com.balihoo.fulfillment.UTCFormatter
 import org.joda.time.{Seconds, DateTime}
 
 import com.amazonaws.services.simpleworkflow.model._
@@ -11,10 +11,11 @@ import scala.util.matching.Regex
 
 object SectionStatus extends Enumeration {
   val READY = Value("READY")
+  val BLOCKED = Value("BLOCKED")
   val SCHEDULED = Value("SCHEDULED")
   val STARTED = Value("STARTED")
   val FAILED = Value("FAILED")
-  val TIMED_OUT = Value("TIMED OUT")
+  val TIMED_OUT = Value("TIMED_OUT")
   val CANCELED = Value("CANCELED")
   val TERMINAL = Value("TERMINAL") // Section has FAILED/CANCELED/TIMED OUT too many times!
   val COMPLETE = Value("COMPLETE")
@@ -280,6 +281,11 @@ class FulfillmentSection(val name: String
     timeline.note("Deferred: "+note, Some(when))
   }
 
+  def setBlocked(note:String, when:DateTime) = {
+    status = SectionStatus.BLOCKED
+    timeline.warning("Blocked: "+note, Some(when))
+  }
+
   def setStatus(ss:String, message:String, when:DateTime) = {
     SectionStatus.withName(ss) match {
       case SectionStatus.READY =>
@@ -293,12 +299,12 @@ class FulfillmentSection(val name: String
     }
   }
 
-  def resolveReferences(map:FulfillmentSections):Boolean = {
+  def resolveReferences(fulfillment:Fulfillment):Boolean = {
     if(status == SectionStatus.READY) {
       for((pname, param) <- params) {
         param match {
           case sectionReferences: SectionReferences =>
-            sectionReferences.processReferences(map)
+            sectionReferences.processReferences(fulfillment)
           case _ =>
         }
       }
@@ -320,6 +326,23 @@ class FulfillmentSection(val name: String
       case Some(d) => Seconds.secondsBetween(DateTime.now, d).getSeconds
       case _ => 0
     }
+  }
+
+  def resolvable(fulfillment:Fulfillment): Boolean = {
+    if(List(SectionStatus.IMPOSSIBLE, SectionStatus.TERMINAL).contains(status)) {
+      return false
+    }
+
+    for((pname, param) <- params) {
+      param match {
+        case sectionReferences: SectionReferences =>
+          if(!sectionReferences.resolvable(fulfillment)) {
+            return false
+          }
+        case _ =>
+      }
+    }
+    true
   }
 
   override def toString = {
@@ -507,31 +530,32 @@ class SectionReferences(sectionNames:List[String]) {
 
   val sections = for(name <- sectionNames) yield new SectionReference(name)
 
-  def hydrate(map:FulfillmentSections) = {
+  def hydrate(fulfillment:Fulfillment) = {
     for(sectionRef <- sections) {
-      if(map.hasSection(sectionRef.name)) {
-        sectionRef.section = Some(map.getSectionByName(sectionRef.name))
+      if(fulfillment.hasSection(sectionRef.name)) {
+        sectionRef.section = Some(fulfillment.getSectionByName(sectionRef.name))
       }
     }
   }
 
-  def processReferences(map:FulfillmentSections) = {
-    hydrate(map)
+  def processReferences(fulfillment:Fulfillment) = {
+    hydrate(fulfillment)
 
     var priorSectionRef:SectionReference = null
 
     for(sectionRef <- sections) {
+      val currentSection = sectionRef.section.get
       priorSectionRef match {
         case sr: SectionReference =>
           if(sr.isValid) {
             sr.section.get.status match {
               case SectionStatus.TERMINAL =>
-                if(sectionRef.section.get.status == SectionStatus.CONTINGENT) {
+                if(currentSection.status == SectionStatus.CONTINGENT) {
 
                   // The prior section didn't complete successfully.. let's
                   // let the next section have a try
-                  sectionRef.section.get.setReady("Promoted from Contingent", DateTime.now)
-                  sectionRef.section.get.resolveReferences(map) // <-- recurse
+                  currentSection.setReady("Promoted from Contingent", DateTime.now)
+                  currentSection.resolveReferences(fulfillment) // <-- recurse
                 }
               case _ => // We don't care about other status until a TERMINAL case is hit
             }
@@ -539,17 +563,17 @@ class SectionReferences(sectionNames:List[String]) {
           priorSectionRef.dismissed = true
         case _ =>
           // This is the first referenced section..
-          if(sectionRef.section.get.status == SectionStatus.CONTINGENT) {
-            sectionRef.section.get.setReady("Promoted from Contingent", DateTime.now)
-            sectionRef.section.get.resolveReferences(map) // <-- recurse
+          if(currentSection.status == SectionStatus.CONTINGENT) {
+            currentSection.setReady("Promoted from Contingent", DateTime.now)
+            currentSection.resolveReferences(fulfillment) // <-- recurse
           }
       }
       priorSectionRef = sectionRef
     }
   }
 
-  def resolved(map:FulfillmentSections):Boolean = {
-    hydrate(map)
+  def resolved(fulfillment:Fulfillment):Boolean = {
+    hydrate(fulfillment)
 
     for(sectionRef <- sections) {
       sectionRef.section match {
@@ -565,8 +589,25 @@ class SectionReferences(sectionNames:List[String]) {
     false
   }
 
-  def getValue(map:FulfillmentSections):String = {
-    hydrate(map)
+  def resolvable(fulfillment:Fulfillment):Boolean = {
+    hydrate(fulfillment)
+
+    for(sectionRef <- sections) {
+      sectionRef.section match {
+        case section: Some[FulfillmentSection] =>
+          section.get.resolvable(fulfillment) match {
+            case true =>
+              return true
+            case _ =>
+          }
+        case _ =>
+      }
+    }
+    false
+  }
+
+  def getValue(fulfillment:Fulfillment):String = {
+    hydrate(fulfillment)
 
     for(sectionRef <- sections) {
       if(sectionRef.isValid && sectionRef.section.get.status == SectionStatus.COMPLETE) {
@@ -576,7 +617,7 @@ class SectionReferences(sectionNames:List[String]) {
           case e: Exception =>
 
             val gripe = s"Referenced section ${sectionRef.section.get.name} is complete but the JSON could not be parsed! "+e.getMessage
-            map.timeline.error(gripe, None)
+            fulfillment.timeline.error(gripe, None)
 
             throw new Exception(gripe)
         }
@@ -584,7 +625,7 @@ class SectionReferences(sectionNames:List[String]) {
     }
 
     val gripe = "Tried to get value from referenced sections and no value was available! "+toString()
-    map.timeline.error(gripe, None)
+    fulfillment.timeline.error(gripe, None)
 
     throw new Exception(gripe)
   }

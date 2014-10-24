@@ -31,7 +31,7 @@ angular.module('filters', []).
                };
            });
 
-var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize', 'filters', 'angular-moment']);
+var app = angular.module('FulfillmentDashboard', ['ngRoute', 'ngSanitize', 'ngDialog', 'filters', 'angular-moment']);
 
 toastr.options = {
     "closeButton" : true,
@@ -86,6 +86,9 @@ app.factory('formatUtil', function() {
             }
             return _div(body, "block " + divclass);
         }
+        if(_isJSON(json)) {
+            return _jsonFormat(JSON.parse(json), "json");
+        }
         if (_isString(json)) {
             return _span(_formatURLs(json), "jsonvalue");
         }
@@ -93,14 +96,7 @@ app.factory('formatUtil', function() {
         return _span(json, "jsonvalue");
     }
 
-    function _formatJson(jsonString) {
-        if(_isJSON(jsonString)) {
-            return _jsonFormat(JSON.parse(jsonString), "json");
-        }
-        return _span(_formatURLs(jsonString), "");
-    }
-
-    function _formatJsonBasic(jsonString) {
+    function _prettyJson(jsonString) {
         if (undefined == jsonString) {
             return jsonString;
         }
@@ -115,34 +111,8 @@ app.factory('formatUtil', function() {
         return JSON.stringify(jsonString, undefined, 4);
     }
 
-    function _indent(n) {
-        return Array(n).join('\t');
-    }
-
-    function _formatJsonlike(str) {
-        if (undefined == str) {
-            return str;
-        }
-        var out = "";
-        var indent = 0;
-        for (var i = 0, len = str.length; i < len; i++) {
-            var c = str[i];
-            if(c == '{') {
-                c += " ";
-                out += "\n" + _indent(indent);
-                indent++;
-            }
-            if(c == '}') {
-                indent--;
-            }
-
-            out += c;
-        }
-
-        return _formatWhitespace(out);
-    }
-
     function _formatURLs(param) {
+        if(param === null) { return ""; }
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
 
         return param.replace(urlRegex, function (url) {
@@ -159,6 +129,7 @@ app.factory('formatUtil', function() {
     }
 
     function _isJSON(j) {
+        if(j === null) { return false; }
         return j[0] == '{' || j[0] == '[';
     }
 
@@ -170,18 +141,26 @@ app.factory('formatUtil', function() {
         return typeof s === "string";
     }
 
+    function _escapeSlash(s) {
+        return s.replace("/", "++++");
+    }
+
+    function _unEscapeSlash(s) {
+        return s.replace("++++", "/");
+    }
+
     return {
         formatWhitespace: _formatWhitespace,
         div: _div,
         span: _span,
         jsonFormat: _jsonFormat,
-        formatJson: _formatJson,
-        formatJsonBasic: _formatJsonBasic,
-        formatJsonlike: _formatJsonlike,
+        prettyJson: _prettyJson,
         formatURLs: _formatURLs,
         isJSON: _isJSON,
         isArray: _isArray,
-        isString: _isString
+        isString: _isString,
+        escapeSlash: _escapeSlash,
+        unEscapeSlash: _unEscapeSlash
     }
 
 });
@@ -206,7 +185,7 @@ app.config(
                       templateUrl : "partials/history.html",
                       reloadOnSearch: false})
             .when("/workers", {
-                      controller : "workersController",
+                      controller : "processController",
                       templateUrl : "partials/workers.html",
                       reloadOnSearch: false})
             .when("/start", { redirectTo: "/history"})
@@ -243,7 +222,7 @@ app.controller('envController', function($scope, $route, $http, $location, envir
 
 });
 
-app.controller('historyController', function($scope, $route, $http, $location) {
+app.controller('historyController', function($scope, $route, $http, $location, ngDialog, formatUtil) {
 
     $scope.$on(
         "$routeChangeSuccess",
@@ -281,11 +260,23 @@ app.controller('historyController', function($scope, $route, $http, $location) {
         $location.path("workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(execution.runId));
     };
 
+    $scope.linkWorkflow = function(execution) {
+        return "#/workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(formatUtil.escapeSlash(execution.runId));
+    };
+
     $scope.statusMap = {
+        // These are all SWF Workflow Close Statii
         "FAILED" : "label-danger",
         "COMPLETED" : "label-success",
         "TIMED_OUT" : "label-warning",
-        "TERMINATED" : "label-danger"
+        "TERMINATED" : "label-danger",
+        "CANCELED" : "label-warning",
+        "CONTINUTED_AS_NEW" : "label-default",
+
+        "IN_PROGRESS" : "label-info",
+        "BLOCKED" : "label-warning",
+        "CANCEL_REQUESTED" : "label-warning"
+
     };
 
     $scope.figureStatusLabel = function(status) {
@@ -297,7 +288,7 @@ app.controller('historyController', function($scope, $route, $http, $location) {
 
     $scope.formatStatus = function(closeStatus) {
         if(closeStatus == null) {
-            return "IN PROGRESS";
+            return "IN_PROGRESS";
         }
 
         return closeStatus;
@@ -307,9 +298,60 @@ app.controller('historyController', function($scope, $route, $http, $location) {
         var parts = tag.split(':');
         return "<b>"+parts[0]+"</b>&nbsp;:&nbsp;"+parts[1];
     };
+
+    $scope.promptCancelWorkflow = function(ex) {
+        $scope.ex = ex;
+        ngDialog.open({
+                          template : "confirmCancel",
+                          controller : "historyController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.cancelWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.ex.runId;
+        params['workflowId'] = $scope.ex.workflowId;
+        $http.post('workflow/cancel', params )
+            .success(function(data) {
+                         toastr.info(data, "Cancel Requested!");
+                         $scope.ex.closeStatus = "CANCEL_REQUESTED";
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
+    $scope.promptTerminateWorkflow = function(ex) {
+        $scope.ex = ex;
+        ngDialog.open({
+                          template : "confirmTerminate",
+                          controller : "historyController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.terminateWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.ex.runId;
+        params['workflowId'] = $scope.ex.workflowId;
+        params['reason'] = $scope.terminateReason;
+        params['details'] = $scope.terminateDetails;
+        $http.post('workflow/terminate', params )
+            .success(function(data) {
+                         toastr.info(data, "Workflow Terminated!");
+                         $scope.ex.closeStatus = "TERMINATED";
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
 });
 
-app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil, environment) {
+
+app.controller('workflowController', function($scope, $route, $http, $location, $anchorScroll, formatUtil, environment, ngDialog) {
 
     $scope.formatUtil = formatUtil;
 
@@ -317,6 +359,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
             $scope.params = $route.current.params;
+            $scope.params.runId = formatUtil.unEscapeSlash($scope.params.runId);
             $scope.getWorkflow();
         }
     );
@@ -358,8 +401,54 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
 
     };
 
+    $scope.promptCancelWorkflow = function() {
+        ngDialog.open({
+                          template : "confirmCancel",
+                          controller : "workflowController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.cancelWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
+        $http.post('workflow/cancel', params )
+            .success(function(data) {
+                         toastr.info(data, "Cancel Requested!")
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
+    $scope.promptTerminateWorkflow = function() {
+        ngDialog.open({
+                          template : "confirmTerminate",
+                          controller : "workflowController",
+                          scope : $scope
+                      });
+    };
+
+    $scope.terminateWorkflow = function() {
+        var params = {};
+        params['runId'] = $scope.params.runId;
+        params['workflowId'] = $scope.params.workflowId;
+        params['reason'] = $scope.terminateReason;
+        params['details'] = $scope.terminateDetails;
+        $http.post('workflow/terminate', params )
+            .success(function(data) {
+                       toastr.info(data, "Workflow Terminated!")
+                     })
+            .error(function(error) {
+                       toastr.error(error.details, error.error)
+                   });
+
+    };
+
     $scope.prepWorkflow = function() {
-        $scope.workflow.editable = $scope.workflow.resolution == "IN PROGRESS" || $scope.workflow.resolution == "BLOCKED";
+        $scope.workflow.editable = $scope.workflow.status == "IN_PROGRESS" || $scope.workflow.status == "BLOCKED";
         $scope.workflow.edited = false;
 
         for(var s in $scope.workflow.sections) {
@@ -370,7 +459,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             for(pname in section.params) {
                 var param = section.params[pname];
                 if(formatUtil.isJSON(param)) {
-                    param = formatUtil.formatJsonBasic(param);
+                    param = formatUtil.prettyJson(param);
                 }
                 section.params[pname] = {
                     "original" : param,
@@ -475,11 +564,12 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.workflowStatusMap = {
-        "IN PROGRESS" : "label-info",
+        "IN_PROGRESS" : "label-info",
+        "CANCEL_REQUESTED" : "label-warning",
         "BLOCKED" : "label-warning",
         "CANCELLED" : "label-warning",
         "FAILED" : "label-danger",
-        "TIMED OUT" : "label-danger",
+        "TIMED_OUT" : "label-danger",
         "TERMINATED" : "label-danger",
         "COMPLETED" : "label-success"
     };
@@ -489,7 +579,8 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "SCHEDULED" : "label-info",
         "STARTED" : "label-info",
         "FAILED" : "label-warning",
-        "TIMED OUT" : "label-warning",
+        "BLOCKED" : "label-warning",
+        "TIMED_OUT" : "label-warning",
         "CANCELED" : "label-warning",
         "TERMINAL" : "label-danger",
         "COMPLETE" : "label-success",
@@ -539,59 +630,71 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         $location.path("workflow/initiate/fromExisting");
     };
 
-    $("#rawInputToggle").click(function() {
+    $(".rawInputToggle").click(function() {
         $('#rawInput').slideToggle()
     });
 
-    $("#historyViewToggle").click(function() {
+    $(".historyViewToggle").click(function() {
         $('#historyView').slideToggle()
     });
 });
 
-app.controller('workersController', function($scope, $route, $http, $location, environment, formatUtil) {
+app.controller('processController', function($scope, $route, $http, $location, environment, formatUtil) {
 
     $scope.showDefunct = false;
     $scope.formatUtil = formatUtil;
 
+
     $scope.$on(
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
-            $scope.getWorkers();
+            $scope.getProcesses();
         }
     );
 
 
-    $scope.getWorkers = function() {
+    $scope.getProcesses = function() {
         $scope.loading = true;
         var params = {};
         $http.get('worker', { params : params})
             .success(function(data) {
-                         $scope.loading = false;
+                         $scope.loadingWorkers = false;
                          $scope.workers = data;
                          $scope.categorizeWorkers();
                          $scope.currentDomain = environment.data.domain;
                      })
             .error(function(error) {
-                       $scope.loading = false;
+                       $scope.loadingWorkers = false;
+                       toastr.error(error.details, error.error)
+                   });
+        $http.get('coordinator', { params : params})
+            .success(function(data) {
+                         $scope.loadingCoords = false;
+                         $scope.coordinators = data;
+                         $scope.categorizeCoordinators();
+                         $scope.currentDomain = environment.data.domain;
+                     })
+            .error(function(error) {
+                       $scope.loadingCoords = false;
                        toastr.error(error.details, error.error)
                    });
     };
 
-    $scope.setFreshnessLabel = function(worker) {
+    $scope.setFreshnessLabel = function(process) {
 
-        worker.defunct = false;
-        if(worker.minutesSinceLast < -10) {
-            worker.freshness = "label-default";
-            worker.defunct = true;
-        } else if(worker.minutesSinceLast < -5) {
-            worker.freshness = "label-warning";
+        process.defunct = false;
+        if(process.minutesSinceLast < -10) {
+            process.freshness = "label-default";
+            process.defunct = true;
+        } else if(process.minutesSinceLast < -5) {
+            process.freshness = "label-warning";
         } else {
-            worker.freshness = "label-success";
+            process.freshness = "label-success";
         }
     };
 
     $scope.categorizeWorkers = function() {
-        $scope.domains = {};
+        $scope.workersByDomain = {};
         for(var w in $scope.workers) {
             var worker = $scope.workers[w];
             worker.showFormatted = true;
@@ -606,15 +709,44 @@ app.controller('workersController', function($scope, $route, $http, $location, e
 
             $scope.setFreshnessLabel(worker);
 
-            if(!$scope.domains.hasOwnProperty(worker.domain)) {
-                $scope.domains[worker.domain] = {};
+            if(!$scope.workersByDomain.hasOwnProperty(worker.domain)) {
+                $scope.workersByDomain[worker.domain] = {};
             }
-            var domain = $scope.domains[worker.domain];
+            var domain = $scope.workersByDomain[worker.domain];
             if(!domain.hasOwnProperty(worker.activityName)) {
                 domain[worker.activityName] = [];
             }
 
             domain[worker.activityName].push(worker);
+
+        }
+    };
+
+    $scope.categorizeCoordinators = function() {
+        $scope.coordsByDomain = {};
+        for(var w in $scope.coordinators) {
+            var coordinator = $scope.coordinators[w];
+            coordinator.showFormatted = true;
+            coordinator.showContents = false;
+            if(formatUtil.isJSON(coordinator.specification)) {
+                coordinator.operators = JSON.parse(coordinator.specification);
+            }
+// TODO Implement me!
+//            if(formatUtil.isJSON(coordinator.resolutionHistory)) {
+//                coordinator.resolutionHistory = JSON.parse(coordinator.resolutionHistory);
+//            }
+
+            $scope.setFreshnessLabel(coordinator);
+
+            if(!$scope.coordsByDomain.hasOwnProperty(coordinator.domain)) {
+                $scope.coordsByDomain[coordinator.domain] = {};
+            }
+            var domain = $scope.coordsByDomain[coordinator.domain];
+            if(!domain.hasOwnProperty(coordinator.workflowName)) {
+                domain[coordinator.workflowName] = [];
+            }
+
+            domain[coordinator.workflowName].push(coordinator);
 
         }
     };
@@ -641,7 +773,7 @@ app.controller('workflowInitiationController', function($scope, $route, $http, $
 
         if($scope.params.command == "fromExisting") {
             if(environment.existingWorkflow !== null) {
-                $scope.inputJson = environment.existingWorkflow.input;
+                $scope.inputJson = JSON.stringify(JSON.parse(environment.existingWorkflow.history[0].input), null, 4);
                 $scope.workflowId = "Re-run of "+environment.existingWorkflow.workflowId;
             }
         }

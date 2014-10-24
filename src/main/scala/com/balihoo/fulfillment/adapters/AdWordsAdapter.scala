@@ -111,7 +111,7 @@ abstract class AbstractAdWordsAdapter {
       case e:Exception =>
         e.getMessage match {
           case null =>
-            throw new Exception(s"Exception during $context :${e.getStackTraceString.substring(0, 150)}", e)
+            throw new Exception(s"Exception during $context :${e.getStackTraceString take 150}", e)
           case _ =>
             throw new Exception(s"Exception during $context :${e.getMessage}", e)
         }
