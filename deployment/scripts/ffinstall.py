@@ -66,7 +66,7 @@ class Installer(object):
 
 
     def install_package(self, package_name):
-        installer = "apt-get" if self._distro in ["ubuntu", "debian"] else "yum"
+        installer = "apt-get" if self._distro in ["Ubuntu", "Debian"] else "yum"
         self.run_wait_log([installer, "install", "-y", package_name], raise_on_err=True)
 
     def install_phantom(self, version):
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument('--nolaunch', help='do not launch the app', action='store_true')
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
     parser.add_argument('--eip', help='the eip for this instance', default=None)
-    parser.add_argument('--distro', help='the inux distribution to use for this instance', default="ubuntu")
+    parser.add_argument('--distro', help='the linux distribution to use for this instance', default="Ubuntu")
 
     args = parser.parse_args()
 

@@ -20,10 +20,20 @@ export AWS_ACCESS_KEY_ID=${AWSACCESSKEY}
 export AWS_SECRET_ACCESS_KEY=${AWSSECRETKEY}
 export AWS_REGION=${AWSREGION}
 
+if [ "${DISTRO}" = "Ubuntu"]; then
+  INSTALLER="apt-get"
+else
+  INSTALLER="yum"
+fi
+
 log "installing dependencies"
-logdo "export DEBIAN_FRONTEND=noninteractive"
-logdo "apt-get update -q"
-logdo "apt-get install -y unzip default-jre"
+if [ "${DISTRO}" = "Ubuntu"]; then
+  logdo "export DEBIAN_FRONTEND=noninteractive"
+  logdo "apt-get update -q"
+  logdo "${INSTALLER} install -y unzip default-jre"
+else
+  log "nothing to install for amazon linux"
+fi
 
 log "downloading cli tools"
 logdo "curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip"
@@ -46,7 +56,7 @@ log "checking ${S3VEURL}"
 VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})"
 if [ -z "${VEFILE}" ]; then
     log "no installation found: installing virtual env"
-    logdo "apt-get install -y gcc make autoconf libssl-dev libbz2-dev"
+    logdo "${INSTALLER} install -y gcc make autoconf libssl-dev libbz2-dev"
     logdo "chmod +x ${FFDIR}/vesetup"
     logdo "${FFDIR}/vesetup -d ${VEDIR} -p ${PYVERSION} -v ${VEVERSION}"
 
@@ -71,7 +81,7 @@ else
     logdo "$VEACTIVATE"
 fi
 
-FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES}"
+FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES} --distro-${DISTRO}"
 echo "#!/bin/bash" > runffinstall
 echo "$VEACTIVATE" >> runffinstall
 echo "$FFINSTCMD" >> runffinstall

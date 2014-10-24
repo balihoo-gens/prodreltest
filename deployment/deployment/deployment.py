@@ -69,6 +69,7 @@ class Deployment(object):
             "WebPort"               : cfg.web_port,
             "WorkerScript"          : self.gen_script(script_file, s3dir, None, ""),
             "DashboardScript"       : self.gen_script(script_file, s3dir, self._cfg.dasheip, dash_class),
+            "LinuxDistro"           : cfg.distro,
             "Environment"           : cfg.env,
         }
 
@@ -89,6 +90,7 @@ class Deployment(object):
             "VEDIR=%s"        % "/opt/balihoo/virtualenv",
             "PYVERSION=%s"    % self._cfg.pyversion,
             "VEVERSION=%s"    % self._cfg.veversion,
+            "DISTRO=%s"       % self._cfg.distro,
         ]
 
         #optionally add the dashboard eip option.
