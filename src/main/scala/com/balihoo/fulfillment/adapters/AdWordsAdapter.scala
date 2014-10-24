@@ -115,8 +115,6 @@ abstract class AbstractAdWordsAdapter {
           case _ =>
             throw new Exception(s"Exception during $context :${e.getMessage}", e)
         }
-      case e:Throwable =>
-        throw new Exception(s"THROWABLE during $context :${e.getMessage}", e)
     }
   }
 

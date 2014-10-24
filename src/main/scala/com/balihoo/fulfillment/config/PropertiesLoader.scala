@@ -2,8 +2,7 @@ package com.balihoo.fulfillment.config
 
 //import java.util.Properties
 import org.apache.commons.configuration.PropertiesConfiguration
-import java.io.{File, FileInputStream, InputStream}
-import scopt._
+import java.io.{FileInputStream, InputStream}
 import scala.util.Try
 
 //for the cake pattern dependency injection
@@ -22,8 +21,6 @@ class PropertiesLoader(propertiesFileName: String, propertiesDir: String = "") {
   } catch {
       case exception:Exception =>
         println(s"${exception.toString}, ${exception.getMessage}")
-      case _:Throwable =>
-        println(s"caught throwable")
    } finally {
     if (propertiesFileStream != null)
       propertiesFileStream.close()

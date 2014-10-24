@@ -1,6 +1,5 @@
 package com.balihoo.fulfillment.adapters
 
-import com.amazonaws.{AmazonServiceException, AmazonClientException}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.services.simpleworkflow.model._
 import com.amazonaws.handlers.AsyncHandler
@@ -28,10 +27,13 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   private lazy val _taskList: TaskList = new TaskList().withName(_taskListName)
   private lazy val _workflowName = new SWFName(config.getString("workflowName"))
   private lazy val _workflowVersion = new SWFVersion(config.getString("workflowVersion"))
+  private lazy val _workflowExecutionStartToCloseTimeout = config.getOrElse("workflowExecutionStartToCloseTimeout", "3000000")
+  private lazy val _workflowTaskStartToCloseTimeout = config.getOrElse("workflowTaskStartToCloseTimeout", "3000000")
+  private lazy val _workflowChildPolicy = config.getOrElse("workflowChildPolicy", "TERMINATE")
   private lazy val _workflowTaskListName = new SWFName(workflowName+workflowVersion)
 
   //longpoll by default, unless config says "longpoll=false"
-  protected val _longPoll = config.getOrElse("longpoll",true)
+  protected val _longPoll = config.getOrElse("longpoll",default=true)
 
   def taskListName = _taskListName
   def name = _name
@@ -40,6 +42,9 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   def workflowName = _workflowName
   def workflowVersion = _workflowVersion
   def workflowTaskListName = _workflowTaskListName
+  def workflowExecutionStartToCloseTimeout = _workflowExecutionStartToCloseTimeout
+  def workflowTaskStartToCloseTimeout = _workflowTaskStartToCloseTimeout
+  def workflowChildPolicy = _workflowChildPolicy
 
   protected val taskReq: PollForActivityTaskRequest = new PollForActivityTaskRequest()
     .withDomain(domain)
@@ -48,7 +53,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
     .withDomain(domain)
     .withTaskList(taskList)
 
-  def getTask(): Future[Option[ActivityTask]]  = {
+  def getTask: Future[Option[ActivityTask]]  = {
     val taskPromise = Promise[Option[ActivityTask]]()
 
     object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
@@ -131,12 +136,12 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   }
 
   def verifyWorkflowType(autoRegister:Boolean = false) = {
-    val wt = new WorkflowType
-    wt.setName(workflowName)
-    wt.setVersion(workflowVersion)
-    val wtr = new DescribeWorkflowTypeRequest
-    wtr.setDomain(domain)
-    wtr.setWorkflowType(wt)
+    val wt = new WorkflowType()
+      .withName(workflowName)
+      .withVersion(workflowVersion)
+    val wtr = new DescribeWorkflowTypeRequest()
+      .withDomain(domain)
+      .withWorkflowType(wt)
 
     try {
       splog.info(s"Checking for workflow type '$workflowName:$workflowVersion'..")
@@ -150,13 +155,16 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   }
 
   def registerWorkflowType() = {
-    val taskList = new TaskList
-    taskList.setName(workflowTaskListName)
-    val rwtr = new RegisterWorkflowTypeRequest
-    rwtr.setDomain(domain)
-    rwtr.setName(workflowName)
-    rwtr.setVersion(workflowVersion)
-    rwtr.setDefaultTaskList(taskList)
+    val taskList = new TaskList()
+      .withName(workflowTaskListName)
+    val rwtr = new RegisterWorkflowTypeRequest()
+      .withDomain(domain)
+      .withName(workflowName)
+      .withVersion(workflowVersion)
+      .withDefaultTaskList(taskList)
+      .withDefaultChildPolicy(workflowChildPolicy)
+      .withDefaultExecutionStartToCloseTimeout(workflowExecutionStartToCloseTimeout)
+      .withDefaultTaskStartToCloseTimeout(workflowTaskStartToCloseTimeout)
 
     try {
       splog.info(s"Trying to register workflow type '$workflowName:$workflowVersion'")

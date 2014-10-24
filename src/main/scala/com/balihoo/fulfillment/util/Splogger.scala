@@ -75,7 +75,7 @@ class Splogger(filename:String) {
       // If write throws, fw is closed and ret = false
       finally fw.close()
     }
-    catch { case _: Throwable => ret = false }
+    catch { case e: Exception => ret = false }
     ret
    }
 
@@ -109,8 +109,8 @@ class Splogger(filename:String) {
       }
     }
     catch {
-      case t: Throwable =>
-        print(s"$level: $msg [log parse exception: ${t.getMessage}]\n")
+      case e: Exception =>
+        print(s"$level: $msg [log parse exception: ${e.getMessage}]\n")
     }
    }
 
