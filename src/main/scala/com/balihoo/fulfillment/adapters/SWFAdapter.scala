@@ -5,10 +5,11 @@ import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.services.simpleworkflow.model._
 import com.amazonaws.handlers.AsyncHandler
 
-import scala.concurrent.{Promise, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Future, Promise, ExecutionContext}
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util._
+
+import java.util.concurrent.Executors
 
 //for the cake pattern dependency injection
 trait SWFAdapterComponent {
@@ -18,6 +19,8 @@ trait SWFAdapterComponent {
 abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncClient] {
   this: PropertiesLoaderComponent
     with SploggerComponent =>
+
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
   private lazy val _name = new SWFName(config.getString("name"))
   private lazy val _version = new SWFVersion(config.getString("version"))
