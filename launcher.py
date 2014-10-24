@@ -292,6 +292,7 @@ class Launcher(object):
             pid = component.launch()
             self._log.info("Launched", additional_fields={ "pid" : str(pid), "procname" : name })
             self._components[name] = component
+            time.sleep(5)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Launch the Fulfillment application")
@@ -302,7 +303,7 @@ if __name__ == "__main__":
     parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/launcher.log')
     parser.add_argument('-d','--launchdelay', help='minumum number of seconds between launch of the same process', default='600')
-    parser.add_argument('-p','--ping', help='number of seconds after which to ping a quiet process', default='60')
+    parser.add_argument('-p','--ping', help='number of seconds after which to ping a quiet process', default='90')
     parser.add_argument('-q','--quit', help='number of seconds after which to tell a process to quit', default='300')
     parser.add_argument('-t','--terminate', help='number of seconds after which to terminate (SIGTERM) a quiet process', default='600')
     parser.add_argument('-k','--kill', help='number of seconds after which to kill (SIGKILL) a quiet process', default='900')
