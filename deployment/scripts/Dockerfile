@@ -12,12 +12,11 @@ ADD splogger.py /opt/balihoo/fulfillment/splogger.py
 ADD vesetup /opt/balihoo/fulfillment/vesetup
 
 RUN apt-get update
-RUN apt-get install -y curl unzip default-jre
+RUN apt-get install -y curl unzip default-jre gcc make autoconf libssl-dev libbz2-dev python-pip
+RUN pip install boto
 RUN curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip && \
     unzip -o awscli-bundle.zip && \
     ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
-RUN apt-get install -y gcc make autoconf libssl-dev libbz2-dev python-pip
-RUN pip install boto
 RUN chmod +x ffinstall.py
 
 CMD python ffinstall.py
