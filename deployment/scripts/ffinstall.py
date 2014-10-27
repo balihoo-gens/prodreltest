@@ -56,7 +56,7 @@ class Installer(object):
                        stat.S_IRGRP |                stat.S_IXGRP |
                        stat.S_IROTH |                stat.S_IXOTH )
 
-    def run_s3_installer(self, s3bucket, script_name, params):
+    def run_s3_installer(self, s3bucket, script_name, params=""):
         self._log.info("installing " + s3bucket + "/" + script_name + " " + params)
         s3url = os.path.join(s3bucket, script_name)
         if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
@@ -141,8 +141,8 @@ if __name__ == "__main__":
     installer = Installer(args.logfile)
 
     if not args.nonewrelic:
-        installer.run_s3_installer(newrelics3bucket, "nrsysmond-install.sh", "")
-        installer.run_s3_installer(newrelics3bucket, "javaagent-install.sh", "")
+        installer.run_s3_installer(newrelics3bucket, "nrsysmond-install.sh")
+        installer.run_s3_installer(newrelics3bucket, "javaagent-install.sh")
     if not args.nosplunk:
         installer.run_s3_installer(args.splunks3bucket, args.splunkscript)
     if not args.nophantom:
