@@ -19,5 +19,8 @@ RUN curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip
     ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
 RUN chmod +x ffinstall.py
 
+# disable policy-rc to work around init failures 
+RUN echo '#!/bin/sh\nexit 0' > /usr/sbin/policy-rc.d
+
 CMD python ffinstall.py
 
