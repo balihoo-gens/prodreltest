@@ -20,14 +20,14 @@ export AWS_ACCESS_KEY_ID=${AWSACCESSKEY}
 export AWS_SECRET_ACCESS_KEY=${AWSSECRETKEY}
 export AWS_REGION=${AWSREGION}
 
-if [ "${DISTRO}" = "Ubuntu"]; then
+if [ "${DISTRO}" = "Ubuntu" ]; then
   INSTALLER="apt-get"
 else
   INSTALLER="yum"
 fi
 
 log "installing dependencies"
-if [ "${DISTRO}" = "Ubuntu"]; then
+if [ "${DISTRO}" = "Ubuntu" ]; then
   logdo "export DEBIAN_FRONTEND=noninteractive"
   logdo "apt-get update -q"
   logdo "${INSTALLER} install -y unzip default-jre"
@@ -56,7 +56,7 @@ log "checking ${S3VEURL}"
 VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})"
 if [ -z "${VEFILE}" ]; then
     log "no installation found: installing virtual env"
-    if [ "${DISTRO}" = "Ubuntu"]; then
+    if [ "${DISTRO}" = "Ubuntu" ]; then
         logdo "${INSTALLER} install -y gcc make autoconf libssl-dev libbz2-dev"
     else
         logdo "${INSTALLER} install -y gcc make autoconf openssl-devel zlib-devel"
