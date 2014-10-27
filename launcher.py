@@ -90,7 +90,7 @@ class Component(object):
 
     def launch(self):
         cwd = os.path.dirname(self._jar if not running_local else os.path.realpath(__file__))
-        cmdline = ["java", "-cp", self._jar, self._classpath]
+        cmdline = ["java", "-javaagent:/opt/balihoo/newrelic-agent.jar", "-cp", self._jar, self._classpath]
         self._proc = subprocess.Popen(
             cmdline,
             #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...
