@@ -19,8 +19,6 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   this: PropertiesLoaderComponent
     with SploggerComponent =>
 
-  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
-
   private lazy val _name = new SWFName(config.getString("name"))
   private lazy val _version = new SWFVersion(config.getString("version"))
   private lazy val _taskListName = new SWFName(_name + _version)
@@ -33,7 +31,11 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   private lazy val _workflowTaskListName = new SWFName(workflowName+workflowVersion)
 
   //longpoll by default, unless config says "longpoll=false"
-  protected val _longPoll = config.getOrElse("longpoll",default=true)
+  protected val _longPoll = config.getOrElse("longpoll", default=true)
+  //use 10 threads in the threadpool by default, unless the config says otherwise
+  protected val _threadcount = config.getOrElse("threadcount", default=10)
+
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(_threadcount))
 
   def taskListName = _taskListName
   def name = _name
