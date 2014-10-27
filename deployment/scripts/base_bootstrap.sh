@@ -85,10 +85,10 @@ else
     logdo "$VEACTIVATE"
 fi
 
-FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES} --distro-${DISTRO}"
+FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES} --distro ${DISTRO}"
 echo "#!/bin/bash" > runffinstall
-echo "$VEACTIVATE" >> runffinstall
-echo "$FFINSTCMD" >> runffinstall
+echo "${VEACTIVATE}" >> runffinstall
+echo "${FFINSTCMD} >> ${LOGFILE} 2>&1" >> runffinstall
 echo "deactivate" >> runffinstall
 logdo "cat runffinstall"
 logdo "chmod +x runffinstall"
