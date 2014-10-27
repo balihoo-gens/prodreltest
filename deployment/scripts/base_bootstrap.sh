@@ -56,7 +56,11 @@ log "checking ${S3VEURL}"
 VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})"
 if [ -z "${VEFILE}" ]; then
     log "no installation found: installing virtual env"
-    logdo "${INSTALLER} install -y gcc make autoconf libssl-dev libbz2-dev"
+    if [ "${DISTRO}" = "Ubuntu"]; then
+        logdo "${INSTALLER} install -y gcc make autoconf libssl-dev libbz2-dev"
+    else
+        logdo "${INSTALLER} install -y gcc make autoconf openssl-devel zlib-devel"
+    fi
     logdo "chmod +x ${FFDIR}/vesetup"
     logdo "${FFDIR}/vesetup -d ${VEDIR} -p ${PYVERSION} -v ${VEVERSION}"
 

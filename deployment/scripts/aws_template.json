@@ -92,7 +92,7 @@
       "us-east-1"      : { "Amazon" : "ami-7c807d14", "Ubuntu" : "ami-d2ff23ba" },
       "us-west-1"      : { "Amazon" : "ami-a8d3d4ed", "Ubuntu" : "ami-73717d36" },
       "us-west-2"      : { "Amazon" : "ami-1b3b462b", "Ubuntu" : "ami-f1ce8bc1" }
-    },
+    }
 
   },
 
