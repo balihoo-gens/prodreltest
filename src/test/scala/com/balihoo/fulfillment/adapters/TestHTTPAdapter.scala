@@ -52,6 +52,10 @@ class MockServer extends JerseyTest {
   @Path("header")
   def getOk(@Context headers: HttpHeaders) = headers.getHeaderString("testHeader")
 
+  @GET
+  @Path("query")
+  def getOk(@QueryParam("abc") param1: String, @QueryParam("xyz") param2: Int) = param1 + ":" + param2
+
   override def configure = {
     forceSet(TestProperties.CONTAINER_PORT, "0") // Choose first available port.
     new ResourceConfig(getClass)
@@ -127,9 +131,15 @@ class TestHTTPAdapter extends Specification {
     }
 
     "set a request header" in {
-      val result = httpAdapter.get(server.getUrl("header"), List(("testHeader", "Colorful sashimi buffet")))
+      val result = httpAdapter.get(server.getUrl("header"), headers = List(("testHeader", "Colorful sashimi buffet")))
       result.code.code mustEqual 200
       result.bodyString mustEqual "Colorful sashimi buffet"
+    }
+
+    "prepare a query string" in {
+      val result = httpAdapter.get(server.getUrl("query"), queryParams = List(("abc", "yahoo"), ("xyz", 13)))
+      result.code.code mustEqual 200
+      result.bodyString mustEqual "yahoo:13"
     }
   }
 

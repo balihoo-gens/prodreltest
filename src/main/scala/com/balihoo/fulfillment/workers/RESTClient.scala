@@ -30,10 +30,10 @@ class AbstractRESTClient extends FulfillmentWorker {
       splog.info(s"REST client was asked to $method $url")
 
       val response = method match {
-        case "DELETE" => httpAdapter.delete(url, headers)
-        case "GET" => httpAdapter.get(url, headers)
-        case "POST" => httpAdapter.post(url, body, headers)
-        case "PUT" => httpAdapter.put(url, body, headers)
+        case "DELETE" => httpAdapter.delete(url, headers = headers)
+        case "GET" => httpAdapter.get(url, headers = headers)
+        case "POST" => httpAdapter.post(url, body, headers = headers)
+        case "PUT" => httpAdapter.put(url, body, headers = headers)
         case _ => throw new IllegalArgumentException(s"Invalid method: $url")
       }
 
@@ -47,7 +47,7 @@ class RESTClient(override val _cfg: PropertiesLoader, override val _splog: Splog
   extends AbstractRESTClient
   with LoggingWorkflowAdapterImpl
   with HTTPAdapterComponent {
-    private val timeoutSeconds = _cfg.getOptInt("timeoutSeconds", 60)
+    private val timeoutSeconds = _cfg.getOrElse("timeoutSeconds", 60)
     lazy private val _http = new HTTPAdapter(timeoutSeconds)
     def httpAdapter = _http
 }
