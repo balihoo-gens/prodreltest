@@ -89,6 +89,7 @@ class Deployment(object):
             "VEDIR=%s"        % "/opt/balihoo/virtualenv",
             "PYVERSION=%s"    % self._cfg.pyversion,
             "VEVERSION=%s"    % self._cfg.veversion,
+            "ENV_NAME=%s"    % self._cfg.env,
         ]
 
         #optionally add the dashboard eip option.

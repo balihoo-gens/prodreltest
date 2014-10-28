@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
     if not args.nonewrelic:
         installer.run_s3_installer(newrelics3bucket, "nrsysmond-install.sh")
-        installer.run_s3_installer(newrelics3bucket, "javaagent-install.sh")
+        installer.run_s3_installer(newrelics3bucket, "javaagent-install.sh", "fulfillment_"  + os.environ["ENV_NAME"].lower())
     if not args.nosplunk:
         installer.run_s3_installer(args.splunks3bucket, args.splunkscript)
     if not args.nophantom:
