@@ -45,8 +45,6 @@ abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] 
           val dr = Regions.DEFAULT_REGION
           println(s"Unable to get region: ${e.getMessage}\n  region defaulting to ${dr.getName}")
           dr
-        case _:Throwable =>
-          throw new Exception("throwable getting region from config")
       }
     )
   }

@@ -1,19 +1,17 @@
 package com.balihoo.fulfillment.workers
 
 //scala imports
+
 import scala.collection.mutable
-import scala.sys.process._
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
 import scala.util.{Success, Failure}
-import scala.concurrent.{Future, Await, Promise, future}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Future, Await, Promise, ExecutionContext}
 import scala.concurrent.duration._
 
 //java imports
-import java.util.Date
 import java.util.UUID.randomUUID
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{TimeUnit, Executors}
 
 //aws imports
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig.TableNameOverride
@@ -26,7 +24,6 @@ import play.api.libs.json._
 
 //other external
 import org.joda.time.{Minutes, DateTime}
-import org.joda.time.format.ISODateTimeFormat
 import org.keyczar.Crypter
 
 //local imports
@@ -36,6 +33,8 @@ import com.balihoo.fulfillment.util._
 
 abstract class FulfillmentWorker {
   this: LoggingWorkflowAdapter =>
+
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
   val instanceId = randomUUID().toString
 
@@ -50,24 +49,6 @@ abstract class FulfillmentWorker {
   val defaultTaskScheduleToStartTimeout = swfAdapter.config.getString("default_task_schedule_to_start_timeout")
   val defaultTaskStartToCloseTimeout = swfAdapter.config.getString("default_task_start_to_close_timeout")
 
-  val hostAddress = sys.env.get("EC2_HOME") match {
-    case Some(s:String) =>
-      val url = "http://169.254.169.254/latest/meta-data/public-hostname"
-      val aws_ec2_identify = "curl -s $url --max-time 2 --retry 3"
-      aws_ec2_identify.!!
-    case None =>
-      try {
-        // This might throw an exception if the local DNS doesn't know about the system hostname.
-        // At this point we're looking for some kind of identifier. It doesn't have to actually
-        // be reachable.
-        java.net.InetAddress.getLocalHost.getHostName
-      } catch {
-        case e:Exception =>
-          // If all else fails..
-          "hostname".!!
-      }
-  }
-
   val workerTable = new FulfillmentWorkerTable with DynamoAdapterComponent with SploggerComponent {
     def dynamoAdapter = FulfillmentWorker.this.dynamoAdapter
     def splog = FulfillmentWorker.this.splog
@@ -78,7 +59,7 @@ abstract class FulfillmentWorker {
   val entry = new FulfillmentWorkerEntry
   entry.tableName = workerTable.dynamoAdapter.config.getString("worker_status_table")
   entry.setInstance(instanceId)
-  entry.setHostAddress(hostAddress)
+  entry.setHostAddress(HostIdentity.getHostAddress)
   entry.setActivityName(name)
   entry.setActivityVersion(version)
   entry.setSpecification(getSpecification.toString)
@@ -110,21 +91,21 @@ abstract class FulfillmentWorker {
       handleTaskFuture(swfAdapter.getTask)
       Await.result(_doneFuture.get, Duration.Inf )
     }
-    shutdown
+    shutdown()
   }
 
   def setupQuitKey(getch: Getch): Future[Boolean] = {
-    var donePromise = Promise[Boolean]()
+    val donePromise = Promise[Boolean]()
     getch.addMapping(
-      Seq("q", "Q", "Exit"), () => {
+      Seq("quit", "Quit", "exit", "Exit"), () => {
         //stdin received quit request. Respond on stdout
         println("Quitting...")
         updateStatus("Terminated by user", "WARN")
         donePromise.success(true)
       }
     )
-    //echo a dot
-    getch.addMapping(Seq("."), () => { print(".") } )
+    //respond to ping
+    getch.addMapping(Seq("ping"), () => { println("pong") } )
 
     //return the future that will succeed when termination is requested
     donePromise.future
@@ -132,13 +113,13 @@ abstract class FulfillmentWorker {
 
   def shutdown() = {
     updateStatus("Exiting")
-    val excsvc = swfAdapter.client.getExecutorService()
-    excsvc.shutdown
+    val excsvc = swfAdapter.client.getExecutorService
+    excsvc.shutdown()
     if (!excsvc.awaitTermination(3, TimeUnit.SECONDS)) {
       val tasks = excsvc.shutdownNow()
       splog.warning("Performing hard shutdown with remaining tasks: " + tasks.length)
       Thread.sleep(100)
-      swfAdapter.client.shutdown
+      swfAdapter.client.shutdown()
     }
   }
 
@@ -150,7 +131,7 @@ abstract class FulfillmentWorker {
           case Some(task) =>
             try {
               _lastTaskToken = task.getTaskToken
-              val shortToken = (_lastTaskToken takeRight 10)
+              val shortToken = _lastTaskToken takeRight 10
               updateStatus("Processing task.." + shortToken )
               handleTask(getSpecification.getParameters(task.getInput))
             } catch {
@@ -161,7 +142,7 @@ abstract class FulfillmentWorker {
             splog.info("no task available")
         }
 
-        if (!_doneFuture.isEmpty || _doneFuture.get.isCompleted) {
+        if (_doneFuture.nonEmpty || _doneFuture.get.isCompleted) {
           //get the next one
           handleTaskFuture(swfAdapter.getTask)
         } else {
@@ -172,7 +153,7 @@ abstract class FulfillmentWorker {
       case Failure(e) =>
         val ms = 1000
         updateStatus(s"Polling Exception ${e.getMessage}: waiting ${ms}ms before retrying", "EXCEPTION")
-        if (!_doneFuture.isEmpty || _doneFuture.get.isCompleted) {
+        if (_doneFuture.nonEmpty || _doneFuture.get.isCompleted) {
           Thread.sleep(ms)
           //get the next one
           handleTaskFuture(swfAdapter.getTask)
@@ -193,8 +174,6 @@ abstract class FulfillmentWorker {
     } catch {
       case e:Exception =>
         failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
-      case t:Throwable =>
-        failTask(s"""{"$name": "Caught a Throwable"}""", t.getMessage)
     }
   }
 
@@ -234,7 +213,7 @@ abstract class FulfillmentWorker {
   def completeTask(result:String) = {
     completedTasks += 1
     try {
-      if (_lastTaskToken != null && !_lastTaskToken.isEmpty) {
+      if (_lastTaskToken != null && _lastTaskToken.nonEmpty) {
         val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
         response.setTaskToken(_lastTaskToken)
         response.setResult(getSpecification.result.sensitive match {
@@ -255,7 +234,7 @@ abstract class FulfillmentWorker {
   def failTask(reason:String, details:String) = {
     failedTasks += 1
     try {
-      if (_lastTaskToken != null && !_lastTaskToken.isEmpty) {
+      if (_lastTaskToken != null && _lastTaskToken.nonEmpty) {
         val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
         response.setTaskToken(_lastTaskToken)
         response.setReason(reason)
@@ -428,28 +407,14 @@ class ActivityParameters(val params:Map[String,String], val input:String = "{}")
   }
 }
 
-object UTCFormatter {
-
-  val SEC_IN_MS = 1000
-  val MIN_IN_MS = SEC_IN_MS * 60
-  val HOUR_IN_MS = MIN_IN_MS * 60
-  val DAY_IN_MS = HOUR_IN_MS * 24
-
-  val dateTimeFormatter = ISODateTimeFormat.dateTime().withZoneUTC()
-
-  def format(dateTime:DateTime): String = {
-    dateTimeFormatter.print(dateTime)
-  }
-  def format(date:Date): String = {
-    dateTimeFormatter.print(new DateTime(date))
-  }
-
-
-}
 
 class FulfillmentWorkerTable {
   this: DynamoAdapterComponent
     with SploggerComponent =>
+
+  val tableName = dynamoAdapter.config.getString("worker_status_table")
+  val readCapacity = dynamoAdapter.config.getOrElse("worker_status_read_capacity", 3)
+  val writeCapacity = dynamoAdapter.config.getOrElse("worker_status_write_capacity", 5)
 
   waitForActiveTable()
 
@@ -458,8 +423,8 @@ class FulfillmentWorkerTable {
     var active = false
     while(!active) {
       try {
-        splog.info(s"Checking for worker status table ${dynamoAdapter.tableName}")
-        val tableDesc = dynamoAdapter.client.describeTable(dynamoAdapter.tableName)
+        splog.info(s"Checking for worker status table $tableName")
+        val tableDesc = dynamoAdapter.client.describeTable(tableName)
 
         // I didn't see any constants for these statuses..
         tableDesc.getTable.getTableStatus match {
@@ -487,8 +452,8 @@ class FulfillmentWorkerTable {
 
   def createWorkerTable() = {
     val ctr = new CreateTableRequest()
-    ctr.setTableName(dynamoAdapter.tableName)
-    ctr.setProvisionedThroughput(new ProvisionedThroughput(dynamoAdapter.readCapacity, dynamoAdapter.writeCapacity))
+    ctr.setTableName(tableName)
+    ctr.setProvisionedThroughput(new ProvisionedThroughput(readCapacity, writeCapacity))
     ctr.setAttributeDefinitions(List(new AttributeDefinition("instance", "S")))
     ctr.setKeySchema(List( new KeySchemaElement("instance", "HASH")))
     try {
@@ -518,7 +483,7 @@ class FulfillmentWorkerTable {
         .withAttributeValueList(new AttributeValue().withS(UTCFormatter.format(oldest))))
 
     val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp,
-      new DynamoDBMapperConfig(new TableNameOverride(dynamoAdapter.tableName)))
+      new DynamoDBMapperConfig(new TableNameOverride(tableName)))
     for(worker:FulfillmentWorkerEntry <- list) {
       worker.minutesSinceLast = Minutes.minutesBetween(DateTime.now, new DateTime(worker.last)).getMinutes
     }
@@ -640,8 +605,6 @@ abstract class FulfillmentWorkerApp {
     catch {
       case e:Exception =>
         splog.exception(e.getMessage)
-      case t:Throwable =>
-        splog.error(t.getMessage)
     }
     splog.info(s"Terminated $name")
   }

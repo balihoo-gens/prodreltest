@@ -71,7 +71,7 @@
                         <button class="btn btn-xs pull-right" ng-click="newWorkflow()">Create New Fulfillment</button>
                         <b>Fulfillment Input</b>
                     </div>
-                    <pre class="json" ng-bind-html="formatUtil.formatJsonBasic(workflow.history[0].input)"></pre>
+                    <pre class="json" ng-bind-html="formatUtil.prettyJson(workflow.history[0].input)"></pre>
                 </div>
                 <div id="historyView" class="panel panel-default initiallyHidden">
                     <div class="panel-heading-small historyViewToggle">
@@ -127,7 +127,7 @@
                                         <div style="width:92%">
                                             <div ng-if="param.isJson">
                                     <span ng-if="!param.editing">
-                                        <span class="json" ng-bind-html="formatUtil.formatJson(param.value)"></span>
+                                        <span class="json" ng-bind-html="formatUtil.jsonFormat(param.value)"></span>
                                     </span>
                                     <span ng-if="param.editing">
                                                 <textarea rows="15" class="form-control" ng-model="param.value"></textarea>
@@ -137,7 +137,7 @@
                                             <div ng-if="param.isArray">
                                         <span ng-if="!param.editing">
                                             <div ng-repeat="item in param.value">
-                                                <span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}<span ng-repeat="pathItem in item.path"><span ng-show="pathItem.key">/{{pathItem.key}}</span><span ng-show="pathItem.index">[{{pathItem.index}}]</span></span></span>&nbsp;<span ng-show="item.resolved" ng-bind-html="formatUtil.formatJson(item.value)"></span></div>
+                                                <span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}<span ng-repeat="pathItem in item.path"><span ng-show="pathItem.key">/{{pathItem.key}}</span><span ng-show="pathItem.index">[{{pathItem.index}}]</span></span></span>&nbsp;<span ng-show="item.resolved" ng-bind-html="formatUtil.jsonFormat(item.value)"></span></div>
                                         </span>
                                         <span ng-if="param.editing">
                                             <select ng-repeat="item in param.value" ng-model="item">
@@ -173,7 +173,7 @@
                         </div>
                         <div class="col-md-12">
                             <h3 ng-show="section.value">Result</h3>
-                            <div class="block" ng-bind-html="formatUtil.formatJson(section.value)"></div>
+                            <div class="block" ng-bind-html="formatUtil.jsonFormat(section.value)"></div>
                             <br/>
                             <br/>
                         </div>

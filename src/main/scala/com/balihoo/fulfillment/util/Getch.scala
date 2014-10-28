@@ -39,6 +39,7 @@ class Getch {
           for ((strings, function) <- _fmap ) {
             if (caughtOneOf(strings)) {
               function()
+              clear
             }
           }
         } else {
