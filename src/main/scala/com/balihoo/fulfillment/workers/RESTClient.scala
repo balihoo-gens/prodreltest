@@ -34,7 +34,7 @@ class AbstractRESTClient extends FulfillmentWorker {
         case "GET" => httpAdapter.get(url, headers = headers)
         case "POST" => httpAdapter.post(url, body, headers = headers)
         case "PUT" => httpAdapter.put(url, body, headers = headers)
-        case _ => throw new IllegalArgumentException(s"Invalid method: $url")
+        case _ => throw new IllegalArgumentException(s"Invalid method: $method")
       }
 
       val responseMap = Map("statusCode" -> response.code.code.toString, "body" -> response.bodyString)
