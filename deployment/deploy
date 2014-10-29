@@ -39,7 +39,7 @@ def main():
     parser.add_argument('--dasheip', help='the eip for the dashboard', default=None)
     parser.add_argument('--access_key', help='the aws access key used for deployment', default=os.environ["AWS_ACCESS_KEY_ID"])
     parser.add_argument('--secret_key', help='the aws secret key used for deployment', default=os.environ["AWS_SECRET_ACCESS_KEY"])
-    parser.add_argument('--distro', help='the linux ditribution to use', default='ubuntu')
+    parser.add_argument('--distro', help='the linux ditribution to use', default='Ubuntu')
     parser.add_argument('--env', help='the deployment environment: dev, stage, etc.', default='dev')
 
     args = parser.parse_args()
