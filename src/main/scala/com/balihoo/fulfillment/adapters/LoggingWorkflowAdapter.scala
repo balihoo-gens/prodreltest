@@ -1,5 +1,4 @@
 package com.balihoo.fulfillment.adapters
-import com.amazonaws.ClientConfiguration
 import com.balihoo.fulfillment.util.{SploggerComponent, Splogger}
 import com.balihoo.fulfillment.config.PropertiesLoader
 
