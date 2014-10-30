@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--pkgdir', help='path of the package to use (skips packaging)')
     parser.add_argument('--nocf', help='do not create a cloud formation stack', action='store_true')
     parser.add_argument('--noupload', help='do not upload to S3', action='store_true')
+    parser.add_argument('--debug', help='include debugging utilities', action="store_true")
 
     #configs from cmd line or environment: these are things that could be different per deployed environment
     parser.add_argument('--region', help='the AWS region', default='us-west-2')
@@ -62,6 +63,7 @@ def main():
         veversion=args.veversion,
         dasheip=args.dasheip,
         env=args.env,
+        debug=args.debug
     )
 
     d = Deployment(args.logfile, config)

@@ -24,7 +24,8 @@ class Deployment(object):
         "pyversion",
         "veversion",
         "dasheip",
-        "env"
+        "env",
+        "debug"
     ])
 
     def __init__(self, log_filename, cfg):
@@ -34,7 +35,7 @@ class Deployment(object):
 
     def package(self, rootdir):
         self.log.debug("packaging " + rootdir)
-        p = Packager(rootdir, log_filename=self._log_filename)
+        p = Packager(rootdir, log_filename=self._log_filename, debug=self._cfg.debug)
         return p.package()
 
     def upload(self, pkgpath):
