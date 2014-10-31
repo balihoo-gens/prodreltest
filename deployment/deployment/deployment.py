@@ -68,13 +68,16 @@ class Deployment(object):
             "AccessIPMask"          : cfg.access_ip_mask,
             "WebPort"               : cfg.web_port,
             "WorkerScript"          : self.gen_script(script_file, s3dir, None, ""),
-            "DashboardScript"       : self.gen_script(script_file, s3dir, self._cfg.dasheip, dash_class),
+            "DashboardScript"       : self.gen_script(script_file, s3dir, cfg.dasheip, dash_class),
             "LinuxDistro"           : cfg.distro,
             "Environment"           : cfg.env,
         }
 
+        #stackname must be unique, so add a ms resolution unix timestamp
+        hextime = hex(int(time.time()*1000))[2:]
+        #also add the environment
+        stackname = "fulfillment-%s-%s" % (cfg.env, hextime,)
         #json dump guarantees valid json, but not a valid template per se
-        stackname = "fulfillment%d" % (int(time.time()),)
         return c.create_stack(stackname, json.dumps(template_data), parameters)
 
     def gen_script(self, script_file, s3dir, eip, classes):
