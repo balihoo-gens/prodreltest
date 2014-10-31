@@ -11,5 +11,5 @@ ADD vesetup /opt/balihoo/fulfillment/vesetup
 
 RUN chmod +x ffinstall.py
 
-CMD python ffinstall.py
+CMD python ffinstall.py && tail -F /var/log/balihoo/fulfillment/*.log
 
