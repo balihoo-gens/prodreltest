@@ -3,7 +3,7 @@ package com.balihoo.fulfillment.dashboard
 import java.io.File
 import java.util
 
-import com.balihoo.fulfillment.{UTCFormatter, SWFHistoryConvertor}
+import com.balihoo.fulfillment.SWFHistoryConvertor
 import com.balihoo.fulfillment.deciders._
 import com.balihoo.fulfillment.workers.{FulfillmentWorkerTable, FulfillmentWorkerEntry}
 import org.joda.time.DateTime

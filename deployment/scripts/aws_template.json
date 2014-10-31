@@ -64,6 +64,12 @@
       "Type" : "String"
     },
 
+    "LinuxDistro" : {
+      "Description" : "The linux distribution to use",
+      "Type" : "String",
+      "AllowedValues" : [ "Ubuntu", "Amazon" ]
+    },
+
     "Environment" : {
       "Description" : "The environment for the instances: dev, stage, prod, demo, david. Use this to separate this deployment from another in the same region",
       "Type" : "String"
@@ -82,16 +88,10 @@
       "m1.xlarge"   : { "Arch" : "64" }
     },
 
-    "AWSRegionArch2AMIAmazonLinux" : {
-      "us-east-1"      : { "64" : "ami-7c807d14" },
-      "us-west-1"      : { "64" : "ami-a8d3d4ed" },
-      "us-west-2"      : { "64" : "ami-1b3b462b" }
-    },
-
-    "AWSRegionArch2AMIUbuntu" : {
-      "us-east-1"      : { "64" : "ami-d2ff23ba" },
-      "us-west-1"      : { "64" : "ami-73717d36" },
-      "us-west-2"      : { "64" : "ami-f1ce8bc1" }
+    "AWSRegion2AMI" : {
+      "us-east-1"      : { "Amazon" : "ami-7c807d14", "Ubuntu" : "ami-d2ff23ba" },
+      "us-west-1"      : { "Amazon" : "ami-a8d3d4ed", "Ubuntu" : "ami-73717d36" },
+      "us-west-2"      : { "Amazon" : "ami-1b3b462b", "Ubuntu" : "ami-f1ce8bc1" }
     }
 
   },
@@ -110,10 +110,7 @@
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
         "KeyName" : { "Ref" : "KeyName" },
-        "ImageId" : { "Fn::FindInMap" : [
-          "AWSRegionArch2AMIUbuntu", { "Ref" : "AWS::Region" },
-          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "WorkerInstanceType" },
-          "Arch" ] } ] },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegion2AMI", { "Ref" : "AWS::Region" }, { "Ref" : "LinuxDistro" } ] },
         "SecurityGroups" : [
           { "Ref" : "InstanceSecurityGroup" },
           "splunk-access"
@@ -205,10 +202,7 @@
     "DashboardLaunchConfig" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
-        "ImageId" : { "Fn::FindInMap" : [
-          "AWSRegionArch2AMIUbuntu", { "Ref" : "AWS::Region" },
-          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "DashboardInstanceType" },
-          "Arch" ] } ] },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegion2AMI", { "Ref" : "AWS::Region" }, { "Ref" : "LinuxDistro" } ] },
         "KeyName" : { "Ref" : "KeyName" },
         "SecurityGroups" : [
           { "Ref" : "DashboardSecurityGroup" },

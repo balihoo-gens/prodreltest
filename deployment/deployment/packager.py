@@ -75,6 +75,8 @@ class Packager:
         shutil.copy(installscript, tmpdir)
 
         if self._debug:
-          shutil.copy(os.path.join(self._rootdir, "deployment/scripts/Dockerfile"), tmpdir)
+          shutil.copy(os.path.join(self._rootdir, "deployment/debug/Dockerfile"), tmpdir)
+          shutil.copy(os.path.join(self._rootdir, "deployment/debug/OS-Dockerfile"), tmpdir)
+          shutil.copy(os.path.join(self._rootdir, "deployment/debug/debug.sh"), tmpdir)
 
         return tmpdir
