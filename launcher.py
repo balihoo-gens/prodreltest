@@ -91,11 +91,9 @@ class Component(object):
     def launch(self, nragent_path=""):
         cwd = os.path.dirname(self._jar if not running_local else os.path.realpath(__file__))
         cmdline = ["java"]
-        if not nragent_path:
-            cmdline.append("-javaagent:" + nragent_path)
-        cmdline.append("-cp")
-        cmdline.append(self._jar)
-        cmdline.append(self._classpath)
+        if nragent_path:
+            cmdline += ["-javaagent:" + nragent_path]
+        cmdline += ["-cp", self._jar, self._classpath]
         self._proc = subprocess.Popen(
             cmdline,
             #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...

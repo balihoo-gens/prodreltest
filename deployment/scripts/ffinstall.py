@@ -58,12 +58,12 @@ class Installer(object):
 
     def run_s3_installer(self, s3bucket, script_name, params=[]):
         s3url = s3bucket + "/" + script_name
-        self._log.info("installing from s3... url=[" + s3url + "] script params=[" + " ".join(params))
+        self._log.info("installing from s3... url=[" + s3url + "] script params=[" + " ".join(params) + "]")
         try:
             if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
                 script = os.path.join(".", script_name)
                 self.make_executable(script)
-                cmd = params.insert(0, script)
+                cmd = script + params
                 self.run_wait_log(cmd)
         except Exception as e:
             self._log.error("Failed to install from s3: %s" % (e.message,))
