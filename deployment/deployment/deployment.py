@@ -25,6 +25,7 @@ class Deployment(object):
         "dasheip",
         "distro",
         "env",
+        "nonewrelic",
         "debug"
     ])
 
@@ -94,6 +95,9 @@ class Deployment(object):
             "DISTRO=%s"       % self._cfg.distro,
             "ENV_NAME=%s"     % self._cfg.env,
         ]
+
+        if self._cfg.nonewrelic:
+            pieces += "NONEWRELIC=true"
 
         #optionally add the dashboard eip option.
         if eip:

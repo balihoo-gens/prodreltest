@@ -42,6 +42,7 @@ def main():
     parser.add_argument('--secret_key', help='the aws secret key used for deployment', default=os.environ["AWS_SECRET_ACCESS_KEY"])
     parser.add_argument('--distro', help='the linux ditribution to use', default='Ubuntu')
     parser.add_argument('--env', help='the deployment environment: dev, stage, etc.', default='dev')
+    parser.add_argument('--nonewrelic', help='disable newrelic installation', action="store_true")
 
     args = parser.parse_args()
 
@@ -65,7 +66,8 @@ def main():
         dasheip=args.dasheip,
         distro=args.distro,
         env=args.env,
-        debug=args.debug
+        nonewrelic=args.nonewrelic,
+        debug=args.debug,
     )
 
     d = Deployment(args.logfile, config)
