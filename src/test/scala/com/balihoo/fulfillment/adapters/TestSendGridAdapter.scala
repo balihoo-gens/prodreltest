@@ -18,36 +18,106 @@ import org.hamcrest.{Description, BaseMatcher}
 class TestSendGridAdapter extends Specification {
   "SendGridAdapter" should {
     "verify that a real subaccount exists" in new adapter {
-      sendGridAdapter.checkAccountExists(realSubaccount) must beTrue
+      sendGridAdapter.checkSubaccountExists(realSubaccountId) must beSome(realSubaccountCredentials.apiUser)
     }
 
     "verify that a test subaccount exists" in new adapter {
-      sendGridAdapter.checkAccountExists(testSubaccount) must beTrue
+      sendGridAdapter.checkSubaccountExists(testSubaccountId) must beSome(testSubaccountUser)
     }
 
     "verify that a bogus subaccount doesn't exist" in new adapter {
-      sendGridAdapter.checkAccountExists(bogusSubaccount) must beFalse
+      sendGridAdapter.checkSubaccountExists(bogusSubaccountId) must beNone
     }
 
     "handle a bad response when checking for a subaccount" in new adapter {
-      sendGridAdapter.checkAccountExists(errorSubaccount) must throwA[SendGridException]
+      sendGridAdapter.checkSubaccountExists(errorSubaccountId1) must throwA[SendGridException]
     }
+    /*
+    "create a real subaccount" in new adapter {
+      sendGridAdapter.createSubaccount(realSubaccount) === realSubaccountCredentials.apiUser
+    }
+
+    "create a test subaccount" in new adapter {
+      sendGridAdapter.createSubaccount(testSubaccount) === testSubaccountUser
+    }*/
+
+    "handle a bad response when creating a subaccount" in new adapter {
+      sendGridAdapter.createSubaccount(errorSubaccount1) must throwA[SendGridException]
+    }
+    /*
+    "handle an error response when creating a subaccount" in new adapter {
+      sendGridAdapter.createSubaccount(errorSubaccount2) must throwA[SendGridException]
+    } */
   }
 }
 
 trait adapter extends Scope with Mockito {
+  val testRootApiUser = "mainAccountUser"
+  val testRootApiKey = "StinkyCheese"
   val testSubaccountUser = "drunkenGorilla"
   val testPasswordSalt = "iodized"
   val v1ApiBaseUrlString = "https://whats.up/doc" // Don't put a slash at the end of this URL, or the tests won't work.
   val v3ApiBaseUrlString = "https://hot.new/api" // Same with this one.
-  val profileGetUrl = new URL(v1ApiBaseUrlString / "profile.get.json")
+  val profileGetUrl = new URL(v3ApiBaseUrlString / "customer.profile.json")
+  val createSubaccountUrl = new URL(v3ApiBaseUrlString / "customer.add.json")
   val realSubaccountParticipantId = "12345"
   val bogusSubaccountParticipantId = "manEatingBanana"
-  val errorSubaccountParticipantId = "indigestion"
-  val realSubaccount = SendGridSubaccount(realSubaccountParticipantId, false)
-  val testSubaccount = SendGridSubaccount(realSubaccountParticipantId, true)
-  val bogusSubaccount = SendGridSubaccount(bogusSubaccountParticipantId, false)
-  val errorSubaccount = SendGridSubaccount(errorSubaccountParticipantId, false)
+  val errorSubaccountParticipantId1 = "indigestion1"
+  val errorSubaccountParticipantId2 = "indigestion2"
+  val realSubaccountId = SendGridSubaccountId(realSubaccountParticipantId, false)
+  val testSubaccountId = SendGridSubaccountId(realSubaccountParticipantId, true)
+  val bogusSubaccountId = SendGridSubaccountId(bogusSubaccountParticipantId, false)
+  val errorSubaccountId1 = SendGridSubaccountId(errorSubaccountParticipantId1, false)
+  val apiCredentials = SendGridCredentials(testRootApiUser, testRootApiKey)
+  val testSubAccountCredentials = apiUserToCredentials(testSubaccountUser)
+  val realSubaccountCredentials = apiUserToCredentials(s"FF$realSubaccountParticipantId")
+  val bogusSubaccountCredentials = apiUserToCredentials(s"FF$bogusSubaccountParticipantId")
+  val errorSubaccount1Credentials = apiUserToCredentials(s"FF$errorSubaccountParticipantId1")
+  val errorSubaccount2Credentials = apiUserToCredentials(s"FF$errorSubaccountParticipantId2")
+
+  val realSubaccount = new SendGridSubaccount(
+    _credentials = realSubaccountCredentials,
+    _firstName = "Boba",
+    _lastName = "Fett",
+    _address = "1138 Imperial Way",
+    _city = "Great Pit of Carkoon",
+    _state = "Tatooine",
+    _zip = "0982340980498",
+    _country = "a galaxy far, far away",
+    _phone = "867-5309")
+
+  val testSubaccount = new SendGridSubaccount(
+    _credentials = testSubAccountCredentials,
+    _firstName = "Test",
+    _lastName = "User",
+    _address = "404 South 8th Street Suite 300",
+    _city = "Boise",
+    _state = "ID",
+    _zip = "83702",
+    _country = "USA",
+    _phone = "2086294254")
+
+  val errorSubaccount1 = new SendGridSubaccount(
+    _credentials = errorSubaccount1Credentials,
+    _firstName = "Test",
+    _lastName = "User",
+    _address = "404 South 8th Street Suite 300",
+    _city = "Boise",
+    _state = "ID",
+    _zip = "83702",
+    _country = "USA",
+    _phone = "2086294254")
+
+  val errorSubaccount2 = new SendGridSubaccount(
+    _credentials = errorSubaccount2Credentials,
+    _firstName = "Test",
+    _lastName = "User",
+    _address = "404 South 8th Street Suite 300",
+    _city = "Boise",
+    _state = "ID",
+    _zip = "83702",
+    _country = "USA",
+    _phone = "2086294254")
 
   val sendGridAdapter = new AbstractSendGridAdapter
     with PropertiesLoaderComponent
@@ -55,26 +125,48 @@ trait adapter extends Scope with Mockito {
     with HTTPAdapterComponent {
 
     val config = mock[PropertiesLoader]
+    config.getString("apiUser") returns testRootApiUser
+    config.getString("apiKey") returns testRootApiKey
     config.getString("testUser") returns testSubaccountUser
     config.getString("passwordSalt") returns testPasswordSalt
     config.getString("v1ApiBaseUrl") returns v1ApiBaseUrlString
     config.getString("v3ApiBaseUrl") returns v3ApiBaseUrlString
 
     val splog = mock[Splogger]
+    
+    val successResponse = buildHttpResponse(200,
+      """
+        |{
+        |  "message": "success"
+        |}
+      """.stripMargin)
+    
+    val permissionErrorResponse = buildHttpResponse(200,
+      """
+        |{
+        |  "error": {
+        |    "code": 401,
+        |    "message": "Permission denied, wrong credentials"
+        |  }
+        |}
+      """.stripMargin)
+    
+    val serverErrorResponse = buildHttpResponse(500, "Server is drunk")
 
+    // ----------------- Begin mock HttpAdapter -------------------- //
     val httpAdapter = mock[HTTPAdapter]
 
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(testSubaccountUser)), any[Seq[(String, String)]]) returns buildHttpResponse(200,
-      """
+    // Profile lookup
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(testSubAccountCredentials)), any[Seq[(String, String)]]) returns buildHttpResponse(200,
+      s"""
         |[
         |  {
-        |    "username": "drunkenGorilla",
-        |    "email": "drunkenGorilla@balihoo.com",
+        |    "username": "$testSubaccountUser",
+        |    "email": "$testSubaccountUser@balihoo.com",
         |    "active": "true",
         |    "first_name": "Test",
         |    "last_name": "User",
-        |    "address": "404 South 8th Street",
-        |    "address2": "Suite 300",
+        |    "address": "404 South 8th Street Suite 300",
         |    "city": "Boise",
         |    "state": "ID",
         |    "zip": "83702",
@@ -85,18 +177,16 @@ trait adapter extends Scope with Mockito {
         |  }
         |]
         |""".stripMargin)
-
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams("FF" + realSubaccountParticipantId)), any[Seq[(String, String)]]) returns buildHttpResponse(200,
-      """
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(realSubaccountCredentials)), any[Seq[(String, String)]]) returns buildHttpResponse(200,
+      s"""
       |[
       |  {
-      |    "username": "FF12345",
-      |    "email": "FF12345@balihoo.com",
+      |    "username": "FF$realSubaccountParticipantId",
+      |    "email": "FF$realSubaccountParticipantId@balihoo.com",
       |    "active": "true",
       |    "first_name": "Test",
       |    "last_name": "User",
-      |    "address": "404 South 8th Street",
-      |    "address2": "Suite 300",
+      |    "address": "404 South 8th Street Suite 300",
       |    "city": "Boise",
       |    "state": "ID",
       |    "zip": "83702",
@@ -107,28 +197,37 @@ trait adapter extends Scope with Mockito {
       |  }
       |]
       |""".stripMargin)
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(bogusSubaccountCredentials)), any[Seq[(String, String)]]) returns permissionErrorResponse
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(errorSubaccount1Credentials)), any[Seq[(String, String)]]) returns serverErrorResponse
 
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams("FF" + bogusSubaccountParticipantId)), any[Seq[(String, String)]]) returns buildHttpResponse(200,
-      """
-        |{
-        |  "error": {
-        |    "code": 401,
-        |    "message": "Permission denied, wrong credentials"
-        |  }
-        |}
-      """.stripMargin)
-
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams("FF" + errorSubaccountParticipantId)), any[Seq[(String, String)]]) returns buildHttpResponse(500, "")
+    // Subaccount creation
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(realSubaccount)), any[Seq[(String, String)]]) returns successResponse
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(testSubaccount)), any[Seq[(String, String)]]) returns successResponse
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(errorSubaccount1)), any[Seq[(String, String)]]) returns permissionErrorResponse
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(errorSubaccount2)), any[Seq[(String, String)]]) returns serverErrorResponse
+    // ----------------- End mock HttpAdapter -------------------- //
 
     /**
-     * Builds a list of query parameters
-     * @param apiUser
+     * Builds a list of query parameters, starting with credentials
+     * @param credentials
      * @param otherParams
      * @return
      */
-    private def buildQueryParams(apiUser: String, otherParams: Seq[(String, Any)] = Seq()): Seq[(String, Any)] = {
-      val apiKey = DigestUtils.sha256Hex(apiUser + testPasswordSalt).substring(0, 16);
-      Seq(("api_user", apiUser), ("api_key", apiKey)) ++ otherParams
+    private def buildQueryParams(credentials: SendGridCredentials, otherParams: Seq[(String, Any)] = Seq()): Seq[(String, Any)] =
+      Seq(("api_user", credentials.apiUser), ("api_key", credentials.apiKey)) ++ otherParams
+
+    /**
+     * Builds a list of query parameters for creating a subaccount
+     * @param subaccount
+     * @return
+     */
+    private def buildQueryParams(subaccount: SendGridSubaccount): Seq[(String, Any)] = {
+      buildQueryParams(apiCredentials,
+        Seq(("username", subaccount.credentials.apiUser), ("password", subaccount.credentials.apiKey),
+          ("confirm_password", subaccount.credentials.apiKey), ("email", subaccount.email),
+          ("first_name", subaccount.firstName), ("last_name", subaccount.lastName), ("address", subaccount.address),
+          ("city", subaccount.city), ("state", subaccount.state), ("zip", subaccount.zip), ("country", subaccount.country),
+          ("phone", subaccount.phone), ("website", "N/A")))
     }
 
     /**
@@ -148,6 +247,17 @@ trait adapter extends Scope with Mockito {
       response
     }
   }
+
+  /**
+   * Creates SendGridCredentials for a give username
+   * @param apiUser
+   * @return
+   */
+  def apiUserToCredentials(apiUser: String): SendGridCredentials = {
+    val apiKey = DigestUtils.sha256Hex(apiUser + testPasswordSalt).substring(0, 16);
+    SendGridCredentials(apiUser, apiKey)
+  }
+
 }
 
 private class QueryParamMatcher(apiUser: String, passwordSalt: String, otherParams: Seq[(String, Any)] = Seq()) extends BaseMatcher[Seq[(String, Any)]] {
