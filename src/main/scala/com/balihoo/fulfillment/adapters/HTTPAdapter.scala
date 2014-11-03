@@ -25,7 +25,13 @@ abstract class AbstractHTTPAdapter {
    * @param params
    * @return
    */
-  protected def appendQueryString(url: URL, params: Seq[(String, Any)]): URL = new URL(params.foldLeft(url.toString)((s, param) => s ? param))
+  protected def appendQueryString(url: URL, params: Seq[(String, Any)]): URL = {
+    // Convert to a URI before the foldLeft operation to avoid a bug that shows up if the URL is in string form.
+    // https://github.com/NET-A-PORTER/scala-uri/issues/72
+    val uri: com.netaporter.uri.Uri = url.toString
+    val resultUri = params.foldLeft(uri)((s, param) => s ? param)
+    new URL(resultUri.toString)
+  }
 }
 
 class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
@@ -35,8 +41,9 @@ class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
 
   override def delete(url: URL, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq()) =
     execute(DELETE(appendQueryString(url, queryParams)).addHeaders(headers.toList))
-  override def get(url: URL, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq()) =
+  override def get(url: URL, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq()) = {
     execute(GET(appendQueryString(url, queryParams)).addHeaders(headers.toList))
+  }
   override def post(url: URL, body: AnyRef, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq()) =
     execute(POST(appendQueryString(url, queryParams)).addHeaders(headers.toList).setBody(body))
   override def put(url: URL, body: AnyRef, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq()) =

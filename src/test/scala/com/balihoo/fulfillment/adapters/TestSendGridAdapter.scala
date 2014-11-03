@@ -32,22 +32,22 @@ class TestSendGridAdapter extends Specification {
     "handle a bad response when checking for a subaccount" in new adapter {
       sendGridAdapter.checkSubaccountExists(errorSubaccountId1) must throwA[SendGridException]
     }
-    /*
+
     "create a real subaccount" in new adapter {
       sendGridAdapter.createSubaccount(realSubaccount) === realSubaccountCredentials.apiUser
     }
 
     "create a test subaccount" in new adapter {
       sendGridAdapter.createSubaccount(testSubaccount) === testSubaccountUser
-    }*/
+    }
 
     "handle a bad response when creating a subaccount" in new adapter {
       sendGridAdapter.createSubaccount(errorSubaccount1) must throwA[SendGridException]
     }
-    /*
+
     "handle an error response when creating a subaccount" in new adapter {
       sendGridAdapter.createSubaccount(errorSubaccount2) must throwA[SendGridException]
-    } */
+    }
   }
 }
 
@@ -58,7 +58,7 @@ trait adapter extends Scope with Mockito {
   val testPasswordSalt = "iodized"
   val v1ApiBaseUrlString = "https://whats.up/doc" // Don't put a slash at the end of this URL, or the tests won't work.
   val v3ApiBaseUrlString = "https://hot.new/api" // Same with this one.
-  val profileGetUrl = new URL(v3ApiBaseUrlString / "customer.profile.json")
+  val profileGetUrl = new URL(v1ApiBaseUrlString / "profile.get.json")
   val createSubaccountUrl = new URL(v3ApiBaseUrlString / "customer.add.json")
   val realSubaccountParticipantId = "12345"
   val bogusSubaccountParticipantId = "manEatingBanana"

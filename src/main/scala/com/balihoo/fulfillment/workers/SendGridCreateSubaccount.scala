@@ -13,7 +13,7 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
       new ActivityParameter("participantId", "string", "The participant ID used to identify the SendGrid subaccount"),
-      new ActivityParameter("useTestAccount", "boolean", "True if the SendGrid test account should be used"),
+      new ActivityParameter("useTestSubaccount", "boolean", "True if the SendGrid test account should be used"),
       new ActivityParameter("firstName", "string", "The first name from the participant's marketing address"),
       new ActivityParameter("lastName", "string", "The last name from the participant's marketing address"),
       new ActivityParameter("address", "string", "The street address from the participant's marketing address"),
