@@ -92,7 +92,7 @@ class Component(object):
         cmdline = ["java"]
         if nragent_path:
             cmdline += ["-javaagent:" + nragent_path]
-        return ["-cp", jar, classpath]
+        return cmdline + ["-cp", jar, classpath]
 
     def is_alive(self):
         if self._proc:
@@ -310,7 +310,10 @@ class Launcher(object):
                     task.complete(str(component.pid))
                 except Exception as e:
                     self._log.error("failed to launch component from swf task: %s" % (e.message,))
-                    task.fail(e.message)
+                    try:
+                        task.fail(e.message)
+                    except Exception as e:
+                        self._log.error("failed to fail swf task: %s" % (e.message,))
 
     def resolve_class_name(self, class_name):
         """ try to find the class_name in the list and return the properly
@@ -333,8 +336,11 @@ class Launcher(object):
             self._log.info("Launched", additional_fields={ "pid" : str(pid), "procname" : name })
             self._components[name] = component
             return component
-        except:
-            self._log.error("Unable to launch", additional_fields={ "jar": self._jar, "procname" : name })
+        except Exception as e:
+            self._log.error(
+                "Unable to launch: %s" % (str(e),),
+                additional_fields={ "jar": self._jar, "procname" : name }
+            )
             return None
         finally:
             self._log.info("Managing %d processes" % (len(self._components),))
@@ -357,10 +363,10 @@ if __name__ == "__main__":
     parser.add_argument('-j','--jarname', help='the path of the jar to run from', default=jar)
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/launcher.log')
     parser.add_argument('-d','--launchdelay', help='minumum number of seconds between launch of the same process', default='600')
-    parser.add_argument('-p','--ping', help='number of seconds after which to ping a quiet process', default='90')
-    parser.add_argument('-q','--quit', help='number of seconds after which to tell a process to quit', default='300')
-    parser.add_argument('-t','--terminate', help='number of seconds after which to terminate (SIGTERM) a quiet process', default='600')
-    parser.add_argument('-k','--kill', help='number of seconds after which to kill (SIGKILL) a quiet process', default='900')
+    parser.add_argument('-p','--ping', help='number of seconds after which to ping a quiet process', default='300')
+    parser.add_argument('-q','--quit', help='number of seconds after which to tell a process to quit', default='600')
+    parser.add_argument('-t','--terminate', help='number of seconds after which to terminate (SIGTERM) a quiet process', default='900')
+    parser.add_argument('-k','--kill', help='number of seconds after which to kill (SIGKILL) a quiet process', default='1200')
     parser.add_argument('-c','--config', help='path to the swf config file', default='config/aws.properties.private')
     parser.add_argument('--newrelicagent', help='path to the newrelic agent to use for monitoring', default="/opt/balihoo/newrelic-agent.jar")
     parser.add_argument('--nonewrelic', help='disable newrelic agent', action="store_true", default=False)

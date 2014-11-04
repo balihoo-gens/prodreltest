@@ -50,14 +50,11 @@ class SwfWorker(swf.ActivityWorker):
             task_list=self.task_list
         )
         try:
-            print("registering %s" % (at.name,))
             at.register()
-            print("%s registered successfully" % (at.name,))
-        except (SWFDomainAlreadyExistsError, SWFTypeAlreadyExistsError):
-            print("%s already registered" % (at.name,))
+        except SWFTypeAlreadyExistsError:
+            pass
 
     def get_task(self):
-        print("polling...")
         task = self.poll()
         if 'activityId' in task:
             return task
