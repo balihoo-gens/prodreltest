@@ -6,7 +6,7 @@ except ImportError:
     #path hackery really just for local testing
     # because these are elsewhere on the EC2 instance
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'deployment'))
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'launcher'))
     from splogger import Splogger
     from launcher import Launcher
 
