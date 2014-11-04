@@ -88,9 +88,12 @@ class Component(object):
             return self._retval is None
         return False
 
-    def launch(self):
+    def launch(self, nragent_path=""):
         cwd = os.path.dirname(self._jar if not running_local else os.path.realpath(__file__))
-        cmdline = ["java", "-cp", self._jar, self._classpath]
+        cmdline = ["java"]
+        if nragent_path:
+            cmdline += ["-javaagent:" + nragent_path]
+        cmdline += ["-cp", self._jar, self._classpath]
         self._proc = subprocess.Popen(
             cmdline,
             #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...
@@ -280,7 +283,7 @@ class Launcher(object):
                 return path
         return classname
 
-    def launch(self, classes=None):
+    def launch(self, classes=None, nragent_path=""):
         if classes == None or len(classes) < 1:
             classes = self.ALL_CLASSES
         else:
@@ -289,7 +292,7 @@ class Launcher(object):
         for path in classes:
             component = Component(self._jar, path)
             name = component.name
-            pid = component.launch()
+            pid = component.launch(nragent_path)
             self._log.info("Launched", additional_fields={ "pid" : str(pid), "procname" : name })
             self._components[name] = component
             time.sleep(5)
@@ -307,11 +310,17 @@ if __name__ == "__main__":
     parser.add_argument('-q','--quit', help='number of seconds after which to tell a process to quit', default='300')
     parser.add_argument('-t','--terminate', help='number of seconds after which to terminate (SIGTERM) a quiet process', default='600')
     parser.add_argument('-k','--kill', help='number of seconds after which to kill (SIGKILL) a quiet process', default='900')
+    parser.add_argument('-nra','--newrelicagent', help='path to the newrelic agent to use for monitoring', default="/opt/balihoo/newrelic-agent.jar")
+    parser.add_argument('-nnr','--nonewrelic', help='disable newrelic agent', action="store_true", default=False)
 
     args = parser.parse_args()
 
+    nragent_path = "/opt/balihoo/newrelic-agent.jar"
+    if not args.nonewrelic and args.newrelicagent:
+      nragent_path = args.newrelicagent
+
     launcher = Launcher(args.jarname, args.logfile)
-    launcher.launch(args.classes)
+    launcher.launch(args.classes, nragent_path)
     timeouts = Timeouts(
         ping=int(args.ping),
         quit=int(args.quit),

@@ -9,10 +9,11 @@ class Packager:
     """ Packages up everything needed for deployment
         into a directory, ready to be sync-ed to S3
     """
-    def __init__(self, rootdir, unattended=False, log_filename="/var/log/balihoo/fulfillment/packup.log"):
+    def __init__(self, rootdir, unattended=False, log_filename="/var/log/balihoo/fulfillment/packup.log",debug=False):
         self._rootdir = rootdir
         self._log = Splogger(log_filename, component="packager")
         self._unattended = unattended
+        self._debug = debug
 
     def info(self,msg):
         print(msg)
@@ -72,5 +73,10 @@ class Packager:
         self.info("gathering install script and deps")
         installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall.py")
         shutil.copy(installscript, tmpdir)
+
+        if self._debug:
+          shutil.copy(os.path.join(self._rootdir, "deployment/debug/Dockerfile"), tmpdir)
+          shutil.copy(os.path.join(self._rootdir, "deployment/debug/OS-Dockerfile"), tmpdir)
+          shutil.copy(os.path.join(self._rootdir, "deployment/debug/debug.sh"), tmpdir)
 
         return tmpdir

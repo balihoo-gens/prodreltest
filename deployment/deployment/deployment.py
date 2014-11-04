@@ -24,7 +24,9 @@ class Deployment(object):
         "veversion",
         "dasheip",
         "distro",
-        "env"
+        "env",
+        "nonewrelic",
+        "debug"
     ])
 
     def __init__(self, log_filename, cfg):
@@ -34,7 +36,7 @@ class Deployment(object):
 
     def package(self, rootdir):
         self.log.debug("packaging " + rootdir)
-        p = Packager(rootdir, log_filename=self._log_filename)
+        p = Packager(rootdir, log_filename=self._log_filename, debug=self._cfg.debug)
         return p.package()
 
     def upload(self, pkgpath):
@@ -91,7 +93,11 @@ class Deployment(object):
             "PYVERSION=%s"    % self._cfg.pyversion,
             "VEVERSION=%s"    % self._cfg.veversion,
             "DISTRO=%s"       % self._cfg.distro,
+            "ENV_NAME=%s"     % self._cfg.env,
         ]
+
+        if self._cfg.nonewrelic:
+            pieces += "NONEWRELIC=true"
 
         #optionally add the dashboard eip option.
         if eip:

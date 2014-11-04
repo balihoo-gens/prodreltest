@@ -39,3 +39,4 @@ atlassian-ide-plugin.xml
 .*.sw?
 
 *.log
+deployments/*

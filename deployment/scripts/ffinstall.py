@@ -56,14 +56,18 @@ class Installer(object):
                        stat.S_IRGRP |                stat.S_IXGRP |
                        stat.S_IROTH |                stat.S_IXOTH )
 
-    def install_splunk(self, s3bucket, script_name):
-        self._log.info("installing splunk from " + s3bucket)
-        s3url = os.path.join(s3bucket, script_name)
-        if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
-            self.make_executable(script_name)
-            script_path = os.path.join(".", script_name)
-            self.run_wait_log([script_path])
-
+    def run_s3_installer(self, s3bucket, script_name, params=[]):
+        s3url = s3bucket + "/" + script_name
+        if not s3url.startswith("s3://"):
+            s3url = "s3://" + s3url
+        self._log.info("installing from s3... url=[" + s3url + "] script params=[" + " ".join(params) + "]")
+        try:
+            if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
+                script = os.path.join(".", script_name)
+                self.make_executable(script)
+                self.run_wait_log([script] + params)
+        except Exception as e:
+            self._log.error("Failed to install from s3: %s" % (e.message,))
 
     def install_package(self, package_name):
         installer = "apt-get" if self._distro in ["Ubuntu", "Debian"] else "yum"
@@ -135,12 +139,22 @@ if __name__ == "__main__":
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
     parser.add_argument('--eip', help='the eip for this instance', default=None)
     parser.add_argument('--distro', help='the linux distribution to use for this instance', default="Ubuntu")
-
+    parser.add_argument('--env', help='the environment to use for this instance', default="dev")
+    parser.add_argument('--nonewrelic', help='do not install newrelic', action='store_true')
     args = parser.parse_args()
 
     installer = Installer(args.logfile, args.distro)
+
+    if not args.nonewrelic:
+        env_name = args.env.lower()
+        newrelics3bucket = "balihoo." + env_name + ".aws-installs/newrelic"
+        newrelicconfig = "fulfillment_" + env_name + ".newrelic.yml"
+        nrsysmond_params = ["--s3-bucket", newrelics3bucket]
+        javaagent_params = ["--s3-bucket", newrelics3bucket, "--config", newrelicconfig]
+        installer.run_s3_installer(newrelics3bucket, "nrsysmond-install.sh", nrsysmond_params)
+        installer.run_s3_installer(newrelics3bucket, "javaagent-install.sh", javaagent_params)
     if not args.nosplunk:
-        installer.install_splunk(args.splunks3bucket, args.splunkscript)
+        installer.run_s3_installer(args.splunks3bucket, args.splunkscript)
     if not args.nophantom:
         installer.install_phantom(args.phantomversion)
     if args.eip:
