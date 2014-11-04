@@ -3,6 +3,7 @@ import sys, os
 import subprocess
 import argparse
 import time
+import re
 
 try:
     import Queue as queue
@@ -39,10 +40,8 @@ class Component(object):
         PINGING = "awaiting ping"
         RESPONSIVE = "responsive"
 
-    def __init__(self, jar, classpath):
+    def __init__(self, jar, classpath, nragent_path=None):
         self._name = classpath.split('.')[-1]
-        self._jar = jar
-        self._classpath = classpath
         self._proc = None
         self._launchtime = 0
         self._last_heard_from = 0
@@ -53,6 +52,8 @@ class Component(object):
         self._stderr_queue = queue.Queue()
         self._stdout_thread = None
         self._stderr_thread = None
+        self._cwd = os.path.dirname(self._jar if not running_local else os.path.realpath(__file__))
+        self._cmdline = self._make_cmdline(jar, classpath, nragent_path)
 
     def __str__(self):
         s = self.name
@@ -87,6 +88,12 @@ class Component(object):
     def waiting(self, value):
         self._waiting = value
 
+    def _make_cmdline(self, jar, classpath, nragent_path):
+        cmdline = ["java"]
+        if nragent_path:
+            cmdline += ["-javaagent:" + nragent_path]
+        return ["-cp", jar, classpath]
+
     def is_alive(self):
         if self._proc:
             self._retval = self._proc.poll()
@@ -94,12 +101,10 @@ class Component(object):
         return False
 
     def launch(self):
-        cwd = os.path.dirname(self._jar if not running_local else os.path.realpath(__file__))
-        cmdline = ["java", "-cp", self._jar, self._classpath]
         self._proc = subprocess.Popen(
-            cmdline,
+            self._cmdline,
             #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...
-            cwd=cwd,
+            cwd=self._cwd,
             #if output is piped, it HAS to be consumed to avoid deadlock due to full pipes
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -188,46 +193,48 @@ class Component(object):
 
 class Launcher(object):
     ALL_CLASSES = {
-        "com.balihoo.fulfillment.deciders.coordinator": True,
-        "com.balihoo.fulfillment.workers.adwords_accountcreator": True,
-        "com.balihoo.fulfillment.workers.adwords_accountlookup": True,
-        "com.balihoo.fulfillment.workers.adwords_adgroupprocessor": True,
-        "com.balihoo.fulfillment.workers.adwords_campaignprocessor": True,
-        "com.balihoo.fulfillment.workers.adwords_imageadprocessor": True,
-        "com.balihoo.fulfillment.workers.adwords_textadprocessor": True,
-        "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
+#        "com.balihoo.fulfillment.deciders.coordinator": True,
+#        "com.balihoo.fulfillment.workers.adwords_accountcreator": True,
+#        "com.balihoo.fulfillment.workers.adwords_accountlookup": True,
+#        "com.balihoo.fulfillment.workers.adwords_adgroupprocessor": True,
+#        "com.balihoo.fulfillment.workers.adwords_campaignprocessor": True,
+#        "com.balihoo.fulfillment.workers.adwords_imageadprocessor": True,
+#        "com.balihoo.fulfillment.workers.adwords_textadprocessor": True,
+#        "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
         "com.balihoo.fulfillment.workers.htmlrenderer": True,
-        "com.balihoo.fulfillment.workers.layoutrenderer": True,
-        "com.balihoo.fulfillment.workers.email_addressverifier": False,
-        "com.balihoo.fulfillment.workers.email_sender": False,
-        "com.balihoo.fulfillment.workers.email_verifiedaddresslister": False,
-        "com.balihoo.fulfillment.workers.facebook_poster": False,
-        "com.balihoo.fulfillment.workers.ftp_uploader": False,
-        "com.balihoo.fulfillment.workers.ftp_uploadvalidator": False,
-        "com.balihoo.fulfillment.workers.rest_client": False,
+        "com.balihoo.fulfillment.workers.layoutrenderer": False,
+#        "com.balihoo.fulfillment.workers.email_addressverifier": False,
+#        "com.balihoo.fulfillment.workers.email_sender": False,
+#        "com.balihoo.fulfillment.workers.email_verifiedaddresslister": False,
+#        "com.balihoo.fulfillment.workers.facebook_poster": False,
+#        "com.balihoo.fulfillment.workers.ftp_uploader": False,
+#        "com.balihoo.fulfillment.workers.ftp_uploadvalidator": False,
+#        "com.balihoo.fulfillment.workers.rest_client": False,
     }
 
-    def __init__(self, jar, logfile, cfgfile):
+    def __init__(self, jar, logfile, cfgfile=None, nragent_path=None):
         self._jar = jar
+        self._nragent_path = nragent_path
         self._components = {}
         self._log = Splogger(logfile)
-        self._cfg_rx = re.compile("^([\w-]+)\s*=\s*([\w-]+)\s*$")
-        self._task_poller = self._make_task_poller()
+        if cfgfile:
+            self._task_poller = self._make_task_poller(cfgfile)
 
-    def _make_task_poller(self):
+    def _make_task_poller(self, cfgfile):
         cfg = self._parse_config(cfgfile)
         w = SwfWorker(region_name=cfg['region'], domain=cfg['domain'], name="launcher", version="1")
         return w.start_async_polling()
 
-    def _parse_config(self):
+    def _parse_config(self, cfgfile):
         cfg = {}
+        rx = re.compile("^([\w-]+)\s*=\s*([\w-]+)\s*$")
         with open(cfgfile) as f:
             for line in f:
-                mo = self._cfg_rx.match(line)
+                mo = rx.match(line)
                 if mo:
                     groups = mo.groups()
                     if len(groups) == 2:
-                        cfg[groups[0]) = groups[1]
+                        cfg[groups[0]] = groups[1]
         return cfg
 
     def log_component(self, component):
@@ -243,8 +250,6 @@ class Launcher(object):
             self._log.error("stderr: %s" % (line,), additional_fields=proc_data)
 
     def monitor(self, seconds_between_launch, timeouts):
-        count = len(self._components)
-        self._log.info("Monitoring %d components" % (count,))
         while True:
             self.handle_tasks()
             for name in self._components:
@@ -294,44 +299,53 @@ class Launcher(object):
             component.responsive()
 
     def handle_tasks(self):
-        task = self.get()
-        if task:
-            try:
-                classname = task.params["classname"]
-                component = self.launch_new_component(classname)
-                task.complete(str(component.pid))
-            except Exception as e:
-                self._log.error("failed to launch component from swf task: %s" % (e.message,))
-                task.fail(e.message())
+        if self._task_poller:
+            task = self._task_poller.get()
+            if task:
+                try:
+                    class_name = str(task.params["classname"])
+                    component = self.launch_new_component(class_name)
+                    if not component:
+                        raise Exception("unable to launch %s" % (class_name,))
+                    task.complete(str(component.pid))
+                except Exception as e:
+                    self._log.error("failed to launch component from swf task: %s" % (e.message,))
+                    task.fail(e.message)
 
-    def resolve_classname(self, classname):
-        """ try to find the classname in the list and return the properly
+    def resolve_class_name(self, class_name):
+        """ try to find the class_name in the list and return the properly
             qualified name if matched. If the name cannot be found, it may
             refer to a main that is not in the default list, so try to run
             it anyway
         """
         for path in self.ALL_CLASSES:
-            if path.find(classname) > -1:
+            if path.find(class_name) > -1:
                 return path
-        return classname
+        return class_name
 
-    def launch_new_component(self, classname):
-        if classname not in self.ALL_CLASSES:
-            classname = self.resolve_classname
-        component = Component(self._jar, classname)
+    def launch_new_component(self, class_name, nragent_path=None):
+        if class_name not in self.ALL_CLASSES:
+            class_name = self.resolve_class_name(class_name)
+        component = Component(self._jar, class_name, nragent_path)
         name = component.name
-        pid = component.launch()
-        self._log.info("Launched", additional_fields={ "pid" : str(pid), "procname" : name })
-        self._components[name] = component
-        return component
+        try:
+            pid = component.launch()
+            self._log.info("Launched", additional_fields={ "pid" : str(pid), "procname" : name })
+            self._components[name] = component
+            return component
+        except:
+            self._log.error("Unable to launch", additional_fields={ "jar": self._jar, "procname" : name })
+            return None
+        finally:
+            self._log.info("Managing %d processes" % (len(self._components),))
 
     def launch(self, classes=None):
         if classes == None or len(classes) < 1:
-            #by default, select all the enabled classes
-            #classes = [c for x in self.ALL_CLASSES if self.ALL_CLASSES[c]]
+            #select all the enabled classes if none are provided
+            classes = [c for c in self.ALL_CLASSES if self.ALL_CLASSES[c]]
 
-        for classname in classes:
-            self.launch_new_component(classname)
+        for class_name in classes:
+            self.launch_new_component(class_name, self._nragent_path)
             time.sleep(5)
 
 if __name__ == "__main__":
@@ -348,10 +362,21 @@ if __name__ == "__main__":
     parser.add_argument('-t','--terminate', help='number of seconds after which to terminate (SIGTERM) a quiet process', default='600')
     parser.add_argument('-k','--kill', help='number of seconds after which to kill (SIGKILL) a quiet process', default='900')
     parser.add_argument('-c','--config', help='path to the swf config file', default='config/aws.properties.private')
+    parser.add_argument('--newrelicagent', help='path to the newrelic agent to use for monitoring', default="/opt/balihoo/newrelic-agent.jar")
+    parser.add_argument('--nonewrelic', help='disable newrelic agent', action="store_true", default=False)
+    parser.add_argument('--noworker', help='disable swf worker', action="store_true", default=False)
 
     args = parser.parse_args()
 
-    launcher = Launcher(args.jarname, args.logfile)
+    nragent_path = None
+    if not args.nonewrelic:
+        nragent_path = args.newrelicagent
+
+    config_file = None
+    if not args.noworker:
+        config_file = args.config
+
+    launcher = Launcher(args.jarname, args.logfile, config_file, nragent_path)
     launcher.launch(args.classes)
     timeouts = Timeouts(
         ping=int(args.ping),
