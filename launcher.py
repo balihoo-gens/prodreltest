@@ -18,9 +18,14 @@ try:
 except ImportError:
     #path hackery really just for local testing
     # because these are elsewhere on the EC2 instance
-    sys.path.append(os.path.join(os.path.dirname(__file__), 'deployment', 'deployment'))
+    deployment_dir = os.path.join(os.path.dirname(__file__), 'deployment')
+    sys.path.append(os.path.join(deployment_dir, 'deployment'))
+    sys.path.append(os.path.join(deployment_dir, 'scripts'))
     from splogger import Splogger
     running_local = True
+
+#imports that depend on path changes if local
+from swfworker import SwfWorker, Task, PollInfo
 
 Timeouts = namedtuple('Timeouts', ["ping", "quit", "terminate", "kill"])
 
@@ -182,30 +187,48 @@ class Component(object):
            pass
 
 class Launcher(object):
-    ALL_CLASSES = [
-        "com.balihoo.fulfillment.deciders.coordinator",
-        "com.balihoo.fulfillment.workers.adwords_accountcreator",
-        "com.balihoo.fulfillment.workers.adwords_accountlookup",
-        "com.balihoo.fulfillment.workers.adwords_adgroupprocessor",
-        "com.balihoo.fulfillment.workers.adwords_campaignprocessor",
-        "com.balihoo.fulfillment.workers.adwords_imageadprocessor",
-        "com.balihoo.fulfillment.workers.adwords_textadprocessor",
-#        "com.balihoo.fulfillment.workers.email_addressverifier",
-#        "com.balihoo.fulfillment.workers.email_sender",
-#        "com.balihoo.fulfillment.workers.email_verifiedaddresslister",
-#        "com.balihoo.fulfillment.workers.facebook_poster",
-#        "com.balihoo.fulfillment.workers.ftp_uploader",
-#        "com.balihoo.fulfillment.workers.ftp_uploadvalidator",
-        "com.balihoo.fulfillment.workers.geonames_timezoneretriever",
-        "com.balihoo.fulfillment.workers.htmlrenderer",
-        "com.balihoo.fulfillment.workers.layoutrenderer",
-#        "com.balihoo.fulfillment.workers.rest_client",
-    ]
+    ALL_CLASSES = {
+        "com.balihoo.fulfillment.deciders.coordinator": True,
+        "com.balihoo.fulfillment.workers.adwords_accountcreator": True,
+        "com.balihoo.fulfillment.workers.adwords_accountlookup": True,
+        "com.balihoo.fulfillment.workers.adwords_adgroupprocessor": True,
+        "com.balihoo.fulfillment.workers.adwords_campaignprocessor": True,
+        "com.balihoo.fulfillment.workers.adwords_imageadprocessor": True,
+        "com.balihoo.fulfillment.workers.adwords_textadprocessor": True,
+        "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
+        "com.balihoo.fulfillment.workers.htmlrenderer": True,
+        "com.balihoo.fulfillment.workers.layoutrenderer": True,
+        "com.balihoo.fulfillment.workers.email_addressverifier": False,
+        "com.balihoo.fulfillment.workers.email_sender": False,
+        "com.balihoo.fulfillment.workers.email_verifiedaddresslister": False,
+        "com.balihoo.fulfillment.workers.facebook_poster": False,
+        "com.balihoo.fulfillment.workers.ftp_uploader": False,
+        "com.balihoo.fulfillment.workers.ftp_uploadvalidator": False,
+        "com.balihoo.fulfillment.workers.rest_client": False,
+    }
 
-    def __init__(self, jar, logfile):
+    def __init__(self, jar, logfile, cfgfile):
         self._jar = jar
         self._components = {}
         self._log = Splogger(logfile)
+        self._cfg_rx = re.compile("^([\w-]+)\s*=\s*([\w-]+)\s*$")
+        self._task_poller = self._make_task_poller()
+
+    def _make_task_poller(self):
+        cfg = self._parse_config(cfgfile)
+        w = SwfWorker(region_name=cfg['region'], domain=cfg['domain'], name="launcher", version="1")
+        return w.start_async_polling()
+
+    def _parse_config(self):
+        cfg = {}
+        with open(cfgfile) as f:
+            for line in f:
+                mo = self._cfg_rx.match(line)
+                if mo:
+                    groups = mo.groups()
+                    if len(groups) == 2:
+                        cfg[groups[0]) = groups[1]
+        return cfg
 
     def log_component(self, component):
         proc_data = {
@@ -223,6 +246,7 @@ class Launcher(object):
         count = len(self._components)
         self._log.info("Monitoring %d components" % (count,))
         while True:
+            self.handle_tasks()
             for name in self._components:
                 component = self._components[name]
                 self.log_component(component)
@@ -269,6 +293,17 @@ class Launcher(object):
         else:
             component.responsive()
 
+    def handle_tasks(self):
+        task = self.get()
+        if task:
+            try:
+                classname = task.params["classname"]
+                component = self.launch_new_component(classname)
+                task.complete(str(component.pid))
+            except Exception as e:
+                self._log.error("failed to launch component from swf task: %s" % (e.message,))
+                task.fail(e.message())
+
     def resolve_classname(self, classname):
         """ try to find the classname in the list and return the properly
             qualified name if matched. If the name cannot be found, it may
@@ -280,18 +315,23 @@ class Launcher(object):
                 return path
         return classname
 
+    def launch_new_component(self, classname):
+        if classname not in self.ALL_CLASSES:
+            classname = self.resolve_classname
+        component = Component(self._jar, classname)
+        name = component.name
+        pid = component.launch()
+        self._log.info("Launched", additional_fields={ "pid" : str(pid), "procname" : name })
+        self._components[name] = component
+        return component
+
     def launch(self, classes=None):
         if classes == None or len(classes) < 1:
-            classes = self.ALL_CLASSES
-        else:
-            classes = [self.resolve_classname(classname) for classname in classes]
+            #by default, select all the enabled classes
+            #classes = [c for x in self.ALL_CLASSES if self.ALL_CLASSES[c]]
 
-        for path in classes:
-            component = Component(self._jar, path)
-            name = component.name
-            pid = component.launch()
-            self._log.info("Launched", additional_fields={ "pid" : str(pid), "procname" : name })
-            self._components[name] = component
+        for classname in classes:
+            self.launch_new_component(classname)
             time.sleep(5)
 
 if __name__ == "__main__":
@@ -307,6 +347,7 @@ if __name__ == "__main__":
     parser.add_argument('-q','--quit', help='number of seconds after which to tell a process to quit', default='300')
     parser.add_argument('-t','--terminate', help='number of seconds after which to terminate (SIGTERM) a quiet process', default='600')
     parser.add_argument('-k','--kill', help='number of seconds after which to kill (SIGKILL) a quiet process', default='900')
+    parser.add_argument('-c','--config', help='path to the swf config file', default='config/aws.properties.private')
 
     args = parser.parse_args()
 

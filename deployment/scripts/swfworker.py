@@ -4,6 +4,7 @@ from boto.swf.exceptions import SWFTypeAlreadyExistsError, SWFDomainAlreadyExist
 from threading import Thread, Event
 from collections import namedtuple
 import time
+import json
 
 try:
     import Queue as queue
@@ -72,7 +73,7 @@ class SwfWorker(swf.ActivityWorker):
                 if 'activityId' in task:
                     token = task['taskToken']
                     q.put(Task(
-                        params=task['input'],
+                        params=json.loads(task['input']),
                         complete=lambda result=None: self.complete(token, result),
                         fail=lambda details=None: self.fail(token, details),
                     ))
