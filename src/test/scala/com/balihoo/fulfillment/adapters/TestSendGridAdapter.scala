@@ -57,9 +57,10 @@ trait adapter extends Scope with Mockito {
   val testSubaccountUser = "drunkenGorilla"
   val testPasswordSalt = "iodized"
   val v1ApiBaseUrlString = "https://whats.up/doc" // Don't put a slash at the end of this URL, or the tests won't work.
+  val v2ApiBaseUrlString = "https://less.old/api" // Same with this one.
   val v3ApiBaseUrlString = "https://hot.new/api" // Same with this one.
   val profileGetUrl = new URL(v1ApiBaseUrlString / "profile.get.json")
-  val createSubaccountUrl = new URL(v3ApiBaseUrlString / "customer.add.json")
+  val createSubaccountUrl = new URL(v2ApiBaseUrlString / "customer.add.json")
   val realSubaccountParticipantId = "12345"
   val bogusSubaccountParticipantId = "manEatingBanana"
   val errorSubaccountParticipantId1 = "indigestion1"
@@ -130,6 +131,7 @@ trait adapter extends Scope with Mockito {
     config.getString("testUser") returns testSubaccountUser
     config.getString("passwordSalt") returns testPasswordSalt
     config.getString("v1ApiBaseUrl") returns v1ApiBaseUrlString
+    config.getString("v2ApiBaseUrl") returns v2ApiBaseUrlString
     config.getString("v3ApiBaseUrl") returns v3ApiBaseUrlString
 
     val splog = mock[Splogger]
@@ -157,7 +159,7 @@ trait adapter extends Scope with Mockito {
     val httpAdapter = mock[HTTPAdapter]
 
     // Profile lookup
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(testSubAccountCredentials)), any[Seq[(String, String)]]) returns buildHttpResponse(200,
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(testSubAccountCredentials)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns buildHttpResponse(200,
       s"""
         |[
         |  {
@@ -177,7 +179,7 @@ trait adapter extends Scope with Mockito {
         |  }
         |]
         |""".stripMargin)
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(realSubaccountCredentials)), any[Seq[(String, String)]]) returns buildHttpResponse(200,
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(realSubaccountCredentials)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns buildHttpResponse(200,
       s"""
       |[
       |  {
@@ -197,14 +199,14 @@ trait adapter extends Scope with Mockito {
       |  }
       |]
       |""".stripMargin)
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(bogusSubaccountCredentials)), any[Seq[(String, String)]]) returns permissionErrorResponse
-    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(errorSubaccount1Credentials)), any[Seq[(String, String)]]) returns serverErrorResponse
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(bogusSubaccountCredentials)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns permissionErrorResponse
+    httpAdapter.get(===(profileGetUrl), ===(buildQueryParams(errorSubaccount1Credentials)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns serverErrorResponse
 
     // Subaccount creation
-    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(realSubaccount)), any[Seq[(String, String)]]) returns successResponse
-    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(testSubaccount)), any[Seq[(String, String)]]) returns successResponse
-    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(errorSubaccount1)), any[Seq[(String, String)]]) returns permissionErrorResponse
-    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(errorSubaccount2)), any[Seq[(String, String)]]) returns serverErrorResponse
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(realSubaccount)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns successResponse
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(testSubaccount)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns successResponse
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(errorSubaccount1)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns permissionErrorResponse
+    httpAdapter.get(===(createSubaccountUrl), ===(buildQueryParams(errorSubaccount2)), any[Seq[(String, String)]], any[Option[(String, String)]]) returns serverErrorResponse
     // ----------------- End mock HttpAdapter -------------------- //
 
     /**
@@ -222,12 +224,11 @@ trait adapter extends Scope with Mockito {
      * @return
      */
     private def buildQueryParams(subaccount: SendGridSubaccount): Seq[(String, Any)] = {
-      buildQueryParams(apiCredentials,
-        Seq(("username", subaccount.credentials.apiUser), ("password", subaccount.credentials.apiKey),
-          ("confirm_password", subaccount.credentials.apiKey), ("email", subaccount.email),
-          ("first_name", subaccount.firstName), ("last_name", subaccount.lastName), ("address", subaccount.address),
-          ("city", subaccount.city), ("state", subaccount.state), ("zip", subaccount.zip), ("country", subaccount.country),
-          ("phone", subaccount.phone), ("website", "N/A")))
+      buildQueryParams(apiCredentials,  Seq(("username", subaccount.credentials.apiUser),
+        ("password", subaccount.credentials.apiKey), ("confirm_password", subaccount.credentials.apiKey),
+        ("email", subaccount.email), ("first_name", subaccount.firstName), ("last_name", subaccount.lastName),
+        ("address", subaccount.address), ("city", subaccount.city), ("state", subaccount.state), ("zip", subaccount.zip),
+        ("country", subaccount.country), ("phone", subaccount.phone), ("website", "N/A")))
     }
 
     /**
