@@ -99,7 +99,7 @@ abstract class AbstractSendGridAdapter {
    */
   def checkSubaccountExists(subaccountId: SendGridSubaccountId): Option[String] = {
     splog.debug("Checking for existence of " + subaccountId)
-    // As of 11/3/14, this doesn't work with the v3 API URL.
+    // As of 11/3/14, this doesn't work with the v2 or v3 API.
     val url = new URL(v1ApiBaseUrl, "profile.get.json")
     val credentials = getCredentials(subaccountId)
     val result = httpAdapter.get(url, queryParams = credentials);
@@ -125,7 +125,7 @@ abstract class AbstractSendGridAdapter {
    */
   def createSubaccount(subaccount: SendGridSubaccount): String = {
     splog.debug("Creating subaccount " + subaccount)
-    // As of 11/3/14, this doesn't work with the v3 API URL.
+    // As of 11/3/14, this doesn't work with the v3 API.
     val url = new URL(v2ApiBaseUrl, "customer.add.json")
     val queryParams = Seq(
       ("api_user", rootApiUser),
