@@ -9,7 +9,12 @@ except ImportError:
 
 
 class Component(object):
+    """ Represents a fulfillment process that can be started from a jar
+    """
+
     class Responsiveness(object):
+        """ Enum container for component responsiveness state
+        """
         NOT_RUNNING = "not running"
         LAUNCHED = "launched"
         KILLING = "being killed"
@@ -19,6 +24,11 @@ class Component(object):
         RESPONSIVE = "responsive"
 
     def __init__(self, jar, classpath, nragent_path=None):
+        """ Component constructor
+        @param jar - string: the full path to the jarfile to run from
+        @param classpath - string: the classpath of the main to run
+        @param nragent_path - string: optional path to a new relic agent
+        """
         self._name = classpath.split('.')[-1]
         self._proc = None
         self._launchtime = 0
@@ -39,6 +49,7 @@ class Component(object):
             self._cwd = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..')
 
     def __str__(self):
+        """ string containing pid, lauch time and responsiveness """
         s = self.name
         if self.pid:
             s += " [%d]" % (self.pid,)
@@ -72,12 +83,14 @@ class Component(object):
         self._waiting = value
 
     def _make_cmdline(self, jar, classpath, nragent_path):
+        """ construct the executable cmd line for this component """
         cmdline = ["java"]
         if nragent_path:
             cmdline += ["-javaagent:" + nragent_path]
         return cmdline + ["-cp", jar, classpath]
 
     def is_alive(self):
+        """ use the availability o"""
         if self._proc:
             self._retval = self._proc.poll()
             return self._retval is None
