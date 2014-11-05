@@ -97,24 +97,30 @@ class Component(object):
         return False
 
     def launch(self):
-        self._proc = subprocess.Popen(
-            self._cmdline,
-            #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...
-            cwd=self._cwd,
-            #if output is piped, it HAS to be consumed to avoid deadlock due to full pipes
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            bufsize = 1
-        )
-        self._launchtime = time.time()
-        self._last_heard_from = self._launchtime
-        self._waiting = False
-        self._pid = self._proc.pid
-        self._responsiveness = Component.Responsiveness.LAUNCHED
+        """ launches a new process for this component """
+        if not self.is_alive():
+            self._proc = subprocess.Popen(
+                self._cmdline,
+                #run in the jar dir, config uses relative paths from cwd. Unless local, then use the dir this script is in...
+                cwd=self._cwd,
+                #if output is piped, it HAS to be consumed to avoid deadlock due to full pipes
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize = 1
+            )
+            self._launchtime = time.time()
+            self._last_heard_from = self._launchtime
+            self._waiting = False
+            self._pid = self._proc.pid
+            self._responsiveness = Component.Responsiveness.LAUNCHED
         return self._pid
 
     def _act_on_proc(self, status, f):
+        """ performs an action on a process
+        @param status Responsiveness value - level of responsiveness to try to get to
+        @param f function - function to execute to help get to the right responsiveness
+        """
         if self._responsiveness != status:
             if self.is_alive():
                 if f: f()
@@ -123,27 +129,38 @@ class Component(object):
         return False
 
     def responsive(self):
+        """ mark this component as responsive """
         return self._act_on_proc(Component.Responsiveness.RESPONSIVE, None)
 
     def ping(self):
+        """ send a ping to the process and update status """
         def f():
             self._proc.stdin.write("ping")
             self._proc.stdin.flush()
         return self._act_on_proc(Component.Responsiveness.PINGING, f)
 
     def quit(self):
+        """ send 'quit' to the process and update status """
         def f():
             self._proc.stdin.write("quit")
             self._proc.stdin.flush()
         return self._act_on_proc(Component.Responsiveness.QUITTING, f)
 
     def terminate(self):
+        """ send SIG_TERM to the process and update status """
         return self._act_on_proc(Component.Responsiveness.TERMINATING, self._proc.terminate)
 
     def kill(self):
+        """ send SIG_KILL to the process and update status """
         return self._act_on_proc(Component.Responsiveness.KILLING, self._proc.kill)
 
     def _setup_out(self, t, q, s):
+        """ create a new thread to read stdout from the process
+        read asynchronously into a queue
+        @param t Thread: thread to check
+        @param q Queue: queue to write to
+        @param s stream: io stream to read
+        """
         if not (t and t.is_alive()):
             if self.is_alive():
                 def reader():
@@ -158,6 +175,7 @@ class Component(object):
         return None
 
     def stdout(self):
+        """ generator to read from stdout """
         t = self._setup_out(
             self._stdout_thread,
             self._stdout_queue,
@@ -173,6 +191,7 @@ class Component(object):
            pass
 
     def stderr(self):
+        """ generator to read from stderr """
         t = self._setup_out(
             self._stderr_thread,
             self._stderr_queue,

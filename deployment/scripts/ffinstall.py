@@ -22,9 +22,13 @@ class Installer(object):
         self._log = Splogger(logfile)
         self._distro = distro
 
-    def launch_app(self, classes):
+    def launch_app(self, classes, noworker):
         thisdir = os.path.dirname(os.path.realpath(__file__))
-        proc = subprocess.Popen(["python", "launcher.py"] + classes, cwd=thisdir)
+        cmdline = ["python", "launcher.py"]
+        if noworker:
+            cmdline += ["--noworker"]
+        cmdline += classes
+        proc = subprocess.Popen(cmdline, cwd=thisdir)
         self._log.info("started launcher process with pid %d" % (proc.pid,))
 
     def run_wait_log(self, cmd, cwd=None, raise_on_err=False):
@@ -137,6 +141,7 @@ if __name__ == "__main__":
     parser.add_argument('--distro', help='the linux distribution to use for this instance', default="Ubuntu")
     parser.add_argument('--env', help='the environment to use for this instance', default="dev")
     parser.add_argument('--nolaunch', help='do not launch the app', action='store_true')
+    parser.add_argument('--noworker', help='do not launch with a swfworker', action='store_true')
     #phantom
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
     parser.add_argument('--nophantom', help='do not install phantomjs', action='store_true')
@@ -165,4 +170,4 @@ if __name__ == "__main__":
     if args.eip:
         installer.associate_eip(args.eip)
     if not args.nolaunch:
-        installer.launch_app(args.classes)
+        installer.launch_app(args.classes, args.noworker)
