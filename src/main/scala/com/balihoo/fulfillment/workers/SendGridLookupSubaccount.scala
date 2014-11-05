@@ -13,17 +13,20 @@ abstract class AbstractSendGridLookupSubaccount extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
       new ActivityParameter("participantId", "string", "The participant ID used to identify the SendGrid subaccount"),
-      new ActivityParameter("useTestAccount", "boolean", "True if the SendGrid test account should be used")
-    ), new ActivityResult("boolean", "True if the SendGrid subaccount exists"))
+      new ActivityParameter("useTestSubaccount", "boolean", "True if the SendGrid test account should be used")
+    ), new ActivityResult("string", "The subaccount ID"))
   }
 
   override def handleTask(params: ActivityParameters) = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
-      val participantId = params("participantId")
-      val useTestSubaccount = params("useTestSubaccount").toBoolean
-      sendGridAdapter.checkAccountExists(SendGridSubaccount(participantId, useTestSubaccount)).toString
+      val subaccountId = SendGridSubaccountId(params("participantId"), params("useTestSubaccount").toBoolean)
+      val apiUser = sendGridAdapter.checkSubaccountExists(subaccountId)
+      apiUser match {
+        case Some(s) => s
+        case _ => throw new SendGridException("Subaccount not found.") // Throw an exception to cause the task to fail.
+      }
     }
   }
 }
@@ -39,6 +42,6 @@ class SendGridLookupSubaccount(override val _cfg: PropertiesLoader, override val
 
 object sendgrid_lookupsubaccount extends FulfillmentWorkerApp {
   override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
-    new FacebookPoster(cfg, splog)
+    new SendGridLookupSubaccount(cfg, splog)
   }
 }
