@@ -20,7 +20,7 @@ import java.net.URLEncoder
 @RunWith(classOf[JUnitRunner])
 class TestFulfillmentCoordinator extends Specification with Mockito
 {
-  def generateSections(json:String) = {
+  def generateFulfillment(json:String) = {
     var events: mutable.MutableList[HistoryEvent] = mutable.MutableList[HistoryEvent]()
 
     val event:HistoryEvent = new HistoryEvent
@@ -35,134 +35,6 @@ class TestFulfillmentCoordinator extends Specification with Mockito
     events += event
 
     new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
-  }
-
-  "FulfillmentSection" should {
-    "  be initialized without error" in {
-
-      val json = Json.parse( """{
-         "cake" : {
-         "action" : { "name" : "bake",
-                      "version" : "1",
-                      "failure" : {
-                          "max" : "3",
-                          "delay" : "100"
-                      },
-                      "cancelation" : {
-                          "max" : "7",
-                          "delay" : "4535"
-                      },
-                      "timeout" : {
-                          "max" : "14",
-                          "delay" : "0"
-                      },
-                      "startToCloseTimeout" : "tuna sandwich"
-                    },
-         "params" : { "cake_batter" : [ "batter" ],
-				              "cake_pan" : "9\" x 11\"",
-				              "bake_time" : "40" },
-         "prereqs" : ["heat_oven"],
-         "status" : "READY",
-         "waitUntil" : "2093-07-04T16:04:00-06",
-         "totally unhandled" : "stuff"
-	      }}""")
-
-
-      val jso = json.as[JsObject].value("cake").as[JsObject]
-      val section = new FulfillmentSection("test section", jso, DateTime.now)
-
-      section.name mustEqual "test section"
-      section.prereqs(0) mustEqual "heat_oven"
-      section.action.get.getName mustEqual "bake"
-      section.action.get.getVersion mustEqual "1"
-      section.failureParams.maxRetries mustEqual 3
-      section.failureParams.delaySeconds mustEqual 100
-      section.cancelationParams.maxRetries mustEqual 7
-      section.cancelationParams.delaySeconds mustEqual 4535
-      section.timeoutParams.maxRetries mustEqual 14
-      section.timeoutParams.delaySeconds mustEqual 0
-
-      section.scheduledCount mustEqual 0
-      section.failedCount mustEqual 0
-      section.timedoutCount mustEqual 0
-      section.canceledCount mustEqual 0
-      section.startedCount mustEqual 0
-
-      section.startToCloseTimeout mustEqual Some("tuna sandwich")
-      section.waitUntil.get mustEqual new DateTime("2093-07-04T16:04:00-06")
-
-      section.params("cake_batter").asInstanceOf[SectionReferences].sections(0).name mustEqual "batter"
-      section.params("cake_pan").asInstanceOf[String] mustEqual "9\" x 11\""
-      section.params("bake_time").asInstanceOf[String] mustEqual "40"
-
-      section.status mustEqual SectionStatus.withName("READY")
-
-      section.timeline.events(0).message mustEqual "totally unhandled : \"stuff\""
-    }
-
-    "  handle status changes" in {
-
-      val json = Json.parse( """{
-         "action" : { "name" : "awesome",
-                      "version" : "a zillion",
-                      "failure" : {
-                          "max" : "1",
-                          "delay" : "100"
-                      },
-                      "cancelation" : {
-                          "max" : "2",
-                          "delay" : "4535"
-                      },
-                      "timeout" : {
-                          "max" : "3",
-                          "delay" : "0"
-                      },
-                      "startToCloseTimeout" : "tuna sandwich"
-                    },
-         "params" : { "param1" : "1",
-				              "param2" : "2"},
-         "prereqs" : ["heat_oven"],
-         "status" : "READY"
-	      }""").as[JsObject]
-
-      val section = new FulfillmentSection("sectionName", json, DateTime.now)
-
-      section.status mustEqual SectionStatus.READY
-
-      section.startedCount mustEqual 0
-      section.setStarted(DateTime.now)
-
-      section.status mustEqual SectionStatus.STARTED
-
-      section.startedCount mustEqual 1
-
-      section.setStarted(DateTime.now)
-      section.setStarted(DateTime.now)
-
-      section.startedCount mustEqual 3
-      section.status mustEqual SectionStatus.STARTED
-
-      section.setScheduled(DateTime.now)
-      section.status mustEqual SectionStatus.SCHEDULED
-
-      section.scheduledCount mustEqual 1
-      section.startedCount mustEqual 3 // STILL 3
-
-      section.setCompleted("awesome results", DateTime.now)
-
-      section.value mustEqual "awesome results"
-      section.scheduledCount mustEqual 1 // STILL 1
-      section.startedCount mustEqual 3 // STILL 3
-      section.status mustEqual SectionStatus.COMPLETE
-
-      section.setFailed("reasons", "terrible reasons", DateTime.now)
-      section.status mustEqual SectionStatus.FAILED
-      section.timeline.events.last.message mustEqual "Failed because:reasons terrible reasons"
-
-      section.setFailed("reasons", "more terrible reasons", DateTime.now)
-      section.status mustEqual SectionStatus.TERMINAL
-      section.timeline.events.last.message mustEqual "Failed too many times! (2 > 1)"
-    }
   }
 
   "SectionMap" should {
@@ -368,7 +240,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       val sections = new Fulfillment(SWFHistoryConvertor.historyToSWFEvents(mutableSeqAsJavaList(events)))
       val generator = new DecisionGenerator(sections)
-      generator.makeDecisions(false)
+      generator.makeDecisions()
     }
 
     "  schedule work when there's no waitUntil" in {
@@ -392,269 +264,104 @@ class TestFulfillmentCoordinator extends Specification with Mockito
     }
   }
 
-  "FulfillmentOperators" should {
+  "Section References" should {
+    "  initialize properly" in {
 
-    "  be upset about missing 'input'" in {
-      val sections = generateSections("""{
-         "neat" : {
-            "action" : "MD5",
-            "params" : {},
-            "prereqs" : [],
-            "status" : "READY"
-	          }
-	        }""")
-
-      val generator = new DecisionGenerator(sections)
-      val decisions = generator.makeDecisions()
-      val attribs = decisions(0).getRecordMarkerDecisionAttributes
-      attribs mustNotEqual null
-
-      val wrongattribs = decisions(0).getCompleteWorkflowExecutionDecisionAttributes
-      wrongattribs mustEqual null
-
-      attribs.getMarkerName mustEqual "OperatorResult##neat##FAILURE"
-      attribs.getDetails mustEqual "input parameter 'input' is REQUIRED!"
-    }
-
-    "  evaluate MD5 properly and not freak over an undeclared param" in {
-      val sections = generateSections("""{
-         "neat" : {
-            "action" : "MD5",
-            "params" : { "input" : "some trash string not related to tuna at all", "fig" : "newton" },
-            "prereqs" : [],
-            "status" : "READY"
-	          }
-	        }""")
-
-      val generator = new DecisionGenerator(sections)
-      val decisions = generator.makeDecisions()
-      val attribs = decisions(0).getRecordMarkerDecisionAttributes
-      attribs mustNotEqual null
-
-      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
-      attribs.getDetails mustEqual "E546FF3E618B9579D3D039C11A2FFFCA"
-
-      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
-
-    }
-
-    "  format strings with StringFormat" in {
-      val sections = generateSections("""{
-         "neat" : {
-            "action" : "StringFormat",
-            "params" : { "format" : "The {subject} eats {food} when {time}",
-                         "subject" : "GIANT",
-                         "food" : "tuna flesh",
-                         "time" : "whenever the hail he wants..!!",
-                         "pointless" : "this won't get used" },
-            "prereqs" : [],
-            "status" : "READY"
-	          }
-	        }""")
-
-      val generator = new DecisionGenerator(sections)
-      val decisions = generator.makeDecisions()
-      val attribs = decisions(0).getRecordMarkerDecisionAttributes
-      attribs mustNotEqual null
-
-      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
-      attribs.getDetails mustEqual "The GIANT eats tuna flesh when whenever the hail he wants..!!"
-
-      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
-
-    }
-
-    "  reference results from other sections properly" in {
-      val sections = generateSections("""{
-         "neat" : {
-            "action" : "StringFormat",
-            "params" : { "format" : "The movie {movie} is {detailedreview}",
-                         "movie" : ["taen"],
-                         "detailedreview" : "alright. I mean it's oK I guess.",
-                         "pointless" : "this won't get used" },
-            "prereqs" : [],
-            "status" : "READY"
-	          },
-          "taen" : {
-            "value" : "ANIMAL HOUSE",
-            "status" : "COMPLETE"
-          }
-	        }""")
-
-      val generator = new DecisionGenerator(sections)
-      val decisions = generator.makeDecisions()
-      val attribs = decisions(0).getRecordMarkerDecisionAttributes
-      attribs mustNotEqual null
-
-      attribs.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
-      attribs.getDetails mustEqual "The movie ANIMAL HOUSE is alright. I mean it's oK I guess."
-
-      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
-
-    }
-
-    "  multiple operators should evaluate in series" in {
-      val sections = generateSections("""{
-         "neat" : {
-            "action" : "StringFormat",
-            "params" : { "format" : "The movie {movie} is {detailedreview}",
-                         "movie" : ["taen"],
-                         "detailedreview" : "alright. I mean it's oK I guess.",
-                         "pointless" : "this won't get used" },
-            "prereqs" : [],
-            "status" : "READY"
-	          },
-          "taen" : {
-            "action" : "StringFormat",
-            "params" : { "format" : "{firstword} {secondword}",
-                         "firstword" : "Under",
-                         "secondword" : ["seagal got plump"],
-                         "pointless" : "this won't get used" },
-            "prereqs" : [],
-            "status" : "READY"
-          },
-          "seagal got plump" : {
-            "value" : "SIEGE",
-            "status" : "COMPLETE"
-          }
-	        }""")
-
-      val generator = new DecisionGenerator(sections)
-      val decisions = generator.makeDecisions()
-      val attribs0 = decisions(0).getRecordMarkerDecisionAttributes
-      attribs0 mustNotEqual null
-
-      attribs0.getMarkerName mustEqual "OperatorResult##taen##SUCCESS"
-      attribs0.getDetails mustEqual "Under SIEGE"
-
-      val attribs1 = decisions(1).getRecordMarkerDecisionAttributes
-      attribs1 mustNotEqual null
-
-      attribs1.getMarkerName mustEqual "OperatorResult##neat##SUCCESS"
-      attribs1.getDetails mustEqual "The movie Under SIEGE is alright. I mean it's oK I guess."
-
-      decisions(2).getDecisionType mustEqual "CompleteWorkflowExecution"
-    }
-
-
-    "  URL Encode strings using URLEncode" in {
-      val input = "if ((!flip && flap->flop()) || (*deref::ptr)[7]) { return ~(&address); }"
-      val sections = generateSections(
-      s"""{
-        "HumanFoot": {
-            "action": "URLEncode",
-            "params": {
-                "input": "$input"
-            },
-            "status" : "READY"
-        }
-      }"""
-
-      )
-      val generator = new DecisionGenerator(sections)
-      val decisions = generator.makeDecisions()
-      val attribs0 = decisions(0).getRecordMarkerDecisionAttributes
-      attribs0 mustNotEqual null
-      attribs0.getMarkerName mustEqual "OperatorResult##HumanFoot##SUCCESS"
-      attribs0.getDetails mustEqual URLEncoder.encode(input, "UTF-8")
-      decisions(1).getDecisionType mustEqual "CompleteWorkflowExecution"
-    }
-
-    "  URL Encode strings from a format" in {
-      val soulfood = Map(
-        "grits" -> "4# of grits",
-        "fish" -> "a rusty bucket of F*I*S*H heads",
-        //"door" -> "served on a &*^$#W(*&)@#^*&^ cellar d00r!", //Failed because:FAILURE Illegal group reference
-        "door" -> "served on a &*^#W(*&)@#^*&^ cellar d00r!",
-        "gravy" -> "with gravy. period."
-      )
-      val format = "\"{" + soulfood.keys.mkString("}, {") + "}\""
-      val items = for { (k,v) <- soulfood } yield s""" "$k" : "$v" """
       val input = s"""{
         "HumanFoot": {
-            "action": "URLEncode",
+            "action": { "name" : "none", "version" : "none"},
             "params": {
-                "input": ["SoulFood"]
+                "one": "stuff",
+                "two": ["cellar door", "stork ankles"]
             },
-            "status" : "READY"
+            "status" : "COMPLETE",
+            "value" : "whatever"
         },
-        "SoulFood": {
-            "action" : "StringFormat",
-            "params" : { "format" : $format,
-                         ${items.mkString(",\n")}
+        "CellarDoor": {
+            "action": { "name" : "CellarDoorAction", "version" : "555"},
+            "params": {
+                "one": "stuff",
+                "two": {"<(section)>" : "HumanFoot"}
             },
             "status" : "READY"
         }
       }"""
-      val sections = generateSections(input)
-      val generator = new DecisionGenerator(sections)
-      val decisions = generator.makeDecisions()
-      val attribs0 = decisions(0).getRecordMarkerDecisionAttributes
-      attribs0 mustNotEqual null
 
-      val soulcat = soulfood.values.mkString(", ")
-      attribs0.getMarkerName mustEqual "OperatorResult##SoulFood##SUCCESS"
-      attribs0.getDetails mustEqual soulcat
+      val sections = generateFulfillment(input)
 
-      val attribs1 = decisions(1).getRecordMarkerDecisionAttributes
-      attribs1 mustNotEqual null
+      val dg = new DecisionGenerator(sections)
+      val decisions = dg.makeDecisions()
 
-      attribs1.getMarkerName mustEqual "OperatorResult##HumanFoot##SUCCESS"
-      attribs1.getDetails mustEqual URLEncoder.encode(soulcat, "UTF-8")
-
-      decisions(2).getDecisionType mustEqual "CompleteWorkflowExecution"
-    }
-  }
-
-  "SectionReference" should {
-    "  return simple values" in {
-      val result = Json.parse("""{
-            "value" : "donkey teeth"
-	        }""")
-
-      val reference = new SectionReference("none")
-
-      ReferencePath.isJsonPath("stuff") mustEqual false
-      ReferencePath.isJsonPath("stuff/tea") mustEqual true
-      ReferencePath.isJsonPath("stuff[0]/") mustEqual true
-      ReferencePath.isJsonPath("stuff/monkey[9]") mustEqual true
-      ReferencePath.isJsonPath("stuff/monkey[9]/cheese") mustEqual true
-
-      reference.section = Some(new FulfillmentSection("some section", result.as[JsObject], DateTime.now))
-
-      reference.getValue mustEqual "donkey teeth"
+      decisions.size mustEqual 1
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
+      decisions(0).getScheduleActivityTaskDecisionAttributes.getInput.contains("whatever")
+      decisions(0).getScheduleActivityTaskDecisionAttributes.getActivityType.getName mustEqual "CellarDoorAction"
 
     }
 
-    "  parse paths properly" in {
-      val reference = new SectionReference("none/first/second[3]/fourth")
+    "  promote contingency to ready" in {
 
-      reference.name mustEqual "none"
-      reference.path.get.components(0).key.get mustEqual "first"
-      reference.path.get.components(1).key.get mustEqual "second"
-      reference.path.get.components(2).index.get mustEqual 3
-      reference.path.get.components(3).key.get mustEqual "fourth"
+      val input = s"""{
+        "HumanFoot": {
+            "action": { "name" : "FootAction", "version" : "777"},
+            "params": {
+                "one": "stuff",
+                "two": ["cellar door", "stork ankles"]
+            },
+            "status" : "CONTINGENT"
+        },
+        "CellarDoor": {
+            "action": { "name" : "CellarDoorAction", "version" : "555"},
+            "params": {
+                "one": "stuff",
+                "two": {"<(section)>" : "HumanFoot"}
+            },
+            "status" : "READY"
+        }
+      }"""
+
+      val sections = generateFulfillment(input)
+      val dg = new DecisionGenerator(sections)
+      val decisions = dg.makeDecisions()
+
+      decisions.size mustEqual 1
+      decisions(0).getDecisionType mustEqual DecisionType.ScheduleActivityTask.toString
+      decisions(0).getScheduleActivityTaskDecisionAttributes.getInput.contains("stork ankles")
+      decisions(0).getScheduleActivityTaskDecisionAttributes.getActivityType.getName mustEqual "FootAction"
 
     }
 
-    "  return json value from jsobject" in {
+    "  recognize impossibility in referenced section" in {
 
-      val result = """{
-            "first" : { "second" : ["u", "o'brien", "y", { "fourth" : "donkey tooth" } ] }
-	        }"""
-      val sectionJson = Json.parse(s"""{}""")
+      val input = s"""{
+        "HumanFoot": {
+            "action": { "name" : "FootAction", "version" : "777"},
+            "params": {
+                "one": "stuff",
+                "two": ["cellar door", "stork ankles"]
+            },
+            "status" : "TERMINAL"
+        },
+        "CellarDoor": {
+            "action": { "name" : "CellarDoorAction", "version" : "555"},
+            "params": {
+                "one": "stuff",
+                "two": {"<(section)>" : "HumanFoot"}
+            },
+            "status" : "READY"
+        }
+      }"""
 
-      val reference = new SectionReference("none/first/second[3]/fourth")
-      reference.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
-      reference.section.get.value = result
+      val sections = generateFulfillment(input)
+      val dg = new DecisionGenerator(sections)
+      val decisions = dg.makeDecisions()
 
-      reference.getValue mustEqual "donkey tooth"
+      decisions.size mustEqual 1
+      decisions(0).getDecisionType mustEqual DecisionType.FailWorkflowExecution.toString
+      decisions(0).getFailWorkflowExecutionDecisionAttributes.getReason mustEqual "There are failed sections!"
+      decisions(0).getFailWorkflowExecutionDecisionAttributes.getDetails.trim mustEqual """Section CellarDoor is IMPOSSIBLE!
+	Section HumanFoot is TERMINAL!"""
 
-      val reference2 = new SectionReference("none/first/second/[1]")
-      reference2.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
-      reference2.section.get.value = result
-
-      reference2.getValue mustEqual "o'brien"
     }
   }
 
@@ -672,7 +379,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
             "status" : "READY"
         }
       }"""
-      val sections = generateSections(input)
+      val sections = generateFulfillment(input)
 
       true
     }

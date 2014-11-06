@@ -938,3 +938,14 @@ footer .container-fluid {
     color:black;
 }
 
+.paramJson {
+    margin:2px 2px 2px 20px;
+    padding:3px;
+    border-bottom-right-radius: 4px;
+    border-top-left-radius: 4px;
+}
+
+.paramJson:hover {
+    background-color: rgba(247, 149, 50, .2);
+}
+
