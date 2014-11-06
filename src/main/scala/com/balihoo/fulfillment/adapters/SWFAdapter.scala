@@ -4,9 +4,11 @@ import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.services.simpleworkflow.model._
 import com.amazonaws.handlers.AsyncHandler
 
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.{Future, Promise, ExecutionContext}
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util._
+
+import java.util.concurrent.Executors
 
 //for the cake pattern dependency injection
 trait SWFAdapterComponent {
@@ -29,7 +31,11 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   private lazy val _workflowTaskListName = new SWFName(workflowName+workflowVersion)
 
   //longpoll by default, unless config says "longpoll=false"
-  protected val _longPoll = config.getOrElse("longpoll",default=true)
+  protected val _longPoll = config.getOrElse("longpoll", default=true)
+  //use 10 threads in the threadpool by default, unless the config says otherwise
+  protected val _threadcount = config.getOrElse("threadcount", default=10)
+
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(_threadcount))
 
   def taskListName = _taskListName
   def name = _name
@@ -54,6 +60,7 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
 
     object activityPollHandler extends AsyncHandler[PollForActivityTaskRequest, ActivityTask] {
       override def onSuccess(req:PollForActivityTaskRequest, task:ActivityTask) {
+        splog.debug("poll returned")
         if (task != null && task.getTaskToken != null) {
           taskPromise.success(Some(task))
         } else {
@@ -61,12 +68,14 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
         }
       }
       override def onError(e:Exception) {
+        splog.debug("poll failed")
         taskPromise.failure(e)
       }
     }
 
     object activityCountHandler extends AsyncHandler[CountPendingActivityTasksRequest, PendingTaskCount] {
       override def onSuccess(req:CountPendingActivityTasksRequest, count:PendingTaskCount) {
+        splog.debug("count poll returned")
         if (count.getCount > 0) {
           client.pollForActivityTaskAsync(taskReq, activityPollHandler)
         } else {
@@ -75,13 +84,16 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
         }
       }
       override def onError(e:Exception) {
+        splog.debug("count poll failed")
         taskPromise.failure(e)
       }
     }
 
     if (_longPoll) {
+      splog.debug("using longpoll")
       client.pollForActivityTaskAsync(taskReq, activityPollHandler)
     } else {
+      splog.debug("checking queue count")
       client.countPendingActivityTasksAsync(countReq, activityCountHandler)
     }
 
@@ -141,7 +153,6 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
       case ure:UnknownResourceException =>
         splog.warning(s"The workflow type '${wt.getName}:${wt.getVersion}' doesn't exist!")
         if(autoRegister) { registerWorkflowType() }
-
     }
   }
 

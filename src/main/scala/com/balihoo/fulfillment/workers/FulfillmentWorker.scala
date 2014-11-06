@@ -6,13 +6,12 @@ import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
 import scala.util.{Success, Failure}
-import scala.concurrent.{Future, Await, Promise}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Future, Await, Promise, ExecutionContext}
 import scala.concurrent.duration._
 
 //java imports
 import java.util.UUID.randomUUID
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{TimeUnit, Executors}
 
 //aws imports
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig.TableNameOverride
@@ -34,6 +33,8 @@ import com.balihoo.fulfillment.util._
 
 abstract class FulfillmentWorker {
   this: LoggingWorkflowAdapter =>
+
+  implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
 
   val instanceId = randomUUID().toString
 
