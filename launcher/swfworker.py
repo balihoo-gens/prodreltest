@@ -11,11 +11,14 @@ try:
 except ImportError:
     import queue
 
-
 class UnknownRegionException(Exception):
+    """ explicit exception (over keyerror) when a region cannot be resolved """
     pass
 
+""" container class for access to async swf task polling """
 PollInfo = namedtuple('PollInfo', ['thread', 'queue', 'event', 'stop', 'get'])
+
+""" wrapper for a SWF task. Attaches complete and fail functions """
 Task = namedtuple('Task', ['params', 'complete', 'fail'])
 
 class SwfWorker(swf.ActivityWorker):

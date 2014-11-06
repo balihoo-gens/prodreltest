@@ -77,8 +77,14 @@ class Installer(object):
         installer = "apt-get" if self._distro in ["Ubuntu", "Debian"] else "yum"
         self.run_wait_log([installer, "install", "-y", package_name], raise_on_err=True)
 
+    def install_phantom(self, version):
+        if version == "custom":
+            self._install_phantom_custom()
+        else:
+            self._install_phantom_official(version)
+
     #custom phantom build
-    def install_phantom_custom(self):
+    def _install_phantom_custom(self):
         s3bucket = "s3://balihoo.dev.fulfillment"
         s3url = os.path.join(s3bucket, "phantomjs/builtfromsource/master/bin", "phantomjs")
         try:
@@ -89,7 +95,7 @@ class Installer(object):
         except Exception as e:
             self._log.error("Failed to install phantom: %s" % (e.message,))
 
-    def install_phantom(self, version):
+    def _install_phantom_official(self, version):
         self._log.info("installing phantomjs binary version " + version)
 
         fullname = "phantomjs-%s-linux-x86_64" % (version,)
@@ -133,7 +139,7 @@ if __name__ == "__main__":
     splunk_script = "installSplunkForwarder.sh"
     newrelic_s3bucket = "balihoo.dev.aws-installs/newrelic"
     newrelic_config = "fulfillment_dev.newrelic.yml"
-    phantomversion = "1.9.8"
+    phantomversion = "custom"
 
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')

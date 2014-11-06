@@ -69,8 +69,8 @@ class Deployment(object):
             "MaxInstances"          : cfg.max_instances,
             "AccessIPMask"          : cfg.access_ip_mask,
             "WebPort"               : cfg.web_port,
-            "WorkerScript"          : self.gen_script(script_file, s3dir, None, ""),
-            "DashboardScript"       : self.gen_script(script_file, s3dir, self._cfg.dasheip, dash_class),
+            "WorkerScript"          : self.gen_script(script_file, s3dir, None, False, ""),
+            "DashboardScript"       : self.gen_script(script_file, s3dir, self._cfg.dasheip, True, dash_class),
             "LinuxDistro"           : cfg.distro,
             "Environment"           : cfg.env,
         }
@@ -79,7 +79,7 @@ class Deployment(object):
         stackname = "fulfillment%d" % (int(time.time()),)
         return c.create_stack(stackname, json.dumps(template_data), parameters)
 
-    def gen_script(self, script_file, s3dir, eip, classes):
+    def gen_script(self, script_file, s3dir, eip, noworker, classes):
         pieces = [
             "#!/bin/bash",
             "set -e",
@@ -97,11 +97,15 @@ class Deployment(object):
         ]
 
         if self._cfg.nonewrelic:
-            pieces += "NONEWRELIC=true"
+            pieces.append('NONEWRELIC="--nonewrelic"')
 
         #optionally add the dashboard eip option.
         if eip:
             pieces.append('EIPOPT="--eip %s"' % eip)
+
+        #dashboard should not have a swf worker to launch addl processes
+        if noworker:
+            pieces.append('NOWORKER="--noworker"')
 
         with open(script_file) as f:
             pieces.append(f.read())
