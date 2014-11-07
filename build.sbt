@@ -48,7 +48,8 @@ libraryDependencies ++= Seq(
   "com.stackmob" %% "newman" % "1.3.5",
   ("com.balihoo.socialmedia" % "facebook-client" % "14.19-SNAPSHOT").exclude("ch.qos.logback", "logback-classic"),
   "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test,
-  "com.netaporter" %% "scala-uri" % "0.4.3"
+  "com.netaporter" %% "scala-uri" % "0.4.3",
+  "javax.ws.rs" % "javax.ws.rs-api" % "2.0.1"
 )
 
 

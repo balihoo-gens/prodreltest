@@ -3,8 +3,10 @@ package com.balihoo.fulfillment.adapters
 import java.net.URL
 import com.balihoo.fulfillment.config.{PropertiesLoader, PropertiesLoaderComponent}
 import com.balihoo.fulfillment.util.{SploggerComponent, Splogger}
+import com.stackmob.newman.response.HttpResponse
 import org.apache.commons.codec.digest.DigestUtils
-import play.api.libs.json.{JsValue, JsObject, Json}
+import play.api.libs.json.{JsObject, Json}
+import javax.ws.rs.core.UriBuilder
 
 trait SendGridAdapterComponent {
   def sendGridAdapter: AbstractSendGridAdapter
@@ -64,7 +66,7 @@ abstract class AbstractSendGridAdapter {
    * @param apiUser the API user
    * @return the credentials
    */
-  private def getCredentials(apiUser: String) = new SendGridCredentials(apiUser, apiKey(apiUser))
+  def getCredentials(apiUser: String) = new SendGridCredentials(apiUser, apiKey(apiUser))
 
   /**
    * Get the credentials for a subaccount.
@@ -124,7 +126,7 @@ abstract class AbstractSendGridAdapter {
    * @return the username for the subaccount
    */
   def createSubaccount(subaccount: SendGridSubaccount): String = {
-    splog.debug("Creating subaccount " + subaccount)
+    splog.debug("Creating subaccount: " + subaccount.credentials.apiUser)
     // As of 11/3/14, this doesn't work with the v3 API.
     val url = new URL(v2ApiBaseUrl, "customer.add.json")
     val queryParams = Seq(
@@ -143,18 +145,139 @@ abstract class AbstractSendGridAdapter {
       ("country", subaccount.country),
       ("phone", subaccount.phone),
       ("website", "N/A"))
-    val result = httpAdapter.get(url, queryParams = queryParams)
+    val response = httpAdapter.get(url, queryParams = queryParams)
+    checkResponseForSuccess(response)
+    subaccount.credentials.apiUser
+  }
 
+  /**
+   * Updates a subaccount's profile
+   * @param subaccount The account details (Password not needed, but all other details are required.)
+   */
+  def updateProfile(subaccount: SendGridSubaccount): Unit = {
+    splog.debug("Updating profile for subaccount: " + subaccount.credentials.apiUser)
+    val url = new URL(v2ApiBaseUrl, "customer.profile.json")
+    val queryParams = Seq(
+      ("api_user", rootApiUser),
+      ("api_key", rootApiKey),
+      ("task", "set"),
+      ("username", subaccount.credentials.apiUser),
+      ("first_name", subaccount.firstName),
+      ("last_name", subaccount.lastName),
+      ("address", subaccount.address),
+      ("city", subaccount.city),
+      ("state", subaccount.state),
+      ("zip", subaccount.zip),
+      ("country", subaccount.country),
+      ("phone", subaccount.phone))
+    val response = httpAdapter.get(url, queryParams = queryParams)
+    checkResponseForSuccess(response)
+  }
+
+  /**
+   * Activates an app for a subaccount
+   * @param subaccountUser
+   * @param appName
+   */
+  def activateApp(subaccountUser: String, appName: String): Unit = {
+    splog.debug("Activating event notification app for subaccount: " + subaccountUser)
+    val url = new URL(v2ApiBaseUrl, "customer.apps.json")
+    val queryParams = Seq(
+      ("api_user", rootApiUser),
+      ("api_key", rootApiKey),
+      ("task", "activate"),
+      ("user", subaccountUser),
+      ("name", appName))
+    val response = httpAdapter.get(url, queryParams = queryParams)
+    checkResponseForSuccess(response)
+  }
+
+  /**
+   * Configures the event notification app so it will send all available event data to a given webhook.
+   * @param subaccountUser
+   * @param webhookUrl
+   * @param webhookUser
+   * @param webhookPassword
+   */
+  def configureEventNotificationApp(subaccountUser: String, webhookUrl: String, webhookUser: String, webhookPassword: String): Unit = {
+    splog.debug("Configuring event notification app for subaccount: " + subaccountUser)
+    val url = new URL(v2ApiBaseUrl, "customer.apps.json")
+    // I was going to use scala-uri to build the URL, but it doesn't encode the user info correctly.
+    // See https://github.com/NET-A-PORTER/scala-uri/issues/73
+    val urlParam = UriBuilder.fromUri(webhookUrl).userInfo("{arg1}:{arg2}").build(webhookUser, webhookPassword).toString
+    val queryParams = Seq(
+      ("api_user", rootApiUser),
+      ("api_key", rootApiKey),
+      ("task", "setup"),
+      ("user", subaccountUser),
+      ("name", "eventnotify"),
+      ("processed", "1"),
+      ("dropped", "1"),
+      ("deferred", "1"),
+      ("delivered", "1"),
+      ("bounce", "1"),
+      ("click", "1"),
+      ("open", "1"),
+      ("unsubscribe", "1"),
+      ("spamreport", "1"),
+      ("url", urlParam))
+    val response = httpAdapter.get(url, queryParams = queryParams)
+    checkResponseForSuccess(response)
+  }
+
+  /**
+   * Sets the IP address for a subacount
+   * @param subaccountUser
+   * @param ipAddress
+   */
+  def setIpAddress(subaccountUser: String, ipAddress: String): Unit = {
+    splog.debug("Setting IP address for subaccount: " + subaccountUser)
+    val url = new URL(v2ApiBaseUrl, "customer.sendip.json")
+    val queryParams = Seq(
+      ("api_user", rootApiUser),
+      ("api_key", rootApiKey),
+      ("task", "append"),
+      ("user", subaccountUser),
+      ("set", "specify"),
+      ("ip[]", ipAddress))
+    val response = httpAdapter.get(url, queryParams = queryParams)
+    checkResponseForSuccess(response)
+  }
+
+  /**
+   * Sets a subaccount's whitelabel
+   * @param subaccountUser
+   * @param whitelabel
+   */
+  def setWhitelabel(subaccountUser: String, whitelabel: String): Unit = {
+    splog.debug("Setting whitelabel for subaccount: " + subaccountUser)
+    val url = new URL(v2ApiBaseUrl, "customer.whitelabel.json")
+    val queryParams = Seq(
+      ("api_user", rootApiUser),
+      ("api_key", rootApiKey),
+      ("task", "append"),
+      ("user", subaccountUser),
+      ("mail_domain", whitelabel))
+    val response = httpAdapter.get(url, queryParams = queryParams)
+    checkResponseForSuccess(response)
+  }
+
+  /**
+   * Checks the HTTP response for a 200 code and a SendGrid success message.
+   * @param response
+   * @throws SendGridException if the code or message are wrong.
+   */
+  private def checkResponseForSuccess(response: HttpResponse): Unit = {
     // Check the response code
-    val bodyOpt = result.code.code match {
-      case 200 => Json.parse(result.bodyString).asOpt[JsObject]
-      case _ => throw new SendGridException(s"SendGrid responded with $result")
+    val bodyOpt = response.code.code match {
+      case 200 => Json.parse(response.bodyString).asOpt[JsObject]
+      case _ => throw new SendGridException(s"SendGrid responded with $response")
     }
 
     // Check the response message
     bodyOpt match {
-      case Some(body) if jsObjectValueEquals(body, "message", "success") => subaccount.credentials.apiUser
-      case _ => throw new SendGridException(s"Unable to create subaccount.  SendGrid responded with $result")
+      case Some(body) if jsObjectValueEquals(body, "message", "success") =>
+      case _ => throw new SendGridException(s"SendGrid responded with $response")
     }
   }
 }
