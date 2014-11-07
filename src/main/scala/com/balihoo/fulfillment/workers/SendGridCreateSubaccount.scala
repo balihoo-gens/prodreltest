@@ -42,6 +42,14 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
         _country = params("country"),
         _phone = params("phone"))
       sendGridAdapter.createSubaccount(subaccount)
+
+      // Configuration stuff that can be done at account creation time.  (This stuff won't need to change later.)
+      sendGridAdapter.activateApp(credentials.apiUser, "eventnotify")
+      sendGridAdapter.activateApp(credentials.apiUser, "clicktrack")
+      sendGridAdapter.activateApp(credentials.apiUser, "opentrack")
+      sendGridAdapter.activateApp(credentials.apiUser, "subscriptiontrack")
+
+      credentials.apiUser
     }
   }
 }

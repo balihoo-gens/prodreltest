@@ -51,10 +51,6 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
         _country = params("country"),
         _phone = params("phone"))
       sendGridAdapter.updateProfile(subaccount)
-      sendGridAdapter.activateApp(subaccountUser, "eventnotify")
-      sendGridAdapter.activateApp(subaccountUser, "clicktrack")
-      sendGridAdapter.activateApp(subaccountUser, "opentrack")
-      sendGridAdapter.activateApp(subaccountUser, "subscriptiontrack")
       sendGridAdapter.configureEventNotificationApp(subaccountUser, webhookUrl, webhookUsername, webhookPassword)
       sendGridAdapter.setIpAddress(subaccountUser, ipAddress)
       sendGridAdapter.setWhitelabel(subaccountUser, whitelabel)

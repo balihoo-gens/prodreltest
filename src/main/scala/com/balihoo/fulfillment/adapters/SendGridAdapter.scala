@@ -123,9 +123,8 @@ abstract class AbstractSendGridAdapter {
   /**
    * Creates a SendGrid subaccount
    * @param subaccount the subaccount information
-   * @return the username for the subaccount
    */
-  def createSubaccount(subaccount: SendGridSubaccount): String = {
+  def createSubaccount(subaccount: SendGridSubaccount): Unit = {
     splog.debug("Creating subaccount: " + subaccount.credentials.apiUser)
     // As of 11/3/14, this doesn't work with the v3 API.
     val url = new URL(v2ApiBaseUrl, "customer.add.json")
@@ -147,7 +146,6 @@ abstract class AbstractSendGridAdapter {
       ("website", "N/A"))
     val response = httpAdapter.get(url, queryParams = queryParams)
     checkResponseForSuccess(response)
-    subaccount.credentials.apiUser
   }
 
   /**
