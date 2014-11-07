@@ -4,15 +4,16 @@ import com.balihoo.fulfillment.config.PropertiesLoaderComponent
 import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentialsProvider}
 import com.amazonaws.regions.{Regions, Region}
-import scala.reflect.ClassTag
+import scala.reflect.{ClassTag, classTag}
+import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
+import com.amazonaws.AmazonWebServiceClient
 
-abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] {
+abstract class AWSAdapter[T <: AmazonWebServiceClient : ClassTag] {
   this: PropertiesLoaderComponent =>
 
   //can't have constructor code using the self type reference
   // unless it was declared 'lazy'. If not, config is still null
   // and will throw a NullPointerException at this time.
-  lazy val domain = config.getString("domain")
   lazy val region:Region = getRegion
   lazy val client:T = createClient
 
@@ -23,7 +24,17 @@ abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] 
     val secretKey = config.getString("aws.secretKey")
     val credentials = new BasicAWSCredentials(accessKey, secretKey)
     //this type cannot be resolved statically by classOf[T]
-    val clientType = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[_ <: com.amazonaws.AmazonWebServiceClient]]
+    val clientType = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[_ <: AmazonWebServiceClient]]
+
+    val awsClientConfig = {
+      val SWFTag = classTag[AmazonSimpleWorkflowAsyncClient]
+      classTag[T] match {
+        case SWFTag =>
+          val swfSocketTimeout = config.getOrElse("swfSocketTimeoutMs", 70*1000)
+          new ClientConfiguration().withSocketTimeout(swfSocketTimeout)
+        case _ => null
+      }
+    }
 
     region.createClient(
       clientType,
@@ -31,7 +42,7 @@ abstract class AWSAdapter[T <: com.amazonaws.AmazonWebServiceClient : ClassTag] 
         def getCredentials = credentials
         def refresh() {}
       },
-      new ClientConfiguration()
+      awsClientConfig
     ).asInstanceOf[T]
   }
 
