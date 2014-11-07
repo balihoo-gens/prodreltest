@@ -6,7 +6,7 @@ except ImportError:
     #path hackery really just for local testing
     # because these are elsewhere on the EC2 instance
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'deployment'))
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'launcher'))
     from splogger import Splogger
     from launcher import Launcher
 
@@ -22,9 +22,13 @@ class Installer(object):
         self._log = Splogger(logfile)
         self._distro = distro
 
-    def launch_app(self, classes):
+    def launch_app(self, classes, noworker):
         thisdir = os.path.dirname(os.path.realpath(__file__))
-        proc = subprocess.Popen(["python", "launcher.py"] + classes, cwd=thisdir)
+        cmdline = ["python", "launcher.py"]
+        if noworker:
+            cmdline += ["--noworker"]
+        cmdline += classes
+        proc = subprocess.Popen(cmdline, cwd=thisdir)
         self._log.info("started launcher process with pid %d" % (proc.pid,))
 
     def run_wait_log(self, cmd, cwd=None, raise_on_err=False):
@@ -42,10 +46,8 @@ class Installer(object):
         #block and accumulate output
         out, err = proc.communicate()
         if len(out) > 0:
-            print(out)
             self._log.info(out)
         if len(err) > 0:
-            print(err)
             self._log.error(err)
         if raise_on_err and (proc.returncode != 0):
             raise Exception("process %d returned %d" % (proc.pid, proc.returncode))
@@ -56,22 +58,32 @@ class Installer(object):
                        stat.S_IRGRP |                stat.S_IXGRP |
                        stat.S_IROTH |                stat.S_IXOTH )
 
-    def install_splunk(self, s3bucket, script_name):
-        self._log.info("installing splunk from " + s3bucket)
-        s3url = os.path.join(s3bucket, script_name)
-        if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
-            self.make_executable(script_name)
-            script_path = os.path.join(".", script_name)
-            self.run_wait_log([script_path])
-
+    def run_s3_installer(self, s3bucket, script_name, params=None):
+        if params is None:
+            params = []
+        s3url = s3bucket + "/" + script_name
+        if not s3url.startswith("s3://"):
+            s3url = "s3://" + s3url
+        self._log.info("installing from s3: url=[%s]" % (s3url,))
+        try:
+            if self.run_wait_log(["aws", "s3","cp", s3url, "."]) >= 0:
+                script = os.path.join(".", script_name)
+                self.make_executable(script)
+                self.run_wait_log([script] + params)
+        except Exception as e:
+            self._log.error("Failed to install from s3: %s" % (e.message,))
 
     def install_package(self, package_name):
         installer = "apt-get" if self._distro in ["Ubuntu", "Debian"] else "yum"
         self.run_wait_log([installer, "install", "-y", package_name], raise_on_err=True)
 
     def install_phantom(self, version):
-        self._install_phantom_custom()
+        if version == "custom":
+            self._install_phantom_custom()
+        else:
+            self._install_phantom_official(version)
 
+    #custom phantom build
     def _install_phantom_custom(self):
         s3bucket = "s3://balihoo.dev.fulfillment"
         s3url = os.path.join(s3bucket, "phantomjs/builtfromsource/master/bin", "phantomjs")
@@ -121,29 +133,47 @@ class Installer(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Install the Fulfillment application")
-    splunks3bucket = "s3://balihoo.dev.splunk"
-    splunkscript = "installSplunkForwarder.sh"
-    phantomversion = "1.9.7"
+
+    #defaults
+    splunk_s3bucket = "balihoo.dev.splunk"
+    splunk_script = "installSplunkForwarder.sh"
+    newrelic_s3bucket = "balihoo.dev.aws-installs/newrelic"
+    newrelic_config = "fulfillment_dev.newrelic.yml"
+    phantomversion = "custom"
 
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')
-    parser.add_argument('--splunks3bucket', help='the AWS s3 bucket URL used to install splunk', default=splunks3bucket)
-    parser.add_argument('--splunkscript', help='the script name used to install splunk', default=splunkscript)
-    parser.add_argument('--nosplunk', help='do not install splunk', action='store_true')
-    parser.add_argument('--nophantom', help='do not install phantomjs', action='store_true')
-    parser.add_argument('--nolaunch', help='do not launch the app', action='store_true')
-    parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
     parser.add_argument('--eip', help='the eip for this instance', default=None)
     parser.add_argument('--distro', help='the linux distribution to use for this instance', default="Ubuntu")
+    parser.add_argument('--env', help='the environment to use for this instance', default="dev")
+    parser.add_argument('--nolaunch', help='do not launch the app', action='store_true')
+    parser.add_argument('--noworker', help='do not launch with a swfworker', action='store_true')
+    #phantom
+    parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
+    parser.add_argument('--nophantom', help='do not install phantomjs', action='store_true')
+    #splunk
+    parser.add_argument('--splunk_s3bucket', help='the AWS s3 bucket URL used to install splunk', default=splunk_s3bucket)
+    parser.add_argument('--splunk_script', help='the script name used to install splunk', default=splunk_script)
+    parser.add_argument('--nosplunk', help='do not install splunk', action='store_true')
+    #new relic
+    parser.add_argument('--newrelic_s3bucket', help='the AWS s3 bucket URL used to install newrelic', default=newrelic_s3bucket)
+    parser.add_argument('--newrelic_config', help='the config file used to install newrelic', default=newrelic_config)
+    parser.add_argument('--nonewrelic', help='do not install newrelic', action='store_true')
 
     args = parser.parse_args()
 
     installer = Installer(args.logfile, args.distro)
+
+    if not args.nonewrelic:
+        nrsysmond_params = ["--s3-bucket", newrelic_s3bucket]
+        javaagent_params = nrsysmond_params + ["--config", newrelic_config]
+        installer.run_s3_installer(newrelic_s3bucket, "nrsysmond-install.sh", nrsysmond_params)
+        installer.run_s3_installer(newrelic_s3bucket, "javaagent-install.sh", javaagent_params)
     if not args.nosplunk:
-        installer.install_splunk(args.splunks3bucket, args.splunkscript)
+        installer.run_s3_installer(args.splunk_s3bucket, args.splunk_script)
     if not args.nophantom:
         installer.install_phantom(args.phantomversion)
     if args.eip:
         installer.associate_eip(args.eip)
     if not args.nolaunch:
-        installer.launch_app(args.classes)
+        installer.launch_app(args.classes, args.noworker)

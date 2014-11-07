@@ -8,6 +8,7 @@ import org.glassfish.jersey.test.{TestProperties, JerseyTest}
 import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
+import play.api.libs.json.{JsObject, Json}
 
 // This class provides an HTTP server for testing.
 @Path("/")
@@ -51,6 +52,28 @@ class MockServer extends JerseyTest {
   @GET
   @Path("header")
   def getOk(@Context headers: HttpHeaders) = headers.getHeaderString("testHeader")
+
+  @GET
+  @Path("query")
+  def getOk(@QueryParam("abc") param1: String, @QueryParam("xyz") param2: Int) = param1 + ":" + param2
+
+  @GET
+  @Path("basicauth")
+  def getBasicAuth(@Context headers: HttpHeaders) = headers.getHeaderString("Authorization")
+
+  @POST
+  @Path("post/basicauth/withtestheader")
+  def postBasicAuthWithTestHeader(@Context headers: HttpHeaders, body: String) = {
+    val credentials = headers.getHeaderString("Authorization")
+    val testHeader = headers.getHeaderString("testHeader")
+    s"""
+       |{
+       |  "credentials": "$credentials",
+       |  "testHeader": "$testHeader",
+       |  "body": "$body"
+       |}
+     """.stripMargin
+  }
 
   override def configure = {
     forceSet(TestProperties.CONTAINER_PORT, "0") // Choose first available port.
@@ -127,9 +150,34 @@ class TestHTTPAdapter extends Specification {
     }
 
     "set a request header" in {
-      val result = httpAdapter.get(server.getUrl("header"), List(("testHeader", "Colorful sashimi buffet")))
+      val result = httpAdapter.get(server.getUrl("header"), headers = List(("testHeader", "Colorful sashimi buffet")))
       result.code.code mustEqual 200
       result.bodyString mustEqual "Colorful sashimi buffet"
+    }
+
+    "prepare a query string" in {
+      val result = httpAdapter.get(server.getUrl("query"), queryParams = List(("abc", "yahoo"), ("xyz", 13)))
+      result.code.code mustEqual 200
+      result.bodyString mustEqual "yahoo:13"
+    }
+
+    "perform basic authentication" in {
+      val result = httpAdapter.get(server.getUrl("basicauth"), credentials = Some(("superman", "kryptonite")))
+      result.code.code === 200
+      result.bodyString === "Basic c3VwZXJtYW46a3J5cHRvbml0ZQ=="
+    }
+
+    "handle basic authentication with an extra header in a POST" in {
+      val url = server.getUrl("post/basicauth/withtestheader")
+      val body = "Why did the chicken cross the road?"
+      val headers = Seq(("testHeader", "lame joke"))
+      val credentials = Some(("superman", "kryptonite"))
+      val result = httpAdapter.post(url, body, headers = headers, credentials = credentials)
+      result.code.code mustEqual 200
+      val json = Json.parse(result.bodyString).as[JsObject]
+      json.value("credentials").as[String] === "Basic c3VwZXJtYW46a3J5cHRvbml0ZQ=="
+      json.value("testHeader").as[String] === headers.head._2
+      json.value("body").as[String] === body
     }
   }
 

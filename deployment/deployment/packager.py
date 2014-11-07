@@ -9,10 +9,11 @@ class Packager:
     """ Packages up everything needed for deployment
         into a directory, ready to be sync-ed to S3
     """
-    def __init__(self, rootdir, unattended=False, log_filename="/var/log/balihoo/fulfillment/packup.log"):
+    def __init__(self, rootdir, unattended=False, log_filename="/var/log/balihoo/fulfillment/packup.log",debug=False):
         self._rootdir = rootdir
         self._log = Splogger(log_filename, component="packager")
         self._unattended = unattended
+        self._debug = debug
 
     def info(self,msg):
         print(msg)
@@ -58,19 +59,27 @@ class Packager:
         shutil.copy(jarname, os.path.join(tmpdir, "fulfillment.jar"))
 
         self.info("gathering launch script")
-        launchfile = os.path.join(self._rootdir, "launcher.py")
-        shutil.copy(launchfile, tmpdir)
+        launch_dir = os.path.join(self._rootdir, "launcher")
+        shutil.copy(os.path.join(launch_dir, "launcher.py"), tmpdir)
+        shutil.copy(os.path.join(launch_dir, "component.py"), tmpdir)
+        shutil.copy(os.path.join(launch_dir, "swfworker.py"), tmpdir)
 
         self.info("gathering install splogger")
-        splogger = os.path.join(self._rootdir, "deployment/deployment/splogger.py")
+        splogger = os.path.join(self._rootdir, "deployment", "deployment", "splogger.py")
         shutil.copy(splogger, tmpdir)
 
         self.info("gathering virtualenv setup script")
-        vesetup = os.path.join(self._rootdir, "deployment/virtualenv/setup")
+        vesetup = os.path.join(self._rootdir, "deployment", "virtualenv", "setup")
         shutil.copy(vesetup, os.path.join(tmpdir, "vesetup"))
 
         self.info("gathering install script and deps")
-        installscript = os.path.join(self._rootdir, "deployment/scripts/ffinstall.py")
+        installscript = os.path.join(self._rootdir, "deployment", "scripts", "ffinstall.py")
         shutil.copy(installscript, tmpdir)
+
+        if self._debug:
+            debugdir = os.path.join(self._rootdir, "deployment", "debug")
+            shutil.copy(os.path.join(debugdir, "Dockerfile"), tmpdir)
+            shutil.copy(os.path.join(debugdir, "OS-Dockerfile"), tmpdir)
+            shutil.copy(os.path.join(debugdir, "debug.sh"), tmpdir)
 
         return tmpdir
