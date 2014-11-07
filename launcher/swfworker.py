@@ -15,11 +15,13 @@ class UnknownRegionException(Exception):
     """ explicit exception (over keyerror) when a region cannot be resolved """
     pass
 
-""" container class for access to async swf task polling """
-PollInfo = namedtuple('PollInfo', ['stop', 'get'])
+class PollInfo(namedtuple('PollInfo', ['stop', 'get'])):
+    """ container class for access to async swf task polling """
+    pass
 
-""" wrapper for a SWF task. Attaches complete and fail functions """
-Task = namedtuple('Task', ['params', 'complete', 'fail'])
+class Task(namedtuple('Task', ['params', 'complete', 'fail'])):
+    """ wrapper for a SWF task. Attaches complete and fail functions """
+    pass
 
 class SwfWorker(swf.ActivityWorker):
     """ Extension of the SWF Activity worker supporting asynchronous polling """
