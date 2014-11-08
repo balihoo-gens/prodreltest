@@ -348,7 +348,7 @@ trait adapter extends Scope with Mockito {
       basicQueryParams(apiCredentials,  Seq(("task", "set"), ("username", subaccount.credentials.apiUser),
         ("first_name", subaccount.firstName), ("last_name", subaccount.lastName),
         ("address", subaccount.address), ("city", subaccount.city), ("state", subaccount.state),
-        ("zip", subaccount.zip), ("country", subaccount.country), ("phone", subaccount.phone)))
+        ("zip", subaccount.zip), ("country", subaccount.country), ("phone", subaccount.phone), ("website", "N/A")))
     }
 
     /**

@@ -167,7 +167,8 @@ abstract class AbstractSendGridAdapter {
       ("state", subaccount.state),
       ("zip", subaccount.zip),
       ("country", subaccount.country),
-      ("phone", subaccount.phone))
+      ("phone", subaccount.phone),
+      ("website", "N/A"))
     val response = httpAdapter.get(url, queryParams = queryParams)
     checkResponseForSuccess(response)
   }
