@@ -10,8 +10,8 @@ scalaVersion := "2.10.2"
 
 // Specify the local repos first for best performance.
 resolvers ++= Seq(
-  "Internal Snapshot Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/snapshots",
-  "Internal Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/internal",
+  "Internal Snapshot Repository" at "https://archiva.balihoo.local/archiva/repository/snapshots",
+  "Internal Repository" at "https://archiva.balihoo.local/archiva/repository/internal",
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases",
   "Keyczar at Google Code" at "http://keyczar.googlecode.com/svn/trunk/java/maven/"
 )
