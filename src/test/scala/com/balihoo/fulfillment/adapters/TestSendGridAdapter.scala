@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
+import com.netaporter.uri.config.UriConfig
+import com.netaporter.uri.parsing.UriParser
 import org.specs2.matcher.AnyMatchers._
 import org.specs2.mock._
 import org.specs2.mutable.Specification
@@ -116,7 +118,7 @@ trait adapter extends Scope with Mockito {
   val v3ApiBaseUrlString = "https://hot.new/api" // Same with this one.
   val profileGetUrl = new URL(v1ApiBaseUrlString / "profile.get.json")
   val createSubaccountUrl = new URL(v2ApiBaseUrlString / "customer.add.json")
-  val subaccountProfileUrl = new URL(v2ApiBaseUrlString / "customer.profile.json")
+  val subaccountProfileUrl = new URL(v1ApiBaseUrlString / "profile.set.json")
   val subaccountAppsUrl = new URL(v2ApiBaseUrlString / "customer.apps.json")
   val subaccountSendIpUrl = new URL(v2ApiBaseUrlString / "customer.sendip.json")
   val subaccountWhitelabelUrl = new URL(v2ApiBaseUrlString / "customer.whitelabel.json")
@@ -345,8 +347,7 @@ trait adapter extends Scope with Mockito {
      * @return
      */
     private def profileUpdateQueryParams(subaccount: SendGridSubaccount): Seq[(String, Any)] = {
-      basicQueryParams(apiCredentials,  Seq(("task", "set"), ("username", subaccount.credentials.apiUser),
-        ("first_name", subaccount.firstName), ("last_name", subaccount.lastName),
+      basicQueryParams(subaccount.credentials,  Seq(("first_name", subaccount.firstName), ("last_name", subaccount.lastName),
         ("address", subaccount.address), ("city", subaccount.city), ("state", subaccount.state),
         ("zip", subaccount.zip), ("country", subaccount.country), ("phone", subaccount.phone), ("website", "N/A")))
     }

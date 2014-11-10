@@ -3,10 +3,11 @@ package com.balihoo.fulfillment.adapters
 import java.net.URL
 import com.balihoo.fulfillment.config.{PropertiesLoader, PropertiesLoaderComponent}
 import com.balihoo.fulfillment.util.{SploggerComponent, Splogger}
+import com.netaporter.uri.encoding.PercentEncoder
 import com.stackmob.newman.response.HttpResponse
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.libs.json.{JsObject, Json}
-import javax.ws.rs.core.UriBuilder
+import com.netaporter.uri.dsl._
 
 trait SendGridAdapterComponent {
   def sendGridAdapter: AbstractSendGridAdapter
@@ -150,16 +151,14 @@ abstract class AbstractSendGridAdapter {
 
   /**
    * Updates a subaccount's profile
-   * @param subaccount The account details (Password not needed, but all other details are required.)
+   * @param subaccount The account details
    */
   def updateProfile(subaccount: SendGridSubaccount): Unit = {
     splog.debug("Updating profile for subaccount: " + subaccount.credentials.apiUser)
-    val url = new URL(v2ApiBaseUrl, "customer.profile.json")
+    val url = new URL(v1ApiBaseUrl, "profile.set.json")
     val queryParams = Seq(
-      ("api_user", rootApiUser),
-      ("api_key", rootApiKey),
-      ("task", "set"),
-      ("username", subaccount.credentials.apiUser),
+      ("api_user", subaccount.credentials.apiUser),
+      ("api_key", subaccount.credentials.apiKey),
       ("first_name", subaccount.firstName),
       ("last_name", subaccount.lastName),
       ("address", subaccount.address),
@@ -191,6 +190,9 @@ abstract class AbstractSendGridAdapter {
     checkResponseForSuccess(response)
   }
 
+  private val credentialEncoder = PercentEncoder(PercentEncoder.GEN_DELIMS ++ PercentEncoder.PATH_CHARS_TO_ENCODE)
+  private def encodeCredential(s: String) = credentialEncoder.encode(s, "UTF-8")
+
   /**
    * Configures the event notification app so it will send all available event data to a given webhook.
    * @param subaccountUser
@@ -201,9 +203,10 @@ abstract class AbstractSendGridAdapter {
   def configureEventNotificationApp(subaccountUser: String, webhookUrl: String, webhookUser: String, webhookPassword: String): Unit = {
     splog.debug("Configuring event notification app for subaccount: " + subaccountUser)
     val url = new URL(v2ApiBaseUrl, "customer.apps.json")
-    // I was going to use scala-uri to build the URL, but it doesn't encode the user info correctly.
+    // scala-uri doesn't encode the user info correctly, so the username and password are being encoded prior to being
+    // added to the URL.  If this bug gets fixed in scala-uri, the encoding step here will need to be removed.
     // See https://github.com/NET-A-PORTER/scala-uri/issues/73
-    val urlParam = UriBuilder.fromUri(webhookUrl).userInfo("{arg1}:{arg2}").build(webhookUser, webhookPassword).toString
+    val urlParam = webhookUrl.withUser(encodeCredential(webhookUser)).withPassword(encodeCredential(webhookPassword)).toString
     val queryParams = Seq(
       ("api_user", rootApiUser),
       ("api_key", rootApiKey),
@@ -276,7 +279,7 @@ abstract class AbstractSendGridAdapter {
     // Check the response message
     bodyOpt match {
       case Some(body) if jsObjectValueEquals(body, "message", "success") =>
-      case _ => throw new SendGridException(s"SendGrid responded with $response")
+      case _ => throw new SendGridException(s"SendGrid responded with $bodyOpt")
     }
   }
 }
