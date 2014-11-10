@@ -39,7 +39,7 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
         if (subTable.isEmpty) {
           var ffdoc:String = template
           for ((key,value) <- subs) {
-            ffdoc = ffdoc.replaceAll(s"${key}",value)
+            ffdoc = ffdoc.replaceAllLiterally(s"${key}",value)
           }
         results += submitTask(ffdoc, tags)
         } else {
@@ -86,7 +86,7 @@ class WorkflowGenerator(override val _cfg: PropertiesLoader, override val _splog
   with LoggingWorkflowAdapterImpl {
 }
 
-object workflowGenerator extends FulfillmentWorkerApp {
+object workflow extends FulfillmentWorkerApp {
   override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
     new WorkflowGenerator(cfg, splog)
   }
