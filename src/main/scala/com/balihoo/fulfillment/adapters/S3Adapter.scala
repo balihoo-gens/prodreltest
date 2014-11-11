@@ -1,11 +1,10 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{Reader, InputStreamReader, FileOutputStream, File}
+import java.io.File
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.{GetObjectRequest, CannedAccessControlList, PutObjectRequest}
+import com.amazonaws.services.s3.model.{S3Object, CannedAccessControlList, PutObjectRequest}
 import com.amazonaws.auth.BasicAWSCredentials
 import com.balihoo.fulfillment.config._
-import org.apache.commons.io.IOUtils
 
 //for the cake pattern dependency injection
 trait S3AdapterComponent {
@@ -15,17 +14,14 @@ trait S3AdapterComponent {
 abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
   this: PropertiesLoaderComponent =>
 
-  def putPublic(bucket:String, key:String, file:File) = {
-      client.putObject(
-        new PutObjectRequest(bucket, key, file)
-          .withCannedAcl(CannedAccessControlList.PublicRead)
-      )
+  def putPublic(bucket: String, key: String, file: File) = {
+    client.putObject(
+      new PutObjectRequest(bucket, key, file)
+        .withCannedAcl(CannedAccessControlList.PublicRead)
+    )
   }
 
-  def getObjectContentAsStreamReader(bucket: String, key: String): Reader = {
-    val s3object = client.getObject(bucket: String, key: String)
-    new InputStreamReader(s3object.getObjectContent)
-  }
+  def withS3Object[T](bucket: String, key: String)(callback: (S3Object) => T) = callback(client.getObject(bucket, key))
 }
 
 class S3Adapter(cfg: PropertiesLoader) extends AbstractS3Adapter with PropertiesLoaderComponent {

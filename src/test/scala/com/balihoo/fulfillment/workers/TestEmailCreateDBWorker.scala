@@ -1,8 +1,9 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{Reader, File}
+import java.io.{InputStreamReader, File}
 import java.net.URISyntaxException
 
+import com.amazonaws.services.s3.model.S3Object
 import com.balihoo.fulfillment.adapters._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -56,7 +57,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
     "fail if csv stream empty" in new TestContext {
-      givenS3Reader()
+      givenReader()
       givenCsvStream(Stream.empty)
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
@@ -66,7 +67,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
     }
     "fail if csv stream has header, but no records" in new TestContext {
-      givenS3Reader()
+      givenReader()
       givenCsvStream(data.header #:: Stream.empty)
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
@@ -76,7 +77,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
     }
     "create db file with schema, convert csv records to database records and save in s3" in new TestContext {
-      givenS3Reader()
+      givenReader()
       givenCsvStream()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
@@ -166,7 +167,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       override val s3Adapter = mock[AbstractS3Adapter]
       override val csvAdapter = mock[CsvAdapter]
       override val liteDbAdapter = mock[LightweightDatabaseAdapter]
-      val readerMock = mock[Reader]
+      val readerMock = mock[InputStreamReader]
       val dbMock = mock[DB_TYPE]
       val dbFileMock = mock[File]
       override val insertBatchSize = 2
@@ -176,8 +177,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       }
     }
 
-    def givenS3Reader() = {
-      worker.s3Adapter.getObjectContentAsStreamReader(===(data.s3bucket), ===(data.s3key)) returns worker.readerMock
+    def givenReader() = {
+      worker.s3Adapter.withS3Object(===(data.s3bucket), ===(data.s3key))(anyFunction1[S3Object, InputStreamReader]) returns worker.readerMock
     }
 
     def givenCsvStream(stream: Stream[List[String]] = data.csvStream) = {

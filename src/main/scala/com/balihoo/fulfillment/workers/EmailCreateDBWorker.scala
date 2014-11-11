@@ -1,7 +1,8 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.File
+import java.io.{InputStreamReader, File}
 
+import com.amazonaws.services.s3.model.S3Object
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -188,7 +189,9 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
   private def csvStreamFromS3Content(bucket: String, key: String) = {
     splog.info(s"Streaming CSV content from S3 bucket=$bucket key=$key")
-    val reader = s3Adapter.getObjectContentAsStreamReader(bucket, key)
+    val reader = s3Adapter.withS3Object(bucket, key) { s3obj: S3Object =>
+      new InputStreamReader(s3obj.getObjectContent)
+    }
     val csvStream = csvAdapter.parseReaderAsStream(reader)
     if (csvStream.isEmpty) throw new RuntimeException("csv stream is empty")
     csvStream
