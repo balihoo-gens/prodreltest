@@ -15,6 +15,7 @@ import org.specs2.matcher.Matcher
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
+import play.api.libs.json.Json
 import scala.collection.JavaConversions._
 
 @RunWith(classOf[JUnitRunner])
@@ -87,7 +88,7 @@ class TestFacebookPoster extends Specification with Mockito {
     "appSecret" -> appSecret,
     "accessToken" -> accessToken,
     "pageId" -> pageId,
-    "target" -> s"""{"countryCodes": ["$usa","$canada"], "regionIds": [$idahoId,$washingtonId], "cityIds": [$boiseId,$meridianId,$nampaId]}""",
+    "target" -> Json.parse(s"""{"countryCodes": ["$usa","$canada"], "regionIds": [$idahoId,$washingtonId], "cityIds": [$boiseId,$meridianId,$nampaId]}"""),
     "message" -> message)
 
   // Optional parameter values
@@ -174,7 +175,7 @@ class TestFacebookPoster extends Specification with Mockito {
     "resolve subregions" in {
       val poster = new TestableFacebookPoster
       val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
-        "target" -> s"""{"countryCodes": ["$usa"], "subregions": ["$ada","$canyon"]}"""))
+        "target" -> Json.parse(s"""{"countryCodes": ["$usa"], "subregions": ["$ada","$canyon"]}""")))
       poster.handleTask(params)
       
       val expectedTarget = new Target(List(usa), List(), List(boiseId, meridianId, nampaId))
@@ -186,7 +187,7 @@ class TestFacebookPoster extends Specification with Mockito {
     "reject subregions if there are multiple countries" in {
       val poster = new TestableFacebookPoster
       val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
-        "target" -> s"""{"countryCodes": ["$usa","$canada"], "subregions": ["$ada"]}"""))
+        "target" -> Json.parse(s"""{"countryCodes": ["$usa","$canada"], "subregions": ["$ada"]}""")))
 
       try {
         poster.handleTask(params)
@@ -201,7 +202,7 @@ class TestFacebookPoster extends Specification with Mockito {
     "reject subregions if there are no countries" in {
       val poster = new TestableFacebookPoster
       val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
-        "target" -> s"""{"countryCodes": [], "subregions": ["$ada"]}"""))
+        "target" -> Json.parse(s"""{"countryCodes": [], "subregions": ["$ada"]}""")))
 
       try {
         poster.handleTask(params)
@@ -216,7 +217,7 @@ class TestFacebookPoster extends Specification with Mockito {
     "resolve cities" in {
       val poster = new TestableFacebookPoster
       val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
-        "target" -> s"""{"countryCodes": ["$usa"], "cities": ["$boise","$meridian","NoSuchCity,Ada,ID"]}"""))
+        "target" -> Json.parse(s"""{"countryCodes": ["$usa"], "cities": ["$boise","$meridian","NoSuchCity,Ada,ID"]}""")))
       poster.handleTask(params)
       
       val expectedTarget = new Target(List(usa), List(), List(boiseId, meridianId))
@@ -228,7 +229,7 @@ class TestFacebookPoster extends Specification with Mockito {
     "reject cities if there are multiple countries" in {
       val poster = new TestableFacebookPoster
       val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
-        "target" -> s"""{"countryCodes": ["$usa","$canada"], "cities": ["$boise"]}"""))
+        "target" -> Json.parse(s"""{"countryCodes": ["$usa","$canada"], "cities": ["$boise"]}""")))
 
       try {
         poster.handleTask(params)
@@ -243,7 +244,7 @@ class TestFacebookPoster extends Specification with Mockito {
     "reject cities if there are no countries" in {
       val poster = new TestableFacebookPoster
       val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
-        "target" -> s"""{"countryCodes": [], "cities": ["$boise"]}"""))
+        "target" -> Json.parse(s"""{"countryCodes": [], "cities": ["$boise"]}""")))
 
       try {
         poster.handleTask(params)

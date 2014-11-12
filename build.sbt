@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
   "org.joda" % "joda-convert" % "1.5",
   "joda-time" % "joda-time" % "2.3",
   //json. Using play's implementation because its already known to the team
-  "com.typesafe.play" % "play-json_2.10" % "2.2.0",
+  "com.typesafe.play" % "play-json_2.10" % "2.4.0-M1",
   "org.specs2" %% "specs2" % "2.3.12" % Test,
   "commons-io" % "commons-io" % "2.4",
   "commons-configuration" % "commons-configuration" % "1.10",
@@ -47,7 +47,8 @@ libraryDependencies ++= Seq(
   "org.keyczar" % "keyczar" % "0.66",
   "com.stackmob" %% "newman" % "1.3.5",
   ("com.balihoo.socialmedia" % "facebook-client" % "14.19-SNAPSHOT").exclude("ch.qos.logback", "logback-classic"),
-  "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test
+  "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test,
+  "com.github.fge" % "json-schema-validator" % "2.2.6"
 )
 
 

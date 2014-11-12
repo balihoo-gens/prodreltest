@@ -167,10 +167,10 @@ class TestFulfillmentSection extends Specification with Mockito
       val reference = new SectionReference("none/first/second[3]/fourth")
 
       reference.name mustEqual "none"
-      reference.path.get.components(0).key.get mustEqual "first"
-      reference.path.get.components(1).key.get mustEqual "second"
-      reference.path.get.components(2).index.get mustEqual 3
-      reference.path.get.components(3).key.get mustEqual "fourth"
+      reference.path.get.getComponent(0).key.get mustEqual "first"
+      reference.path.get.getComponent(1).key.get mustEqual "second"
+      reference.path.get.getComponent(2).index.get mustEqual 3
+      reference.path.get.getComponent(3).key.get mustEqual "fourth"
 
     }
 
@@ -225,6 +225,27 @@ class TestFulfillmentSection extends Specification with Mockito
 
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
+    }
+
+    "  be upset about bad parameter" in {
+
+      val input =
+        """{
+          |"one" : "anti-one",
+          |"two" : { "<(MD5)>" : { "what do I do with an object": "tuna" } }
+          |}""".stripMargin
+
+      val param = new SectionParameter(Json.parse(input))
+
+      try {
+        param.evaluate(null)
+        assert(assertion=false, "There should have been an exception!")
+      } catch {
+        case e:Exception =>
+          e.getMessage mustEqual "Problem processing operator <(md5)> with input '{\"what do I do with an object\":\"tuna\"}...' :java.lang.IndexOutOfBoundsException: Index 0 not found!"
+      }
+
+      true
     }
 
     "  evaluate compound operator" in {
@@ -291,6 +312,25 @@ class TestFulfillmentSection extends Specification with Mockito
 
     }
 
+    "  be upset about " in {
+      val input = """{
+            "<(StringFormat)>" :
+              { "format" : "The {subject} eats {food} when {time}",
+                         "subject" : "GIANT",
+                         "food" : "tuna flesh",
+                         "time" : "whenever the hail he wants..!!",
+                         "pointless" : "this won't get used" }
+	        }"""
+
+      val expected =
+        """"The GIANT eats tuna flesh when whenever the hail he wants..!!""""
+
+      val param = new SectionParameter(Json.parse(input))
+      param.evaluate(null)
+      Json.stringify(param.getResult.get) mustEqual expected
+
+    }
+
     "  URL Encode strings using URLEncode" in {
       val str = "if ((!flip && flap->flop()) || (*deref::ptr)[7]) { return ~(&address); }"
       val input =
@@ -301,6 +341,30 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val expected =
         """"if+%28%28%21flip+%26%26+flap-%3Eflop%28%29%29+%7C%7C+%28*deref%3A%3Aptr%29%5B7%5D%29+%7B+return+%7E%28%26address%29%3B+%7D""""
+
+      val param = new SectionParameter(Json.parse(input))
+      param.evaluate(null)
+      Json.stringify(param.getResult.get) mustEqual expected
+    }
+
+    "  fetch elements from json with jsonpath" in {
+      val str = "gravy/on[3]/cellar/door"
+      val input =
+        s"""{
+            "<(jsonPATH)>" : {
+              "path" : "$str",
+               "json" : {
+                  "gravy" : {
+                    "on" : [ 0, 1, 2,
+                      { "cellar" : { "door" : "HAYOO" } }
+                    ]
+                  }
+               }
+            }
+        }"""
+
+      val expected =
+        """"HAYOO""""
 
       val param = new SectionParameter(Json.parse(input))
       param.evaluate(null)

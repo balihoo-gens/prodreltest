@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.deciders
 import java.net.URLEncoder
 import java.security.MessageDigest
 
+import org.keyczar.exceptions.KeyNotFoundException
 import play.api.libs.json._
 import org.keyczar.Crypter
 
@@ -13,6 +14,7 @@ object JsonOpName extends Enumeration {
   val STRING_FORMAT = Value("stringformat")
   val URL_ENCODE = Value("urlencode")
   val MD5 = Value("md5")
+  val JSON_PATH = Value("jsonpath")
   val OBJECT_KEYS = Value("objectkeys")
   val OBJECT_VALUES = Value("objectvalues")
   val STRING_CONCAT = Value("stringconcat")
@@ -59,11 +61,21 @@ class JsonOpArgs(val kwargs:Map[String,JsValue], val args:Seq[JsValue], val inpu
     kwargs contains param
   }
 
+  def hasIndex(i:Int):Boolean = {
+    args contains i
+  }
+
   def apply(index:Int):JsValue = {
+    if(args.size <= index) {
+      throw new IndexOutOfBoundsException(s"Index $index not found!")
+    }
     args(index)
   }
 
   def apply[T](index:Int)(implicit r: Reads[T]):T = {
+    if(args.size <= index) {
+      throw new IndexOutOfBoundsException(s"Index $index not found!")
+    }
     args(index).validate[T] match {
       case s: JsSuccess[T] => s.get
       case _ =>
@@ -72,6 +84,9 @@ class JsonOpArgs(val kwargs:Map[String,JsValue], val args:Seq[JsValue], val inpu
   }
 
   def apply[T](param:String)(implicit r: Reads[T]):T = {
+    if(!(kwargs contains param)) {
+      throw new KeyNotFoundException(s"Key $param not found!".getBytes)
+    }
     kwargs(param).validate[T] match {
       case s: JsSuccess[T] => s.get
       case _ =>
@@ -202,6 +217,20 @@ object JsonOps {
         ))
       })
 
+  protected val jsonPathOperator =
+    new JsonOp(
+      JsonOpName.JSON_PATH,
+      new JsonOpSpec("Fetches elements from JSON at the provided path",
+        List(new JsonOpParameter("path", "string", "")
+          ,new JsonOpParameter("json", "JSON", "")
+        ),
+        new JsonOpResult("JSON", "the element found 'path'")
+      ),
+      (args) => {
+        val path = new ReferencePath(args[String]("path"))
+        Json.toJson(path.getValue(args[JsValue]("json")))
+      })
+
   protected val urlEncodeOperator =
     new JsonOp(
       JsonOpName.URL_ENCODE,
@@ -240,7 +269,8 @@ object JsonOps {
     stringFormatOperator.name -> stringFormatOperator,
     urlEncodeOperator.name -> urlEncodeOperator,
     objectKeysOperator.name -> objectKeysOperator,
-    objectValuesOperator.name -> objectValuesOperator
+    objectValuesOperator.name -> objectValuesOperator,
+    jsonPathOperator.name -> jsonPathOperator
   )
 
   protected def _escapeDollar(s:String):String = {
@@ -255,12 +285,99 @@ object JsonOps {
       operators(operator)(params)
     } catch {
       case e:Exception =>
-        throw new Exception(s"Problem processing operator ${operator.toString} with input ${Json.stringify(params) take 50} "+e.getMessage+(e.getStackTraceString take 150))
+        throw new Exception(s"Problem processing operator <(${operator.toString})> with input '${Json.stringify(params) take 150}...' :"+e.toString)
     }
   }
 
   def toJson:JsValue = {
     Json.toJson((for((name, operator) <- operators) yield name.toString -> operator.specification.toJson).toMap)
+  }
+}
+
+class ReferencePathComponent(val key:Option[String] = None, val index:Option[Int] = None) {
+
+  if((key.isEmpty && index.isEmpty) || (key.isDefined && index.isDefined))
+    throw new Exception("PathComponent must have a key xor index!") // Exclusive OR
+
+  override def toString = {
+    Json.stringify(toJson)
+  }
+
+  def toJson: JsValue = {
+    val obj = mutable.Map[String, String]()
+    if(key.isDefined) {
+      obj("key") = key.get
+    } else {
+      obj("index") = index.get.toString
+    }
+    Json.toJson(obj.toMap)
+  }
+}
+
+object ReferencePath {
+
+  def isJsonPath(candidate:String):Boolean = {
+    candidate.matches(".*[/\\[\\]]+.*")
+  }
+}
+
+class ReferencePath(path:String) {
+
+  private var components = mutable.MutableList[ReferencePathComponent]()
+  private val pattern = new Regex("""([^\[\]/]+)|(\[\d+\])""")
+  private val matches = (for(m <- pattern.findAllIn(path)) yield m).toList
+
+  for(part <- matches) {
+    components += (part contains "[" match {
+      case true =>
+        new ReferencePathComponent(None, Some(part.substring(1, part.length - 1).toInt))
+      case _ =>
+        new ReferencePathComponent(Some(part), None)
+    })
+  }
+
+  def getValue(jsVal:JsValue):JsValue = {
+    var current:JsValue = jsVal
+    for(component <- components) {
+      component.key.isDefined match {
+        case true =>
+          current match {
+            case jObj:JsObject =>
+              current = jObj.value(component.key.get)
+            case _ =>
+              throw new Exception(s"Expected JSON Object with key '${component.key.get}'!")
+          }
+        case _ =>
+          current match {
+            case jArr:JsArray =>
+              val l = jArr.as[List[JsValue]]
+              current = l(component.index.get)
+            case _ =>
+              throw new Exception(s"Expected JSON Array to index with ${component.index.get}!")
+
+          }
+      }
+    }
+
+    current
+  }
+
+  def popFront():ReferencePathComponent = {
+    val head = components.head
+    components = components.slice(1, components.length)
+    head
+  }
+
+  def getComponent(i:Int):ReferencePathComponent = {
+    components(i)
+  }
+
+  override def toString = {
+    Json.stringify(toJson)
+  }
+
+  def toJson: JsValue = {
+    Json.toJson(for(component <- components) yield component.toJson)
   }
 }
 

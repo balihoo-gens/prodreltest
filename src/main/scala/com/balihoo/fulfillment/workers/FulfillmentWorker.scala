@@ -2,6 +2,9 @@ package com.balihoo.fulfillment.workers
 
 //scala imports
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
+
 import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.collection.JavaConversions._
@@ -43,6 +46,8 @@ abstract class FulfillmentWorker {
   def version = swfAdapter.version
   def taskListName = swfAdapter.taskListName
   def taskList = swfAdapter.taskList
+
+  val crypter = new Crypter("config/crypto")
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
@@ -217,7 +222,7 @@ abstract class FulfillmentWorker {
         val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
         response.setTaskToken(_lastTaskToken)
         response.setResult(getSpecification.result.sensitive match {
-          case true => getSpecification.crypter.encrypt(result)
+          case true => crypter.encrypt(result)
           case _ => result
         })
         swfAdapter.client.respondActivityTaskCompleted(response)
@@ -309,37 +314,211 @@ class ActivityResult(val rtype:String, description:String, val sensitive:Boolean
       "sensitive" -> Json.toJson(sensitive)
     ))
   }
+
+  def toSchema:JsValue = {
+    Json.obj(
+      "type" -> "object",
+      "properties" -> Json.obj(
+        "type" -> rtype,
+        "description" -> Json.obj("type" -> "string"),
+        "sensitive" -> Json.obj("type" -> "string")
+      )
+    )
+  }
 }
 
-class ActivityParameter(val name:String, val ptype:String, val description:String, val required:Boolean = true, val sensitive:Boolean = false) {
-  var value:Option[String] = None
+abstract class ActivityParameter(val name:String
+                                ,val description:String
+                                ,val required:Boolean = true
+                                ,val sensitive:Boolean = false) {
+
+  val crypter = new Crypter("config/crypto")
+  def jsonType:String
+
+  def parseValue(js:JsValue):Any
 
   def toJson:JsValue = {
     Json.toJson(Map(
       "name" -> Json.toJson(name),
-      "type" -> Json.toJson(ptype),
+      "type" -> Json.toJson(jsonType),
       "description" -> Json.toJson(description),
       "required" -> Json.toJson(required),
       "sensitive" -> Json.toJson(sensitive)
     ))
   }
+
+  def toSchema:JsValue = {
+    Json.obj(
+      "type" -> jsonType,
+      "description" -> s"$description sensitive=($sensitive)"
+    )
+  }
+
+  protected def _parseBasic[T: Reads](js:JsValue):Any = {
+    js.validate[T] match {
+      case s:JsSuccess[T] =>
+        Some(s.get)
+      case _ =>
+        throw new Exception(s"Expected $jsonType but got '${Json.stringify(js)}'!")
+    }
+  }
+
 }
 
-class ActivitySpecification(val params:List[ActivityParameter], val result:ActivityResult, val description:String = "") {
+class StringActivityParameter(override val name:String
+                             ,override val description:String
+                             ,override val required:Boolean = true
+                             ,override val sensitive:Boolean = false)
+  extends ActivityParameter(name, description, required, sensitive) {
 
-  val crypter = new Crypter("config/crypto")
+  def jsonType = "string"
+
+  def parseValue(js:JsValue):Any = {
+    if(sensitive)
+      crypter.decrypt(js.as[String])
+    else
+      js.as[String]
+  }
+}
+
+class IntegerActivityParameter(override val name:String
+                              ,override val description:String
+                              ,override val required:Boolean = true
+                              ,override val sensitive:Boolean = false)
+  extends ActivityParameter(name, description, required, sensitive) {
+
+  def jsonType = "integer"
+
+  def parseValue(js:JsValue):Any = _parseBasic[Long](js)
+}
+
+class NumberActivityParameter(override val name:String
+                               ,override val description:String
+                               ,override val required:Boolean = true
+                               ,override val sensitive:Boolean = false)
+  extends ActivityParameter(name, description, required, sensitive) {
+
+  def jsonType = "number"
+
+  def parseValue(js:JsValue):Any = _parseBasic[Double](js)
+}
+
+class BooleanActivityParameter(override val name:String
+                              ,override val description:String
+                              ,override val required:Boolean = true
+                              ,override val sensitive:Boolean = false)
+  extends ActivityParameter(name, description, required, sensitive) {
+
+  def jsonType = "boolean"
+
+  def parseValue(js:JsValue):Any = _parseBasic[Boolean](js)
+}
+
+class StringsActivityParameter(override val name:String
+                              ,override val description:String
+                              ,override val required:Boolean = true
+                              ,override val sensitive:Boolean = false)
+  extends ActivityParameter(name, description, required, sensitive) {
+
+  def jsonType = "array"
+
+  def parseValue(js:JsValue):Any = _parseBasic[List[String]](js)
+
+  override def toSchema:JsValue = {
+    Json.obj(
+      "type" -> jsonType,
+      "description" -> s"$description sensitive=($sensitive)",
+      "items" -> Json.obj(
+        "type" -> "string"
+      )
+    )
+  }
+}
+
+class ObjectActivityParameter(override val name:String
+                               ,override val description:String
+                               ,override val required:Boolean = true
+                               ,override val sensitive:Boolean = false)
+  extends ActivityParameter(name, description, required, sensitive) {
+
+  def jsonType = "object"
+
+  def parseValue(js:JsValue):Any = js.as[JsObject]
+
+  override def toSchema:JsValue = {
+    Json.obj(
+      "type" -> jsonType,
+      "description" -> s"$description sensitive=($sensitive)",
+      "properties" -> Json.obj()
+    )
+  }
+}
+
+class EnumActivityParameter(override val name:String
+                               ,override val description:String
+                               ,val options:Seq[String]
+                               ,override val required:Boolean = true
+                               ,override val sensitive:Boolean = false)
+  extends ActivityParameter(name, description, required, sensitive) {
+
+  def jsonType = "enum"
+
+  def parseValue(js:JsValue):Any = _parseBasic[String](js)
+
+  override def toSchema:JsValue = {
+    Json.obj(
+      "enum" -> Json.toJson(options)
+    )
+  }
+}
+
+class ActivitySpecification(val params:List[ActivityParameter]
+                           ,val result:ActivityResult
+                           ,val description:String = "") {
+
   val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
 
+  private val __factory = JsonSchemaFactory.byDefault()
+  private val __schema:JsonSchema = __factory.getJsonSchema(parameterSchema.as[JsonNode])
+
   def getSpecification:JsValue = {
-    Json.toJson(Map(
+    Json.obj(
       "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
       "result" -> result.toJson,
-      "description" -> Json.toJson(description)
-    ))
+      "description" -> Json.toJson(description),
+      "schema" -> parameterSchema
+    )
   }
 
   override def toString:String = {
     Json.stringify(getSpecification)
+  }
+
+  def parameterSchema:JsObject = {
+    Json.obj(
+      "$schema" ->"http://json-schema.org/draft-04/schema", // Our preferred schema
+      "type" -> "object",
+      "required" -> (for((pname, param) <- paramsMap if param.required) yield pname),
+      "properties" ->  (for((pname, param) <- paramsMap) yield pname -> param.toSchema)
+    )
+  }
+
+  def validate(js:JsValue) = {
+    val report = __schema.validate(js.as[JsonNode])
+
+    report.isSuccess match {
+      case false =>
+          throw new Exception(report.toString)
+//        for(m:ProcessingMessage <- report) {
+//          val report = Json.toJson(m.asJson).as[JsObject]
+//          report.value("domain").as[String]
+//          report.value("required").as[List[String]]
+          //        for((k, v) <- Json.toJson(m.asJson).as[JsObject].fields) {
+          //          println(s"$k:$v")
+          //        }
+//        }
+      case _ =>
+    }
   }
 
   def getParameters(input:String):ActivityParameters = {
@@ -347,60 +526,44 @@ class ActivitySpecification(val params:List[ActivityParameter], val result:Activ
   }
 
   def getParameters(inputObject:JsObject):ActivityParameters = {
+    val foundParams = mutable.Map[String, Any]()
     for((name, value) <- inputObject.fields) {
       if(paramsMap contains name) {
         val param = paramsMap(name)
-        param.value = Some(
-          if(param.sensitive)
-            crypter.decrypt(value.as[String])
-          else
-            value.as[String]
-        )
+        foundParams(name) = param.parseValue(value)
       }
     }
+    // TODO FIXME This should be handled by the schema validation
     for(param <- params) {
-      if(param.required && param.value.isEmpty) {
+      if(param.required && !(foundParams contains param.name)) {
         throw new Exception(s"input parameter '${param.name}' is REQUIRED!")
       }
     }
 
-    new ActivityParameters(
-      (for((name, param) <- paramsMap if param.value.isDefined) yield param.name -> param.value.get).toMap
-      ,Json.stringify(inputObject))
+    new ActivityParameters(foundParams.toMap, Json.stringify(inputObject))
   }
 
 }
 
-class ActivityParameters(val params:Map[String,String], val input:String = "{}") {
+class ActivityParameters(val params:Map[String,Any], val input:String = "{}") {
 
   def has(param:String):Boolean = {
     params contains param
   }
 
-  def apply(param:String):String = {
-    params(param)
+  def apply[T](param:String):T = {
+    params(param).asInstanceOf[T]
   }
 
-  def getOrElse(param:String, default:String):String = {
+  def getOrElse[T](param:String, default:T):T = {
     if(has(param)) {
-      return params(param)
+      return params(param).asInstanceOf[T]
     }
     default
   }
 
-  def getOrElse(param:String, default:Int):Int = {
-    if(has(param)) {
-      try {
-        params(param).toInt
-      } catch {
-        case _: Exception => default
-      }
-    } else {
-        default
-    }
-  }
 
-  def get(param: String): Option[String] = params.get(param)
+  def get[T](param: String): Option[T] = params.get(param).asInstanceOf[Option[T]]
 
   override def toString:String = {
     params.toString()

@@ -63,7 +63,7 @@ object adWordsLocationCriterion {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val zipString = "53001,53002,90210"
+      val zipString = List("53001", "53002", "90210")
 
       val campaignParams = new ActivityParameters(Map(
          "name" -> "fulfillment Campaign",
@@ -88,7 +88,7 @@ object adWordsSchedule {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val scheduleString = "T,Th"
+      val scheduleString = List("T", "Th")
 
       val campaignParams = new ActivityParameters(Map(
         "name" -> "fulfillment Campaign",

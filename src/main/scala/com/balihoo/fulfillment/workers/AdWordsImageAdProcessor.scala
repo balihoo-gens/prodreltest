@@ -47,13 +47,13 @@ trait ImageAdCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("account", "int", "Participant AdWords account ID"),
-        new ActivityParameter("name", "string", "Name of this ad (used to reference the ad later)"),
-        new ActivityParameter("adGroupId", "int", "AdWords AdGroup ID"),
-        new ActivityParameter("url", "string", "Landing page URL"),
-        new ActivityParameter("displayUrl", "string", "Visible Ad URL"),
-        new ActivityParameter("imageUrl", "string", "URL Location of image data for this ad"),
-        new ActivityParameter("status", "string", "ENABLED|PAUSED|DISABLED - ENABLED by default", false)
+        new StringActivityParameter("account", "Participant AdWords account ID"),
+        new StringActivityParameter("name", "Name of this ad (used to reference the ad later)"),
+        new IntegerActivityParameter("adGroupId", "AdWords AdGroup ID"),
+        new StringActivityParameter("url", "Landing page URL"),
+        new StringActivityParameter("displayUrl", "Visible Ad URL"),
+        new StringActivityParameter("imageUrl", "URL Location of image data for this ad"),
+        new EnumActivityParameter("status", "Enabled by default", List("ENABLED", "PAUSED", "DISABLED"), false)
       ), new ActivityResult("int", "ImageAd ID"),
       "Create a Google AdWords Image Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.ImageAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad")
     }
@@ -139,7 +139,7 @@ trait ImageAdCreatorComponent {
 
       val aga = new AdGroupAd()
       aga.setAd(ad)
-      aga.setAdGroupId(params("adGroupId").toLong)
+      aga.setAdGroupId(params[Long]("adGroupId"))
       aga.setStatus(AdGroupAdStatus.fromString(params.getOrElse("status", "ENABLED").toUpperCase))
 
       val operation = new AdGroupAdOperation()
@@ -161,7 +161,7 @@ trait ImageAdCreatorComponent {
     def _add(iad:ImageAd, params:ActivityParameters):ImageAd = {
       val aga = new AdGroupAd()
       aga.setAd(iad)
-      aga.setAdGroupId(params("adGroupId").toLong)
+      aga.setAdGroupId(params[Long]("adGroupId"))
       aga.setStatus(AdGroupAdStatus.fromString(params.getOrElse("status", "ENABLED").toUpperCase))
 
       val operation = new AdGroupAdOperation()
@@ -186,7 +186,7 @@ trait ImageAdCreatorComponent {
 
       val aga = new AdGroupAd()
       aga.setAd(ad)
-      aga.setAdGroupId(params("adGroupId").toLong)
+      aga.setAdGroupId(params[Long]("adGroupId"))
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)

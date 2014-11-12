@@ -2,9 +2,7 @@ package com.balihoo.fulfillment.deciders
 
 import play.api.libs.json._
 
-import scala.collection.mutable
 import org.joda.time.DateTime
-import scala.util.matching.Regex
 
 class SectionReferences(sectionNames:Seq[String], fulfillment:Fulfillment) {
 
@@ -109,83 +107,6 @@ class SectionReferences(sectionNames:Seq[String], fulfillment:Fulfillment) {
   }
 }
 
-class ReferencePathComponent(val key:Option[String] = None, val index:Option[Int] = None) {
-
-  if((key.isEmpty && index.isEmpty) || (key.isDefined && index.isDefined))
-    throw new Exception("PathComponent must have a key xor index!") // Exclusive OR
-
-  override def toString = {
-    Json.stringify(toJson)
-  }
-
-  def toJson: JsValue = {
-    val obj = mutable.Map[String, String]()
-    if(key.isDefined) {
-      obj("key") = key.get
-    } else {
-      obj("index") = index.get.toString
-    }
-    Json.toJson(obj.toMap)
-  }
-}
-
-object ReferencePath {
-
-  def isJsonPath(candidate:String):Boolean = {
-    candidate.matches(".*[/\\[\\]]+.*")
-  }
-}
-
-class ReferencePath(path:String) {
-
-  val components = mutable.MutableList[ReferencePathComponent]()
-  private val pattern = new Regex("""([^\[\]/]+)|(\[\d+\])""")
-  private val matches = (for(m <- pattern.findAllIn(path)) yield m).toList
-  val sectionName = matches.head
-  for(part <- matches.slice(1, matches.length)) {
-    components += (part contains "[" match {
-      case true =>
-        new ReferencePathComponent(None, Some(part.substring(1, part.length - 1).toInt))
-      case _ =>
-        new ReferencePathComponent(Some(part), None)
-    })
-  }
-
-  def getValue(jsVal:JsValue):JsValue = {
-    var current:JsValue = jsVal
-    for(component <- components) {
-      component.key.isDefined match {
-        case true =>
-          current match {
-            case jObj:JsObject =>
-              current = jObj.value(component.key.get)
-            case _ =>
-              throw new Exception(s"Expected JSON Object with key '${component.key.get}'!")
-          }
-        case _ =>
-          current match {
-            case jArr:JsArray =>
-              val l = jArr.as[List[JsValue]]
-              current = l(component.index.get)
-            case _ =>
-              throw new Exception(s"Expected JSON Array to index with ${component.index.get}!")
-
-          }
-      }
-    }
-
-    current
-  }
-
-  override def toString = {
-    Json.stringify(toJson)
-  }
-
-  def toJson: JsValue = {
-    Json.toJson(for(component <- components) yield component.toJson)
-  }
-}
-
 class SectionReference(referenceString:String) {
 
   protected var _sectionName = "-undefined-"
@@ -197,7 +118,8 @@ class SectionReference(referenceString:String) {
     case false => _sectionName = referenceString
     case _ =>
       path = Some(new ReferencePath(referenceString))
-      _sectionName = path.get.sectionName
+      val head = path.get.popFront()
+      _sectionName = head.key.get
   }
 
   def getValue:JsValue = {

@@ -13,10 +13,10 @@ class AbstractRESTClient extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ActivityParameter("url", "string", "The service URL"),
-      new ActivityParameter("headers", "JSON", "This object's attributes will be added to the HTTP request headers.", false),
-      new ActivityParameter("method", "string", "DELETE, GET, POST, or PUT"),
-      new ActivityParameter("body", "string", "The request body for POST or PUT operations, ignored for GET and DELETE")
+      new StringActivityParameter("url", "The service URL"),
+      new ObjectActivityParameter("headers", "This object's attributes will be added to the HTTP request headers.", false),
+      new EnumActivityParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
+      new StringActivityParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
     ), new ActivityResult("JSON", "An object containing statusCode and body attributes"))
   }
 
@@ -24,8 +24,8 @@ class AbstractRESTClient extends FulfillmentWorker {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
     withTaskHandling {
       val url = new URL(params("url"))
-      val headers = Json.parse(params.getOrElse("headers", "{}")).as[Map[String, String]].toList
-      val method = params("method")
+      val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
+      val method = params[String]("method")
       lazy val body = params("body")
       splog.info(s"REST client was asked to $method $url")
 

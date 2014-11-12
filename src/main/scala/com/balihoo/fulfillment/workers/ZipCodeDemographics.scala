@@ -15,8 +15,8 @@ abstract class AbstractZipCodeDemographics extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("demographicsQuery", "JSON", "Demographics Query"),
-        new ActivityParameter("participantId", "int", "Participant Identifier")
+        new ObjectActivityParameter("demographicsQuery", "Demographics Query"),
+        new StringActivityParameter("participantId", "Participant Identifier")
       ), new ActivityResult("string", "A list of zip codes 'ZZZZZ,ZZZZZ,ZZZZZ..."))
   }
 

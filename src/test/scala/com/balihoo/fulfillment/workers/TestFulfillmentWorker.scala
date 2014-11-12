@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.workers
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.github.fge.jsonschema.main.{JsonSchemaFactory, JsonSchema}
 import org.keyczar.Crypter
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -17,23 +19,25 @@ class TestFulfillmentWorker extends Specification with Mockito
     "be initialized without error" in {
 
       val spec = new ActivitySpecification(List(
-        new ActivityParameter("param1", "ocelot", "Param 1 is an Ocelot"),
-        new ActivityParameter("param2", "not an ocelot", "Param 2 is NOT an Ocelot", false, true)
+        new StringActivityParameter("param1", "Param 1 is an Ocelot"),
+        new NumberActivityParameter("param2", "Param 2 is NOT an Ocelot", false, true)
       ), new ActivityResult("result type", "really interesting description"),
        "description for the whole activity. Notes and stuff")
+
+      val schema = """{"$schema":"http://json-schema.org/draft-04/schema","type":"object","required":["param1"],"properties":{"param1":{"type":"string","description":"Param 1 is an Ocelot sensitive=(false)"},"param2":{"type":"number","description":"Param 2 is NOT an Ocelot sensitive=(true)"}}}"""
 
       spec.getSpecification mustEqual Json.toJson(Map(
         "parameters" -> Json.toJson(Map(
           "param1" -> Json.toJson(Map(
             "name" -> Json.toJson("param1"),
-            "type" -> Json.toJson("ocelot"),
+            "type" -> Json.toJson("string"),
             "description" -> Json.toJson("Param 1 is an Ocelot"),
             "required" -> Json.toJson(true),
             "sensitive" -> Json.toJson(false)
           )),
           "param2" -> Json.toJson(Map(
             "name" -> Json.toJson("param2"),
-            "type" -> Json.toJson("not an ocelot"),
+            "type" -> Json.toJson("number"),
             "description" -> Json.toJson("Param 2 is NOT an Ocelot"),
             "required" -> Json.toJson(false),
             "sensitive" -> Json.toJson(true)
@@ -43,16 +47,18 @@ class TestFulfillmentWorker extends Specification with Mockito
           "description" -> Json.toJson("really interesting description"),
           "sensitive" -> Json.toJson(false)
         )),
-        "description" -> Json.toJson("description for the whole activity. Notes and stuff")
-      ))
+        "description" -> Json.toJson("description for the whole activity. Notes and stuff"),
+        "schema" -> Json.parse(schema)
+      )
+      )
 
     }
 
     "properly filter json input" in {
 
       val spec = new ActivitySpecification(List(
-        new ActivityParameter("param1", "ocelot", "Param 1 is an Ocelot"),
-        new ActivityParameter("param2", "not an ocelot", "Param 2 is NOT an Ocelot", false)
+        new StringActivityParameter("param1", "Param 1 is an Ocelot"),
+        new NumberActivityParameter("param2", "Param 2 is NOT an Ocelot", false)
       ), new ActivityResult("result type", "really interesting description"))
 
       val params = spec.getParameters(
@@ -63,16 +69,17 @@ class TestFulfillmentWorker extends Specification with Mockito
         """.stripMargin)
 
       params.has("param2") mustEqual false
-      params.getOrElse("param2", "indigo") mustEqual "indigo"
-      params("param1") mustEqual "flesh of the tuna"
+      params.getOrElse("param2", 675) mustEqual 675
+      params[String]("param1") mustEqual "flesh of the tuna"
       params.getOrElse("param1", "beefeater") mustEqual "flesh of the tuna"
+
     }
 
     "properly decrypt sensitive parameters" in {
 
       val spec = new ActivitySpecification(List(
-        new ActivityParameter("param1", "ocelot", "Param 1 is an Ocelot", true, true),
-        new ActivityParameter("param2", "not an ocelot", "Param 2 is NOT an Ocelot", false)
+        new StringActivityParameter("param1", "Param 1 is an Ocelot", true, true),
+        new StringActivityParameter("param2", "Param 2 is NOT an Ocelot", false)
       ), new ActivityResult("result type", "really interesting description"))
 
       val input = "super secret secrets about tuna flesh"
@@ -88,15 +95,15 @@ class TestFulfillmentWorker extends Specification with Mockito
 
       params.has("param2") mustEqual false
       params.getOrElse("param2", "indigo") mustEqual "indigo"
-      params("param1") mustEqual input
+      params[String]("param1") mustEqual input
       params.getOrElse("param1", "beefeater") mustEqual input
     }
 
     "be upset about missing params that are required" in {
 
       val spec = new ActivitySpecification(List(
-        new ActivityParameter("param1", "ocelot", "Param 1 is an Ocelot"),
-        new ActivityParameter("param2", "not an ocelot", "Param 2 is NOT an Ocelot", false)
+        new StringActivityParameter("param1", "Param 1 is an Ocelot"),
+        new StringActivityParameter("param2", "Param 2 is NOT an Ocelot", false)
       ), new ActivityResult("result type", "really interesting description"))
 
       spec.getParameters(
@@ -104,6 +111,32 @@ class TestFulfillmentWorker extends Specification with Mockito
           | "param2" : "all kinds of angry"
           |}
         """.stripMargin) must throwA[Exception](message = "input parameter 'param1' is REQUIRED!")
+    }
+
+    "produce a valid jsonSchema for parameters" in {
+      val spec = new ActivitySpecification(List(
+        new StringActivityParameter("param1", "Param 1 is a string"),
+        new NumberActivityParameter("param2", "Param 2 is a number", false, true)
+      ), new ActivityResult("result type", "really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val factory = JsonSchemaFactory.byDefault()
+
+      println(spec.parameterSchema)
+      val schema:JsonSchema = factory.getJsonSchema(spec.parameterSchema.as[JsonNode])
+
+      val input:JsonNode = Json.parse(
+        """{
+              "param1" : "stuff",
+              "param6" : "will be ignored"
+          }""").as[JsonNode]
+
+//      println(schema)
+
+      val report = schema.validate(input)
+
+      report.isSuccess
+
     }
   }
 }

@@ -31,8 +31,8 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
     splog.debug(s"using script $scriptName")
     val scriptData = Source.fromURL(getClass.getResource("/" + scriptName))
     val scriptFile = new FileWriter(scriptPath)
-    scriptData.getLines.foreach((line:String) => scriptFile.write(s"$line\n"))
-    scriptFile.close
+    scriptData.getLines().foreach((line:String) => scriptFile.write(s"$line\n"))
+    scriptFile.close()
     scriptPath
   }
 
@@ -55,13 +55,13 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("source", "string", "The URL of of the page to render"),
-        new ActivityParameter("clipselector", "string", "The selector used to clip the page", false),
-        new ActivityParameter("data", "string", "Optional URLEncoded POST data. Not providing this will use GET", false),
-        new ActivityParameter("headers", "string", "Optional headers", false),
-        new ActivityParameter("maxsize", "int", "Maximum size for the image (bytes)", false),
-        new ActivityParameter("minquality", "int", "Minimum quality of the image (percent)", false),
-        new ActivityParameter("target", "string", "The S3 filename of the resulting image")
+        new StringActivityParameter("source", "The URL of of the page to render"),
+        new StringActivityParameter("clipselector", "The selector used to clip the page", false),
+        new StringActivityParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", false),
+        new StringActivityParameter("headers", "Optional headers", false),
+        new IntegerActivityParameter("maxsize", "Maximum size for the image (bytes)", false),
+        new IntegerActivityParameter("minquality", "Minimum quality of the image (percent)", false),
+        new StringActivityParameter("target", "The S3 filename of the resulting image")
       ), new ActivityResult("string", "the target URL if successfully saved"))
   }
 
@@ -119,7 +119,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
   def render(input:MutableMap[String,String]): String = {
     val jsinput = Json.stringify(Json.toJson(input.toMap))
-    splog.debug(s"running process with ${jsinput}")
+    splog.debug(s"running process with $jsinput")
     val result = command.run(jsinput)
     splog.debug(s"process out: ${result.out}")
     splog.debug(s"process err: ${result.err}")

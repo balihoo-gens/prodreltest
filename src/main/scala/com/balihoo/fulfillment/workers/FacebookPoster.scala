@@ -27,16 +27,16 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ActivityParameter("appId", "string", "The Facebook app ID"),
-      new ActivityParameter("appSecret", "string", "The Facebook app secret", sensitive = true),
-      new ActivityParameter("accessToken", "string", "The Facebook access token", sensitive = true),
-      new ActivityParameter("postType", "string", "\"link\", \"photo\", or \"status update\""),
-      new ActivityParameter("pageId", "string", "The Facebook page ID"),
-      new ActivityParameter("target", "JSON", "The targeting data"),
-      new ActivityParameter("message", "string", "The message to post", required = false),
-      new ActivityParameter("linkUrl", "string", "A link to include in the post", required = false),
-      new ActivityParameter("photoUrl", "string", "The URL of the photo to include in the post", required = false),
-      new ActivityParameter("action", "string", "\"validate\" or \"publish\"")
+      new StringActivityParameter("appId", "The Facebook app ID"),
+      new StringActivityParameter("appSecret", "The Facebook app secret", sensitive = true),
+      new StringActivityParameter("accessToken", "The Facebook access token", sensitive = true),
+      new EnumActivityParameter("postType", "", List("link", "photo", "status update")),
+      new StringActivityParameter("pageId", "The Facebook page ID"),
+      new ObjectActivityParameter("target", "The targeting data"),
+      new StringActivityParameter("message", "The message to post", required = false),
+      new StringActivityParameter("linkUrl", "A link to include in the post", required = false),
+      new StringActivityParameter("photoUrl", "The URL of the photo to include in the post", required = false),
+      new EnumActivityParameter("action", "", List("validate", "publish"))
     ), new ActivityResult("string", "the Facebook post ID if the action is \"publish\", otherwise ignore this value"))
   }
 
@@ -59,10 +59,9 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
    */
   private def getPhotoBytes(url: Option[String]): Array[Byte] = {
     url match {
-      case Some(u) => {
+      case Some(u) =>
         splog.info(s"Facebook poster downloading $u")
         IOUtils.toByteArray(new URL(u))
-      }
       case None => null
     }
   }
@@ -71,19 +70,19 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
-      val appId = params("appId")
-      val appSecret = params("appSecret")
-      val accessToken = params("accessToken")
+      val appId:String = params[String]("appId")
+      val appSecret:String = params[String]("appSecret")
+      val accessToken = params[String]("accessToken")
       val connection = new FacebookConnection(appId, appSecret, accessToken)
-      val postType = params("postType")
-      val pageId = params("pageId")
-      val target = createTarget(params("target"))
-      val message = params.getOrElse("message", null)
-      lazy val linkUrl = params.getOrElse("linkUrl", null)
-      lazy val photoUrl = params.get("photoUrl")
+      val postType = params[String]("postType")
+      val pageId:String = params[String]("pageId")
+      val target = createTarget(params[JsObject]("target"))
+      val message:String = params.getOrElse[String]("message", null)
+      lazy val linkUrl:String = params.getOrElse[String]("linkUrl", null)
+      lazy val photoUrl = params.get[String]("photoUrl")
       lazy val photoBytes = getPhotoBytes(photoUrl)
       lazy val photoName = getPhotoName(photoUrl)
-      val action = params("action")
+      val action = params[String]("action")
       splog.info(s"Facebook poster was asked to $action a $postType. The page ID is $pageId.")
 
       (action, postType) match {
@@ -109,12 +108,11 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
    * - subregions is an array of names of counties or county equivalent areas, which will be resolved to city IDs by the worker.
    * - cityIds is an array of Facebook city IDs.
    * - cities is an array of city names, which will be resolved to city IDs by the worker.
-   * @param jsonString the input
+   * @param json JsObject the input
    * @return the output
    */
-  private def createTarget(jsonString: String): Target = {
+  private def createTarget(json: JsObject): Target = {
     // Parse the JSON
-    val json = Json.parse(jsonString).as[JsObject]
     val countryCodes = (json \ "countryCodes").asOpt[Seq[String]]
     val regionIds = (json \ "regionIds").asOpt[Seq[Int]]
     val subregions = (json \ "subregions").asOpt[Seq[String]]

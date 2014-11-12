@@ -127,8 +127,8 @@ abstract class AbstractGeoNamesTimeZoneRetriever extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ActivityParameter("lat", "float", ""),
-      new ActivityParameter("lon", "float", "")
+      new StringActivityParameter("lat", ""),
+      new StringActivityParameter("lon", "")
     ), new ActivityResult("string", "Timezone like (America/Denver)"))
   }
 
