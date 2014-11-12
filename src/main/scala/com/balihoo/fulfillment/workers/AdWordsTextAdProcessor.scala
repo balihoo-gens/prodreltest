@@ -47,13 +47,13 @@ trait TextAdCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("account", "int", "Participant AdWords account ID"),
-        new ActivityParameter("adGroupId", "int", "AdWords AdGroup ID"),
-        new ActivityParameter("headline", "string", "Headline of the ad (25 chars)"),
-        new ActivityParameter("description1", "string", "First line of ad text (35 chars)"),
-        new ActivityParameter("description2", "string", "Second line of ad text (35 chars)"),
-        new ActivityParameter("url", "string", "Landing page URL (domain must match displayUrl)"),
-        new ActivityParameter("displayUrl", "string", "Visible Ad URL")
+        new StringActivityParameter("account", "Participant AdWords account ID"),
+        new IntegerActivityParameter("adGroupId", "AdWords AdGroup ID"),
+        new StringActivityParameter("headline", "Headline of the ad (25 chars)"),
+        new StringActivityParameter("description1", "First line of ad text (35 chars)"),
+        new StringActivityParameter("description2", "Second line of ad text (35 chars)"),
+        new StringActivityParameter("url", "Landing page URL (domain must match displayUrl)"),
+        new StringActivityParameter("displayUrl", "Visible Ad URL")
       ), new ActivityResult("int", "TextAd ID"),
         "Create a Google AdWords Text Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.TextAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad" )
     }
@@ -122,7 +122,7 @@ trait TextAdCreatorComponent {
     def _add(tad:TextAd, params:ActivityParameters):TextAd = {
       val aga = new AdGroupAd()
       aga.setAd(tad)
-      aga.setAdGroupId(params("adGroupId").toLong)
+      aga.setAdGroupId(params[Long]("adGroupId"))
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)
@@ -143,7 +143,7 @@ trait TextAdCreatorComponent {
     def _remove(tad:TextAd, params:ActivityParameters) = {
       val aga = new AdGroupAd()
       aga.setAd(tad)
-      aga.setAdGroupId(params("adGroupId").toLong)
+      aga.setAdGroupId(params[Long]("adGroupId"))
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)

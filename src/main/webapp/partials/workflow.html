@@ -10,6 +10,7 @@
         <h1>Workflow » {{workflow.workflowId}}</h1>
         <div ng-show="toolsVisible">
             <span>
+                <span class="muted red label" ng-click="pingWorkflow()">Ping</span>
                 <span class="muted red label" ng-click="promptCancelWorkflow()">Cancel</span>
                 <span class="muted red label" ng-click="promptTerminateWorkflow()">Terminate</span>
             </span>
@@ -71,7 +72,7 @@
                         <button class="btn btn-xs pull-right" ng-click="newWorkflow()">Create New Fulfillment</button>
                         <b>Fulfillment Input</b>
                     </div>
-                    <pre class="json" ng-bind-html="formatUtil.prettyJson(workflow.history[0].input)"></pre>
+                    <pre class="json" ng-bind-html="formatUtil.prettyJsonEscaped(workflow.history[0].input)"></pre>
                 </div>
                 <div id="historyView" class="panel panel-default initiallyHidden">
                     <div class="panel-heading-small historyViewToggle">
@@ -118,6 +119,17 @@
                             <div ng-hide="section.input.action.name" class="pull-right">
                                 <i class="muted">Operator</i>&nbsp; {{section.input.action}} &nbsp;&nbsp;
                             </div>
+                            <script type="text/ng-template" id="paramJson">
+                                <div class="paramJson" ng-if="formatUtil.isObject(json)">
+                                    {<div ng-repeat="(k, v) in json">
+                                        <div class="paramJson"><b>{{k}}</b> : <span ng-include="'paramJson'" ng-init="json = v"></span></div>
+                                    </div>}
+                                </div>
+                                <div class="paramJson" ng-if="formatUtil.isArray(json)">
+                                    [<div ng-include="'paramJson'" ng-repeat="j in json" ng-init="json = j"></div>]
+                                </div>
+                                <span class="paramJson" ng-if="formatUtil.isSimple(json)" ng-bind-html="formatUtil.jsonFormat(json)"></span>
+                            </script>
                             <h3>Parameters</h3>
                             <table class="table table-condensed table-hover block params" style="width:95%">
                                 <tr ng-repeat="(pname, param) in section.params" ng-class="{info : param.edited}">
@@ -125,36 +137,21 @@
                                     <td>
 
                                         <div style="width:92%">
-                                            <div ng-if="param.isJson">
-                                    <span ng-if="!param.editing">
-                                        <span class="json" ng-bind-html="formatUtil.jsonFormat(param.value)"></span>
-                                    </span>
-                                    <span ng-if="param.editing">
-                                                <textarea rows="15" class="form-control" ng-model="param.value"></textarea>
-                                        </span>
+                                            <!--<span ng-bind-html="formatUtil.jsonFormat(param)" ></span>-->
+
+                                            <div ng-show="!param.editing">
+                                                <div ng-if="param.root.resolved">
+                                                    <span ng-show="param.root.needsEvaluation" class="fa fa-code muted blue action pull-right" ng-click="param.showInput = !param.showInput"></span>
+                                                    <span ng-include="'paramJson'" onload="json = param.root.result"></span>
+                                                </div>
+                                                <div ng-show="param.showInput">
+                                                    <span class="muted" ng-include="'paramJson'" onload="json = param.root.input"></span>
+                                                </div>
+                                            </div>
+                                            <div ng-show="param.editing">
+                                                <textarea rows="10" class="form-control" ng-model="param.editText"></textarea>
                                             </div>
 
-                                            <div ng-if="param.isArray">
-                                        <span ng-if="!param.editing">
-                                            <div ng-repeat="item in param.value">
-                                                <span class="label {{figureStatusLabel(workflow.sections[item.name].status)}}" ng-click="scrollToSection(item.name)">{{item.name}}<span ng-repeat="pathItem in item.path"><span ng-show="pathItem.key">/{{pathItem.key}}</span><span ng-show="pathItem.index">[{{pathItem.index}}]</span></span></span>&nbsp;<span ng-show="item.resolved" ng-bind-html="formatUtil.jsonFormat(item.value)"></span></div>
-                                        </span>
-                                        <span ng-if="param.editing">
-                                            <select ng-repeat="item in param.value" ng-model="item">
-                                                <option ng-repeat="(sectionName, otherSection) in workflow.sections" ng-selected="sectionName == item.name">{{sectionName}}</option>
-                                            </select>
-                                            <i class="fa fa-plus muted action" ng-click="addSection(param.value)"></i>
-                                        </span>
-                                            </div>
-
-                                            <div ng-if="param.isString && !param.isJson">
-                                        <span ng-if="!param.editing">
-                                            <span ng-bind-html="formatUtil.formatURLs(param.value)"></span>
-                                        </span>
-                                        <span ng-if="param.editing">
-                                                <input type="text" class="form-control" ng-model="param.value">
-                                        </span>
-                                            </div>
                                         </div>
                                     </td>
                                     <td>
@@ -162,7 +159,7 @@
                                         <i class="fa fa-pencil muted action" ng-click="param.editing = true"></i>
                                     </span>
                                     <span ng-if="param.editing" style="vertical-align: middle">
-                                            <span class="fa fa-check muted green action" ng-show="param.value != param.original" ng-click="finishEditing(param)"></span>
+                                            <span class="fa fa-check muted green action" ng-show="param.editText != param.originalText" ng-click="finishEditing(param)"></span>
                                             <span class="fa fa-remove muted red action" ng-click="cancelEdit(param)"></span>
                                     </span>
                                     </td>

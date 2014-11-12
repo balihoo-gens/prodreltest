@@ -7,7 +7,6 @@ import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 
 import scala.collection.mutable
-import scala.util.matching.Regex
 
 object SectionStatus extends Enumeration {
   val READY = Value("READY")
@@ -24,7 +23,6 @@ object SectionStatus extends Enumeration {
   val IMPOSSIBLE = Value("IMPOSSIBLE") // Section can never be completed
 
 }
-
 class ActionParams(var maxRetries:Int, var delaySeconds:Int) {
   def toJson: JsValue = {
     Json.obj(
@@ -77,11 +75,10 @@ class FulfillmentSection(val name: String
                          ,val creationDate:DateTime) {
 
   var action: Option[ActivityType] = None
-  var operator: Option[String] = None
-  val params = collection.mutable.Map[String, Any]()
+  val params = collection.mutable.Map[String, SectionParameter]()
   val prereqs = mutable.MutableList[String]()
   val timeline = new Timeline
-  var value: String = ""
+  var value: JsValue = JsNull
 
   var status = SectionStatus.CONTINGENT
 
@@ -138,7 +135,7 @@ class FulfillmentSection(val name: String
           waitUntil = Some(new DateTime(v.as[String]))
 
         case "value" =>
-          value = v.as[String]
+          value = v
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
@@ -149,28 +146,20 @@ class FulfillmentSection(val name: String
 
   def jsonInitAction(jaction: JsValue) = {
     jaction match {
-      case jObj:JsObject =>
+      case jObj: JsObject =>
         action = Some(new ActivityType)
         action.get.setName(jObj.value("name").as[String])
         action.get.setVersion(jObj.value("version").as[String])
         handleActionParams(jObj)
-      case jStr:JsString =>
-        operator = Some(jStr.as[String])
+
       case _ =>
         timeline.error(s"Action '${Json.stringify(jaction)}' is of type '${jaction.getClass.toString}'. This is not a valid type.", Some(creationDate))
     }
   }
 
   def jsonInitParams(jparams: JsObject) = {
-    for((jk, jv) <- jparams.fields) {
-      jv match {
-        case jArr: JsArray =>
-          params(jk) = new SectionReferences(jArr.as[List[String]])
-        case jStr: JsString =>
-          params(jk) = jv.as[String]
-        case _ =>
-          timeline.error(s"Parameter '$jk' is of type '${jv.getClass.toString}'. This is not a valid type.", Some(creationDate))
-      }
+    for((jk:String, jv:JsValue) <- jparams.fields) {
+      params(jk) = new SectionParameter(jv)
     }
   }
 
@@ -186,22 +175,29 @@ class FulfillmentSection(val name: String
           val failure = avalue.as[JsObject]
           failureParams.maxRetries =  failure.value("max").as[String].toInt
           failureParams.delaySeconds =  failure.value("delay").as[String].toInt
+
         case "timeout" =>
           val timeout = avalue.as[JsObject]
           timeoutParams.maxRetries =  timeout.value("max").as[String].toInt
           timeoutParams.delaySeconds =  timeout.value("delay").as[String].toInt
+
         case "cancelation" =>
           val cancelation = avalue.as[JsObject]
           cancelationParams.maxRetries =  cancelation.value("max").as[String].toInt
           cancelationParams.delaySeconds =  cancelation.value("delay").as[String].toInt
+
         case "startToCloseTimeout" =>
           startToCloseTimeout = Some(avalue.as[String])
+
         case "scheduleToCloseTimeout" =>
           scheduleToCloseTimeout = Some(avalue.as[String])
+
         case "scheduleToStartTimeout" =>
           scheduleToStartTimeout = Some(avalue.as[String])
+
         case "heartbeatTimeout" =>
           heartbeatTimeout = Some(avalue.as[String])
+
         case _ =>
       }
     }
@@ -231,7 +227,7 @@ class FulfillmentSection(val name: String
   def setCompleted(result:String, when:DateTime) = {
     status = SectionStatus.COMPLETE
     timeline.success("Completed", Some(when))
-    value = result
+    value = JsString(result)
   }
 
   def setFailed(reason:String, details:String, when:DateTime) = {
@@ -290,23 +286,23 @@ class FulfillmentSection(val name: String
     SectionStatus.withName(ss) match {
       case SectionStatus.READY =>
         setReady(message, when)
+
       case SectionStatus.FAILED =>
         setFailed("FAILED", message, when)
+
       case SectionStatus.TERMINAL =>
         setTerminal(message, when)
+
       case _ =>
         throw new Exception(s"Can't generically set status to '$ss'!")
     }
   }
 
-  def resolveReferences(fulfillment:Fulfillment):Boolean = {
+  def promoteContingentReferences(fulfillment:Fulfillment):Boolean = {
     if(status == SectionStatus.READY) {
       for((pname, param) <- params) {
-        param match {
-          case sectionReferences: SectionReferences =>
-            sectionReferences.processReferences(fulfillment)
-          case _ =>
-        }
+        // attempting to evaluate the parameter will cause any needed promotions
+        param.evaluate(fulfillment)
       }
     }
     true // <-- cause it's recursive... I guess..
@@ -328,18 +324,34 @@ class FulfillmentSection(val name: String
     }
   }
 
+  def gatherParameters():Map[String,String] = {
+
+    val oparams = mutable.Map[String, String]()
+
+    for((name, param) <- params) {
+      if(!param.isResolved) {
+        throw new Exception(s"Unresolved parameter '$name'!")
+      }
+      oparams(name) = Json.stringify(param.getResult.get)
+    }
+
+    oparams.toMap
+  }
+
+  def evaluateParameters(fulfillment:Fulfillment) = {
+    for((name, param) <- params) {
+      param.evaluate(fulfillment)
+    }
+  }
+
   def resolvable(fulfillment:Fulfillment): Boolean = {
     if(List(SectionStatus.IMPOSSIBLE, SectionStatus.TERMINAL).contains(status)) {
       return false
     }
 
     for((pname, param) <- params) {
-      param match {
-        case sectionReferences: SectionReferences =>
-          if(!sectionReferences.resolvable(fulfillment)) {
-            return false
-          }
-        case _ =>
+      if(!param.isResolvable) {
+        return false
       }
     }
     true
@@ -352,13 +364,7 @@ class FulfillmentSection(val name: String
   def toJson: JsValue = {
     val jparams = collection.mutable.Map[String, JsValue]()
     for((pname, param) <- params) {
-      param match {
-        case sectionReferences: SectionReferences =>
-          jparams(pname) = sectionReferences.toJson
-        case s:String =>
-          jparams(pname) = Json.toJson(s)
-        case _ =>
-      }
+      jparams(pname) = param.toJson
     }
 
     val jtimeline = Json.toJson(for(entry <- timeline.events) yield entry.toJson)
@@ -389,253 +395,126 @@ class FulfillmentSection(val name: String
   }
 }
 
-class ReferencePathComponent(val key:Option[String] = None, val index:Option[Int] = None) {
+class ReferenceNotReady(message:String) extends Exception(message)
+class ReferenceNotResolvable(message:String) extends Exception(message)
 
-  if((key.isEmpty && index.isEmpty) || (key.isDefined && index.isDefined))
-    throw new Exception("PathComponent must have a key xor index!") // Exclusive OR
+class SectionParameter(input:JsValue) {
 
-  override def toString = {
-    Json.stringify(toJson)
+  protected var record:JsValue = JsNull
+  protected var fulfillment:Option[Fulfillment] = None
+  protected val inputString = Json.stringify(input)
+  protected val needsEvaluation = inputString contains "<("
+
+  protected var evaluated:Boolean = !needsEvaluation
+  protected var result:Option[JsValue] = evaluated match {
+    case true => Some(input)
+    case _ => None
+
   }
+  protected var resolvable:Boolean = true
 
-  def toJson: JsValue = {
-    val obj = mutable.Map[String, String]()
-    if(key.isDefined) {
-      obj("key") = key.get
-    } else {
-      obj("index") = index.get.toString
-    }
-    Json.toJson(obj.toMap)
-  }
-}
-
-object ReferencePath {
-
-  def isJsonPath(candidate:String):Boolean = {
-    candidate.matches(".*[/\\[\\]]+.*")
-  }
-}
-
-class ReferencePath(path:String) {
-
-  val components = mutable.MutableList[ReferencePathComponent]()
-  private val pattern = new Regex("""([^\[\]/]+)|(\[\d+\])""")
-  private val matches = (for(m <- pattern.findAllIn(path)) yield m).toList
-  val sectionName = matches.head
-  for(part <- matches.slice(1, matches.length)) {
-    components += (part contains "[" match {
-      case true =>
-        new ReferencePathComponent(None, Some(part.substring(1, part.length - 1).toInt))
+  protected def _evaluateJsValue(js:JsValue):JsValue = {
+    js match {
+      case jObj: JsObject =>
+        _evaluateJsObject(jObj)
+      case jArr: JsArray =>
+        _evaluateJsArray(jArr)
       case _ =>
-        new ReferencePathComponent(Some(part), None)
-    })
+        js
+    }
   }
 
-  def getValue(jsonString:String):String = {
-    var current:JsValue = try {
-      Json.parse(jsonString)
-    } catch {
-      case e:Exception =>
-        throw new Exception(s"Failed to parse JSON '$jsonString':"+e.getMessage)
+  protected def _evaluateJsObject(jObj:JsObject):JsValue = {
+    jObj.fields.size match {
+      case 1 =>
+        val firstKey = jObj.keys.head.toLowerCase
+        if(firstKey.startsWith("<(section)>")) { // SECTIONS are special..
+          return _processReference(
+            jObj.value("<(section)>") match {
+              case ss:JsString => List(ss.value)
+              case ls:JsArray => ls.as[List[String]]
+              case _ =>
+                throw new Exception("Section References must be a String or Array[String]")
+            })
+        } else if(firstKey.startsWith("<(")) {
+          return _processOperator(jObj)
+        }
+      case _ =>
     }
 
-    for(component <- components) {
-      component.key.isDefined match {
-        case true =>
-          current match {
-            case jObj:JsObject =>
-              current = jObj.value(component.key.get)
-            case _ =>
-              throw new Exception(s"Expected JSON Object with key '${component.key.get}'!")
-          }
-        case _ =>
-          current match {
-            case jArr:JsArray =>
-              val l = jArr.as[List[JsValue]]
-              current = l(component.index.get)
-            case _ =>
-              throw new Exception(s"Expected JSON Array to index with ${component.index.get}!")
+    // This Object isn't an operator.. just recurse and return
+    Json.toJson((for((k, v) <- jObj.fields) yield k -> _evaluateJsValue(v)).toMap)
+  }
 
-          }
+  protected def _evaluateJsArray(jArr:JsArray):JsValue = {
+    Json.toJson(for(j <- jArr.value) yield _evaluateJsValue(j))
+  }
+
+  protected def _processOperator(jObj:JsObject):JsValue = {
+    val (rawop, operand) : (String, JsValue) = jObj.fields(0)
+    val opName = rawop.substring(2, rawop.length - 2) // trim off the <( .. )>
+
+    JsonOps(JsonOpName.withName(opName.toLowerCase), _evaluateJsValue(operand))
+  }
+
+  protected def _processReference(nameList:List[String]):JsValue = {
+    val sectionRef = new SectionReferences(nameList, fulfillment.get)
+    sectionRef.resolved() match {
+      case true => sectionRef.getValue
+      case false =>
+        resolvable &= sectionRef.resolvable()
+        resolvable match {
+          case true =>
+            sectionRef.promoteContingentReferences()
+            throw new ReferenceNotReady(sectionRef.toString)
+          case false =>
+            throw new ReferenceNotResolvable(sectionRef.toString)
+        }
+    }
+  }
+
+  def evaluate(f:Fulfillment) = {
+    if(!evaluated) {
+      evaluated = true
+      fulfillment = Some(f)
+      try {
+        result = Some(_evaluateJsValue(input))
+      } catch {
+        case rne:ReferenceNotReady =>
+          f.timeline.note(s"Reference not ready! ${rne.getMessage}", Some(DateTime.now()))
+        case rnr:ReferenceNotResolvable =>
+          f.timeline.warning(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
+        case e: Exception => // Unexpected! Throw!
+          throw e
+
       }
     }
-
-    current.as[String]
   }
 
-  override def toString = {
-    Json.stringify(toJson)
+  def getResult:Option[JsValue] = {
+    result
   }
 
-  def toJson: JsValue = {
-    Json.toJson(for(component <- components) yield component.toJson)
-  }
-}
-
-class SectionReference(referenceString:String) {
-
-  protected var _sectionName = "-undefined-"
-  var dismissed:Boolean = false
-  var section:Option[FulfillmentSection] = None
-  var path:Option[ReferencePath] = None
-
-  ReferencePath.isJsonPath(referenceString) match {
-    case false => _sectionName = referenceString
-    case _ =>
-      path = Some(new ReferencePath(referenceString))
-      _sectionName = path.get.sectionName
+  def isResolved:Boolean = {
+    result.isDefined
   }
 
-  def getValue:String = {
-    if(section.isEmpty) { return null; }
-    path.isEmpty match {
-      case true => section.get.value
-      case _ =>
-        path.get.getValue(section.get.value)
-    }
+  def isResolvable:Boolean = {
+    resolvable
   }
 
-  def isValid:Boolean = {
-    section.isDefined
-  }
-
-  def name:String = {
-    _sectionName
+  def isEvaluated:Boolean = {
+    evaluated
   }
 
   def toJson:JsValue = {
     Json.obj(
-      "name" -> name,
-      "dismissed" -> dismissed,
-      "path" -> (path.isDefined match {
-        case true => path.get.toJson
-        case _ => new JsArray
-      }),
-      "resolved" -> (section.isDefined match {
-        case true => section.get.status == SectionStatus.COMPLETE
-        case _ => false
-      }),
-      "value" -> Json.toJson(
-        try {
-          getValue
-        } catch {
-          case e: Exception =>
-            "--ERROR--"
-        })
+      "input" -> input,
+      "result" -> (if(result.isDefined) { result.get } else { JsNull }),
+      "resolvable" -> resolvable,
+      "resolved" -> result.isDefined,
+      "evaluated" -> evaluated,
+      "needsEvaluation" -> needsEvaluation
     )
   }
 }
-
-class SectionReferences(sectionNames:List[String]) {
-
-  val sections = for(name <- sectionNames) yield new SectionReference(name)
-
-  def hydrate(fulfillment:Fulfillment) = {
-    for(sectionRef <- sections) {
-      if(fulfillment.hasSection(sectionRef.name)) {
-        sectionRef.section = Some(fulfillment.getSectionByName(sectionRef.name))
-      }
-    }
-  }
-
-  def processReferences(fulfillment:Fulfillment) = {
-    hydrate(fulfillment)
-
-    var priorSectionRef:SectionReference = null
-
-    for(sectionRef <- sections) {
-      val currentSection = sectionRef.section.get
-      priorSectionRef match {
-        case sr: SectionReference =>
-          if(sr.isValid) {
-            sr.section.get.status match {
-              case SectionStatus.TERMINAL =>
-                if(currentSection.status == SectionStatus.CONTINGENT) {
-
-                  // The prior section didn't complete successfully.. let's
-                  // let the next section have a try
-                  currentSection.setReady("Promoted from Contingent", DateTime.now)
-                  currentSection.resolveReferences(fulfillment) // <-- recurse
-                }
-              case _ => // We don't care about other status until a TERMINAL case is hit
-            }
-          }
-          priorSectionRef.dismissed = true
-        case _ =>
-          // This is the first referenced section..
-          if(currentSection.status == SectionStatus.CONTINGENT) {
-            currentSection.setReady("Promoted from Contingent", DateTime.now)
-            currentSection.resolveReferences(fulfillment) // <-- recurse
-          }
-      }
-      priorSectionRef = sectionRef
-    }
-  }
-
-  def resolved(fulfillment:Fulfillment):Boolean = {
-    hydrate(fulfillment)
-
-    for(sectionRef <- sections) {
-      sectionRef.section match {
-        case section: Some[FulfillmentSection] =>
-          section.get.status match {
-            case SectionStatus.COMPLETE =>
-              return true
-            case _ =>
-          }
-        case _ =>
-      }
-    }
-    false
-  }
-
-  def resolvable(fulfillment:Fulfillment):Boolean = {
-    hydrate(fulfillment)
-
-    for(sectionRef <- sections) {
-      sectionRef.section match {
-        case section: Some[FulfillmentSection] =>
-          section.get.resolvable(fulfillment) match {
-            case true =>
-              return true
-            case _ =>
-          }
-        case _ =>
-      }
-    }
-    false
-  }
-
-  def getValue(fulfillment:Fulfillment):String = {
-    hydrate(fulfillment)
-
-    for(sectionRef <- sections) {
-      if(sectionRef.isValid && sectionRef.section.get.status == SectionStatus.COMPLETE) {
-        try {
-          return sectionRef.getValue
-        } catch {
-          case e: Exception =>
-
-            val gripe = s"Referenced section ${sectionRef.section.get.name} is complete but the JSON could not be parsed! "+e.getMessage
-            fulfillment.timeline.error(gripe, None)
-
-            throw new Exception(gripe)
-        }
-      }
-    }
-
-    val gripe = "Tried to get value from referenced sections and no value was available! "+toString()
-    fulfillment.timeline.error(gripe, None)
-
-    throw new Exception(gripe)
-  }
-
-  override def toString: String = s"sections($sectionNames)"
-
-  def toJson:JsValue = {
-    Json.toJson(
-      for(section <- sections) yield section.toJson
-    )
-  }
-}
-

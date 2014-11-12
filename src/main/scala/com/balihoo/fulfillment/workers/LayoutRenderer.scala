@@ -29,8 +29,8 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
     splog.debug(s"using script $scriptName")
     val scriptData = Source.fromURL(getClass.getResource("/" + scriptName))
     val scriptFile = new FileWriter(scriptPath)
-    scriptData.getLines.foreach((line:String) => scriptFile.write(s"$line\n"))
-    scriptFile.close
+    scriptData.getLines().foreach((line:String) => scriptFile.write(s"$line\n"))
+    scriptFile.close()
     scriptPath
   }
 
@@ -54,12 +54,12 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("formid", "string", "The form id of the form to render"),
-        new ActivityParameter("branddata", "string", "The branddata to use as input to the form"),
-        new ActivityParameter("inputdata", "string", "The inputdata to use as input to the form"),
-        new ActivityParameter("endpoint", "string", "The endpoint URL to use (overrides default)", false),
-        new ActivityParameter("clipselector", "string", "The selector used to clip the page", false),
-        new ActivityParameter("target", "string", "The S3 filename of the resulting page")
+        new StringActivityParameter("formid", "The form id of the form to render"),
+        new StringActivityParameter("branddata", "The branddata to use as input to the form"),
+        new StringActivityParameter("inputdata", "The inputdata to use as input to the form"),
+        new StringActivityParameter("endpoint", "The endpoint URL to use (overrides default)", false),
+        new StringActivityParameter("clipselector", "The selector used to clip the page", false),
+        new StringActivityParameter("target", "The S3 filename of the resulting page")
       ), new ActivityResult("string", "the target URL if successfully saved"))
   }
 
@@ -83,7 +83,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
         cliptuple
       )))
 
-      splog.debug(s"running process with ${cleaninput}")
+      splog.debug(s"running process with $cleaninput")
       val result = command.run(cleaninput)
       splog.debug(s"process out: ${result.out}")
       splog.debug(s"process err: ${result.err}")

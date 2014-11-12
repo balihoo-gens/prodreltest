@@ -19,12 +19,12 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new ActivityParameter("token", "string", "some identifier to tie the chain together", false),
-        new ActivityParameter("maxcount", "int", "How many workflows to iterate", false),
-        new ActivityParameter("multiply", "int", "Exponential multiplication factor at each iteration", false),
-        new ActivityParameter("count", "int", "system: How manieth workflow this is", false),
-        new ActivityParameter("submit_time", "int", "system: the time this workflow was submitted", false),
-        new ActivityParameter("avg_duration", "int", "system: the average time between submittal and handling for workflows in this chain", false)
+        new StringActivityParameter("token", "some identifier to tie the chain together", false),
+        new IntegerActivityParameter("maxcount", "How many workflows to iterate", false),
+        new IntegerActivityParameter("multiply", "Exponential multiplication factor at each iteration", false),
+        new IntegerActivityParameter("count", "system: How manieth workflow this is", false),
+        new IntegerActivityParameter("submit_time", "system: the time this workflow was submitted", false),
+        new IntegerActivityParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", false)
     ), new ActivityResult("JSON", "completed time and token"))
   }
 
@@ -52,9 +52,9 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
 
     val durationAvg:Option[Duration] = durationLast match {
       case Some(duration) =>
-        params.get("avg_duration") match {
+        params.get[Long]("avg_duration") match {
           case Some(durationAvgPrevious) =>
-            val prevMillis = durationAvgPrevious.toLong
+            val prevMillis = durationAvgPrevious
             val curMillis = duration.getMillis
             val avgMillis = ((countPrevious * prevMillis) + curMillis) / count
             Some(new Duration(avgMillis))
@@ -74,7 +74,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
         "submit_time" -> new DateTime(DateTimeZone.UTC).toString
       )
 
-      if (!durationAvg.isEmpty) {
+      if (durationAvg.nonEmpty) {
         val durationMillis = durationAvg.get.getMillis
         params("avg_duration") = durationMillis.toString
       }
@@ -107,7 +107,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
     )
 
     def addDuration(name:String, duration:Option[Duration]) = {
-      if (!duration.isEmpty) {
+      if (duration.nonEmpty) {
         val durationMillis = duration.get.getMillis
         result(name) = durationMillis.toString
       }

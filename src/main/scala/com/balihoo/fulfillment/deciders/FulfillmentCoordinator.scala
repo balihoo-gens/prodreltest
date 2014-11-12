@@ -1,6 +1,5 @@
 package com.balihoo.fulfillment.deciders
 
-import java.security.MessageDigest
 import java.util.UUID.randomUUID
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig.TableNameOverride
@@ -20,9 +19,6 @@ import com.balihoo.fulfillment.config._
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 import com.balihoo.fulfillment.util._
-
-import scala.util.matching.Regex
-import java.net.URLEncoder
 
 object Constants {
   final val delimiter = "##"
@@ -50,8 +46,6 @@ abstract class AbstractFulfillmentCoordinator {
     .withDomain(domain)
     .withTaskList(taskList)
 
-  val operators = new FulfillmentOperators
-
   val coordinatorTable = new FulfillmentCoordinatorTable with DynamoAdapterComponent with SploggerComponent {
     def dynamoAdapter = AbstractFulfillmentCoordinator.this.dynamoAdapter
     def splog = AbstractFulfillmentCoordinator.this.splog
@@ -66,7 +60,7 @@ abstract class AbstractFulfillmentCoordinator {
   entry.setHostAddress(HostIdentity.getHostAddress)
   entry.setWorkflowName(workflowName)
   entry.setWorkflowVersion(workflowVersion)
-  entry.setSpecification(Json.stringify(operators.toJson))
+  entry.setSpecification("[]")
   entry.setDomain(domain)
   entry.setStatus("--")
   entry.setResolutionHistory("[]")
@@ -225,99 +219,11 @@ class OperatorParameters(val params:Map[String,String], val input:String = "{}")
   }
 }
 
-class FulfillmentOperator(val name:String, val specification:OperatorSpecification, code:(OperatorParameters) => String) {
-
-  def apply(inputParams:Map[String, String]):String = {
-    code(specification.getParameters(inputParams))
-  }
-}
-
-class FulfillmentOperators {
-
-  var operators = mutable.Map[String, FulfillmentOperator]()
-
-  registerOperator(
-    new FulfillmentOperator(
-      "MD5",
-      new OperatorSpecification(
-        List(new OperatorParameter("input", "string", "The string to MD5")),
-        new OperatorResult("string", "MD5 checksum of 'input'")
-      ),
-      (parameters) => {
-        MessageDigest.getInstance("MD5").digest(parameters("input").getBytes).map("%02X".format(_)).mkString
-      })
-  )
-
-  registerOperator(
-    new FulfillmentOperator(
-      "StringFormat",
-      new OperatorSpecification(
-        List(new OperatorParameter("format", "string", "A string containing {param1} {param2}.. tokens")
-            ,new OperatorParameter("...", "string", "Strings to be substituted into 'format' at token locations", false)
-        ),
-        new OperatorResult("string", "'format' with tokens substituted")
-      ),
-      (parameters) => {
-        val pattern = new Regex("""\{(\w+)\}""", "token")
-        pattern.replaceAllIn(
-          parameters("format"),
-          m => parameters.getOrElse(m.group("token"), "--")
-        )
-      })
-  )
-
-  registerOperator(
-    new FulfillmentOperator(
-      "URLEncode",
-      new OperatorSpecification(
-        List(new OperatorParameter("input", "string", "The string to URLEncode")),
-        new OperatorResult("string", "URLEncoded form of 'input'")
-      ),
-      (parameters) => {
-        URLEncoder.encode(parameters("input"), "UTF-8")
-      })
-  )
-
-  def registerOperator(operator:FulfillmentOperator) = {
-    operators(operator.name) = operator
-  }
-
-  def apply(operator:String, params:Map[String, String]):String = {
-    operators(operator)(params)
-  }
-
-  def toJson:JsValue = {
-    Json.toJson((for((name, operator) <- operators) yield name -> operator.specification.toJson).toMap)
-  }
-}
-
 /**
  *
  * @param fulfillment Fulfillment
  */
 class DecisionGenerator(fulfillment: Fulfillment) {
-
-  val operators = new FulfillmentOperators
-
-  protected def gatherParameters(section: FulfillmentSection
-                                ,sections: Fulfillment):Map[String,String] = {
-
-    val params = mutable.Map[String, String]()
-
-    for((name, value) <- section.params) {
-      value match {
-        case sectionReferences: SectionReferences =>
-          params(name) = sectionReferences.getValue(sections)
-        case v: String =>
-          params(name) = v
-        case _ =>
-          section.timeline.warning(s"Parameter '$name' doesn't have a recognizable value '$value'", None)
-      }
-    }
-
-    params.toMap
-  }
-
 
   protected def _createTimerDecision(name:String, delaySeconds:Int, status:String, reason:String) = {
 
@@ -336,28 +242,6 @@ class DecisionGenerator(fulfillment: Fulfillment) {
 
     decision.setStartTimerDecisionAttributes(attribs)
 
-    decision
-  }
-
-  protected def operate(section: FulfillmentSection) = {
-
-    val params = gatherParameters(section, fulfillment)
-    val decision: Decision = new Decision
-    decision.setDecisionType(DecisionType.RecordMarker)
-    val attribs:RecordMarkerDecisionAttributes = new RecordMarkerDecisionAttributes
-    var outcome = "SUCCESS"
-    try {
-      val result = operators(section.operator.get, params)
-      section.setCompleted(result, DateTime.now)
-      attribs.setDetails(section.value)
-    } catch {
-      case e:Exception =>
-        outcome = "FAILURE"
-        section.setFailed("Operation Failed", e.getMessage, DateTime.now)
-        attribs.setDetails(e.getMessage)
-    }
-    attribs.setMarkerName(s"OperatorResult${Constants.delimiter}${section.name}${Constants.delimiter}$outcome")
-    decision.setRecordMarkerDecisionAttributes(attribs)
     decision
   }
 
@@ -380,8 +264,8 @@ class DecisionGenerator(fulfillment: Fulfillment) {
     val failReasons = mutable.MutableList[String]()
 
     for(section <- fulfillment.categorized.impossible) {
-      if(section.essential) {
-        val message = s"Essential section ${section.name} is IMPOSSIBLE!"
+      if(section.essential || fulfillment.categorized.essentialTotal == 0) {
+        val message = s"Section ${section.name} is IMPOSSIBLE!"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
@@ -389,8 +273,8 @@ class DecisionGenerator(fulfillment: Fulfillment) {
 
     // Loop through the problem sections
     for(section <- fulfillment.categorized.terminal) {
-      if(section.essential) {
-        val message = s"Essential section ${section.name} is TERMINAL!"
+      if(section.essential || fulfillment.categorized.essentialTotal == 0) {
+        val message = s"Section ${section.name} is TERMINAL!"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
       }
@@ -401,6 +285,7 @@ class DecisionGenerator(fulfillment: Fulfillment) {
 
       val details: String = failReasons.mkString("\n\t", "\n\t", "\n")
       fulfillment.timeline.error("Workflow FAILED "+details, Some(DateTime.now))
+      fulfillment.status = FulfillmentStatus.FAILED
 
       // TODO. We should cancel the in-progress sections as BEST as we can
       val attribs: FailWorkflowExecutionDecisionAttributes = new FailWorkflowExecutionDecisionAttributes
@@ -435,64 +320,48 @@ class DecisionGenerator(fulfillment: Fulfillment) {
     Some(decision)
   }
 
-  def makeDecisions(runOperations:Boolean = true): List[Decision] = {
+  def makeDecisions(): List[Decision] = {
 
     if(fulfillment.terminal()) {
       fulfillment.timeline.error(s"Workflow is TERMINAL (${fulfillment.status})", None)
       return List()
     }
 
-    _checkCancelRequested() match {
-      case d:Some[Decision] => return List(d.get)
-      case _ =>
-    }
-
-    _checkComplete() match {
-      case d:Some[Decision] => return List(d.get)
-      case _ =>
-    }
-
-    _checkFailed() match {
-      case d:Some[Decision] => return List(d.get)
-      case _ =>
-    }
-
     val decisions = new mutable.MutableList[Decision]()
 
-    var decisionLength = 0
+    do {
 
-    if(runOperations) {
-      do { // Loop through the operations until they're all processed
-        decisionLength = decisions.length
-        for(section <- fulfillment.categorized.ready) {
-          if(section.operator.isDefined) {
-            decisions += operate(section)
-          }
-        }
-        fulfillment.categorized.categorize() // Re-categorize the sections based on the new statuses
+      fulfillment.categorized.categorize()
+      decisions.clear()
 
-      } while(decisions.length > decisionLength)
-    }
-
-    _checkFailed() match { // YES AGAIN.. processing any pending operations may have pushed us into complete
-      case d:Some[Decision] => return List(d.get)
-      case _ =>
-    }
-
-    _checkComplete() match { // YES AGAIN.. processing any pending operations may have pushed us into complete
-      case d:Some[Decision] => return decisions.toList ++ List(d.get)
-      case _ =>
-    }
-
-    for(section <- fulfillment.categorized.ready) {
-      val delaySeconds = section.calculateWaitSeconds()
-      // Does this task need to be delayed until the waitUntil time?
-      if (delaySeconds > 0) {
-        decisions += waitDecision(section, delaySeconds)
-      } else if(section.action.isDefined) {
-        decisions += _createActivityDecision(section)
+      _checkCancelRequested() match {
+        case d:Some[Decision] => return List(d.get)
+        case _ =>
       }
-    }
+
+      _checkComplete() match {
+        case d:Some[Decision] => return List(d.get)
+        case _ =>
+      }
+
+      _checkFailed() match {
+        case d:Some[Decision] => return List(d.get)
+        case _ =>
+      }
+
+      for(section <- fulfillment.categorized.ready) {
+        val delaySeconds = section.calculateWaitSeconds()
+        // Does this task need to be delayed until the waitUntil time?
+        if (delaySeconds > 0) {
+          decisions += waitDecision(section, delaySeconds)
+        } else if(section.action.isDefined) {
+          decisions += _createActivityDecision(section)
+        }
+      }
+
+    } while(fulfillment.categorized.checkPromoted)
+
+    fulfillment.categorized.categorize()
 
     // Loop through the problem sections
     for(section <- fulfillment.categorized.failed) {
@@ -560,8 +429,6 @@ class DecisionGenerator(fulfillment: Fulfillment) {
    * @return the decision
    */
   private def _createActivityDecision(section: FulfillmentSection): Decision = {
-    val params = gatherParameters(section, fulfillment)
-
     val decision: Decision = new Decision
     decision.setDecisionType(DecisionType.ScheduleActivityTask)
 
@@ -570,7 +437,7 @@ class DecisionGenerator(fulfillment: Fulfillment) {
 
     val attribs: ScheduleActivityTaskDecisionAttributes = new ScheduleActivityTaskDecisionAttributes
     attribs.setActivityType(section.action.get)
-    attribs.setInput(Json.stringify(Json.toJson(params)))
+    attribs.setInput(Json.stringify(Json.toJson(section.gatherParameters())))
     attribs.setTaskList(taskList)
     attribs.setActivityId(section.getActivityId)
 

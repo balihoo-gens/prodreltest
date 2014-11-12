@@ -11,8 +11,8 @@ abstract class AbstractChaos extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ActivityParameter("chanceToFail", "float", "0-100 Chance to Fail"),
-      new ActivityParameter("chanceToCancel", "float", "0-100 Chance to Cancel")
+      new NumberActivityParameter("chanceToFail", "0-100 Chance to Fail"),
+      new NumberActivityParameter("chanceToCancel", "0-100 Chance to Cancel")
     ), new ActivityResult("string", "Message of little consequence."))
   }
 
@@ -22,8 +22,8 @@ abstract class AbstractChaos extends FulfillmentWorker {
     val failActual = rand.nextFloat() * 100
     val cancelActual = rand.nextFloat() * 100
 
-    val failChances = params("chanceToFail").toFloat
-    val cancelChances = params("chanceToCancel").toFloat
+    val failChances = params[Float]("chanceToFail")
+    val cancelChances = params[Float]("chanceToCancel")
 
     if(failActual < failChances) {
       failTask("Chaos ensued!", s"Failing because $failActual < $failChances")
