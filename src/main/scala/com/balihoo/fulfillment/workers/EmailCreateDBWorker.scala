@@ -189,12 +189,10 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
   private def csvStreamFromS3Content(bucket: String, key: String) = {
     splog.info(s"Streaming CSV content from S3 bucket=$bucket key=$key")
-    val reader = s3Adapter.withS3Object(bucket, key) { s3obj: S3Object =>
-      new InputStreamReader(s3obj.getObjectContent)
-    }
+    val reader = s3Adapter.getObjectContentAsReader(bucket, key)
     val csvStream = csvAdapter.parseReaderAsStream(reader)
     if (csvStream.isEmpty) throw new RuntimeException("csv stream is empty")
-    csvStream
+    (reader, csvStream)
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -204,7 +202,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     /* extract and validate params */
     val (bucket, key, filename, tableDefinition) = getParams(params)
 
-    val csvStream = csvStreamFromS3Content(bucket, key)
+    val (csvReader, csvStream) = csvStreamFromS3Content(bucket, key)
 
     splog.info("Creating DB file")
     val db = liteDbAdapter.create(filename)
@@ -221,6 +219,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     } finally {
       db.close()
+      csvReader.close()
     }
 
     val s3url = s3upload(db.file, filename)

@@ -104,6 +104,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       there was one(worker.dbMock).executeBatch()
       there was one(worker.dbMock).commit()
       there was one(worker.dbMock).close()
+      there was one(worker.readerMock).close()
       there was one(worker.s3Adapter).putPublic(===("mock"), beMatching(s"mock/\\d+/${data.dbname}"), ===(worker.dbFileMock))
       there was one(worker.dbMock).destroy()
 
@@ -189,7 +190,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
 
     def givenReader() = {
-      worker.s3Adapter.withS3Object(===(data.s3bucket), ===(data.s3key))(anyFunction1[S3Object, InputStreamReader]) returns worker.readerMock
+      worker.s3Adapter.getObjectContentAsReader(data.s3bucket, data.s3key) returns worker.readerMock
     }
 
     def givenCsvStream(stream: Stream[List[String]] = data.csvStream) = {

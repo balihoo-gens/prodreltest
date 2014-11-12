@@ -1,8 +1,11 @@
 package com.balihoo.fulfillment.adapters
 
+import java.io.{InputStreamReader, InputStream, Reader}
+import java.nio.charset.Charset
+
 import com.amazonaws.AmazonClientException
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.S3Object
+import com.amazonaws.services.s3.model.{S3ObjectInputStream, S3Object}
 import com.balihoo.fulfillment.config.{PropertiesLoaderComponent, PropertiesLoader}
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
 import org.junit.runner.RunWith
@@ -28,12 +31,30 @@ class TestS3AdapterComponent extends Specification with Mockito {
       } must throwA[AmazonClientException]
     }
   }
+  "getObjectContentAsReader" should {
+    "return a new input stream reader with utf8 as default encoding" in new TestContext {
+      givenS3Object()
+      givenS3ObjectContent()
+      val reader = s3Adapter.getObjectContentAsReader(data.bucket, data.key)
+      reader must beAnInstanceOf[InputStreamReader]
+      Charset.forName("UTF-8").aliases().contains(reader.getEncoding) must beTrue
+    }
+    "return a new input stream reader with specified encoding" in new TestContext {
+      givenS3Object()
+      givenS3ObjectContent()
+      val reader = s3Adapter.getObjectContentAsReader(data.bucket, data.key, "Latin1")
+      reader must beAnInstanceOf[InputStreamReader]
+      Charset.forName("Latin1").aliases().contains(reader.getEncoding) must beTrue
+    }
+  }
 
   class TestContext extends Scope {
 
     object data {
       val bucket = "hsgks"
       val key = "jdgfksl/fjdskg/fkjds"
+      val s3ObjectMock= mock[S3Object]
+      val s3ObjectInputStreamMock = mock[S3ObjectInputStream]
     }
 
     val s3Adapter = new AbstractS3Adapter with SploggerComponent with PropertiesLoaderComponent {
@@ -42,8 +63,12 @@ class TestS3AdapterComponent extends Specification with Mockito {
       override val config = mock[PropertiesLoader]
     }
 
-    def givenS3Object() = {
-      s3Adapter.client.getObject(data.bucket, data.key) returns mock[S3Object]
+    def givenS3ObjectContent(inputStream: S3ObjectInputStream = data.s3ObjectInputStreamMock) = {
+      data.s3ObjectMock.getObjectContent returns inputStream
+    }
+
+    def givenS3Object(s3obj: S3Object = data.s3ObjectMock) = {
+      s3Adapter.client.getObject(data.bucket, data.key) returns s3obj
     }
 
     def givenClientThrowsException() = {
