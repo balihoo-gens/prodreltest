@@ -33,30 +33,30 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
   }
 
   "handleTask" should {
-    "fail if source param missing" in new TestContext {
+    "fail task if source param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map())
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
-    "fail if source param is invalid uri" in new TestContext {
+    "fail task if source param is invalid uri" in new TestContext {
       val activityParameter = new ActivityParameters(Map("source" -> "invalid uri"))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[URISyntaxException]
     }
-    "fail if dbname param missing" in new TestContext {
+    "fail task if dbname param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map("source" -> data.source, "dtd" -> data.dtd))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
-    "fail if dtd param missing" in new TestContext {
+    "fail task if dtd param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map("source" -> data.source, "dbname" -> data.dbname))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
-    "fail if protocol is unsupported" in new TestContext {
+    "fail task if protocol is unsupported" in new TestContext {
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.sourceWithInvalidScheme,
         "dbname" -> data.dbname,
         "dtd" -> data.dtd))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
-    "fail if csv stream empty" in new TestContext {
+    "fail task if csv stream empty" in new TestContext {
       givenReader()
       givenCsvStream(Stream.empty)
       givenLiteDb()
@@ -66,7 +66,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         "dtd" -> data.dtd))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
     }
-    "fail if csv stream has header, but no records" in new TestContext {
+    "fail task if csv stream has no records" in new TestContext {
       givenReader()
       givenCsvStream(data.header #:: data.rafael #:: data.badRecordNovak #:: Stream.empty)
       givenLiteDb()
@@ -76,7 +76,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         "dtd" -> data.dtd))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
     }
-    "fail if csv stream has bad records" in new TestContext {
+    "fail task if csv stream has bad records" in new TestContext {
       givenReader()
       givenCsvStream(data.header #:: Stream.empty)
       givenLiteDb()
@@ -86,7 +86,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         "dtd" -> data.dtd))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
     }
-    "create db file with schema, convert csv records to database records and save in s3" in new TestContext {
+    "complete task if db file could be created from csv and uploaded to s3" in new TestContext {
       givenReader()
       givenCsvStream()
       givenLiteDb()
