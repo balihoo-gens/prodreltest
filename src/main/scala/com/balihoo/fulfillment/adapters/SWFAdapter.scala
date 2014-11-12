@@ -15,20 +15,21 @@ trait SWFAdapterComponent {
   def swfAdapter: AbstractSWFAdapter with PropertiesLoaderComponent
 }
 
-abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncClient] {
+abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncClient]  {
   this: PropertiesLoaderComponent
     with SploggerComponent =>
 
   private lazy val _name = new SWFName(config.getString("name"))
+  private lazy val _domain = config.getString("domain")
   private lazy val _version = new SWFVersion(config.getString("version"))
   private lazy val _taskListName = new SWFName(_name + _version)
   private lazy val _taskList: TaskList = new TaskList().withName(_taskListName)
   private lazy val _workflowName = new SWFName(config.getString("workflowName"))
   private lazy val _workflowVersion = new SWFVersion(config.getString("workflowVersion"))
+  private lazy val _workflowTaskListName = new SWFName(workflowName+workflowVersion)
   private lazy val _workflowExecutionStartToCloseTimeout = config.getOrElse("workflowExecutionStartToCloseTimeout", "3000000")
   private lazy val _workflowTaskStartToCloseTimeout = config.getOrElse("workflowTaskStartToCloseTimeout", "3000000")
   private lazy val _workflowChildPolicy = config.getOrElse("workflowChildPolicy", "TERMINATE")
-  private lazy val _workflowTaskListName = new SWFName(workflowName+workflowVersion)
 
   //longpoll by default, unless config says "longpoll=false"
   protected val _longPoll = config.getOrElse("longpoll", default=true)
@@ -37,9 +38,10 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
 
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(_threadcount))
 
-  def taskListName = _taskListName
   def name = _name
+  def domain = _domain
   def version = _version
+  def taskListName = _taskListName
   def taskList = _taskList
   def workflowName = _workflowName
   def workflowVersion = _workflowVersion
@@ -187,12 +189,12 @@ abstract class AbstractSWFAdapter extends AWSAdapter[AmazonSimpleWorkflowAsyncCl
   }
 }
 
-class SWFAdapter(cfg: PropertiesLoader, _splog: Splogger, autoRegister:Boolean = false)
+class SWFAdapter( _cfg: PropertiesLoader, _splog: Splogger, autoRegister:Boolean = false)
   extends AbstractSWFAdapter
   with SploggerComponent
   with PropertiesLoaderComponent {
 
-  def config = cfg
+  def config = _cfg
   def splog = _splog
 
   verifyDomain(autoRegister)

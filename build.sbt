@@ -10,8 +10,8 @@ scalaVersion := "2.10.2"
 
 // Specify the local repos first for best performance.
 resolvers ++= Seq(
-  "Internal Snapshot Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/snapshots",
-  "Internal Repository" at "http://oak.dev.balihoo.local:8080/archiva/repository/internal",
+  "Internal Snapshot Repository" at "https://archiva.balihoo.local/archiva/repository/snapshots",
+  "Internal Repository" at "https://archiva.balihoo.local/archiva/repository/internal",
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases",
   "Keyczar at Google Code" at "http://keyczar.googlecode.com/svn/trunk/java/maven/"
 )
@@ -48,7 +48,8 @@ libraryDependencies ++= Seq(
   "com.stackmob" %% "newman" % "1.3.5",
   ("com.balihoo.socialmedia" % "facebook-client" % "14.19-SNAPSHOT").exclude("ch.qos.logback", "logback-classic"),
   "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test,
-  "com.github.fge" % "json-schema-validator" % "2.2.6"
+  "com.github.fge" % "json-schema-validator" % "2.2.6",
+  "com.netaporter" %% "scala-uri" % "0.4.3"
 )
 
 

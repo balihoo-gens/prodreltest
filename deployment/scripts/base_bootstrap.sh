@@ -85,7 +85,9 @@ else
     logdo "$VEACTIVATE"
 fi
 
-FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES} --distro ${DISTRO}"
+if hostname | grep -q fulfillment; then echo 'hostname already set, skipping'; else hostname fulfillment-${ENV_NAME}-$(hostname); fi
+
+FFINSTCMD="python ${FFDIR}/ffinstall.py ${EIPOPT} ${CLASSNAMES} --distro ${DISTRO}  --env ${ENV_NAME} ${NONEWRELIC_OPT} ${NOWORKER}"
 echo "#!/bin/bash" > runffinstall
 echo "${VEACTIVATE}" >> runffinstall
 echo "${FFINSTCMD} >> ${LOGFILE} 2>&1" >> runffinstall
