@@ -68,6 +68,16 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
     "fail if csv stream has header, but no records" in new TestContext {
       givenReader()
+      givenCsvStream(data.header #:: data.rafael #:: data.badRecordNovak #:: Stream.empty)
+      givenLiteDb()
+      val activityParameter = new ActivityParameters(Map(
+        "source" -> data.source,
+        "dbname" -> data.dbname,
+        "dtd" -> data.dtd))
+      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
+    }
+    "fail if csv stream has bad records" in new TestContext {
+      givenReader()
       givenCsvStream(data.header #:: Stream.empty)
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
@@ -151,6 +161,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       val roger = List("a", "1", "roger@nike.com", "some", "roger", "federer", "a", "1981-08-08")
       val rafael = List("b", "2", "rafael@nike.com", "some", "rafael", "nadal", "a", "1986-06-03")
       val novak = List("c", "3", "novak@uniqlo.com", "some", "novak", "djokovic", "a", "1987-05-22")
+      val badRecordNovak = List("c", "3", "some", "novak", "djokovic", "a", "1987-05-22")
       val csvStream = header #:: rafael #:: roger #:: novak #:: Stream.empty
       val targetBucket= "test.bucket"
       val targetDir = "somedir"

@@ -146,7 +146,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       if (row.size != csvColumnNames.size) {
 
         /* CSV row column count does not match CSV header column count */
-        splog.warning(s"Skipped row because of column count mismatch, rowNumber=$rowNumber")
+        throw new RuntimeException(s"CSV contains bad row, aborting! rowNumber=$rowNumber")
 
       } else {
 
