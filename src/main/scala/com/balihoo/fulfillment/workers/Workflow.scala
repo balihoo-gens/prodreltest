@@ -7,6 +7,8 @@ import play.api.libs.json._
 import org.joda.time._
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{Map => MutableMapi, MutableList}
+import scala.collection.parallel._
+import scala.concurrent.forkjoin.ForkJoinPool
 
 import com.amazonaws.services.simpleworkflow.model.{
   StartWorkflowExecutionRequest,
@@ -26,39 +28,58 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
 
   override def handleTask(params: ActivityParameters) = {
 
-    val template = params("template")
-    val results:MutableList[String] = MutableList[String]()
-    val tags = List[String]("generated")
-    if (params.has("substitutions")) {
-      val subMapJson = Json.parse(params("substitutions"))
+    withTaskHandling {
+      val template = params("template")
+      val results:MutableList[String] = MutableList[String]()
+      val tags = List[String]("generated")
 
-      def iterateSubs(
-        subTable:Map[String,List[String]],
-        subs:Map[String,String] = Map[String,String]()
-      ): Unit = {
-        if (subTable.isEmpty) {
-          var ffdoc:String = template
-          for ((key,value) <- subs) {
-            ffdoc = ffdoc.replaceAllLiterally(s"${key}",value)
-          }
+      def submitAndRecord(ffdoc:String) = {
         results += submitTask(ffdoc, tags)
-        } else {
-          val (key, vals) = subTable.head
-          vals.par.foreach {
-            v => iterateSubs(subTable.tail, subs + (key -> v))
-          }
+      }
+
+      if (params.has("substitutions")) {
+        val submap = jsonStringToSubTable(params("substitutions"))
+        multipleSubstitute(template, submap, submitAndRecord)
+      } else {
+        results += submitTask(template, tags)
+      }
+
+      results.mkString(",")
+    }
+  }
+
+  def jsonStringToSubTable(input:String): Map[String,List[String]] = {
+    val subMapJson = Json.parse(input)
+
+    subMapJson.validate[Map[String,List[String]]] match {
+      case JsSuccess(submap, _) => submap
+      case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
+    }
+  }
+
+  def multipleSubstitute(template:String, subTable:Map[String,List[String]], f:(String => Unit)) = {
+    val parallellism = new ForkJoinTaskSupport(new ForkJoinPool(10))
+
+    def iterateSubs(
+      subTable:Map[String,List[String]],
+      subs:Map[String,String] = Map[String,String]()
+    ): Unit = {
+      if (subTable.isEmpty) {
+        var ffdoc:String = template
+        for ((key,value) <- subs) {
+          ffdoc = ffdoc.replaceAllLiterally(s"${key}",value)
+        }
+        synchronized { f(ffdoc) }
+      } else {
+        val (key, vals) = subTable.head
+        val parvals = vals.par
+        parvals.tasksupport = parallellism
+        vals.par.foreach {
+          v => iterateSubs(subTable.tail, subs + (key -> v))
         }
       }
-
-      subMapJson.validate[Map[String,List[String]]] match {
-          case JsSuccess(submap, _) => iterateSubs(submap)
-          case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
-      }
-    } else {
-      results += submitTask(template, tags)
     }
-
-    completeTask(results.mkString(","))
+    iterateSubs(subTable)
   }
 
   def uuid = java.util.UUID.randomUUID.toString
