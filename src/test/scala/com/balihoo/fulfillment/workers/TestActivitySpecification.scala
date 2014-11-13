@@ -134,5 +134,27 @@ class TestActivitySpecification extends Specification with Mockito
       report.isSuccess
 
     }
+
+    "be upset about mismatched type" in {
+
+      val spec = new ActivitySpecification(List(
+        new StringActivityParameter("param1", "Param 1 is a string"),
+        new NumberActivityParameter("param2", "Param 2 is a number", false)
+      ), new StringActivityResult("really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val factory = JsonSchemaFactory.byDefault()
+
+      val schema:JsonSchema = factory.getJsonSchema(spec.parameterSchema.as[JsonNode])
+
+      val input =
+        """{
+              "param1" : "stuff",
+              "param2" : "wrong type"
+          }"""
+
+      spec.getParameters(input) must throwA[Exception](message = "validation type error: found 'string' expected 'integer, number'")
+
+    }
   }
 }
