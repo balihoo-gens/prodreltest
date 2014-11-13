@@ -6,7 +6,7 @@ import com.balihoo.fulfillment.util.Splogger
 import play.api.libs.json._
 import org.joda.time._
 import scala.collection.JavaConverters._
-import scala.collection.mutable.{Map => MutableMapi, MutableList}
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel._
 import scala.concurrent.forkjoin.ForkJoinPool
 
@@ -16,21 +16,59 @@ import com.amazonaws.services.simpleworkflow.model.{
   WorkflowType
 }
 
+class SubTableActivityParameter(
+  override val name:String,
+  override val description:String,
+  override val required:Boolean = true
+) extends ActivityParameter(name, description, required) {
+
+  type SubTable = Map[String,List[String]]
+
+  def jsonType = "object"
+
+  def parseValue(js:JsValue):SubTable = {
+    js.validate[SubTable] match {
+      case JsSuccess(submap, _) => submap
+      case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
+    }
+  }
+
+  override def toSchema:JsValue = {
+    Json.obj(
+      "type" -> jsonType,
+      "description" -> description,
+      "minProperties" -> 1,
+      "patternProperties" -> Json.obj(
+        "[\r\n.]+" -> Json.obj(
+          "type" -> "array",
+          "minItems" -> 1,
+          "items" -> Json.obj(
+            "type" -> "string"
+          )
+        )
+      ),
+      "additionalProperties" -> false
+    )
+  }
+}
+
 abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
   this: LoggingWorkflowAdapter =>
 
+  type SubTable = Map[String,List[String]]
+
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new ActivityParameter("template", "string", "the template for the workflows", true),
-        new ActivityParameter("substitutions", "string", "substitution data for workflows", false)
+        new StringActivityParameter("template", "the template for the workflows", true),
+        new SubTableActivityParameter("substitutions", "substitution data for workflows", false)
     ), new ActivityResult("JSON", "list of workflow ids"))
   }
 
   override def handleTask(params: ActivityParameters) = {
 
     withTaskHandling {
-      val template = params("template")
-      val results:MutableList[String] = MutableList[String]()
+      val template = params[String]("template")
+      val results = ArrayBuffer[String]()
       val tags = List[String]("generated")
 
       def submitAndRecord(ffdoc:String) = {
@@ -38,7 +76,8 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
       }
 
       if (params.has("substitutions")) {
-        val submap = jsonStringToSubTable(params("substitutions"))
+        val submap = params[SubTable]("substitutions")
+        //val submap = jsonStringToSubTable(params("substitutions"))
         multipleSubstitute(template, submap, submitAndRecord)
       } else {
         results += submitTask(template, tags)
@@ -48,20 +87,11 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
     }
   }
 
-  def jsonStringToSubTable(input:String): Map[String,List[String]] = {
-    val subMapJson = Json.parse(input)
-
-    subMapJson.validate[Map[String,List[String]]] match {
-      case JsSuccess(submap, _) => submap
-      case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
-    }
-  }
-
-  def multipleSubstitute(template:String, subTable:Map[String,List[String]], f:(String => Unit)) = {
+  def multipleSubstitute(template:String, subTable:SubTable, f:(String => Unit)) = {
     val parallellism = new ForkJoinTaskSupport(new ForkJoinPool(10))
 
     def iterateSubs(
-      subTable:Map[String,List[String]],
+      subTable:SubTable,
       subs:Map[String,String] = Map[String,String]()
     ): Unit = {
       if (subTable.isEmpty) {

@@ -9,7 +9,8 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{Map => MutableMapi, MutableList}
+import scala.collection.mutable.{Map => MutableMap, MutableList}
+import play.api.libs.json._
 
 @RunWith(classOf[JUnitRunner])
 class TestWorkflow extends Specification with JsonMatchers with Mockito {
@@ -37,14 +38,14 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
   "WorkflowGenerator" should {
     "validate substitution input" in {
 
-      val wfgen = new TestableWorkflowGenerator()
-      val subTable = wfgen.jsonStringToSubTable("""
+      val sbparam = new SubTableActivityParameter("", "")
+      val subTable = sbparam.parseValue(Json.parse("""
         |{
         |  "key1" : [ "val1", "val2", "val3" ],
         |  "key2" : [ "val1", "val2", "val3" ]
         |}
         """.stripMargin
-      )
+      ))
 
       subTable must haveKeys("key1", "key2")
       subTable("key1") must have size(3)
@@ -72,26 +73,34 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
 
       val results = MutableList[String]()
       wfgen.multipleSubstitute(input, subTable, (s:String) => results += s)
-      results must contain("Rusty Towel of Mediocrity")
+      results must contain("Rusty Towel of Mutual Understanding")
       results must contain("Jagged Pants of Anger")
-      results must contain("Rusty Locket of the Occult")
+      results must contain("Hallowed Fish of the Occult")
+      val total = subTable.keys.foldLeft(1) { (t,key) => t*subTable(key).size }
+      results must have size(total)
     }
 
     "produce valid json" in {
       val wfgen = new TestableWorkflowGenerator()
-      val params = new ActivityParameters(Map(
+
+      val jsonInput = Json.obj(
         //this template is NOT valid json
         "template" -> """{ "missingquote: { "value" : missing end curly bracket }""",
         //sub in partial json to complete the results
-        "substitutions" -> """
-        |{
-        |  "missingquote" : ["section one\"", "section two\""],
-        |  "missing end curly bracket" : [ "\"value one\" }", "\"value two\" }" ]
-        |}
-        """.stripMargin
-      ))
-      //
-      wfgen.handleTask(params)
+        "substitutions" -> Json.obj(
+          "missingquote" -> Json.arr(
+            """ section one" """,
+            """ section two" """
+          ),
+          "missing end curly bracket" -> Json.arr(
+            """ "value one" }""",
+            """ "value two" }"""
+          )
+        )
+      )
+      val input = Json.stringify(jsonInput)
+
+      wfgen.handleTask(wfgen.getSpecification.getParameters(input))
       wfgen.result match {
         case Some(s) =>
           val results = s.split(",")
