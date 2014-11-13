@@ -20,10 +20,22 @@ class TestSqlLiteDbAdapterComponent extends Specification with Mockito {
       db.isClosed must beFalse
 
       db.execute("create table recipients (id integer, name string)")
-      db.addBatch("insert into recipients (id, name) values (1, 'roger')")
-      db.addBatch("insert into recipients (id, name) values (2, 'rafael')")
-      db.addBatch("insert into recipients (id, name) values (3, 'novak')")
-      db.executeBatch()
+
+      val dbBatch = db.batch("insert into recipients (id, name) values (?, ?)")
+
+      dbBatch.param(1, 1)
+      dbBatch.param(2, "roger")
+      dbBatch.add()
+
+      dbBatch.param(1, 2)
+      dbBatch.param(2, "rafael")
+      dbBatch.add()
+
+      dbBatch.param(1, 3)
+      dbBatch.param(2, "novak")
+      dbBatch.add()
+
+      dbBatch.execute()
 
       val selectCount = db.selectCount("select count(id) from recipients where name like 'r%'")
       selectCount must beEqualTo(2)

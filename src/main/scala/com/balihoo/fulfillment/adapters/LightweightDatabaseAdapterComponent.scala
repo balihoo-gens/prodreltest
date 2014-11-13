@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
 import java.io.File
-import java.sql.{DriverManager, Connection}
+import java.sql.{PreparedStatement, DriverManager, Connection}
 
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
 
@@ -28,6 +28,27 @@ trait LightweightDatabaseAdapterComponent {
   }
 
   /**
+   * Allows to process database operation in batch.
+   */
+  trait DbBatch {
+
+    /**
+     * Add parameter to current batch record.
+     */
+    def param[T <: Any](index: Int, value: T)
+
+    /**
+     * Add current record to batch.
+     */
+    def add()
+
+    /**
+     * Execute current batch operations.
+     */
+    def execute()
+  }
+
+  /**
    * Encapsulate a db and expose operations to be done on it.
    */
   trait LightweightDatabase {
@@ -38,14 +59,9 @@ trait LightweightDatabaseAdapterComponent {
     def execute(statement: String)
 
     /**
-     * Record a sql statement for bulk processing.
+     * @return a new batcher to process db operations in batch.
      */
-    def addBatch(statement: String)
-
-    /**
-     * Execute statements recorded in batch.
-     */
-    def executeBatch(): Array[Int]
+    def batch(statement: String): DbBatch
 
     /**
      * Execute a statement that should return a single row with a single `Int` column.
@@ -87,13 +103,32 @@ trait LightweightDatabaseAdapterComponent {
   }
 
   /**
+   * A jdbc-based batch processor.
+   * @param preparedStatement the jdbc `PreparedStatement`
+   */
+  class JdbcBatch(preparedStatement: PreparedStatement) extends DbBatch {
+
+    override def param[T <: Any](index: Int, value: T) = value match {
+      case anInt: Int => preparedStatement.setInt(index, anInt)
+      case aString: String => preparedStatement.setString(index, aString)
+      case aDate: java.sql.Date => preparedStatement.setDate(index, aDate)
+      case aTimestamp: java.sql.Timestamp => preparedStatement.setTimestamp(index, aTimestamp)
+      case anUnsupportedSqlType => throw new RuntimeException("unsupported type " + value.getClass)
+    }
+
+    override def add() = preparedStatement.addBatch()
+
+    override def execute() = preparedStatement.executeBatch()
+
+  }
+
+  /**
    * A jdbc-based lite db.
    * @param connection the jdbc connection
    */
   abstract class JdbcLightweightDatabase(connection: Connection, splog: Splogger) extends LightweightDatabase {
 
     connection.setAutoCommit(false)
-    val batchInsertStatement = newStatement()
 
     private def newStatement() = {
       val stmt = connection.createStatement()
@@ -102,20 +137,12 @@ trait LightweightDatabaseAdapterComponent {
       stmt
     }
 
+    override def batch(statement: String) = new JdbcBatch(connection.prepareStatement(statement))
+
     override def execute(stmt: String) = {
       connection.setAutoCommit(true)
       newStatement().executeUpdate(stmt)
       connection.setAutoCommit(false)
-    }
-
-    override def addBatch(insert: String) = {
-      batchInsertStatement.addBatch(insert)
-    }
-
-    override def executeBatch() = {
-      val counts = batchInsertStatement.executeBatch()
-      batchInsertStatement.clearBatch()
-      counts
     }
 
     override def commit() = connection.commit()

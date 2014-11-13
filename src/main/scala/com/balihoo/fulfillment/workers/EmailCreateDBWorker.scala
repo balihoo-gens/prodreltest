@@ -59,7 +59,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   implicit val tableDefinitionFormat = Json.format[TableDefinition]
 
   val skippedColumnName = "__skipped_column__"
-  val insertBatchSize = 1000
+  val insertBatchSize = 100000
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -114,12 +114,14 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     s"s3://$targetBucket/$targetKey"
   }
 
-  private def sanitizeDbValue(value: String) = {
+  private def sanitizeDbValue(value: String) = value.replaceAll("\\'", "''")
 
-    // TODO (jmelanson) figure out what to do for sql injection, this line is too dumb (snap csv has users with ; in email)
-    // if (value.contains(";")) throw new RuntimeException("no semi-colon allowed in values (prevent sql injection)")
-
-    value.replaceAll("\\'", "''")
+  private def handleBadRow(rowNum: Integer) = {
+    if (swfAdapter.config.getOrElse("failOnBadRecord", default = true)) {
+      throw new RuntimeException(s"CSV contains bad row, aborting! rowNumber=$rowNum")
+    } else {
+      splog.warning(s"Skipping bad record, rowNumber=$rowNum")
+    }
   }
 
   private def writeCsvStreamToDb(csvStream: Stream[List[String]], tableDefinition: TableDefinition, db: DB_TYPE) = {
@@ -132,56 +134,65 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     if (csvColumnNames.isEmpty) throw new RuntimeException("Wrong CSV / DTD mapping: no columns found!")
     splog.debug(s"Ordered CSV columns : $csvColumnNames")
 
-    val insertColumns = csvColumnNames.filterNot(_ == skippedColumnName).mkString(", ")
+    val nonSkippedColumns = csvColumnNames.filterNot(_ == skippedColumnName)
+    val insertColumns = nonSkippedColumns.mkString(", ")
     splog.debug(s"Ordered CSV insert columns : $insertColumns")
 
     val rows = csvStream.drop(1)
     if (rows.isEmpty) throw new RuntimeException("CSV stream has headers, but no rows")
 
-    /* insert all rows in db */
+    val params = ("?" * nonSkippedColumns.size).mkString(", ")
+    val dbBatch = db.batch(s"insert into recipients ($insertColumns) values ($params)")
+
+    /**
+     * @return type-value tuple sequence for known column names (based on index)
+     */
+    def extractTypesAndValues(row: List[String]) = {
+      row.view.zipWithIndex.flatMap({ case (value, index) =>
+        csvColumnNames(index) match {
+          case `skippedColumnName` => None /* Column is undefined in DTD */
+          case columnName => Some(tableDefinition.name2dbType(columnName) -> value)
+        }
+      })
+    }
+
+    /**
+     * Add a parameter to the prepared statement based on db type and index.
+     */
+    def addSqlParam(sqlParamIndex: Int, dbType: DbTypes, value: String) = dbType match {
+      case VaryingCharactersDbType | CharactersDbType | DateDbType => {
+        val sanitizedValue = sanitizeDbValue(value)
+        dbBatch.param(sqlParamIndex, sanitizedValue)
+      }
+      case IntegerDbType => dbBatch.param(sqlParamIndex, Integer.parseInt(value))
+      case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
+    }
+
+    /* main loop, insert all rows in db */
     var rowNumber = 0
     for (row <- rows) {
       rowNumber += 1
-
       if (row.size != csvColumnNames.size) {
-
         /* CSV row column count does not match CSV header column count */
-        throw new RuntimeException(s"CSV contains bad row, aborting! rowNumber=$rowNumber")
-
+        handleBadRow(rowNumber)
       } else {
+        /* extract all types and value from row and add as prepared statement parameters */
+        extractTypesAndValues(row)
+          .view
+          .zipWithIndex
+          .foreach({ case ((dbType, value), index) => addSqlParam(index + 1, dbType, value)})
 
-        val insertValues = row.view.zipWithIndex.flatMap({ case (value, index) =>
-
-          val columnName = csvColumnNames(index)
-          if (columnName == skippedColumnName) {
-
-            /* Column is undefined in DTD */
-            None
-
-          } else {
-
-            /* extract type from table definition for column name */
-            val dbtype = tableDefinition.name2dbType(columnName)
-
-            dbtype match {
-              case VaryingCharactersDbType | CharactersDbType | DateDbType => Some("'" + sanitizeDbValue(value) + "'")
-              case IntegerDbType => Some(value)
-              case _ => throw new RuntimeException("unhandled db type")
-            }
-
-          }
-
-        }).mkString(", ")
-
-        db.addBatch(s"insert into recipients ($insertColumns) values ($insertValues)")
+        dbBatch.add()
 
         /* execute batch each X records */
         if (rowNumber % insertBatchSize == 0) {
-          db.executeBatch()
+          dbBatch.execute()
           splog.info(s"Executing batch insert, count=$rowNumber")
         }
       }
     }
+
+    dbBatch.execute()
 
     val recipientsCount = db.selectCount(s"select count(*) from recipients")
     splog.info(s"Done with SQL inserts, recipientsDbCount=$recipientsCount")
@@ -213,8 +224,9 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       db.execute(tableDefinition.toSql)
 
       splog.info("Writing CSV records to DB")
+      val time = System.currentTimeMillis()
       writeCsvStreamToDb(csvStream, tableDefinition, db)
-
+      splog.info("csv to sql time=" + (System.currentTimeMillis() - time))
       db.commit()
 
     } finally {

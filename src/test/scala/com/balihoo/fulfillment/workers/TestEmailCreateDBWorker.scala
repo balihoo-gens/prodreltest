@@ -68,7 +68,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
     "fail task if csv stream has no records" in new TestContext {
       givenReader()
-      givenCsvStream(data.header #:: data.rafael #:: data.badRecordNovak #:: Stream.empty)
+      givenCsvStream(data.header #:: Stream.empty)
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -76,7 +76,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         "dtd" -> data.dtd))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
     }
-    "fail task if csv stream has bad records" in new TestContext {
+    "fail task if csv stream has bad records and failOnBadRecord is true" in new TestContext {
+      givenFailOnBadRecord()
       givenReader()
       givenCsvStream(data.header #:: Stream.empty)
       givenLiteDb()
@@ -98,10 +99,32 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       worker.handleTask(activityParameter)
 
       there was one(worker.dbMock).execute("create table recipients (locationid integer, recipientid varchar(100), email varchar(100), firstname varchar(50), lastname varchar(50), birthday date)")
-      there was one(worker.dbMock).addBatch("insert into recipients (recipientid, locationid, email, firstname, lastname, birthday) values ('b', 2, 'rafael@nike.com', 'rafael', 'nadal', '1986-06-03')")
-      there was one(worker.dbMock).addBatch("insert into recipients (recipientid, locationid, email, firstname, lastname, birthday) values ('a', 1, 'roger@nike.com', 'roger', 'federer', '1981-08-08')")
-      there was one(worker.dbMock).addBatch("insert into recipients (recipientid, locationid, email, firstname, lastname, birthday) values ('c', 3, 'novak@uniqlo.com', 'novak', 'djokovic', '1987-05-22')")
-      there was one(worker.dbMock).executeBatch()
+      there was one(worker.dbMock).batch("insert into recipients (recipientid, locationid, email, firstname, lastname, birthday) values (?, ?, ?, ?, ?, ?)")
+
+      there was one(worker.dbBatchMock).param(1, "b")
+      there was one(worker.dbBatchMock).param(2, 2)
+      there was one(worker.dbBatchMock).param(3, "rafael@nike.com")
+      there was one(worker.dbBatchMock).param(4, "rafael")
+      there was one(worker.dbBatchMock).param(5, "nadal")
+      there was one(worker.dbBatchMock).param(6, "1986-06-03")
+
+      there was one(worker.dbBatchMock).param(1, "a")
+      there was one(worker.dbBatchMock).param(2, 1)
+      there was one(worker.dbBatchMock).param(3, "roger@nike.com")
+      there was one(worker.dbBatchMock).param(4, "roger")
+      there was one(worker.dbBatchMock).param(5, "federer")
+      there was one(worker.dbBatchMock).param(6, "1981-08-08")
+
+      there was one(worker.dbBatchMock).param(1, "c")
+      there was one(worker.dbBatchMock).param(2, 3)
+      there was one(worker.dbBatchMock).param(3, "novak@uniqlo.com")
+      there was one(worker.dbBatchMock).param(4, "novak")
+      there was one(worker.dbBatchMock).param(5, "djokovic")
+      there was one(worker.dbBatchMock).param(6, "1987-05-22")
+
+      there was three(worker.dbBatchMock).add()
+      there was two(worker.dbBatchMock).execute()
+
       there was one(worker.dbMock).commit()
       there was one(worker.dbMock).close()
       there was one(worker.readerMock).close()
@@ -182,11 +205,16 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       val readerMock = mock[InputStreamReader]
       val dbMock = mock[DB_TYPE]
       val dbFileMock = mock[File]
+      val dbBatchMock = mock[DbBatch]
       override val insertBatchSize = 2
       var test_complete_result = ""
       override def completeTask(result: String) = {
         test_complete_result = result
       }
+    }
+
+    def givenFailOnBadRecord(value: Boolean = true) = {
+      worker.swfAdapter.config.getOrElse("failOnBadRecord", default = true) returns value
     }
 
     def givenReader() = {
@@ -199,6 +227,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
     def givenLiteDb() = {
       worker.dbMock.file returns worker.dbFileMock
+      worker.dbMock.batch(anyString) returns worker.dbBatchMock
       worker.liteDbAdapter.create(===(data.dbname)) returns worker.dbMock
     }
 
