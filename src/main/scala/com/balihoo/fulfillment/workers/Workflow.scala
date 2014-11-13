@@ -55,12 +55,17 @@ class SubTableActivityParameter(
 abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
   this: LoggingWorkflowAdapter =>
 
+  //worker specific type to store substitution tables
   type SubTable = Map[String,List[String]]
+
+  //worker specific type to store swf execution ids
+  case class WorkFlowExecutionIds(workflowId:String, runId:String)
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
         new StringActivityParameter("template", "the template for the workflows", true),
         new SubTableActivityParameter("substitutions", "substitution data for workflows", false)
+        new StringsActivityParameter("tags", "tags to put on the resulting workflows", false)
     ), new ActivityResult("JSON", "list of workflow ids"))
   }
 
@@ -69,18 +74,19 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
     withTaskHandling {
       val template = params[String]("template")
       val results = ArrayBuffer[String]()
-      val tags = List[String]("generated")
+      val tags = getOrElse(params[List[String]]("tags"), List[String]())
+      val subTable = params[SubTable]("substitutions")
 
       def submitAndRecord(ffdoc:String) = {
         results += submitTask(ffdoc, tags)
+        splog.info(s"")
       }
 
       if (params.has("substitutions")) {
-        val submap = params[SubTable]("substitutions")
-        //val submap = jsonStringToSubTable(params("substitutions"))
-        multipleSubstitute(template, submap, submitAndRecord)
+        //pass the 
+        multipleSubstitute(template, subTable, submitAndRecord _)
       } else {
-        results += submitTask(template, tags)
+        submitAndRecord(template)
       }
 
       results.mkString(",")
@@ -89,6 +95,12 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
 
   def multipleSubstitute(template:String, subTable:SubTable, f:(String => Unit)) = {
     val parallellism = new ForkJoinTaskSupport(new ForkJoinPool(10))
+    object mutex
+
+    //strings can get long, abbreviate with dots
+    def abbr(s:String, n:Int) = {
+      if (s.size > n) s"${s.take(n)}..." else s
+    }
 
     def iterateSubs(
       subTable:SubTable,
@@ -99,7 +111,18 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
         for ((key,value) <- subs) {
           ffdoc = ffdoc.replaceAllLiterally(s"${key}",value)
         }
-        synchronized { f(ffdoc) }
+
+        //craft a log message that shows what was replaced, but avoid putting
+        //  in strings longer that 10 characters
+        val logmsg = m.foldLeft("substituted: ") {
+          (s,kv) => s"""$s ("${abbr(kv._1,10)}" -> "${abbr(kv._2,10)}")"""
+        }
+
+        //
+        mutex.synchronized {
+          splog.info(logmsg)
+          f(ffdoc)
+        }
       } else {
         val (key, vals) = subTable.head
         val parvals = vals.par
@@ -114,7 +137,7 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
 
   def uuid = java.util.UUID.randomUUID.toString
 
-  def submitTask(input:String, tags: List[String]) = {
+  def submitTask(input:String, tags: List[String]): WorkflowExecutionIds = {
     val id=s"genwf_$uuid"
     val executionRequest = new StartWorkflowExecutionRequest()
     executionRequest.setDomain(swfAdapter.config.getString("domain"))
@@ -126,8 +149,8 @@ abstract class AbstractWorkflowGenerator extends FulfillmentWorker {
     val taskListName = new SWFName(workflowName + workflowVersion)
     executionRequest.setWorkflowType(new WorkflowType().withName(workflowName).withVersion(workflowVersion))
     executionRequest.setTaskList(new TaskList().withName(taskListName))
-    swfAdapter.client.startWorkflowExecution(executionRequest).getRunId
-    id
+    val runId = swfAdapter.client.startWorkflowExecution(executionRequest).getRunId
+    new WorkflowExecutionIds(id, runId)
   }
 }
 
