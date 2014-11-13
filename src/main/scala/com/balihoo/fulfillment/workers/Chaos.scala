@@ -13,7 +13,7 @@ abstract class AbstractChaos extends FulfillmentWorker {
     new ActivitySpecification(List(
       new NumberActivityParameter("chanceToFail", "0-100 Chance to Fail"),
       new NumberActivityParameter("chanceToCancel", "0-100 Chance to Cancel")
-    ), new ActivityResult("string", "Message of little consequence."))
+    ), new StringActivityResult("Message of little consequence."))
   }
 
   override def handleTask(params: ActivityParameters) = {

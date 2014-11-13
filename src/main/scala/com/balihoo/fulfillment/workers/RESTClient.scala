@@ -17,7 +17,7 @@ class AbstractRESTClient extends FulfillmentWorker {
       new ObjectActivityParameter("headers", "This object's attributes will be added to the HTTP request headers.", false),
       new EnumActivityParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
       new StringActivityParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
-    ), new ActivityResult("JSON", "An object containing statusCode and body attributes"))
+    ), new ObjectActivityResult("An object containing statusCode and body attributes"))
   }
 
   override def handleTask(params: ActivityParameters) = {

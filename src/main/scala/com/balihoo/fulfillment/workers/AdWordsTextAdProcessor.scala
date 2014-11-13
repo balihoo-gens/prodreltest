@@ -54,7 +54,7 @@ trait TextAdCreatorComponent {
         new StringActivityParameter("description2", "Second line of ad text (35 chars)"),
         new StringActivityParameter("url", "Landing page URL (domain must match displayUrl)"),
         new StringActivityParameter("displayUrl", "Visible Ad URL")
-      ), new ActivityResult("int", "TextAd ID"),
+      ), new StringActivityResult("TextAd ID"),
         "Create a Google AdWords Text Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.TextAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad" )
     }
 

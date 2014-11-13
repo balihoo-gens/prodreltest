@@ -122,7 +122,7 @@ trait CampaignCreatorComponent {
         // TODO FIXME We should have an optional max/min on StringActivityParameter!
         new StringActivityParameter("company name", "LocationExtension(Optional): The name of the company located at the given address. The length of this string should be between 1 and 80, inclusive.", false),
         new StringActivityParameter("phone number", "LocationExtension(Optional): The phone number for the location", false)
-      ), new ActivityResult("int", "AdWords Campaign ID"))
+      ), new StringActivityResult("AdWords Campaign ID"))
     }
 
     def getCampaign(params:String):Campaign = {

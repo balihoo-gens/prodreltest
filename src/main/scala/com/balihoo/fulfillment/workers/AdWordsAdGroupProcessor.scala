@@ -76,7 +76,7 @@ trait AdGroupCreatorComponent {
         new StringsActivityParameter("broad keywords", "List of BROAD Match Keywords", false),
         new StringsActivityParameter("phrase keywords", "List of PHRASE Match Keywords", false),
         new StringsActivityParameter("negative keywords", "List of NEGATIVE Match Keywords", false)
-      ), new ActivityResult("int", "AdGroup ID"))
+      ), new StringActivityResult("AdGroup ID"))
     }
 
     def getAdGroup(params:String):AdGroup = {

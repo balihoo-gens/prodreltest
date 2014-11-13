@@ -28,8 +28,8 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
       new StringActivityParameter("appId", "The Facebook app ID"),
-      new StringActivityParameter("appSecret", "The Facebook app secret", sensitive = true),
-      new StringActivityParameter("accessToken", "The Facebook access token", sensitive = true),
+      new EncryptedActivityParameter("appSecret", "The Facebook app secret"),
+      new EncryptedActivityParameter("accessToken", "The Facebook access token"),
       new EnumActivityParameter("postType", "", List("link", "photo", "status update")),
       new StringActivityParameter("pageId", "The Facebook page ID"),
       new ObjectActivityParameter("target", "The targeting data"),
@@ -37,7 +37,7 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
       new StringActivityParameter("linkUrl", "A link to include in the post", required = false),
       new StringActivityParameter("photoUrl", "The URL of the photo to include in the post", required = false),
       new EnumActivityParameter("action", "", List("validate", "publish"))
-    ), new ActivityResult("string", "the Facebook post ID if the action is \"publish\", otherwise ignore this value"))
+    ), new StringActivityResult("the Facebook post ID if the action is \"publish\", otherwise ignore this value"))
   }
 
   /**

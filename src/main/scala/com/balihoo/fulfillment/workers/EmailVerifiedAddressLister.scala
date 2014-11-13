@@ -9,7 +9,7 @@ abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
   with SESAdapterComponent =>
 
   override def getSpecification: ActivitySpecification = {
-    new ActivitySpecification(List(), new ActivityResult("JSON", "Comma separated list of email addresses"))
+    new ActivitySpecification(List(), new StringsActivityResult("Array of email addresses"))
   }
 
   override def handleTask(params: ActivityParameters) = {

@@ -22,7 +22,7 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
       new StringActivityParameter("zip", "The zip from the participant's marketing address"),
       new StringActivityParameter("country", "The country from the participant's marketing address"),
       new StringActivityParameter("phone", "The phone number from the participant's marketing address")
-    ), new ActivityResult("string", "The subaccount ID"))
+    ), new StringActivityResult("The subaccount ID"))
   }
 
   override def handleTask(params: ActivityParameters) = {
