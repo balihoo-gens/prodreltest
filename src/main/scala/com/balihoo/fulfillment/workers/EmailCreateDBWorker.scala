@@ -72,6 +72,9 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       "process all rows in a csv to a sql lite database file")
   }
 
+  /**
+   * Extract, validate and return parameters for this task.
+   */
   private def getParams(parameters: ActivityParameters) = {
 
     splog.info("Parsing parameters source, dbname and dtd")
@@ -99,6 +102,10 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     (sourceUri.getHost, sourceUri.getPath.substring(1), maybeDbName.get, tableDefinition)
   }
 
+  /**
+   * Uploads local db to S3.
+   * @return url to the resulting db s3 object.
+   */
   private def s3upload(file: File, name: String) = {
     splog.info("Uploading DB file to S3")
     val targetBucket = swfAdapter.config.getString("s3bucket")
@@ -114,8 +121,9 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     s"s3://$targetBucket/$targetKey"
   }
 
-  private def sanitizeDbValue(value: String) = value.replaceAll("\\'", "''")
-
+  /**
+   * Event handler for a row that contains wrong columns count.
+   */
   private def handleBadRow(rowNum: Integer) = {
     if (swfAdapter.config.getOrElse("failOnBadRecord", default = true)) {
       throw new RuntimeException(s"CSV contains bad row, aborting! rowNumber=$rowNum")
@@ -124,6 +132,10 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     }
   }
 
+  /**
+   * Writes the stream of CSV records (list of strings) into the given db.
+   * A table definition is required for mapping types and column names between csv and db.
+   */
   private def writeCsvStreamToDb(csvStream: Stream[List[String]], tableDefinition: TableDefinition, db: DB_TYPE) = {
 
     /*
@@ -135,14 +147,16 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     splog.debug(s"Ordered CSV columns : $csvColumnNames")
 
     val nonSkippedColumns = csvColumnNames.filterNot(_ == skippedColumnName)
-    val insertColumns = nonSkippedColumns.mkString(", ")
-    splog.debug(s"Ordered CSV insert columns : $insertColumns")
+    val sqlColumnNames = nonSkippedColumns.mkString(", ")
+    splog.debug(s"Ordered SQL insert columns : $sqlColumnNames")
 
+    /* skip header, work on rows from now on */
     val rows = csvStream.drop(1)
     if (rows.isEmpty) throw new RuntimeException("CSV stream has headers, but no rows")
 
+    /* generates param size */
     val params = ("?" * nonSkippedColumns.size).mkString(", ")
-    val dbBatch = db.batch(s"insert into recipients ($insertColumns) values ($params)")
+    val dbBatch = db.batch(s"insert into recipients ($sqlColumnNames) values ($params)")
 
     /**
      * @return type-value tuple sequence for known column names (based on index)
@@ -160,10 +174,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
      * Add a parameter to the prepared statement based on db type and index.
      */
     def addSqlParam(sqlParamIndex: Int, dbType: DbTypes, value: String) = dbType match {
-      case VaryingCharactersDbType | CharactersDbType | DateDbType => {
-        val sanitizedValue = sanitizeDbValue(value)
-        dbBatch.param(sqlParamIndex, sanitizedValue)
-      }
+      case VaryingCharactersDbType | CharactersDbType | DateDbType => dbBatch.param(sqlParamIndex, value)
       case IntegerDbType => dbBatch.param(sqlParamIndex, Integer.parseInt(value))
       case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
     }
@@ -192,12 +203,17 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       }
     }
 
-    dbBatch.execute()
+    dbBatch.execute() /* make sure last records are inserted */
 
+    splog.info(s"Testing DB...")
     val recipientsCount = db.selectCount(s"select count(*) from recipients")
     splog.info(s"Done with SQL inserts, recipientsDbCount=$recipientsCount")
   }
 
+  /**
+   * @return an input stream reader (for clean up) and a scala stream based on it for
+   *         processing the CSV records as they come.
+   */
   private def csvStreamFromS3Content(bucket: String, key: String) = {
     splog.info(s"Streaming CSV content from S3 bucket=$bucket key=$key")
     val reader = s3Adapter.getObjectContentAsReader(bucket, key)
