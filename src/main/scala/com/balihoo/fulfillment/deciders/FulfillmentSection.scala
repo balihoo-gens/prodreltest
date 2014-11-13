@@ -324,15 +324,15 @@ class FulfillmentSection(val name: String
     }
   }
 
-  def gatherParameters():Map[String,String] = {
+  def gatherParameters():Map[String,JsValue] = {
 
-    val oparams = mutable.Map[String, String]()
+    val oparams = mutable.Map[String, JsValue]()
 
     for((name, param) <- params) {
       if(!param.isResolved) {
         throw new Exception(s"Unresolved parameter '$name'!")
       }
-      oparams(name) = Json.stringify(param.getResult.get)
+      oparams(name) = Json.toJson(param.getResult.get)
     }
 
     oparams.toMap

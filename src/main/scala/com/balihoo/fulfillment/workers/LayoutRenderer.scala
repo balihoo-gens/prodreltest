@@ -60,7 +60,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
         new StringActivityParameter("endpoint", "The endpoint URL to use (overrides default)", false),
         new StringActivityParameter("clipselector", "The selector used to clip the page", false),
         new StringActivityParameter("target", "The S3 filename of the resulting page")
-      ), new ActivityResult("string", "the target URL if successfully saved"))
+      ), new StringActivityResult("the target URL if successfully saved"))
   }
 
   override def handleTask(params: ActivityParameters) = {

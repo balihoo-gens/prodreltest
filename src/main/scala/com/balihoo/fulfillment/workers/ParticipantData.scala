@@ -16,7 +16,7 @@ abstract class AbstractParticipantData extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
         new StringActivityParameter("participantId", "Participant Identifier")
-      ), new ActivityResult("JSON", "An object of affiliate data"))
+      ), new ObjectActivityResult("An object of affiliate data"))
   }
 
   override def handleTask(params: ActivityParameters) = {

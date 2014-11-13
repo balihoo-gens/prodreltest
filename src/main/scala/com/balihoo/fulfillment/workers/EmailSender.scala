@@ -14,8 +14,8 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
       new StringsActivityParameter("recipients", "Array of email addresses"),
       new StringActivityParameter("subject", ""),
       new StringActivityParameter("body", ""),
-      new StringActivityParameter("type", "html|normal")
-    ), new ActivityResult("JSON", "Result of Send"))
+      new BooleanActivityParameter("html", "Send email in HTML format")
+    ), new ObjectActivityResult("Result of Send"))
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -27,7 +27,7 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
         params[List[String]]("recipients"),
         params("subject"),
         params("body"),
-        params("type") == "html"
+        params[Boolean]("html")
       ).toString
     }
   }

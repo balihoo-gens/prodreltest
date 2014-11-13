@@ -14,7 +14,7 @@ abstract class AbstractSendGridLookupSubaccount extends FulfillmentWorker {
     new ActivitySpecification(List(
       new StringActivityParameter("participantId", "The participant ID used to identify the SendGrid subaccount"),
       new BooleanActivityParameter("useTestSubaccount", "True if the SendGrid test account should be used")
-    ), new ActivityResult("string", "The subaccount ID"))
+    ), new StringActivityResult("The subaccount ID"))
   }
 
   override def handleTask(params: ActivityParameters) = {

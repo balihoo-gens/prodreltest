@@ -17,7 +17,7 @@ abstract class AbstractZipCodeDemographics extends FulfillmentWorker {
       new ActivitySpecification(List(
         new ObjectActivityParameter("demographicsQuery", "Demographics Query"),
         new StringActivityParameter("participantId", "Participant Identifier")
-      ), new ActivityResult("string", "A list of zip codes 'ZZZZZ,ZZZZZ,ZZZZZ..."))
+      ), new StringsActivityResult("A array of zip codes"))
   }
 
   override def handleTask(params: ActivityParameters) = {

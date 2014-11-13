@@ -62,7 +62,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
         new IntegerActivityParameter("maxsize", "Maximum size for the image (bytes)", false),
         new IntegerActivityParameter("minquality", "Minimum quality of the image (percent)", false),
         new StringActivityParameter("target", "The S3 filename of the resulting image")
-      ), new ActivityResult("string", "the target URL if successfully saved"))
+      ), new StringActivityResult("the target URL if successfully saved"))
   }
 
   override def handleTask(params: ActivityParameters) = {

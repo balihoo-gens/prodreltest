@@ -58,7 +58,7 @@ trait AccountCreatorComponent {
         new StringActivityParameter("name", "Name of this Account"),
         new StringActivityParameter("currencyCode", "Usually US. https://developers.google.com/adwords/api/docs/appendix/currencycodes "),
         new StringActivityParameter("timeZone", "https://developers.google.com/adwords/api/docs/appendix/timezones")
-      ), new ActivityResult("int", "AdWords Account ID"))
+      ), new StringActivityResult("AdWords Account ID"))
     }
 
     def getManagerAccount(params:ActivityParameters):ManagedCustomer = {

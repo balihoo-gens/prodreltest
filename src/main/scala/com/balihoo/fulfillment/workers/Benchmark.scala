@@ -25,7 +25,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
         new IntegerActivityParameter("count", "system: How manieth workflow this is", false),
         new IntegerActivityParameter("submit_time", "system: the time this workflow was submitted", false),
         new IntegerActivityParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", false)
-    ), new ActivityResult("JSON", "completed time and token"))
+    ), new ObjectActivityResult("completed time and token"))
   }
 
   override def handleTask(params: ActivityParameters) = {
