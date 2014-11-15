@@ -110,6 +110,9 @@ trait LightweightDatabaseAdapterComponent {
 
     override def param[T <: Any](index: Int, value: T) = value match {
       case anInt: Int => preparedStatement.setInt(index, anInt)
+      case aLong: Long => preparedStatement.setLong(index, aLong)
+      case aFloat: Float => preparedStatement.setFloat(index, aFloat)
+      case aDouble: Double => preparedStatement.setDouble(index, aDouble)
       case aString: String => preparedStatement.setString(index, aString)
       case aDate: java.sql.Date => preparedStatement.setDate(index, aDate)
       case aTimestamp: java.sql.Timestamp => preparedStatement.setTimestamp(index, aTimestamp)

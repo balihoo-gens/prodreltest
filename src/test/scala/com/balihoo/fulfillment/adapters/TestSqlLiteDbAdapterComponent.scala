@@ -23,7 +23,7 @@ class TestSqlLiteDbAdapterComponent extends Specification with Mockito {
 
       val dbBatch = db.batch("insert into recipients (id, name) values (?, ?)")
 
-      dbBatch.param(1, 1)
+      dbBatch.param(1, 1.toLong)
       dbBatch.param(2, "roger")
       dbBatch.add()
 

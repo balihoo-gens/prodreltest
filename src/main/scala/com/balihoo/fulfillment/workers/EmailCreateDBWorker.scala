@@ -1,12 +1,15 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{InputStreamReader, File}
+import java.io.File
+import java.text.SimpleDateFormat
 
-import com.amazonaws.services.s3.model.S3Object
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.workers.db.{DataTypes, TableDefinition, ColumnDefinition}
 import play.api.libs.json.Json
+
+import scala.util.{Failure, Success, Try}
 
 /**
  * Worker that creates a database file from a csv file, based on a dtd.
@@ -21,45 +24,13 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     with CsvAdapterComponent
     with LightweightDatabaseAdapterComponent =>
 
-  /** Supported database types. */
-  sealed trait DbTypes
-  case object VaryingCharactersDbType extends DbTypes
-  case object CharactersDbType extends DbTypes
-  case object DateDbType extends DbTypes
-  case object IntegerDbType extends DbTypes
-
-  /** Simple SQL column definition. */
-  case class ColumnDefinition(name: String, `type`: String, source: String, index: Option[String])
-
-  /** Simple SQL table definition. */
-  case class TableDefinition(columns: Seq[ColumnDefinition]) {
-
-    /** Column names by column source. */
-    val source2name = columns.map(col => col.source.toLowerCase -> col.name.toLowerCase).toMap
-
-    /** Column types by column name. */
-    val name2dbType: Map[String, DbTypes] = columns.map(col => col.`type`.toLowerCase match {
-        case columnType if columnType.startsWith("varchar") => col.name.toLowerCase -> VaryingCharactersDbType
-        case columnType if columnType.startsWith("char") => col.name.toLowerCase -> CharactersDbType
-        case columnType if columnType.startsWith("int") => col.name.toLowerCase -> IntegerDbType
-        case columnType if columnType.startsWith("date") => col.name.toLowerCase -> DateDbType
-    }).toMap
-
-    /** Return a SQL statement to create table. */
-    def toSql = "create table recipients (" +
-      columns.map(col => col.name.toLowerCase + " " + col.`type`.toLowerCase).mkString(", ") + ")"
-
-    splog.debug("namesBySource=" + source2name)
-    splog.debug("typesByName=" + name2dbType)
-    splog.debug("table definition sql=" + toSql)
-  }
-
   /** Table definition JSON format. */
   implicit val tableColumnDefinition = Json.format[ColumnDefinition]
   implicit val tableDefinitionFormat = Json.format[TableDefinition]
 
   val skippedColumnName = "__skipped_column__"
   val insertBatchSize = 100000
+  val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -84,21 +55,21 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     // TODO (jmelanson) use json type when supported
     val maybeDtd = parameters.get("dtd")
 
-    if (!maybeSource.isDefined || maybeSource.get.trim.isEmpty)
-      throw new IllegalArgumentException("source parameter is empty")
-
+    if (!maybeSource.isDefined || maybeSource.get.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
     val sourceUri = new java.net.URI(maybeSource.get)
+    if (!maybeSource.get.trim.startsWith("s3")) throw new IllegalArgumentException("source protocol is unsupported for now")
+    if (!maybeDbName.isDefined || maybeDbName.get.trim.isEmpty) throw new IllegalArgumentException("dbname parameter is empty")
+    if (!maybeDtd.isDefined || maybeDtd.get.trim.isEmpty) throw new IllegalArgumentException("dtd parameter is empty")
 
-    if (!maybeSource.get.trim.startsWith("s3"))
-      throw new IllegalArgumentException("source protocol is unsupported for now")
+    val tableDefinition = Try(Json.parse(maybeDtd.get).as[TableDefinition]) match {
+      case Success(td) => td
+      case Failure(t) => throw new IllegalArgumentException("invalid DTD")
+    }
 
-    if (!maybeDbName.isDefined || maybeDbName.get.trim.isEmpty)
-      throw new IllegalArgumentException("dbname parameter is empty")
+    splog.debug("namesBySource=" + tableDefinition.source2name)
+    splog.debug("typesByName=" + tableDefinition.name2type)
+    splog.debug("table definition sql=" + tableDefinition.tableCreateSql)
 
-    if (!maybeDtd.isDefined || maybeDtd.get.trim.isEmpty)
-      throw new IllegalArgumentException("dtd parameter is empty")
-
-    val tableDefinition = Json.parse(maybeDtd.get).as[TableDefinition]
     (sourceUri.getHost, sourceUri.getPath.substring(1), maybeDbName.get, tableDefinition)
   }
 
@@ -165,7 +136,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       row.view.zipWithIndex.flatMap({ case (value, index) =>
         csvColumnNames(index) match {
           case `skippedColumnName` => None /* Column is undefined in DTD */
-          case columnName => Some(tableDefinition.name2dbType(columnName) -> value)
+          case columnName => Some(tableDefinition.name2type(columnName) -> value)
         }
       })
     }
@@ -173,9 +144,14 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     /**
      * Add a parameter to the prepared statement based on db type and index.
      */
-    def addSqlParam(sqlParamIndex: Int, dbType: DbTypes, value: String) = dbType match {
-      case VaryingCharactersDbType | CharactersDbType | DateDbType => dbBatch.param(sqlParamIndex, value)
-      case IntegerDbType => dbBatch.param(sqlParamIndex, Integer.parseInt(value))
+    def addSqlParam(sqlParamIndex: Int, dbType: DataTypes.DataType, value: String) = dbType match {
+      case DataTypes.Text => dbBatch.param(sqlParamIndex, value)
+      case DataTypes.Integer => dbBatch.param(sqlParamIndex, value.toLong)
+      case DataTypes.Date => dbBatch.param(sqlParamIndex, new java.sql.Date(sqlDateParser.parse(value).getTime))
+      /** TODO (jmelanson) support timestamp (need requirements) */
+      case DataTypes.Timestamp => dbBatch.param(sqlParamIndex, value)
+      case DataTypes.Boolean => dbBatch.param(sqlParamIndex, value.toBoolean)
+      case DataTypes.Real => dbBatch.param(sqlParamIndex, value.toDouble)
       case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
     }
 
@@ -204,6 +180,10 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     }
 
     dbBatch.execute() /* make sure last records are inserted */
+
+    splog.info(s"Creating indexes...")
+    tableDefinition.uniqueIndexCreateSql.foreach(db.execute)
+    tableDefinition.simpleIndexCreateSql.foreach(db.execute)
 
     splog.info(s"Testing DB...")
     val recipientsCount = db.selectCount(s"select count(*) from recipients")
@@ -237,7 +217,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     try {
 
       splog.info("Creating DB schema")
-      db.execute(tableDefinition.toSql)
+      db.execute(tableDefinition.tableCreateSql)
 
       splog.info("Writing CSV records to DB")
       val time = System.currentTimeMillis()
@@ -259,6 +239,133 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     completeTask(s3url)
 
   }
+}
+
+/**
+ * Package object to encapsulate database model.
+ */
+package object db {
+
+  /**
+   * Supported database types enumeration.
+   */
+  object DataTypes {
+    sealed abstract class DataType(aliases: String*) {
+      val regex = aliases
+        .map(_.replaceAll("\\s", "\\\\s"))
+        .mkString("(", "|", ")\\s*([(](\\d+)[)]){0,1}")
+        .r
+    }
+    case object Text extends DataType("character", "varchar", "varying character", "char", "nchar", "native character", "nvarchar", "text", "clob")
+    case object Integer extends DataType("int", "integer", "tinyint", "smallint", "mediumint", "bigint", "unsigned big int", "int2", "int8")
+    case object Real extends DataType("real", "double", "double precision", "float")
+    case object Date extends DataType("date")
+    case object Boolean extends DataType("boolean")
+    case object Timestamp extends DataType("datetime", "timestamp")
+  }
+
+  /**
+   * Simple SQL column definition.
+   */
+  case class ColumnDefinition(name: String, `type`: String, source: String, index: Option[String] = None) {
+
+    /** members as lower case */
+
+    val getName = name.toLowerCase
+    val getType = `type`.toLowerCase
+    val getSource = source.toLowerCase
+    def getIndex = index.get.toLowerCase
+
+    import db.DataTypes._
+
+    /** Simple column creation sql statement. */
+    val columnCreateSql = getName + " " + getType
+
+    /** Column is indexed. */
+    val isIndexed = index.isDefined
+
+    /** Column part of primary key. */
+    def isPrimaryKey = index.fold(false) {
+      case idx if getIndex matches "primary key|pk|primary|primarykey" => true
+      case _ => false
+    }
+
+    /** Column has unique index. */
+    def isUniqueKey = index.fold(false) {
+      case idx if getIndex matches "unique" => true
+      case _ => false
+    }
+
+    /** Index is simple. */
+    def isSimpleIndex = isIndexed && !(isUniqueKey || isPrimaryKey)
+
+    /**
+     * @return Data type from the raw column type.
+     */
+    def dataType = getType match {
+      case Text.regex(keywords, _, size) => Text
+      case Integer.regex(keywords, _, size) => Integer
+      case Real.regex(keywords, _, size) => Real
+      case Date.regex(keywords, _, size) => Date
+      case Boolean.regex(keywords, _, size) => Boolean
+      case Timestamp.regex(keywords, _, size) => Timestamp
+      case _ => throw new RuntimeException(s"unsupported db data type [${`type`}]")
+    }
+  }
+
+  val defaultTableName = "recipients"
+
+  /**
+   * Simple SQL table definition.
+   */
+  case class TableDefinition(columns: Seq[ColumnDefinition] = Seq.empty, name: Option[String] = Some(defaultTableName)) {
+
+    /** Source to name mapping. */
+    val source2name = columns.map(col => col.getSource -> col.getName).toMap
+
+    /** Name to data type mapping. */
+    val name2type = columns.map(col => col.getName -> col.dataType).toMap
+
+    /** Index names to indexed column definitions. */
+    val indexedColumns = columns.filter(_.isIndexed)
+
+    /** Primary key column definitions */
+    val primaryKeyIndexColumns = indexedColumns.filter(_.isPrimaryKey)
+
+    /** Unique indexes. */
+    val uniqueIndexColumns = indexedColumns.filter(_.isUniqueKey)
+
+    /** Simple indexes. */
+    val simpleIndexColumns = indexedColumns.filter(_.isSimpleIndex)
+
+    /** Primary key creation sql statement. */
+    val primaryKeyCreateSql = primaryKeyIndexColumns.map(_.getName).mkString("primary key (", ", ", ")")
+
+    /** Table name to use. */
+    val getName = name.getOrElse(defaultTableName)
+
+    /** Return a data definition SQL statement from this table definition. */
+    val tableCreateSql = {
+      val columnsCreateSql = columns.map(_.columnCreateSql)
+      val allDefinitions = if (primaryKeyIndexColumns.isEmpty) columnsCreateSql else columnsCreateSql :+ primaryKeyCreateSql
+      allDefinitions.mkString(s"create table $getName (", ", ", ")")
+    }
+
+    /** Return a list of create SQL statement for unique indexes defined in this table definition. */
+    val uniqueIndexCreateSql = uniqueIndexColumns.map({ column =>
+      s"create unique index ${column.getName}_unique_idx on $getName (${column.getName})"
+    }).toSeq
+
+    /** Return a list of create SQL statement for simple indexes defined in this table definition. */
+    val simpleIndexCreateSql = simpleIndexColumns
+      .groupBy(_.getIndex)
+      .map({ case (indexName, indexColumnDefinitions) =>
+        val indexColumns = indexColumnDefinitions.map(_.getName).mkString(", ")
+        s"create index $indexName on $getName ($indexColumns)"
+      }).toSeq
+
+  }
+
 }
 
 class EmailCreateDBWorker(override val _cfg: PropertiesLoader, override val _splog: Splogger) extends AbstractEmailCreateDBWorker

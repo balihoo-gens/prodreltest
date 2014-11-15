@@ -2,9 +2,10 @@ package com.balihoo.fulfillment.workers
 
 import java.io.{InputStreamReader, File}
 import java.net.URISyntaxException
+import java.text.SimpleDateFormat
 
-import com.amazonaws.services.s3.model.S3Object
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers.db.{ColumnDefinition, DataTypes}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.specs2.runner._
@@ -17,7 +18,7 @@ import scala.util.Try
 @RunWith(classOf[JUnitRunner])
 class TestEmailCreateDBWorker extends Specification with Mockito {
 
-  "getSpecification" should {
+  "EmailCreateDBWorker.getSpecification" should {
     "return a valid specification" in new TestContext {
       val spec = worker.getSpecification
       spec must beAnInstanceOf[ActivitySpecification]
@@ -32,7 +33,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
   }
 
-  "handleTask" should {
+  "EmailCreateDBWorker.handleTask" should {
     "fail task if source param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map())
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
@@ -47,6 +48,10 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
     "fail task if dtd param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map("source" -> data.source, "dbname" -> data.dbname))
+      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
+    }
+    "fail task if dtd param is invalid" in new TestContext {
+      val activityParameter = new ActivityParameters(Map("source" -> data.source, "dtd" -> data.invalidDtd, "dbname" -> data.dbname))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
     "fail task if protocol is unsupported" in new TestContext {
@@ -98,34 +103,47 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
       worker.handleTask(activityParameter)
 
-      there was one(worker.dbMock).execute("create table recipients (locationid integer, recipientid varchar(100), email varchar(100), firstname varchar(50), lastname varchar(50), birthday date)")
-      there was one(worker.dbMock).batch("insert into recipients (recipientid, locationid, email, firstname, lastname, birthday) values (?, ?, ?, ?, ?, ?)")
+      there was one(worker.dbMock).execute("create table recipients (" +
+        "locationid integer, " +
+        "recipientid varchar(100), " +
+        "email varchar(100), " +
+        "firstname varchar(50), " +
+        "lastname varchar(50), " +
+        "birthday date, " +
+        "primary key (locationid, recipientid))")
+      there was one(worker.dbMock).batch("insert into recipients " +
+        "(recipientid, locationid, email, firstname, lastname, birthday) " +
+        "values (?, ?, ?, ?, ?, ?)")
 
       there was one(worker.dbBatchMock).param(1, "b")
-      there was one(worker.dbBatchMock).param(2, 2)
+      there was one(worker.dbBatchMock).param(2, 2.toLong)
       there was one(worker.dbBatchMock).param(3, "rafael@nike.com")
       there was one(worker.dbBatchMock).param(4, "rafael")
       there was one(worker.dbBatchMock).param(5, "nadal")
-      there was one(worker.dbBatchMock).param(6, "1986-06-03")
+      there was one(worker.dbBatchMock).param(6, new java.sql.Date(sqlDateParser.parse("1986-06-03").getTime))
 
       there was one(worker.dbBatchMock).param(1, "a")
-      there was one(worker.dbBatchMock).param(2, 1)
+      there was one(worker.dbBatchMock).param(2, 1.toLong)
       there was one(worker.dbBatchMock).param(3, "roger@nike.com")
       there was one(worker.dbBatchMock).param(4, "roger")
       there was one(worker.dbBatchMock).param(5, "federer")
-      there was one(worker.dbBatchMock).param(6, "1981-08-08")
+      there was one(worker.dbBatchMock).param(6, new java.sql.Date(sqlDateParser.parse("1981-08-08").getTime))
 
       there was one(worker.dbBatchMock).param(1, "c")
-      there was one(worker.dbBatchMock).param(2, 3)
+      there was one(worker.dbBatchMock).param(2, 3.toLong)
       there was one(worker.dbBatchMock).param(3, "novak@uniqlo.com")
       there was one(worker.dbBatchMock).param(4, "novak")
       there was one(worker.dbBatchMock).param(5, "djokovic")
-      there was one(worker.dbBatchMock).param(6, "1987-05-22")
+      there was one(worker.dbBatchMock).param(6, new java.sql.Date(sqlDateParser.parse("1987-05-22").getTime))
 
       there was three(worker.dbBatchMock).add()
       there was two(worker.dbBatchMock).execute()
 
       there was one(worker.dbMock).commit()
+      there was one(worker.dbMock).execute("create unique index email_unique_idx on recipients (email)")
+      there was one(worker.dbMock).execute("create index fullname on recipients (firstname, lastname)")
+      there was one(worker.dbMock).execute("create index bday on recipients (birthday)")
+
       there was one(worker.dbMock).close()
       there was one(worker.readerMock).close()
       there was one(worker.s3Adapter).putPublic(===("mock"), beMatching(s"mock/\\d+/${data.dbname}"), ===(worker.dbFileMock))
@@ -134,10 +152,11 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       /* make sure output is complete s3 url */
       worker.test_complete_result must beMatching(s"s3://mock/mock/\\d+/" + data.dbname)
     }
-
   }
 
   class TestContext extends Scope {
+
+    val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
 
     object data {
       val s3bucket = "balihoo.fulfillment.stuff"
@@ -161,17 +180,20 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         Json.obj(
           "name" -> "email",
           "type" -> "varchar(100)",
-          "source" -> "EMAILADDR"
+          "source" -> "EMAILADDR",
+          "index" -> "unique"
         ),
         Json.obj(
           "name" -> "firstName",
           "type" -> "varchar(50)",
-          "source" -> "FNAME"
+          "source" -> "FNAME",
+          "index" -> "fullname"
         ),
         Json.obj(
           "name" -> "lastName",
           "type" -> "varchar(50)",
-          "source" -> "LNAME"
+          "source" -> "LNAME",
+          "index" -> "fullname"
         ),
         Json.obj(
           "name" -> "birthday",
@@ -181,6 +203,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         )
       ))
       val dtd = Json.stringify(dtdJson)
+      val invalidDtd = "{}"
       val header = List("RECIPIENT", "STORENUM", "emailaddr", "UNUSED", "FNAME", "LNAME", "TYPE", "BDAY")
       val roger = List("a", "1", "roger@nike.com", "some", "roger", "federer", "a", "1981-08-08")
       val rafael = List("b", "2", "rafael@nike.com", "some", "rafael", "nadal", "a", "1986-06-03")
@@ -233,4 +256,117 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
   }
 
+  "ColumnDefinition" should {
+    "detect text types" in new DbTestContext {
+      ColumnDefinition("aname", "nvarchar", "asource").dataType must beEqualTo(DataTypes.Text)
+      ColumnDefinition("aname", "char(3)", "asource").dataType must beEqualTo(DataTypes.Text)
+      ColumnDefinition("aname", "varchar(100)", "asource").dataType must beEqualTo(DataTypes.Text)
+      ColumnDefinition("aname", "text", "asource").dataType must beEqualTo(DataTypes.Text)
+    }
+    "detect integer types" in new DbTestContext {
+      ColumnDefinition("aname", "int", "asource").dataType must beEqualTo(DataTypes.Integer)
+      ColumnDefinition("aname", "integer", "asource").dataType must beEqualTo(DataTypes.Integer)
+      ColumnDefinition("aname", "bigint", "asource").dataType must beEqualTo(DataTypes.Integer)
+      ColumnDefinition("aname", "smallint", "asource").dataType must beEqualTo(DataTypes.Integer)
+    }
+    "detect real types" in new DbTestContext {
+      ColumnDefinition("aname", "real", "asource").dataType must beEqualTo(DataTypes.Real)
+      ColumnDefinition("aname", "float", "asource").dataType must beEqualTo(DataTypes.Real)
+      ColumnDefinition("aname", "double", "asource").dataType must beEqualTo(DataTypes.Real)
+    }
+    "detect date types" in new DbTestContext {
+      ColumnDefinition("aname", "date", "asource").dataType must beEqualTo(DataTypes.Date)
+    }
+    "detect timestamp types" in new DbTestContext {
+      ColumnDefinition("aname", "datetime", "asource").dataType must beEqualTo(DataTypes.Timestamp)
+      ColumnDefinition("aname", "timestamp", "asource").dataType must beEqualTo(DataTypes.Timestamp)
+    }
+  }
+
+  "TableDefinition" should {
+    "populate source to name map" in new DbTestContext {
+      val result = data.tableDefinition.source2name
+      result must beAnInstanceOf[Map[String, String]]
+      result.size must beEqualTo(data.tableDefinition.columns.size)
+      result.getOrElse("SOMEINT".toLowerCase, "") must beEqualTo("someint")
+      result.getOrElse("SOMEINT2".toLowerCase, "") must beEqualTo("someint2")
+      result.getOrElse("SOMESTRING".toLowerCase, "") must beEqualTo("somestring")
+      result.getOrElse("SOMEDATE".toLowerCase, "") must beEqualTo("somedate")
+      result.getOrElse("SOMESTRING2".toLowerCase, "") must beEqualTo("somestring2")
+      result.getOrElse("SOMESTRING3".toLowerCase, "") must beEqualTo("somestring3")
+      result.getOrElse("SOMEBOOL".toLowerCase, "") must beEqualTo("somebool")
+      result.getOrElse("SOMETIMESTAMP".toLowerCase, "") must beEqualTo("sometimestamp")
+      result.getOrElse("SOMEREAL".toLowerCase, "") must beEqualTo("somereal")
+    }
+    "populate names to db types map" in new DbTestContext {
+      val result = data.tableDefinition.name2type
+      result must beAnInstanceOf[Map[String, String]]
+      result.size must beEqualTo(data.tableDefinition.columns.size)
+      result.getOrElse("someint", "") must beEqualTo(DataTypes.Integer)
+      result.getOrElse("someint2", "") must beEqualTo(DataTypes.Integer)
+      result.getOrElse("somestring", "") must beEqualTo(DataTypes.Text)
+      result.getOrElse("somedate", "") must beEqualTo(DataTypes.Date)
+      result.getOrElse("somestring2", "") must beEqualTo(DataTypes.Text)
+      result.getOrElse("somestring3", "") must beEqualTo(DataTypes.Text)
+      result.getOrElse("somebool", "") must beEqualTo(DataTypes.Boolean)
+      result.getOrElse("sometimestamp", "") must beEqualTo(DataTypes.Timestamp)
+      result.getOrElse("somereal", "") must beEqualTo(DataTypes.Real)
+    }
+    "generate appropriate table creation sql statement" in new DbTestContext {
+      val result = data.tableDefinition.tableCreateSql
+      result must beAnInstanceOf[String]
+      result must beEqualTo("create table recipients (" +
+        "someint integer, " +
+        "someint2 integer, " +
+        "somestring varchar(50), " +
+        "somedate date, " +
+        "somestring2 char(3), " +
+        "somestring3 char(3), " +
+        "somebool boolean, " +
+        "sometimestamp timestamp, " +
+        "somereal double, " +
+        "primary key (someint, someint2))")
+    }
+    "generate appropriate unique indexes creation sql statements" in new DbTestContext {
+      val uniques = data.tableDefinition.uniqueIndexCreateSql
+      uniques must beAnInstanceOf[Seq[String]]
+      uniques must beEqualTo(Seq("create unique index somestring_unique_idx on recipients (somestring)"))
+    }
+    "generate appropriate simple indexes creation sql statements" in new DbTestContext {
+      val simples = data.tableDefinition.simpleIndexCreateSql
+      simples must beAnInstanceOf[Seq[String]]
+      simples must beEqualTo(Seq("create index an_index_name on recipients (somestring2, somestring3)"))
+    }
+  }
+
+  class DbTestContext extends Scope {
+
+    import db._
+
+    object data {
+      val col1 = ColumnDefinition("someint", "integer", "SOMEINT", Some("primary key"))
+      val col2 = ColumnDefinition("someint2", "integer", "SOMEINT2", Some("primary key"))
+      val col3 = ColumnDefinition("somestring", "varchar(50)", "SOMESTRING", Some("unique"))
+      val col4 = ColumnDefinition("somedate", "date", "SOMEDATE")
+      val col5 = ColumnDefinition("somestring2", "char(3)", "SOMESTRING2", Some("an_index_name"))
+      val col6 = ColumnDefinition("somestring3", "char(3)", "SOMESTRING3", Some("an_index_name"))
+      val col7 = ColumnDefinition("somebool", "boolean", "SOMEBOOL")
+      val col8 = ColumnDefinition("sometimestamp", "timestamp", "SOMETIMESTAMP")
+      val col9 = ColumnDefinition("somereal", "double", "SOMEREAL")
+      val tableDefinition =
+        TableDefinition(
+          Seq(
+            col1,
+            col2,
+            col3,
+            col4,
+            col5,
+            col6,
+            col7,
+            col8,
+            col9
+          )
+        )
+    }
+  }
 }
