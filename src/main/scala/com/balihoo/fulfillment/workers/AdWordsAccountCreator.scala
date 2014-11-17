@@ -54,15 +54,15 @@ trait AccountCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("parent", "int", "Parent AdWords account ID"),
-        new ActivityParameter("name", "string", "Name of this Account"),
-        new ActivityParameter("currencyCode", "string", "Usually US. https://developers.google.com/adwords/api/docs/appendix/currencycodes "),
-        new ActivityParameter("timeZone", "string", "https://developers.google.com/adwords/api/docs/appendix/timezones")
-      ), new ActivityResult("int", "AdWords Account ID"))
+        new IntegerActivityParameter("parent", "Parent AdWords account ID"),
+        new StringActivityParameter("name", "Name of this Account"),
+        new StringActivityParameter("currencyCode", "Usually US. https://developers.google.com/adwords/api/docs/appendix/currencycodes "),
+        new StringActivityParameter("timeZone", "https://developers.google.com/adwords/api/docs/appendix/timezones")
+      ), new StringActivityResult("AdWords Account ID"))
     }
 
     def getManagerAccount(params:ActivityParameters):ManagedCustomer = {
-      val parent = params("parent")
+      val parent = params[String]("parent")
       val context = s"getManagerAccount(parent='$parent')"
 
       val selector = new SelectorBuilder()
@@ -75,7 +75,7 @@ trait AccountCreatorComponent {
     }
 
     def getAccount(params:ActivityParameters):ManagedCustomer = {
-      val name = params("name")
+      val name = params[String]("name")
       val context = s"getAccount(name='$name')"
 
       val selector = new SelectorBuilder()
@@ -120,7 +120,7 @@ trait AccountCreatorComponent {
     }
 
     def lookupParentAccount(params:ActivityParameters):String = {
-      val parentName = params("parent")
+      val parentName = params[String]("parent")
       brandAccountCache.contains(parentName) match {
         case true =>
           brandAccountCache(parentName)

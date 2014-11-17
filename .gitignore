@@ -1,5 +1,7 @@
 *.properties.private
 
+deployments/
+
 # sbt specific
 dist/*
 target/

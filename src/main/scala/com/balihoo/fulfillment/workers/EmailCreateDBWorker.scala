@@ -35,11 +35,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new ActivityParameter("source", "string", "URL that indicates where the source data is downloaded from (S3)"),
-        new ActivityParameter("dbname", "string", "Name of the sqlite file that will be generated"),
-        new ActivityParameter("dtd", "string", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)")
+        new StringActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
+        new StringActivityParameter("dbname", "Name of the sqlite file that will be generated"),
+        new StringActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)")
       ),
-      new ActivityResult("string", "Name of the sqlite file that will be generated"),
+      new StringActivityResult("Name of the sqlite file that will be generated"),
       "process all rows in a csv to a sql lite database file")
   }
 
@@ -50,10 +50,10 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     splog.info("Parsing parameters source, dbname and dtd")
 
-    val maybeSource = parameters.get("source")
-    val maybeDbName = parameters.get("dbname")
+    val maybeSource = parameters.get[String]("source")
+    val maybeDbName = parameters.get[String]("dbname")
     // TODO (jmelanson) use json type when supported
-    val maybeDtd = parameters.get("dtd")
+    val maybeDtd = parameters.get[String]("dtd")
 
     if (!maybeSource.isDefined || maybeSource.get.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
     val sourceUri = new java.net.URI(maybeSource.get)

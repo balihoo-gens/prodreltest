@@ -26,9 +26,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       spec.params.count(_.name == "source") must beEqualTo(1)
       spec.params.count(_.name == "dbname") must beEqualTo(1)
       spec.params.count(_.name == "dtd") must beEqualTo(1)
-      spec.result must beAnInstanceOf[ActivityResult]
-      spec.result.rtype must beEqualTo("string")
-      spec.result.sensitive must beFalse
+      spec.result must beAnInstanceOf[StringActivityResult]
       spec.description must not(beEmpty)
     }
   }
