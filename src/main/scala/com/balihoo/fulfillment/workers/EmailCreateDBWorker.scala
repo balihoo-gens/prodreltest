@@ -13,9 +13,6 @@ import scala.util.{Failure, Success, Try}
 
 /**
  * Worker that creates a database file from a csv file, based on a dtd.
- *
- * TODO (jmelanson) create indexes at the end of insertions.
- * TODO (jmelanson) prevent sql injection the smart way.
  */
 abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
