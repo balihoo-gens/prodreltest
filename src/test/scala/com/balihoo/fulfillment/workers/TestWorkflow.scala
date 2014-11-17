@@ -31,7 +31,7 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
 
     // Override this method to avoid actually submitting, but record the input instead
     override def submitTask(input:String, tags: List[String]) = {
-      input
+      new WorkflowExecutionIds(input, tags.mkString(","))
     }
   }
 
@@ -103,9 +103,12 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
       wfgen.handleTask(wfgen.getSpecification.getParameters(input))
       wfgen.result match {
         case Some(s) =>
-          val results = s.split(",")
+          val results = Json.parse(s).as[List[JsObject]]
           for (result <- results) {
-            result must */("value (one|two)".r)
+            //this just contains the input for test so we can
+            //validate it; would contain the wfid in reality
+            val orgInput = (result \ "workflowId").as[String]
+            orgInput must */("value (one|two)".r)
           }
           results must have size(4)
         case _ => failure
