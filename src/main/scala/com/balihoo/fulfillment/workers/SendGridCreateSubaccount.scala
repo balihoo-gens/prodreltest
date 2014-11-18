@@ -22,7 +22,7 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
       new StringActivityParameter("zip", "The zip from the participant's marketing address"),
       new StringActivityParameter("country", "The country from the participant's marketing address"),
       new StringActivityParameter("phone", "The phone number from the participant's marketing address")
-    ), new StringActivityResult("The subaccount ID"))
+    ), new StringActivityResult("The subaccount username"))
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -42,6 +42,14 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
         _country = params("country"),
         _phone = params("phone"))
       sendGridAdapter.createSubaccount(subaccount)
+
+      // Configuration stuff that can be done at account creation time.  (This stuff won't need to change later.)
+      sendGridAdapter.activateApp(credentials.apiUser, "eventnotify")
+      sendGridAdapter.activateApp(credentials.apiUser, "clicktrack")
+      sendGridAdapter.activateApp(credentials.apiUser, "opentrack")
+      sendGridAdapter.activateApp(credentials.apiUser, "subscriptiontrack")
+
+      credentials.apiUser
     }
   }
 }
