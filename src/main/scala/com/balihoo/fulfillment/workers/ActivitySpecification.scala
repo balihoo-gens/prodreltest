@@ -286,12 +286,14 @@ class EnumActivityParameter(override val name:String
                             ,override val required:Boolean = true)
   extends ActivityParameter(name, description, required) {
 
-  def jsonType = "enum"
+  def jsonType = "string"
 
   def parseValue(js:JsValue):Any = _parseBasic[String](js)
 
   override def toSchema:JsValue = {
     Json.obj(
+      "type" -> jsonType,
+      "description" -> description,
       "enum" -> Json.toJson(options)
     )
   }

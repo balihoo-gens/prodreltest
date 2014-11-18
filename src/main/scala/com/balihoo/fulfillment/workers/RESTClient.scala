@@ -26,7 +26,7 @@ class AbstractRESTClient extends FulfillmentWorker {
       val url = new URL(params("url"))
       val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
       val method = params[String]("method")
-      lazy val body = params("body")
+      lazy val body = params[String]("body")
       splog.info(s"REST client was asked to $method $url")
 
       val response = method match {
