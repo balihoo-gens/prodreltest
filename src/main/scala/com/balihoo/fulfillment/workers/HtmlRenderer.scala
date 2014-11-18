@@ -58,7 +58,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
         new StringActivityParameter("source", "The URL of of the page to render"),
         new StringActivityParameter("clipselector", "The selector used to clip the page", false),
         new StringActivityParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", false),
-        new StringActivityParameter("headers", "Optional headers", false),
+        new ObjectActivityParameter("headers", "Optional headers", false),
         new IntegerActivityParameter("maxsize", "Maximum size for the image (bytes)", false),
         new IntegerActivityParameter("minquality", "Minimum quality of the image (percent)", false),
         new StringActivityParameter("target", "The S3 filename of the resulting image")
@@ -68,17 +68,24 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
     try {
 
+      val target = params[String]("target")
+      val source = params[String]("source")
+
       val input = MutableMap(
         "action" -> "render",
-        "source" -> params("source"),
-        "target" -> params("target")
+        "source" -> source,
+        "target" -> target
       )
 
       //optionally add the optional parameters
-      for (s <- Seq("data", "clipselector", "headers")
+      for (s <- Seq("data", "clipselector")
         if params.has(s)
       ) yield {
-        input(s) = params(s)
+        input(s) = params[String](s)
+      }
+
+      if (params.has("headers")) {
+        input("headers") = Json.stringify(params[JsObject]("headers"))
       }
 
       val maxsize = params.getOrElse("maxsize", maxsizeDefault )
@@ -105,7 +112,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
       imageFileName match {
         case Some(filename) =>
-          val s3location = s3Move(filename, params("target"))
+          val s3location = s3Move(filename, target)
           completeTask(s3location)
         case None =>
           throw new Exception("Failed to render image")
