@@ -132,9 +132,13 @@ abstract class FulfillmentWorker {
               _lastTaskToken = task.getTaskToken
               val shortToken = _lastTaskToken takeRight 10
               updateStatus("Processing task.." + shortToken )
+              val start = System.currentTimeMillis()
               handleTask(getSpecification.getParameters(task.getInput))
+              val time = System.currentTimeMillis() - start
+              splog.info(s"Task processed time=$time")
             } catch {
               case e:Exception =>
+                splog.warning(s"activity failed: exception=${e.toString}")
                 failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
             }
           case None =>

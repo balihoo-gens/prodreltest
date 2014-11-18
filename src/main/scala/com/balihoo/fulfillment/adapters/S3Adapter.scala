@@ -1,25 +1,42 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.File
+import java.io.{InputStreamReader, File}
+import java.nio.charset.Charset
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.{CannedAccessControlList, PutObjectRequest}
+import com.amazonaws.services.s3.model.{S3Object, CannedAccessControlList, PutObjectRequest}
 import com.amazonaws.auth.BasicAWSCredentials
 import com.balihoo.fulfillment.config._
 
 //for the cake pattern dependency injection
 trait S3AdapterComponent {
-  def s3Adapter: AbstractS3Adapter with PropertiesLoaderComponent
+  def s3Adapter: AbstractS3Adapter
 }
 
 abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
   this: PropertiesLoaderComponent =>
 
-  def putPublic(bucket:String, key:String, file:File) = {
-      client.putObject(
-        new PutObjectRequest(bucket, key, file)
-          .withCannedAcl(CannedAccessControlList.PublicRead)
-      )
+  def putPublic(bucket: String, key: String, file: File) = {
+    client.putObject(
+      new PutObjectRequest(bucket, key, file)
+        .withCannedAcl(CannedAccessControlList.PublicRead)
+    )
   }
+
+  def withS3Object[T](bucket: String, key: String)(callback: (S3Object) => T) = {
+    val s3obj = client.getObject(bucket, key)
+    callback(s3obj)
+  }
+
+  /**
+   * Warning: don't forget to close your reader!
+   * @return a new `InputStreamReader` from the `S3ObjectInputStream` with `utf-8` as default encoding.
+   */
+  def getObjectContentAsReader(bucket: String, key: String, charsetName: String = "UTF-8") = {
+    withS3Object(bucket, key) { s3obj =>
+      new InputStreamReader(s3obj.getObjectContent, Charset.forName(charsetName: String))
+    }
+  }
+
 }
 
 class S3Adapter(cfg: PropertiesLoader) extends AbstractS3Adapter with PropertiesLoaderComponent {
