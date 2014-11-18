@@ -12,21 +12,21 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ActivityParameter("subaccount", "string", "The SendGrid subaccount username"),
-      new ActivityParameter("firstName", "string", "The first name from the participant's marketing address"),
-      new ActivityParameter("lastName", "string", "The last name from the participant's marketing address"),
-      new ActivityParameter("address", "string", "The street address from the participant's marketing address"),
-      new ActivityParameter("city", "string", "The city from the participant's marketing address"),
-      new ActivityParameter("state", "string", "The state from the participant's marketing address"),
-      new ActivityParameter("zip", "string", "The zip from the participant's marketing address"),
-      new ActivityParameter("country", "string", "The country from the participant's marketing address"),
-      new ActivityParameter("phone", "string", "The phone number from the participant's marketing address"),
-      new ActivityParameter("webhookUrl", "string", "The event notification webhook URL"),
-      new ActivityParameter("webhookUsername", "string", "The event notification webhook username"),
-      new ActivityParameter("webhookPassword", "string", "The even notification webhook password", sensitive = true),
-      new ActivityParameter("ipAddress", "string", "The IP address SendGrid should use for sending email"),
-      new ActivityParameter("whitelabel", "string", "The SendGrid whitelabel for the subaccount")
-    ), new ActivityResult("string", "The subaccount name"))
+      new StringActivityParameter("subaccount", "The SendGrid subaccount username"),
+      new StringActivityParameter("firstName", "The first name from the participant's marketing address"),
+      new StringActivityParameter("lastName", "The last name from the participant's marketing address"),
+      new StringActivityParameter("address", "The street address from the participant's marketing address"),
+      new StringActivityParameter("city", "The city from the participant's marketing address"),
+      new StringActivityParameter("state", "The state from the participant's marketing address"),
+      new StringActivityParameter("zip", "The zip from the participant's marketing address"),
+      new StringActivityParameter("country", "The country from the participant's marketing address"),
+      new StringActivityParameter("phone", "The phone number from the participant's marketing address"),
+      new StringActivityParameter("webhookUrl", "The event notification webhook URL"),
+      new StringActivityParameter("webhookUsername", "The event notification webhook username"),
+      new EncryptedActivityParameter("webhookPassword", "The even notification webhook password"),
+      new StringActivityParameter("ipAddress", "The IP address SendGrid should use for sending email"),
+      new StringActivityParameter("whitelabel", "The SendGrid whitelabel for the subaccount")
+    ), new StringActivityResult("The subaccount name"))
   }
 
   override def handleTask(params: ActivityParameters) = {
