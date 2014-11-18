@@ -142,7 +142,7 @@ abstract class AbstractWorkflowGenerator
         submitAndRecord(template)
       }
 
-      "[" + results.mkString(",") + "]"
+      results.mkString("[", ",", "]")
       //Json.toJson(results).stringify
     }
   }
