@@ -72,28 +72,33 @@ app.factory('formatUtil', function() {
     }
 
     function _jsonFormat(json, divclass) {
-        if (json instanceof Array) {
-            var body = "";
+        var body = "";
+        if (_isArray(json)) {
             for (var item in json) {
                 body += _div(_jsonFormat(json[item]));
             }
             return _div(body, "block " + divclass);
         }
-        if (json instanceof Object) {
-            var body = "";
+        if (_isObject(json)) {
             for (var key in json) {
-                body += _div("<span><b>" + key + "</b></span> : " + _jsonFormat(json[key], "block"));
+                body += _div("<span><b>" + _escapeHTML(key) + "</b></span> : " + _jsonFormat(json[key], "block"));
             }
             return _div(body, "block " + divclass);
         }
         if(_isJSON(json)) {
-            return _jsonFormat(JSON.parse(json), "json");
+            var parsed = json;
+            try {
+                parsed = JSON.parse(json);
+            } catch(e) {
+                return parsed;
+            }
+            return _jsonFormat(parsed, "json");
         }
         if (_isString(json)) {
             return _span(_formatURLs(json), "jsonvalue");
         }
 
-        return _span(json, "jsonvalue");
+        return _span(_escapeHTML(json), "jsonvalue");
     }
 
     function _prettyJson(jsonString) {
@@ -111,11 +116,32 @@ app.factory('formatUtil', function() {
         return JSON.stringify(jsonString, undefined, 4);
     }
 
+    function _prettyJsonEscaped(str) {
+        return _escapeHTML(_prettyJson(str));
+    }
+
+    function _escapeHTML(s) {
+
+        var entityMap = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': '&quot;',
+            "'": '&#39;',
+            "/": '&#x2F;'
+        };
+
+        return String(s).replace(/[&<>"'\/]/g, function (ss) {
+            return entityMap[ss];
+        });
+    }
+
     function _formatURLs(param) {
         if(param === null) { return ""; }
+
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
 
-        return param.replace(urlRegex, function (url) {
+        return _escapeHTML(param).replace(urlRegex, function (url) {
 
             if (( url.indexOf(".jpg") > 0 )
                 || ( url.indexOf(".png") > 0 )
@@ -130,11 +156,23 @@ app.factory('formatUtil', function() {
 
     function _isJSON(j) {
         if(j === null) { return false; }
+        if(!_isString(j)) { return false; }
         return j[0] == '{' || j[0] == '[';
     }
 
     function _isArray(a) {
-        return a instanceof Array;
+        return $.isArray(a);
+    }
+
+    function _isObject(o) {
+        if($.isArray(o)) { return false; }
+        return o instanceof Object;
+    }
+
+    function _isSimple(i) {
+        if(_isArray(i)) { return false; }
+        if(_isObject(i)) { return false; }
+        return true;
     }
 
     function _isString(s) {
@@ -155,9 +193,12 @@ app.factory('formatUtil', function() {
         span: _span,
         jsonFormat: _jsonFormat,
         prettyJson: _prettyJson,
+        prettyJsonEscaped: _prettyJsonEscaped,
         formatURLs: _formatURLs,
         isJSON: _isJSON,
         isArray: _isArray,
+        isObject: _isObject,
+        isSimple: _isSimple,
         isString: _isString,
         escapeSlash: _escapeSlash,
         unEscapeSlash: _unEscapeSlash
@@ -245,7 +286,7 @@ app.controller('historyController', function($scope, $route, $http, $location, n
         var params = {};
         params['startDate'] = moment($('#startDate').data("DateTimePicker").getDate()).utc().format('YYYY-MM-DDTHH:mm:ss')+"Z";
         params['endDate'] = moment($('#endDate').data("DateTimePicker").getDate()).utc().format('YYYY-MM-DDTHH:mm:ss')+"Z";
-        $http.get('workflow/history', { params : params})
+        $http.get('workflow/history', { params : params, cache: false})
             .success(function(data) {
                          $scope.loading = false;
                          $scope.executions = data;
@@ -256,12 +297,14 @@ app.controller('historyController', function($scope, $route, $http, $location, n
                    });
     };
 
+    // NOTE Don't refactor! Double encoding these links for reasons..
+    // http://stackoverflow.com/questions/16630912/angular-js-route-doesnt-match-component-with-2f-encoded
     $scope.seeWorkflow = function(execution) {
-        $location.path("workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(execution.runId));
+        $location.path("workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(encodeURIComponent(execution.runId)));
     };
 
     $scope.linkWorkflow = function(execution) {
-        return "#/workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(formatUtil.escapeSlash(execution.runId));
+        return "#/workflow/"+encodeURIComponent(execution.workflowId)+"/run/"+encodeURIComponent(encodeURIComponent(execution.runId));
     };
 
     $scope.statusMap = {
@@ -359,7 +402,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         "$routeChangeSuccess",
         function($currentRoute, $previousRoute) {
             $scope.params = $route.current.params;
-            $scope.params.runId = formatUtil.unEscapeSlash($scope.params.runId);
+            $scope.params.runId = decodeURIComponent($scope.params.runId);
             $scope.getWorkflow();
         }
     );
@@ -372,7 +415,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         var params = {};
         params['runId'] = $scope.params.runId;
         params['workflowId'] = $scope.params.workflowId;
-        $http.get('workflow/detail', { params : params})
+        $http.get('workflow/detail', { params : params, cache: false})
             .success(function(data) {
                          $scope.loading = false;
                          $scope.workflow = data;
@@ -458,19 +501,15 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             section.showContents = false;
             for(pname in section.params) {
                 var param = section.params[pname];
-                if(formatUtil.isJSON(param)) {
-                    param = formatUtil.prettyJson(param);
-                }
                 section.params[pname] = {
-                    "original" : param,
-                    "value" : param,
+                    "root" : param,
+                    "editText" : formatUtil.prettyJson(param.input),
+                    "originalText" : formatUtil.prettyJson(param.input),
                     "name" : pname,
                     "edited" : false,
                     "editing" : false,
                     "editable" : $scope.workflow.editable && section.fixable,
-                    "isJson" : formatUtil.isJSON(param),
-                    "isArray" : formatUtil.isArray(param),
-                    "isString" : formatUtil.isString(param)
+                    "showInput" : !param.resolved
                 }
             }
 
@@ -492,14 +531,21 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
     };
 
     $scope.cancelEdit = function(param) {
-        param.value = param.original;
+        param.editText = param.originalText;
         param.editing = false;
         $scope.checkForEdits();
     };
 
     $scope.finishEditing = function(param) {
+        try {
+            param.root.input = JSON.parse(param.editText);
+        } catch(e) {
+            toastr.error(e.message, "Invalid JSON!");
+            return;
+        }
+
         param.editing = false;
-        param.edited = param.original != param.value;
+        param.edited = param.originalText != param.editText;
         $scope.checkForEdits();
     };
 
@@ -513,7 +559,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             for (pname in section.params) {
                 var param = section.params[pname];
                 if(param.edited) {
-                    paramUpdates[pname] = param.value;
+                    paramUpdates[pname] = param.root.input;
                 }
             }
             if(Object.size(paramUpdates)) {
@@ -555,7 +601,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             section.status = section.originalStatus;
             for (pname in section.params) {
                 var param = section.params[pname];
-                param.value = param.original;
+                param.root.input = JSON.parse(param.originalText);
                 param.edited = false;
             }
         }

@@ -10,12 +10,12 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ActivityParameter("from", "string", ""),
-      new ActivityParameter("recipients", "string", "Comma separated list of email addresses"),
-      new ActivityParameter("subject", "string", ""),
-      new ActivityParameter("body", "string", ""),
-      new ActivityParameter("type", "html|normal", "")
-    ), new ActivityResult("JSON", "Result of Send"))
+      new StringActivityParameter("from", ""),
+      new StringsActivityParameter("recipients", "Array of email addresses"),
+      new StringActivityParameter("subject", ""),
+      new StringActivityParameter("body", ""),
+      new BooleanActivityParameter("html", "Send email in HTML format")
+    ), new ObjectActivityResult("Result of Send"))
   }
 
   override def handleTask(params: ActivityParameters) = {
@@ -24,10 +24,10 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
     withTaskHandling {
       sendEmail(
         params("from"),
-        params("recipients").split(",").toList,
+        params[List[String]]("recipients"),
         params("subject"),
         params("body"),
-        params("type") == "html"
+        params[Boolean]("html")
       ).toString
     }
   }

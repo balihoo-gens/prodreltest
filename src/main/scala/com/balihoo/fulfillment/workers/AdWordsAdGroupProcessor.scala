@@ -64,19 +64,19 @@ trait AdGroupCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ActivityParameter("account", "int", "Participant AdWords account ID"),
-        new ActivityParameter("name", "string", "Name of this AdGroup"),
-        new ActivityParameter("campaignId", "int", "AdWords Campaign ID"),
-        new ActivityParameter("bidDollars", "float", "Bid amount in dollars"),
-        new ActivityParameter("mobile bid modifier", "float", "Proportion of bidDollars to be bid for mobile", false),
-        new ActivityParameter("status", "ENABLED|PAUSED|DELETED", ""),
-        new ActivityParameter("target", "JSON", "Mysterious and magical Form Builder output!", false),
-        new ActivityParameter("interests", "<interest>,<interest>,..", "List of Interests\nhttps://developers.google.com/adwords/api/docs/appendix/verticals", false),
-        new ActivityParameter("exact keywords", "<keyword>,<keyword>,..", "List of EXACT Match Keywords", false),
-        new ActivityParameter("broad keywords", "<keyword>,<keyword>,..", "List of BROAD Match Keywords", false),
-        new ActivityParameter("phrase keywords", "<keyword>,<keyword>,..", "List of PHRASE Match Keywords", false),
-        new ActivityParameter("negative keywords", "<keyword>,<keyword>,..", "List of NEGATIVE Match Keywords", false)
-      ), new ActivityResult("int", "AdGroup ID"))
+        new StringActivityParameter("account", "Participant AdWords account ID"),
+        new StringActivityParameter("name", "Name of this AdGroup"),
+        new StringActivityParameter("campaignId", "AdWords Campaign ID"),
+        new NumberActivityParameter("bidDollars", "Bid amount in dollars"),
+        new NumberActivityParameter("mobile bid modifier", "Proportion of bidDollars to be bid for mobile", false),
+        new EnumActivityParameter("status", "", List("ENABLED","PAUSED","DELETED")),
+        new ObjectActivityParameter("target", /*"JSON",*/ "Mysterious and magical Form Builder output!", false),
+        new StringsActivityParameter("interests", "List of Interests\nhttps://developers.google.com/adwords/api/docs/appendix/verticals", false),
+        new StringsActivityParameter("exact keywords", "List of EXACT Match Keywords", false),
+        new StringsActivityParameter("broad keywords", "List of BROAD Match Keywords", false),
+        new StringsActivityParameter("phrase keywords", "List of PHRASE Match Keywords", false),
+        new StringsActivityParameter("negative keywords", "List of NEGATIVE Match Keywords", false)
+      ), new StringActivityResult("AdGroup ID"))
     }
 
     def getAdGroup(params:String):AdGroup = {
@@ -89,8 +89,8 @@ trait AdGroupCreatorComponent {
 
     def getAdGroup(params: ActivityParameters): AdGroup = {
 
-      val name = params("name")
-      val campaignId = params("campaignId")
+      val name = params[String]("name")
+      val campaignId = params[String]("campaignId")
       val context = s"getAdGroup(name='$name', campaignId='$campaignId')"
 
       val selector = new SelectorBuilder()
@@ -122,8 +122,8 @@ trait AdGroupCreatorComponent {
      */
     def createAdGroup(params: ActivityParameters): AdGroup = {
 
-      val name = params("name")
-      val campaignId = params("campaignId")
+      val name = params[String]("name")
+      val campaignId = params[String]("campaignId")
       val context = s"createAdGroup(name='$name', campaignId='$campaignId')"
 
       // We look up the campaign so we can follow it's Bidding strategy
@@ -132,11 +132,11 @@ trait AdGroupCreatorComponent {
       val adGroup = new AdGroup()
       adGroup.setName(name)
       adGroup.setCampaignId(campaignId.toLong)
-      adGroup.setStatus(AdGroupStatus.fromString(params("status")))
+      adGroup.setStatus(AdGroupStatus.fromString(params[String]("status")))
 
       val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
       val money = new Money()
-      money.setMicroAmount(adWordsAdapter.dollarsToMicros(params("bidDollars").toFloat))
+      money.setMicroAmount(adWordsAdapter.dollarsToMicros(params[Float]("bidDollars")))
 
       // Switching on the CAMPAIGN bidding strategy
       campaign.getBiddingStrategyConfiguration.getBiddingStrategyType match {
@@ -179,33 +179,29 @@ trait AdGroupCreatorComponent {
 
       val context = s"updateAdGroup(name='${adGroup.getId}', params=$params)"
 
-      for((param, value) <- params.params) {
-        param match {
-          case "status" =>
-            adGroup.setStatus(AdGroupStatus.fromString(value))
-          case "bidDollars" =>
-            val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
-            val money = new Money()
-            money.setMicroAmount(adWordsAdapter.dollarsToMicros(value.toFloat))
+      if(params.has("status")) {
+        adGroup.setStatus(AdGroupStatus.fromString(params[String]("status")))
+      }
 
-            // Switching on the known AdGroup bidding strategy
-            adGroup.getBiddingStrategyConfiguration.getBiddingStrategyType match {
-              case BiddingStrategyType.MANUAL_CPC =>
-                val bid = new CpcBid()
-                bid.setBid(money)
-                biddingStrategyConfiguration.setBids(Array(bid))
-              case BiddingStrategyType.MANUAL_CPM =>
-                val bid = new CpmBid()
-                bid.setBid(money)
-                biddingStrategyConfiguration.setBids(Array(bid))
-              case _ =>
-                throw new Exception(s"biddingStrategy ${adGroup.getBiddingStrategyConfiguration.getBiddingStrategyType} is not supported!")
-            }
+      if(params.has("bidDollars")) {
+        val biddingStrategyConfiguration = new BiddingStrategyConfiguration()
+        val money = new Money()
+        money.setMicroAmount(adWordsAdapter.dollarsToMicros(params[Float]("bidDollars")))
 
-            adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
+        // Switching on the known AdGroup bidding strategy
+        adGroup.getBiddingStrategyConfiguration.getBiddingStrategyType match {
+          case BiddingStrategyType.MANUAL_CPC =>
+            val bid = new CpcBid()
+            bid.setBid(money)
+            biddingStrategyConfiguration.setBids(Array(bid))
+          case BiddingStrategyType.MANUAL_CPM =>
+            val bid = new CpmBid()
+            bid.setBid(money)
+            biddingStrategyConfiguration.setBids(Array(bid))
           case _ =>
-
+            throw new Exception(s"biddingStrategy ${adGroup.getBiddingStrategyConfiguration.getBiddingStrategyType} is not supported!")
         }
+        adGroup.setBiddingStrategyConfiguration(biddingStrategyConfiguration)
       }
 
       val operation = new AdGroupOperation()
@@ -221,7 +217,7 @@ trait AdGroupCreatorComponent {
       adGroup
     }
 
-    def _processKeywords(adGroup: AdGroup, keywords: Array[String], matchType: KeywordMatchType) = {
+    def _processKeywords(adGroup: AdGroup, keywords: Seq[String], matchType: KeywordMatchType) = {
       val eksc = new SetComparator[Keyword](
         _comparifyKeywords(_getExistingKeywords(adGroup, matchType)),
         _comparifyKeywords(_makeNewKeywords(keywords, matchType)))
@@ -230,7 +226,7 @@ trait AdGroupCreatorComponent {
       _addKeywords(adGroup, eksc.additionCandidates)
     }
 
-    def _processNegativeKeywords(adGroup: AdGroup, keywords: Array[String]) = {
+    def _processNegativeKeywords(adGroup: AdGroup, keywords: Seq[String]) = {
       val eksc = new SetComparator[Keyword](
         _comparifyKeywords(_getExistingKeywords(adGroup, KeywordMatchType.EXACT, CriterionUse.NEGATIVE)),
         _comparifyKeywords(_makeNewKeywords(keywords, KeywordMatchType.EXACT)))
@@ -308,7 +304,7 @@ trait AdGroupCreatorComponent {
       (for(keyword <- keywords) yield s"${keyword.getMatchType.toString}${keyword.getText}" -> keyword).toMap
     }
 
-    def _processInterests(adGroup: AdGroup, interests: Array[String]) = {
+    def _processInterests(adGroup: AdGroup, interests: Seq[String]) = {
       val eisc = new SetComparator[CriterionUserInterest](
         _comparifyInterests(_getExistingInterests(adGroup)),
         _comparifyInterests(_makeNewInterests(interests)))
@@ -478,24 +474,32 @@ trait AdGroupCreatorComponent {
 
     def _processOptionalParams(adGroup: AdGroup, params: ActivityParameters) = {
 
-      for((param, value) <- params.params) {
-        param match {
-          case "target" => // This one is dumb and needs to go!
-            _processTargetingDeprecatedYucky(adGroup, value)
-          case "interests" =>
-            _processInterests(adGroup, value.split(","))
-          case "exact keywords" =>
-            _processKeywords(adGroup, value.split(","), KeywordMatchType.EXACT)
-          case "broad keywords" =>
-            _processKeywords(adGroup, value.split(","), KeywordMatchType.BROAD)
-          case "phrase keywords" =>
-            _processKeywords(adGroup, value.split(","), KeywordMatchType.PHRASE)
-          case "negative keywords" =>
-            _processNegativeKeywords(adGroup, value.split(","))
-          case "mobile bid modifier" =>
-            _processBidModifier(adGroup, value, PLATFORM_MOBILE)
-          case _ =>
-        }
+      if(params.has("interests")) {
+        _processInterests(adGroup, params[List[String]]("interests"))
+      }
+
+      if(params.has("exact keywords")) {
+        _processKeywords(adGroup, params[List[String]]("exact keywords"), KeywordMatchType.EXACT)
+      }
+
+      if(params.has("broad keywords")) {
+        _processKeywords(adGroup,params[List[String]]("broad keywords"), KeywordMatchType.BROAD)
+      }
+
+      if(params.has("phrase keywords")) {
+        _processKeywords(adGroup, params[List[String]]("phrase keywords"), KeywordMatchType.PHRASE)
+      }
+
+      if(params.has("negative keywords")) {
+        _processNegativeKeywords(adGroup, params[List[String]]("negative keywords"))
+      }
+
+      if(params.has("mobile bid modifier")) {
+        _processBidModifier(adGroup, params[String]("mobile bid modifier"), PLATFORM_MOBILE)
+      }
+
+      if(params.has("target")) {  // TODO FIXME This one is dumb and needs to go!
+        _processTargetingDeprecatedYucky(adGroup, params[String]("target"))
       }
     }
 

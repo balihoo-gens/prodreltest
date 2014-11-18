@@ -101,17 +101,18 @@ class Fulfillment(val history:List[SWFEvent]) {
           section.setImpossible(gripe, when)
           throw new Exception(gripe)
         }
-        param match {
-          case sectionReferences: SectionReferences =>
-            for(sectionRef <- sectionReferences.sections) {
-              if(!hasSection(sectionRef.name)) {
-                val gripe = s"Fulfillment is impossible! Param ($pname -> ${sectionRef.name}) for $name does not exist!"
-                section.setImpossible(gripe, when)
-                throw new Exception(gripe)
-              }
-            }
-          case _ =>
-        }
+        // FIXME: This level of sanity checking is more difficult now!
+//        param match {
+//          case sectionReferences: SectionReferences =>
+//            for(sectionRef <- sectionReferences.sections) {
+//              if(!hasSection(sectionRef.name)) {
+//                val gripe = s"Fulfillment is impossible! Param ($pname -> ${sectionRef.name}) for $name does not exist!"
+//                section.setImpossible(gripe, when)
+//                throw new Exception(gripe)
+//              }
+//            }
+//          case _ =>
+//        }
       }
     }
 
@@ -165,9 +166,9 @@ class Fulfillment(val history:List[SWFEvent]) {
 
     // We look through the section references to see if anything needs to be promoted from CONTINGENT -> READY.
     // Sections get promoted when they're in a SectionReference list and the prior section is TERMINAL
-    for((name, section) <- nameToSection) {
-      section.resolveReferences(this)
-    }
+//    for((name, section) <- nameToSection) {
+//      section.promoteContingentReferences(this)
+//    }
   }
 
   protected def processUnhandledEventType(event:SWFEvent) = {
@@ -269,6 +270,8 @@ class Fulfillment(val history:List[SWFEvent]) {
             }
           }
         }
+      case "ping" =>
+        timeline.note("Received ping!", Some(event.eventDateTime))
       case _ =>
         timeline.warning(s"Unhandled signal ${event.get[String]("signalName")} ${event.get[String]("input")}", Some(event.eventDateTime))
     }

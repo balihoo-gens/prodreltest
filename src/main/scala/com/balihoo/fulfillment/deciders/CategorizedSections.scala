@@ -84,13 +84,9 @@ class CategorizedSections(fulfillment: Fulfillment) {
   protected def categorizeReadySection(section: FulfillmentSection) = {
 
     var paramsReady: Boolean = true
-    for((name, value) <- section.params) {
-      value match {
-        case sectionReferences: SectionReferences =>
-          paramsReady &= sectionReferences.resolved(fulfillment)
-        case _ =>
-          // non-reference params are automatically ready..
-      }
+    for((name, param) <- section.params) {
+      param.evaluate(fulfillment)
+      paramsReady &= param.isResolved
     }
 
     var prereqsReady: Boolean = true
@@ -139,6 +135,16 @@ class CategorizedSections(fulfillment: Fulfillment) {
 
   def hasPendingSections: Boolean = {
     inprogress.length + deferred.length != 0
+  }
+
+  def checkPromoted: Boolean = {
+    for(section <- contingent) {
+      if(section.status == SectionStatus.READY) {
+        return true
+      }
+    }
+
+    false
   }
 
 }

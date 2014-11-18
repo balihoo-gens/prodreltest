@@ -54,6 +54,7 @@ trait WorkflowInitiatorComponent {
       executionRequest.setWorkflowId(id)
       executionRequest.setInput(input)
       executionRequest.setTagList(tags.asJavaCollection)
+
       val workflowName = new SWFName(swfAdapter.config.getString("workflowName"))
       val workflowVersion = new SWFVersion(swfAdapter.config.getString("workflowVersion"))
       val taskListName = new SWFName(workflowName + workflowVersion)
@@ -186,22 +187,23 @@ trait WorkflowInspectorComponent {
         events.addAll(history.getEvents)
       }
       val historyJson = SWFHistoryConvertor.historyToJson(events)
-      val sections = new Fulfillment(SWFHistoryConvertor.jsonToSWFEvents(historyJson))
-      new DecisionGenerator(sections).makeDecisions(runOperations=false)
+      val fulfillment = new Fulfillment(SWFHistoryConvertor.jsonToSWFEvents(historyJson))
+      new DecisionGenerator(fulfillment).makeDecisions()
 
       val sectionsJson = collection.mutable.Map[String, JsValue]()
-      for((name, section:FulfillmentSection) <- sections.nameToSection) {
+      for((name, section:FulfillmentSection) <- fulfillment.nameToSection) {
+        section.evaluateParameters(fulfillment) // NOTE: This may have the undesirable side effect of changing section statuses (not actually in the workflow, but in the returned data)
         sectionsJson(name) = section.toJson
       }
 
-      val jtimeline = Json.toJson(for(entry <- sections.timeline.events) yield entry.toJson)
+      val jtimeline = Json.toJson(for(entry <- fulfillment.timeline.events) yield entry.toJson)
 
       Map(
         "timeline" -> jtimeline,
         "sections" -> Json.toJson(sectionsJson.toMap),
         "workflowId" -> Json.toJson(workflowId),
         "runId" -> Json.toJson(runId),
-        "status" -> Json.toJson(sections.status.toString),
+        "status" -> Json.toJson(fulfillment.status.toString),
         "history" -> historyJson
       )
 

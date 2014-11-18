@@ -127,15 +127,16 @@ abstract class AbstractGeoNamesTimeZoneRetriever extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ActivityParameter("lat", "float", ""),
-      new ActivityParameter("lon", "float", "")
-    ), new ActivityResult("string", "Timezone like (America/Denver)"))
+      new StringActivityParameter("lat", ""),
+      new StringActivityParameter("lon", "")
+    ), new StringActivityResult("Timezone like (America/Denver)"))
   }
 
   override def handleTask(params: ActivityParameters) = {
 
-    val lat = params("lat")
-    val lon = params("lon")
+    val lat = params[String]("lat")
+    val lon = params[String]("lon")
+
     val results = latLonToTimeZone(lat, lon)
 
     val jresults = Json.parse(results).as[JsObject]
