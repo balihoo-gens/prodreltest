@@ -5,7 +5,6 @@ import java.net.URISyntaxException
 import java.text.SimpleDateFormat
 
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.workers.db.{ColumnDefinition, DataTypes}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.specs2.runner._
@@ -101,16 +100,16 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
       worker.handleTask(activityParameter)
 
-      there was one(worker.dbMock).execute("create table recipients (" +
-        "locationid integer, " +
-        "recipientid varchar(100), " +
-        "email varchar(100), " +
-        "firstname varchar(50), " +
-        "lastname varchar(50), " +
-        "birthday date, " +
-        "primary key (locationid, recipientid))")
-      there was one(worker.dbMock).batch("insert into recipients " +
-        "(recipientid, locationid, email, firstname, lastname, birthday) " +
+      there was one(worker.dbMock).execute("create table \"recipients\" (" +
+        "\"locationid\" integer, " +
+        "\"recipientid\" varchar(100), " +
+        "\"email\" varchar(100), " +
+        "\"firstname\" varchar(50), " +
+        "\"lastname\" varchar(50), " +
+        "\"birthday\" date, " +
+        "primary key (\"locationid\", \"recipientid\"))")
+      there was one(worker.dbMock).batch("insert into \"recipients\" " +
+        "(\"recipientid\", \"locationid\", \"email\", \"firstname\", \"lastname\", \"birthday\") " +
         "values (?, ?, ?, ?, ?, ?)")
 
       there was one(worker.dbBatchMock).param(1, "b")
@@ -138,9 +137,9 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       there was two(worker.dbBatchMock).execute()
 
       there was one(worker.dbMock).commit()
-      there was one(worker.dbMock).execute("create unique index email_unique_idx on recipients (email)")
-      there was one(worker.dbMock).execute("create index fullname on recipients (firstname, lastname)")
-      there was one(worker.dbMock).execute("create index bday on recipients (birthday)")
+      there was one(worker.dbMock).execute("create unique index \"email_unique_idx\" on \"recipients\" (\"email\")")
+      there was one(worker.dbMock).execute("create index \"fullname\" on \"recipients\" (\"firstname\", \"lastname\")")
+      there was one(worker.dbMock).execute("create index \"bday\" on \"recipients\" (\"birthday\")")
 
       there was one(worker.dbMock).close()
       there was one(worker.readerMock).close()
@@ -162,7 +161,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       val source = s"s3://$s3bucket/$s3key"
       val sourceWithInvalidScheme = s"http://$s3bucket/$s3key"
       val dbname = "test.db"
-      val dtdJson = Json.obj("columns" -> Json.arr(
+      val dtd = Json.obj("columns" -> Json.arr(
         Json.obj(
           "name" -> "locationId",
           "type" -> "integer",
@@ -200,8 +199,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
           "index" -> "bday"
         )
       ))
-      val dtd = Json.stringify(dtdJson)
-      val invalidDtd = "{}"
+      val invalidDtd = Json.obj()
       val header = List("RECIPIENT", "STORENUM", "emailaddr", "UNUSED", "FNAME", "LNAME", "TYPE", "BDAY")
       val roger = List("a", "1", "roger@nike.com", "some", "roger", "federer", "a", "1981-08-08")
       val rafael = List("b", "2", "rafael@nike.com", "some", "rafael", "nadal", "a", "1986-06-03")
@@ -219,12 +217,12 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       with LightweightDatabaseAdapterComponent {
 
       trait TestDbType extends LightweightDatabase with LightweightFileDatabase
-      override type DB_TYPE = TestDbType
+      override type DbType = TestDbType
       override val s3Adapter = mock[AbstractS3Adapter]
       override val csvAdapter = mock[CsvAdapter]
       override val liteDbAdapter = mock[LightweightDatabaseAdapter]
       val readerMock = mock[InputStreamReader]
-      val dbMock = mock[DB_TYPE]
+      val dbMock = mock[DbType]
       val dbFileMock = mock[File]
       val dbBatchMock = mock[DbBatch]
       override val insertBatchSize = 2
@@ -313,34 +311,31 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "generate appropriate table creation sql statement" in new DbTestContext {
       val result = data.tableDefinition.tableCreateSql
       result must beAnInstanceOf[String]
-      result must beEqualTo("create table recipients (" +
-        "someint integer, " +
-        "someint2 integer, " +
-        "somestring varchar(50), " +
-        "somedate date, " +
-        "somestring2 char(3), " +
-        "somestring3 char(3), " +
-        "somebool boolean, " +
-        "sometimestamp timestamp, " +
-        "somereal double, " +
-        "primary key (someint, someint2))")
+      result must beEqualTo("create table \"recipients\" (" +
+        "\"someint\" integer, " +
+        "\"someint2\" integer, " +
+        "\"somestring\" varchar(50), " +
+        "\"somedate\" date, " +
+        "\"somestring2\" char(3), " +
+        "\"somestring3\" char(3), " +
+        "\"somebool\" boolean, " +
+        "\"sometimestamp\" timestamp, " +
+        "\"somereal\" double, " +
+        "primary key (\"someint\", \"someint2\"))")
     }
     "generate appropriate unique indexes creation sql statements" in new DbTestContext {
       val uniques = data.tableDefinition.uniqueIndexCreateSql
       uniques must beAnInstanceOf[Seq[String]]
-      uniques must beEqualTo(Seq("create unique index somestring_unique_idx on recipients (somestring)"))
+      uniques must beEqualTo(Seq("create unique index \"somestring_unique_idx\" on \"recipients\" (\"somestring\")"))
     }
     "generate appropriate simple indexes creation sql statements" in new DbTestContext {
       val simples = data.tableDefinition.simpleIndexCreateSql
       simples must beAnInstanceOf[Seq[String]]
-      simples must beEqualTo(Seq("create index an_index_name on recipients (somestring2, somestring3)"))
+      simples must beEqualTo(Seq("create index \"an_index_name\" on \"recipients\" (\"somestring2\", \"somestring3\")"))
     }
   }
 
   class DbTestContext extends Scope {
-
-    import db._
-
     object data {
       val col1 = ColumnDefinition("someint", "integer", "SOMEINT", Some("primary key"))
       val col2 = ColumnDefinition("someint2", "integer", "SOMEINT2", Some("primary key"))

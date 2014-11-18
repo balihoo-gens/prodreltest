@@ -11,7 +11,7 @@ import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
  */
 trait LightweightDatabaseAdapterComponent {
 
-  type DB_TYPE <: LightweightDatabase with LightweightFileDatabase
+  type DbType <: LightweightDatabase with LightweightFileDatabase
 
   /**
    * @return a lightweight db instance.
@@ -23,7 +23,7 @@ trait LightweightDatabaseAdapterComponent {
    */
   trait LightweightDatabaseAdapter {
 
-    def create(name: String): DB_TYPE
+    def create(name: String): DbType
 
   }
 
@@ -171,7 +171,7 @@ trait SqlLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdap
 
   this: SploggerComponent =>
 
-  override type DB_TYPE = SqlLiteLightweightDatabase
+  override type DbType = SqlLiteLightweightDatabase
 
   override val liteDbAdapter = new SqlLiteLightweightDatabaseAdapter
 
