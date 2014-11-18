@@ -49,25 +49,28 @@ class ActivitySpecification(val params:List[ActivityParameter]
   def validate(js:JsValue) = {
     val report = __schema.validate(js.as[JsonNode])
 
-    //level: "error"
-    //schema: {"loadingURI":"#","pointer":""}
-    //instance: {"pointer":""}
-    //domain: "validation"
-    //keyword: "required"
-    //required: ["param1"]
-    //missing: ["param1"]
-
     report.isSuccess match {
       case false =>
         val gripes = mutable.MutableList[String]()
+//        throw new Exception(report.toString)
         for(m:ProcessingMessage <- report) {
           val report = Json.toJson(m.asJson).as[JsObject]
-          val domain = report.value("domain").as[String]
-          val level = report.value("level").as[String]
-          val keyword = report.value("keyword").as[String]
-          val item = report.value(keyword).as[List[String]]
-
-          gripes += s"$domain $level: '${item.mkString(", ")}' is $keyword"
+          report.value("keyword").as[String] match {
+            case "type" =>
+              val domain = report.value("domain").as[String]
+              val level = report.value("level").as[String]
+              val found = report.value("found").as[String]
+              val expected = report.value("expected").as[List[String]]
+              gripes += s"$domain type $level: found '$found' expected '${expected.mkString(", ")}'"
+            case "required" =>
+              val domain = report.value("domain").as[String]
+              val level = report.value("level").as[String]
+              val keyword = report.value("keyword").as[String]
+              val item = report.value(keyword).as[List[String]]
+              gripes += s"$domain $level: '${item.mkString(", ")}' is $keyword"
+            case _ =>
+              gripes += report.toString()
+          }
         }
         throw new Exception(gripes.mkString(","))
       case _ =>
@@ -283,12 +286,14 @@ class EnumActivityParameter(override val name:String
                             ,override val required:Boolean = true)
   extends ActivityParameter(name, description, required) {
 
-  def jsonType = "enum"
+  def jsonType = "string"
 
   def parseValue(js:JsValue):Any = _parseBasic[String](js)
 
   override def toSchema:JsValue = {
     Json.obj(
+      "type" -> jsonType,
+      "description" -> description,
       "enum" -> Json.toJson(options)
     )
   }

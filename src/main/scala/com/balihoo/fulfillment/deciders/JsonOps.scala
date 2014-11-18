@@ -79,7 +79,7 @@ class JsonOpArgs(val kwargs:Map[String,JsValue], val args:Seq[JsValue], val inpu
     args(index).validate[T] match {
       case s: JsSuccess[T] => s.get
       case _ =>
-        throw new Exception("Parameter of type:"/*+m.toString()*/+" does not exist at index "+index)
+        throw new Exception(s"Parameter '${args(index)}' was invalid at index $index")
     }
   }
 
@@ -90,7 +90,7 @@ class JsonOpArgs(val kwargs:Map[String,JsValue], val args:Seq[JsValue], val inpu
     kwargs(param).validate[T] match {
       case s: JsSuccess[T] => s.get
       case _ =>
-        throw new Exception("Parameter of type:"/*+m.toString()*/+" does not exist for name "+param)
+        throw new Exception(s"Parameter '${kwargs(param)}' was invalid at name $param")
     }
   }
 

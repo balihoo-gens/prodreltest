@@ -31,7 +31,7 @@ object FTPUploadConfig {
       new StringActivityParameter("sourceUrl", "The URL of the file to be uploaded"),
       new StringActivityParameter("ftpHost", "The destination host name"),
       new IntegerActivityParameter("ftpPort", "The destination port number (default = 21)", required = false),
-      new EncryptedActivityParameter("ftpUsername", "The username for the destination FTP server"),
+      new StringActivityParameter("ftpUsername", "The username for the destination FTP server"),
       new EncryptedActivityParameter("ftpPassword", "The password for the destination FTP server"),
       new StringActivityParameter("ftpDirectory", "The destination directory (default = \"/\")", required = false),
       new StringActivityParameter("ftpFilename", "The destination filename")

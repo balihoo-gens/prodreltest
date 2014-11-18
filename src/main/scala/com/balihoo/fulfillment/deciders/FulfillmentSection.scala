@@ -9,20 +9,20 @@ import play.api.libs.json._
 import scala.collection.mutable
 
 object SectionStatus extends Enumeration {
-  val READY = Value("READY")
   val BLOCKED = Value("BLOCKED")
-  val SCHEDULED = Value("SCHEDULED")
-  val STARTED = Value("STARTED")
-  val FAILED = Value("FAILED")
-  val TIMED_OUT = Value("TIMED_OUT")
   val CANCELED = Value("CANCELED")
-  val TERMINAL = Value("TERMINAL") // Section has FAILED/CANCELED/TIMED OUT too many times!
   val COMPLETE = Value("COMPLETE")
   val CONTINGENT = Value("CONTINGENT") // Special case. We won't attempt to process this unless necessary
   val DEFERRED = Value("DEFERRED") // A Timer will activate this later
+  val FAILED = Value("FAILED")
   val IMPOSSIBLE = Value("IMPOSSIBLE") // Section can never be completed
-
+  val READY = Value("READY")
+  val SCHEDULED = Value("SCHEDULED")
+  val STARTED = Value("STARTED")
+  val TERMINAL = Value("TERMINAL") // Section has FAILED/CANCELED/TIMED OUT too many times!
+  val TIMED_OUT = Value("TIMED_OUT")
 }
+
 class ActionParams(var maxRetries:Int, var delaySeconds:Int) {
   def toJson: JsValue = {
     Json.obj(
