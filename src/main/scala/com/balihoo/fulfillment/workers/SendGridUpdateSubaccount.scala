@@ -4,7 +4,7 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
 
-abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
+abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
     with SendGridAdapterComponent =>
 
@@ -12,8 +12,7 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("participantId", "The participant ID used to identify the SendGrid subaccount"),
-      new BooleanActivityParameter("useTestSubaccount", "True if the SendGrid test account should be used"),
+      new StringActivityParameter("subaccount", "The SendGrid subaccount username"),
       new StringActivityParameter("firstName", "The first name from the participant's marketing address"),
       new StringActivityParameter("lastName", "The last name from the participant's marketing address"),
       new StringActivityParameter("address", "The street address from the participant's marketing address"),
@@ -21,16 +20,26 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
       new StringActivityParameter("state", "The state from the participant's marketing address"),
       new StringActivityParameter("zip", "The zip from the participant's marketing address"),
       new StringActivityParameter("country", "The country from the participant's marketing address"),
-      new StringActivityParameter("phone", "The phone number from the participant's marketing address")
-    ), new StringActivityResult("The subaccount username"))
+      new StringActivityParameter("phone", "The phone number from the participant's marketing address"),
+      new StringActivityParameter("webhookUrl", "The event notification webhook URL"),
+      new StringActivityParameter("webhookUsername", "The event notification webhook username"),
+      new EncryptedActivityParameter("webhookPassword", "The even notification webhook password"),
+      new StringActivityParameter("ipAddress", "The IP address SendGrid should use for sending email"),
+      new StringActivityParameter("whitelabel", "The SendGrid whitelabel for the subaccount")
+    ), new StringActivityResult("The subaccount name"))
   }
 
   override def handleTask(params: ActivityParameters) = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
-      val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
-      val credentials = sendGridAdapter.subaccountToCredentials(subaccountId)
+      val subaccountUser = params("subaccount")
+      val webhookUrl = params("webhookUrl")
+      val webhookUsername = params("webhookUsername")
+      val webhookPassword = params("webhookPassword")
+      val ipAddress = params("ipAddress")
+      val whitelabel = params("whitelabel")
+      val credentials = sendGridAdapter.getCredentials(subaccountUser)
       val subaccount = new SendGridSubaccount(
         _credentials = credentials,
         _firstName = params("firstName"),
@@ -41,21 +50,17 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
         _zip = params("zip"),
         _country = params("country"),
         _phone = params("phone"))
-      sendGridAdapter.createSubaccount(subaccount)
-
-      // Configuration stuff that can be done at account creation time.  (This stuff won't need to change later.)
-      sendGridAdapter.activateApp(credentials.apiUser, "eventnotify")
-      sendGridAdapter.activateApp(credentials.apiUser, "clicktrack")
-      sendGridAdapter.activateApp(credentials.apiUser, "opentrack")
-      sendGridAdapter.activateApp(credentials.apiUser, "subscriptiontrack")
-
-      credentials.apiUser
+      sendGridAdapter.updateProfile(subaccount)
+      sendGridAdapter.configureEventNotificationApp(subaccountUser, webhookUrl, webhookUsername, webhookPassword)
+      sendGridAdapter.setIpAddress(subaccountUser, ipAddress)
+      sendGridAdapter.setWhitelabel(subaccountUser, whitelabel)
+      subaccountUser
     }
   }
 }
 
-class SendGridCreateSubaccount(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractSendGridCreateSubaccount
+class SendGridUpdateSubaccount(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractSendGridUpdateSubaccount
   with LoggingWorkflowAdapterImpl
   with SendGridAdapterComponent {
 
@@ -63,8 +68,8 @@ class SendGridCreateSubaccount(override val _cfg: PropertiesLoader, override val
   def sendGridAdapter = _sendGridAdapter
 }
 
-object sendgrid_createsubaccount extends FulfillmentWorkerApp {
+object sendgrid_updatesubaccount extends FulfillmentWorkerApp {
   override def createWorker(cfg:PropertiesLoader, splog:Splogger): FulfillmentWorker = {
-    new SendGridCreateSubaccount(cfg, splog)
+    new SendGridUpdateSubaccount(cfg, splog)
   }
 }

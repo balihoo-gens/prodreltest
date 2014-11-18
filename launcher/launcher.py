@@ -48,7 +48,7 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.facebook_poster": False,
         "com.balihoo.fulfillment.workers.ftp_uploader": False,
         "com.balihoo.fulfillment.workers.ftp_uploadvalidator": False,
-        "com.balihoo.fulfillment.workers.rest_client": False,
+        "com.balihoo.fulfillment.workers.rest_client": True,
         "com.balihoo.fulfillment.workers.benchmark": False,
         "com.balihoo.fulfillment.workers.sendgrid_lookupsubaccount": False,
         "com.balihoo.fulfillment.dashboard.dashboard": False,
