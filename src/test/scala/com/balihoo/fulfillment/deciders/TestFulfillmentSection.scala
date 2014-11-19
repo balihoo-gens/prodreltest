@@ -200,7 +200,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val input =
         """{"one":"anti-one","two":"anti-two"}"""
 
-      val param = new SectionParameter(Json.obj(
+      val param = new SectionParameter(null, Json.obj(
         "one" -> "anti-one",
         "two" -> "anti-two"
       ))
@@ -221,7 +221,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val expected =
         """{"one":"anti-one","two":"4EB20288AFAED97E82BDE371260DB8D8"}"""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
 
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
@@ -235,14 +235,14 @@ class TestFulfillmentSection extends Specification with Mockito
           |"two" : { "<(MD5)>" : { "what do I do with an object": "tuna" } }
           |}""".stripMargin
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
 
       try {
         param.evaluate(null)
         assert(assertion=false, "There should have been an exception!")
       } catch {
         case e:Exception =>
-          e.getMessage mustEqual "Problem processing operator <(md5)> with input '{\"what do I do with an object\":\"tuna\"}...' :java.lang.IndexOutOfBoundsException: Index 0 not found!"
+          e.getMessage mustEqual "ERROR During <(md5)> java.lang.IndexOutOfBoundsException: Index 0 not found! : input '{\"what do I do with an object\":\"tuna\"}..."
       }
 
       true
@@ -260,7 +260,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val expected =
         """{"one":"anti-one","two":"4EB20288AFAED97E82BDE371260DB8D8"}"""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
 
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
@@ -274,7 +274,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val expected =
         """["stork","cellar"]"""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
 
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
@@ -288,7 +288,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val expected =
         """["ankles","door"]"""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
     }
@@ -306,7 +306,7 @@ class TestFulfillmentSection extends Specification with Mockito
        val expected =
         """"The GIANT eats tuna flesh when whenever the hail he wants..!!""""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
 
@@ -325,7 +325,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val expected =
         """"The GIANT eats tuna flesh when whenever the hail he wants..!!""""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
 
@@ -342,7 +342,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val expected =
         """"if+%28%28%21flip+%26%26+flap-%3Eflop%28%29%29+%7C%7C+%28*deref%3A%3Aptr%29%5B7%5D%29+%7B+return+%7E%28%26address%29%3B+%7D""""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
     }
@@ -366,7 +366,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val expected =
         """"HAYOO""""
 
-      val param = new SectionParameter(Json.parse(input))
+      val param = new SectionParameter(null, Json.parse(input))
       param.evaluate(null)
       Json.stringify(param.getResult.get) mustEqual expected
     }

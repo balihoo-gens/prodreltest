@@ -85,7 +85,12 @@ class CategorizedSections(fulfillment: Fulfillment) {
 
     var paramsReady: Boolean = true
     for((name, param) <- section.params) {
-      param.evaluate(fulfillment)
+      try {
+        param.evaluate(fulfillment)
+      } catch {
+        case e:Exception =>
+          section.timeline.error(e.getMessage, Some(DateTime.now()))
+      }
       paramsReady &= param.isResolved
     }
 

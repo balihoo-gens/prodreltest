@@ -159,7 +159,7 @@ class FulfillmentSection(val name: String
 
   def jsonInitParams(jparams: JsObject) = {
     for((jk:String, jv:JsValue) <- jparams.fields) {
-      params(jk) = new SectionParameter(jv)
+      params(jk) = new SectionParameter(this, jv)
     }
   }
 
@@ -298,14 +298,11 @@ class FulfillmentSection(val name: String
     }
   }
 
-  def promoteContingentReferences(fulfillment:Fulfillment):Boolean = {
+  def promoteContingentReferences(fulfillment:Fulfillment) = {
     if(status == SectionStatus.READY) {
-      for((pname, param) <- params) {
-        // attempting to evaluate the parameter will cause any needed promotions
-        param.evaluate(fulfillment)
-      }
+      // attempting to evaluate the parameters will cause any needed promotions
+      evaluateParameters(fulfillment)
     }
-    true // <-- cause it's recursive... I guess..
   }
 
   def getActivityId = {
@@ -340,7 +337,12 @@ class FulfillmentSection(val name: String
 
   def evaluateParameters(fulfillment:Fulfillment) = {
     for((name, param) <- params) {
-      param.evaluate(fulfillment)
+      try {
+        param.evaluate(fulfillment)
+      } catch {
+        case e:Exception =>
+          timeline.error(e.getMessage, Some(DateTime.now()))
+      }
     }
   }
 
@@ -398,7 +400,7 @@ class FulfillmentSection(val name: String
 class ReferenceNotReady(message:String) extends Exception(message)
 class ReferenceNotResolvable(message:String) extends Exception(message)
 
-class SectionParameter(input:JsValue) {
+class SectionParameter(val section:FulfillmentSection, input:JsValue) {
 
   protected var record:JsValue = JsNull
   protected var fulfillment:Option[Fulfillment] = None
@@ -481,9 +483,9 @@ class SectionParameter(input:JsValue) {
         result = Some(_evaluateJsValue(input))
       } catch {
         case rne:ReferenceNotReady =>
-          f.timeline.note(s"Reference not ready! ${rne.getMessage}", Some(DateTime.now()))
+          section.timeline.note(s"Reference not ready! ${rne.getMessage}", Some(DateTime.now()))
         case rnr:ReferenceNotResolvable =>
-          f.timeline.warning(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
+          section.timeline.warning(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
         case e: Exception => // Unexpected! Throw!
           throw e
 
