@@ -298,14 +298,11 @@ class FulfillmentSection(val name: String
     }
   }
 
-  def promoteContingentReferences(fulfillment:Fulfillment):Boolean = {
+  def promoteContingentReferences(fulfillment:Fulfillment) = {
     if(status == SectionStatus.READY) {
-      for((pname, param) <- params) {
-        // attempting to evaluate the parameter will cause any needed promotions
-        param.evaluate(fulfillment)
-      }
+      // attempting to evaluate the parameters will cause any needed promotions
+      evaluateParameters(fulfillment)
     }
-    true // <-- cause it's recursive... I guess..
   }
 
   def getActivityId = {
@@ -340,8 +337,22 @@ class FulfillmentSection(val name: String
 
   def evaluateParameters(fulfillment:Fulfillment) = {
     for((name, param) <- params) {
-      param.evaluate(fulfillment)
+      try {
+        param.evaluate(fulfillment)
+      } catch {
+        // We don't return or rethrow from any of these. We want to keep processing!
+        case rne:ReferenceNotResolved =>
+          timeline.note(s"Reference not resolved! ${rne.getMessage}", Some(DateTime.now()))
+        case rnr:ReferenceNotResolvable =>
+          timeline.warning(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
+        case e:Exception =>
+          timeline.error(e.getMessage, Some(DateTime.now()))
+      }
     }
+  }
+
+  def paramsResolved():Boolean = {
+    params.forall(_._2.isResolved)
   }
 
   def resolvable(fulfillment:Fulfillment): Boolean = {
@@ -352,6 +363,21 @@ class FulfillmentSection(val name: String
     for((pname, param) <- params) {
       if(!param.isResolvable) {
         return false
+      }
+    }
+    true
+  }
+
+  def prereqsReady(fulfillment:Fulfillment):Boolean = {
+    for(prereq: String <- prereqs) {
+      val referencedSection: FulfillmentSection = fulfillment.getSectionByName(prereq)
+      referencedSection.status match {
+        case SectionStatus.COMPLETE =>
+        // println("Section is complete")
+        case _ =>
+          // Anything other than complete is BLOCKING our progress
+          timeline.warning(s"Waiting for prereq $prereq (${referencedSection.status})", None)
+          return false
       }
     }
     true
@@ -395,7 +421,7 @@ class FulfillmentSection(val name: String
   }
 }
 
-class ReferenceNotReady(message:String) extends Exception(message)
+class ReferenceNotResolved(message:String) extends Exception(message)
 class ReferenceNotResolvable(message:String) extends Exception(message)
 
 class SectionParameter(input:JsValue) {
@@ -466,7 +492,7 @@ class SectionParameter(input:JsValue) {
         resolvable match {
           case true =>
             sectionRef.promoteContingentReferences()
-            throw new ReferenceNotReady(sectionRef.toString)
+            throw new ReferenceNotResolved(sectionRef.toString)
           case false =>
             throw new ReferenceNotResolvable(sectionRef.toString)
         }
@@ -475,19 +501,9 @@ class SectionParameter(input:JsValue) {
 
   def evaluate(f:Fulfillment) = {
     if(!evaluated) {
-      evaluated = true
+      evaluated = true // Dont' confuse with 'resolved'! This just means we touched it.
       fulfillment = Some(f)
-      try {
-        result = Some(_evaluateJsValue(input))
-      } catch {
-        case rne:ReferenceNotReady =>
-          f.timeline.note(s"Reference not ready! ${rne.getMessage}", Some(DateTime.now()))
-        case rnr:ReferenceNotResolvable =>
-          f.timeline.warning(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
-        case e: Exception => // Unexpected! Throw!
-          throw e
-
-      }
+      result = Some(_evaluateJsValue(input))
     }
   }
 

@@ -94,7 +94,8 @@ app.factory('formatUtil', function() {
             }
             return _jsonFormat(parsed, "json");
         }
-        if (_isString(json)) {
+
+        if(_isString(json) && json.indexOf("://") > -1) {
             return _span(_formatURLs(json), "jsonvalue");
         }
 
@@ -141,7 +142,7 @@ app.factory('formatUtil', function() {
 
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
 
-        return _escapeHTML(param).replace(urlRegex, function (url) {
+        return param.replace(urlRegex, function (url) {
 
             if (( url.indexOf(".jpg") > 0 )
                 || ( url.indexOf(".png") > 0 )

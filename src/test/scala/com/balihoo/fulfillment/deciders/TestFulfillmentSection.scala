@@ -242,7 +242,7 @@ class TestFulfillmentSection extends Specification with Mockito
         assert(assertion=false, "There should have been an exception!")
       } catch {
         case e:Exception =>
-          e.getMessage mustEqual "Problem processing operator <(md5)> with input '{\"what do I do with an object\":\"tuna\"}...' :java.lang.IndexOutOfBoundsException: Index 0 not found!"
+          e.getMessage mustEqual "ERROR During <(md5)> java.lang.IndexOutOfBoundsException: Index 0 not found! : input '{\"what do I do with an object\":\"tuna\"}..."
       }
 
       true
