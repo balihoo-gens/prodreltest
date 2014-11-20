@@ -24,7 +24,11 @@ class Task(namedtuple('Task', ['params', 'complete', 'fail'])):
     pass
 
 class SwfWorker(swf.ActivityWorker):
-    """ Extension of the SWF Activity worker supporting asynchronous polling """
+    """ Extension of the SWF Activity worker supporting asynchronous polling
+        Relies on AWS Keys to be in the environment
+        access_key = os.environ["AWS_ACCESS_KEY_ID"]
+        secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
+    """
 
     def __init__(self, region_name, name, domain, version):
         """ construct the worker, and register it """

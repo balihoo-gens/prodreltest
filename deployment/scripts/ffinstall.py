@@ -6,7 +6,7 @@ except ImportError:
     #path hackery really just for local testing
     # because these are elsewhere on the EC2 instance
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'deployment'))
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'launcher'))
+    sys.path.append(os.path.join(os.path.dirname(__file__), '../..', 'launcher'))
     from splogger import Splogger
     from launcher import Launcher
 
@@ -17,10 +17,25 @@ import urllib
 import tarfile
 import json
 
+class OpenUrl(object):
+    """ wrapper to be able to use 'with' on a url like a file
+    this functionality is available in python 3 urllib2 by default
+    """
+    def __init__(self, url):
+       self._f = urllib.urlopen(url)
+
+    def __enter__(self):
+        return self._f
+
+    def __exit__(self, type, value, tb):
+        if self._f:
+            self._f.close()
+
 class Installer(object):
-    def __init__(self, logfile, distro):
+    def __init__(self, logfile, distro, iamrole):
         self._log = Splogger(logfile)
         self._distro = distro
+        self.setup_aws_credentials(iamrole)
 
     def launch_app(self, classes, noworker):
         thisdir = os.path.dirname(os.path.realpath(__file__))
@@ -120,16 +135,35 @@ class Installer(object):
         awsinstanceurl = "http://169.254.169.254/latest/dynamic/instance-identity/document"
         instance_data = json.loads(urllib.urlopen(awsinstanceurl).read())
         instance_id = instance_data["instanceId"]
-        access_key = os.environ["AWS_ACCESS_KEY_ID"]
-        secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
         region = os.environ["AWS_REGION"]
-        ec2conn = ec2.connect_to_region(region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        ec2conn = ec2.connect_to_region(region_name=region, aws_access_key_id=self._access_key, aws_secret_access_key=self._secret_key)
         if ec2conn.disassociate_address(public_ip=eip):
             self._log.info("successfully disassociated eip " + eip)
         if ec2conn.associate_address(instance_id=instance_id, public_ip=eip):
             self._log.info("successfully associated with eip " + eip)
         else:
             self._log.error("failed to associate with eip " + eip)
+
+    def setup_aws_credentials(self, iamrole):
+        """ Tries to load AWS credentials from the environment
+        If not there, get them from IAM. Log failure, but do not terminate
+        """
+        try:
+            try:
+                self._access_key = os.environ["AWS_ACCESS_KEY_ID"]
+                self._secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
+            except KeyError:
+                url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/" + iamrole
+                response = None
+                with OpenUrl(url) as u:
+                    response = u.read()
+                creds=json.loads(response)
+                self._access_key = creds["AccessKeyId"]
+                self._secret_key = creds["SecretAccessKey"]
+                os.environ["AWS_ACCESS_KEY_ID"] = self._access_key
+                os.environ["AWS_SECRET_ACCESS_KEY"] = self._secret_key
+        except Exception as e:
+            self._log.error("failed to load AWS Credentials: " + str(e))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Install the Fulfillment application")
@@ -140,6 +174,7 @@ if __name__ == "__main__":
     newrelic_s3bucket = "balihoo.dev.aws-installs/newrelic"
     newrelic_config = "fulfillment_dev.newrelic.yml"
     phantomversion = "custom"
+    iamrole = "Fulfillment"
 
     parser.add_argument('classes', metavar='C', type=str, nargs='*', help='classes to run')
     parser.add_argument('-l','--logfile', help='the log file', default='/var/log/balihoo/fulfillment/installer.log')
@@ -148,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument('--env', help='the environment to use for this instance', default="dev")
     parser.add_argument('--nolaunch', help='do not launch the app', action='store_true')
     parser.add_argument('--noworker', help='do not launch with a swfworker', action='store_true')
+    parser.add_argument('--iamrole', help='AWS IAM Role to use for credentials', default=iamrole)
     #phantom
     parser.add_argument('--phantomversion', help='the phantomjs version to download', default=phantomversion)
     parser.add_argument('--nophantom', help='do not install phantomjs', action='store_true')
@@ -162,7 +198,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    installer = Installer(args.logfile, args.distro)
+    installer = Installer(args.logfile, args.distro, args.iamrole)
 
     if not args.nonewrelic:
         nrsysmond_params = ["--s3-bucket", newrelic_s3bucket]

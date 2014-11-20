@@ -75,7 +75,12 @@ class Launcher(object):
         @returns PollInfo object - contains tasks received async from SWF
         """
         cfg = self._parse_config(cfgfile)
-        w = SwfWorker(region_name=cfg['region'], domain=cfg['domain'], name="launcher", version="1")
+        w = SwfWorker(
+            name = "launcher",
+            version = "1",
+            region_name = cfg['region'],
+            domain = cfg['domain']
+        )
         return w.start_async_polling()
 
     def _parse_config(self, cfgfile):

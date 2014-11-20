@@ -116,6 +116,7 @@
           "splunk-access"
         ],
         "InstanceType" : { "Ref" : "WorkerInstanceType" },
+        "IamInstanceProfile" : "arn:aws:iam::596229110736:instance-profile/fulfillment-profile",
         "UserData": { "Fn::Base64" : { "Ref" : "WorkerScript" } }
       }
     },
@@ -210,6 +211,7 @@
           "splunk-access"
         ],
         "InstanceType" : { "Ref" : "DashboardInstanceType" },
+        "IamInstanceProfile" : "arn:aws:iam::596229110736:instance-profile/fulfillment-profile",
         "UserData": { "Fn::Base64" : { "Ref" : "DashboardScript" } }
       }
     },

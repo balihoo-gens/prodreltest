@@ -7,6 +7,9 @@ import com.amazonaws.regions.{Regions, Region}
 import scala.reflect.{ClassTag, classTag}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.AmazonWebServiceClient
+import scala.util.Properties.envOrNone
+import play.api.libs.json._
+import scala.sys.process._
 
 abstract class AWSAdapter[T <: AmazonWebServiceClient : ClassTag] {
   this: PropertiesLoaderComponent =>
@@ -17,12 +20,30 @@ abstract class AWSAdapter[T <: AmazonWebServiceClient : ClassTag] {
   lazy val region:Region = getRegion
   lazy val client:T = createClient
 
+  def getCredsByRole(roleName: String): BasicAWSCredentials = {
+        val url = config.getOrElse("iamurl", "http://169.254.169.254/latest/meta-data/iam/security-credentials")
+        val aws_get_creds = s"curl -s $url/$roleName --max-time 2 --retry 3"
+        val jsonCreds = Json.parse(aws_get_creds.!!)
+        val accessKey = (jsonCreds \ "AccessKeyId").as[String]
+        val secretKey = (jsonCreds \ "SecretAccessKey").as[String]
+        new BasicAWSCredentials(accessKey, secretKey)
+   }
+
   //put this all in a method rather than just in the constructor to
   // make it easier to Mock this
   protected def createClient:T = {
-    val accessKey: String = config.getString("aws.accessKey")
-    val secretKey = config.getString("aws.secretKey")
-    val credentials = new BasicAWSCredentials(accessKey, secretKey)
+
+    //stick the values as options in a tuple so we can easily match for both
+    val keyTuple = Tuple2[Option[String], Option[String]](
+      envOrNone("AWS_ACCESS_KEY_ID"),
+      envOrNone("AWS_SECRET_ACCESS_KEY")
+    )
+
+    val credentials = keyTuple match {
+      case (Some(accessKey), Some(secretKey)) => new BasicAWSCredentials(accessKey, secretKey)
+      case _ => getCredsByRole(config.getOrElse("iamrole", "Fulfillment"))
+    }
+
     //this type cannot be resolved statically by classOf[T]
     val clientType = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[_ <: AmazonWebServiceClient]]
 
