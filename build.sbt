@@ -132,3 +132,8 @@ excludeFilter in unmanagedSources :=
   "EmailWorkers.scala" ||
 */
   ""
+
+fork in Test := true
+
+javaOptions in Test += "-Xmx2048m"
+
