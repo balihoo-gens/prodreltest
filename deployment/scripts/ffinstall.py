@@ -43,7 +43,11 @@ class Installer(object):
         if noworker:
             cmdline += ["--noworker"]
         cmdline += classes
-        proc = subprocess.Popen(cmdline, cwd=thisdir)
+        proc = subprocess.Popen(
+            cmdline,
+            cwd=thisdir,
+            env=os.environ.copy(),
+        )
         self._log.info("started launcher process with pid %d" % (proc.pid,))
 
     def run_wait_log(self, cmd, cwd=None, raise_on_err=False):
@@ -55,6 +59,7 @@ class Installer(object):
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=os.environ.copy(),
             **kwargs
         )
         self._log.info("%s process started with pid %d" % (cmd[0], proc.pid))
@@ -152,7 +157,12 @@ class Installer(object):
             try:
                 self._access_key = os.environ["AWS_ACCESS_KEY_ID"]
                 self._secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
+                self._log.info("found keys in env: (%s, %s)" % (
+                    self._access_key,
+                    self._secret_key,
+                ))
             except KeyError:
+                self._log.info("creds not in env, using IAM role")
                 url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/" + iamrole
                 response = None
                 with OpenUrl(url) as u:
@@ -162,6 +172,10 @@ class Installer(object):
                 self._secret_key = creds["SecretAccessKey"]
                 os.environ["AWS_ACCESS_KEY_ID"] = self._access_key
                 os.environ["AWS_SECRET_ACCESS_KEY"] = self._secret_key
+                self._log.info("stored keys in env: (%s, %s)" % (
+                    self._access_key,
+                    self._secret_key,
+                ))
         except Exception as e:
             self._log.error("failed to load AWS Credentials: " + str(e))
 
