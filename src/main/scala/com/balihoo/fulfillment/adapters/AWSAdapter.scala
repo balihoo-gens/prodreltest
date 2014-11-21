@@ -7,9 +7,6 @@ import com.amazonaws.regions.{Regions, Region}
 import scala.reflect.{ClassTag, classTag}
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowAsyncClient
 import com.amazonaws.AmazonWebServiceClient
-import scala.util.Properties.envOrNone
-import play.api.libs.json._
-import scala.sys.process._
 
 abstract class AWSAdapter[T <: AmazonWebServiceClient : ClassTag] {
   this: PropertiesLoaderComponent =>
