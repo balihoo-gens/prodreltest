@@ -56,11 +56,11 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
         new StringActivityParameter("source", "The URL of of the page to render"),
-        new StringActivityParameter("clipselector", "The selector used to clip the page", false),
-        new StringActivityParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", false),
-        new ObjectActivityParameter("headers", "Optional headers", false),
-        new IntegerActivityParameter("maxsize", "Maximum size for the image (bytes)", false),
-        new IntegerActivityParameter("minquality", "Minimum quality of the image (percent)", false),
+        new StringActivityParameter("clipselector", "The selector used to clip the page", required=false),
+        new StringActivityParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", required=false),
+        new ObjectActivityParameter("headers", "Optional headers", required=false),
+        new IntegerActivityParameter("maxsize", "Maximum size for the image (bytes)", required=false),
+        new IntegerActivityParameter("minquality", "Minimum quality of the image (percent)", required=false),
         new StringActivityParameter("target", "The S3 filename of the resulting image")
       ), new StringActivityResult("the target URL if successfully saved"))
   }
