@@ -17,6 +17,7 @@ class Uploader(object):
 
     def upload_dir(self, srcpath):
         if os.path.isdir(srcpath):
+            subdirs = os.path.join("deployments", self._env)
             predirs, dirname = os.path.split(srcpath)
             dirnameindex = len(predirs)
             if dirnameindex > 0:
@@ -24,13 +25,13 @@ class Uploader(object):
             for root, subs, files in os.walk(srcpath):
                 #abs path may have been provided, but we
                 #only need the part from the dirname and on
-                reldir = os.path.join(root[dirnameindex:], "deployments", self._env)
+                reldir = os.path.join(subdirs, root[dirnameindex:])
                 for f in files:
                     s3path = os.path.join(reldir, f)
                     localpath = os.path.join(root, f)
                     s3key = self._s3bucket.new_key(s3path)
                     s3key.set_contents_from_filename(localpath)
                     print("uploaded %s to %s" % (localpath, s3path))
-            return dirname
+            return os.path.join(subdirs,dirname)
         else:
             raise Exception("Unable to upload: %s is not a directory" % (srcpath,))
