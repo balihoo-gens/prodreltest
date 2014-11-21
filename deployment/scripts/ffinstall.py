@@ -17,25 +17,10 @@ import urllib
 import tarfile
 import json
 
-class OpenUrl(object):
-    """ wrapper to be able to use 'with' on a url like a file
-    this functionality is available in python 3 urllib2 by default
-    """
-    def __init__(self, url):
-       self._f = urllib.urlopen(url)
-
-    def __enter__(self):
-        return self._f
-
-    def __exit__(self, type, value, tb):
-        if self._f:
-            self._f.close()
-
 class Installer(object):
     def __init__(self, logfile, distro, iamrole):
         self._log = Splogger(logfile)
         self._distro = distro
-        self.setup_aws_credentials(iamrole)
 
     def launch_app(self, classes, noworker):
         thisdir = os.path.dirname(os.path.realpath(__file__))
@@ -46,7 +31,7 @@ class Installer(object):
         proc = subprocess.Popen(
             cmdline,
             cwd=thisdir,
-            env=os.environ.copy(),
+            env=os.environ,
         )
         self._log.info("started launcher process with pid %d" % (proc.pid,))
 
@@ -59,7 +44,7 @@ class Installer(object):
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=os.environ.copy(),
+            env=os.environ,
             **kwargs
         )
         self._log.info("%s process started with pid %d" % (cmd[0], proc.pid))
@@ -141,43 +126,13 @@ class Installer(object):
         instance_data = json.loads(urllib.urlopen(awsinstanceurl).read())
         instance_id = instance_data["instanceId"]
         region = os.environ["AWS_REGION"]
-        ec2conn = ec2.connect_to_region(region_name=region, aws_access_key_id=self._access_key, aws_secret_access_key=self._secret_key)
+        ec2conn = ec2.connect_to_region(region_name=region)
         if ec2conn.disassociate_address(public_ip=eip):
             self._log.info("successfully disassociated eip " + eip)
         if ec2conn.associate_address(instance_id=instance_id, public_ip=eip):
             self._log.info("successfully associated with eip " + eip)
         else:
             self._log.error("failed to associate with eip " + eip)
-
-    def setup_aws_credentials(self, iamrole):
-        """ Tries to load AWS credentials from the environment
-        If not there, get them from IAM. Log failure, but do not terminate
-        """
-        try:
-            try:
-                self._access_key = os.environ["AWS_ACCESS_KEY_ID"]
-                self._secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
-                self._log.info("found keys in env: (%s, %s)" % (
-                    self._access_key,
-                    self._secret_key,
-                ))
-            except KeyError:
-                self._log.info("creds not in env, using IAM role")
-                url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/" + iamrole
-                response = None
-                with OpenUrl(url) as u:
-                    response = u.read()
-                creds=json.loads(response)
-                self._access_key = creds["AccessKeyId"]
-                self._secret_key = creds["SecretAccessKey"]
-                os.environ["AWS_ACCESS_KEY_ID"] = self._access_key
-                os.environ["AWS_SECRET_ACCESS_KEY"] = self._secret_key
-                self._log.info("stored keys in env: (%s, %s)" % (
-                    self._access_key,
-                    self._secret_key,
-                ))
-        except Exception as e:
-            self._log.error("failed to load AWS Credentials: " + str(e))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Install the Fulfillment application")
