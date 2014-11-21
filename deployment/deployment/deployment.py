@@ -87,8 +87,6 @@ class Deployment(object):
         pieces = [
             "#!/bin/bash",
             "set -e",
-            "AWSACCESSKEY=%s" % self._cfg.access_key,
-            "AWSSECRETKEY=%s" % self._cfg.secret_key,
             "AWSREGION=%s"    % self._cfg.region,
             "S3BUCKET=%s"     % self._cfg.s3bucket,
             "S3DIR=%s"        % s3dir,
