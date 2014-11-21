@@ -43,7 +43,7 @@ class SubTableActivityParameter(
   def parseValue(js:JsValue):SubTable = {
     js.validate[SubTable] match {
       case JsSuccess(submap, _) => submap
-      case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
+      case JsError(e) => throw new Exception(s"unable to parse substitutions map: ${e.toString}")
     }
   }
 
