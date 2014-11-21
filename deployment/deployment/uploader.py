@@ -4,7 +4,7 @@ import os, sys
 
 class Uploader(object):
 
-    def __init__(self, s3bucket, region, access_key, secret_key):
+    def __init__(self, s3bucket, region, access_key, secret_key, env):
         #self._conn = awss3.connect_to_region(
         #    region,
         self._conn = boto.connect_s3 (
@@ -13,6 +13,7 @@ class Uploader(object):
         )
         self._s3bucket_name = s3bucket
         self._s3bucket = self._conn.get_bucket(self._s3bucket_name)
+        self._env = env
 
     def upload_dir(self, srcpath):
         if os.path.isdir(srcpath):
@@ -23,7 +24,7 @@ class Uploader(object):
             for root, subs, files in os.walk(srcpath):
                 #abs path may have been provided, but we
                 #only need the part from the dirname and on
-                reldir = root[dirnameindex:]
+                reldir = os.path.join(root[dirnameindex:], "deployments", self._env)
                 for f in files:
                     s3path = os.path.join(reldir, f)
                     localpath = os.path.join(root, f)
