@@ -47,7 +47,6 @@ class SubTableActivityParameter(
     }
   }
 
-  //see https://gist.github.com/balihoo-gens/e662179accfdb0f8a2b9
   override def toSchema:JsValue = {
     Json.obj(
       "type" -> jsonType,
@@ -62,7 +61,6 @@ class SubTableActivityParameter(
           )
         )
       )
-      //"additionalProperties" -> false
     )
   }
 }
