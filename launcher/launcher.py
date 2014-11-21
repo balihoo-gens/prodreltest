@@ -41,6 +41,8 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.adwords_textadprocessor": True,
         "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
         "com.balihoo.fulfillment.workers.htmlrenderer": True,
+        "com.balihoo.fulfillment.workers.email_createdb": True,
+        "com.balihoo.fulfillment.workers.workflow": True,
         "com.balihoo.fulfillment.workers.layoutrenderer": False,
         "com.balihoo.fulfillment.workers.email_addressverifier": False,
         "com.balihoo.fulfillment.workers.email_sender": False,
@@ -124,24 +126,27 @@ class Launcher(object):
                values to monitor
         """
         while True:
-            self.handle_tasks()
-            for name in self._components:
-                component = self._components[name]
-                self.log_component(component)
-                if component.is_alive():
-                    self.check_responsiveness(component, timeouts)
-                else:
-                    time_since_last_launch = time.time() - component.launchtime
-                    if not component.waiting:
-                        self._log.error(
-                            "died after %f seconds" % (time_since_last_launch),
-                            additional_fields={ "pid" : str(component.pid), "procname" : name }
-                        )
-                    if time_since_last_launch > seconds_between_launch:
-                        pid = component.launch()
-                        self._log.warn("relaunched", additional_fields={ "pid" : str(pid), "procname" : name })
+            try:
+                self.handle_tasks()
+                for name in self._components:
+                    component = self._components[name]
+                    self.log_component(component)
+                    if component.is_alive():
+                        self.check_responsiveness(component, timeouts)
                     else:
-                        component.waiting = True
+                        time_since_last_launch = time.time() - component.launchtime
+                        if not component.waiting:
+                            self._log.error(
+                                "died after %f seconds" % (time_since_last_launch),
+                                additional_fields={ "pid" : str(component.pid), "procname" : name }
+                            )
+                        if time_since_last_launch > seconds_between_launch:
+                            pid = component.launch()
+                            self._log.warn("relaunched", additional_fields={ "pid" : str(pid), "procname" : name })
+                        else:
+                            component.waiting = True
+            except Exception as e:
+                self._log.warn("unhandled exception: %s" % (str(e),))
             time.sleep(0.2)
 
     def check_responsiveness(self, component, timeouts):

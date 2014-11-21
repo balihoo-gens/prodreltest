@@ -108,7 +108,10 @@ class SwfWorker(swf.ActivityWorker):
             try:
                 return q.get_nowait()
             except queue.Empty:
-                return None
+                pass
+            except Exception as e:
+                self._log.warn("exception getting task from queue: %s" % (str(e),))
+            return None
 
         t = Thread(target=_run)
         t. start()
