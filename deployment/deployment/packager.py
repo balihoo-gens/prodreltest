@@ -42,11 +42,11 @@ class Packager:
             raise Exception("fat jar creation failed. See %s" % (self._log.filename(),))
         return jarname
 
-    def package(self):
+    def package(self, env):
         """ returns the path of the dir to be
             sync-ed to the S3 bucket
         """
-        tmpdir = os.path.join(self._rootdir, "deployments/%s" % (datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss%f")))
+        tmpdir = os.path.join(self._rootdir, "deployments", "%s_%s" % (env, datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss%f")))
         if os.path.isdir(tmpdir):
             shutil.rmtree(tmpdir)
         os.makedirs(tmpdir)

@@ -119,10 +119,29 @@
                             <div ng-hide="section.input.action.name" class="pull-right">
                                 <i class="muted">Operator</i>&nbsp; {{section.input.action}} &nbsp;&nbsp;
                             </div>
+                            <script type="text/ng-template" id="paramReference">
+                                <div class="paramJson" ng-if="formatUtil.isArray(sections)">
+                                    <div ng-repeat="sectionName in sections">
+                                        {{sectionName}}
+                                        <span class="label {{figureStatusLabel(workflow.sections[sectionName].status)}}">{{workflow.sections[sectionName].status}}</span>
+                                    </div>
+                                </div>
+                                <div class="paramJson" ng-if="formatUtil.isSimple(sections)">
+                                    {{sections}}
+                                    <span class="label {{figureStatusLabel(workflow.sections[sections].status)}}">{{workflow.sections[sections].status}}</span>
+                                </div>
+                            </script>
                             <script type="text/ng-template" id="paramJson">
                                 <div class="paramJson" ng-if="formatUtil.isObject(json)">
                                     {<div ng-repeat="(k, v) in json">
-                                        <div class="paramJson"><b>{{k}}</b> : <span ng-include="'paramJson'" ng-init="json = v"></span></div>
+                                        <div class="paramJson"><b>{{k}}</b> :
+                                            <div ng-if="k == '<(section)>'">
+                                                <span ng-include="'paramReference'" ng-init="sections = v"></span>
+                                            </div>
+                                            <div ng-if="k != '<(section)>'">
+                                                <span ng-include="'paramJson'" ng-init="json = v"></span>
+                                            </div>
+                                        </div>
                                     </div>}
                                 </div>
                                 <div class="paramJson" ng-if="formatUtil.isArray(json)">

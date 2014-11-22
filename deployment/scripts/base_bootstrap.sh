@@ -15,9 +15,6 @@ THIS="$(readlink -f $SRC)"
 log "running bootstrap script: $THIS"
 log "PATH: ${PATH}"
 
-log "export aws keys"
-export AWS_ACCESS_KEY_ID=${AWSACCESSKEY}
-export AWS_SECRET_ACCESS_KEY=${AWSSECRETKEY}
 export AWS_REGION=${AWSREGION}
 
 if [ "${DISTRO}" = "Ubuntu" ]; then

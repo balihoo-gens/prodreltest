@@ -285,7 +285,7 @@ object JsonOps {
       operators(operator)(params)
     } catch {
       case e:Exception =>
-        throw new Exception(s"Problem processing operator <(${operator.toString})> with input '${Json.stringify(params) take 150}...' :"+e.toString)
+        throw new Exception(s"ERROR During <(${operator.toString})> ${e.toString} : input '${Json.stringify(params) take 150}...")
     }
   }
 

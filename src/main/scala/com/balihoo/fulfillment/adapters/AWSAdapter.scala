@@ -20,9 +20,7 @@ abstract class AWSAdapter[T <: AmazonWebServiceClient : ClassTag] {
   //put this all in a method rather than just in the constructor to
   // make it easier to Mock this
   protected def createClient:T = {
-    val accessKey: String = config.getString("aws.accessKey")
-    val secretKey = config.getString("aws.secretKey")
-    val credentials = new BasicAWSCredentials(accessKey, secretKey)
+
     //this type cannot be resolved statically by classOf[T]
     val clientType = implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[_ <: AmazonWebServiceClient]]
 
@@ -36,12 +34,12 @@ abstract class AWSAdapter[T <: AmazonWebServiceClient : ClassTag] {
       }
     }
 
+    //No credentials are provided. This means that the client will first look in the environment
+    //then system properties and finally the IMDS for IAM roles.
+    //If no IAM role is available (e.g. running local), creds should be in the env
     region.createClient(
       clientType,
-      new AWSCredentialsProvider() {
-        def getCredentials = credentials
-        def refresh() {}
-      },
+      null,
       awsClientConfig
     ).asInstanceOf[T]
   }

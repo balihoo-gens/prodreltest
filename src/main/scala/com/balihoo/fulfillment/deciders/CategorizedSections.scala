@@ -83,26 +83,9 @@ class CategorizedSections(fulfillment: Fulfillment) {
    */
   protected def categorizeReadySection(section: FulfillmentSection) = {
 
-    var paramsReady: Boolean = true
-    for((name, param) <- section.params) {
-      param.evaluate(fulfillment)
-      paramsReady &= param.isResolved
-    }
+    section.evaluateParameters(fulfillment)
 
-    var prereqsReady: Boolean = true
-    for(prereq: String <- section.prereqs) {
-      val referencedSection: FulfillmentSection = fulfillment.getSectionByName(prereq)
-      referencedSection.status match {
-        case SectionStatus.COMPLETE =>
-          // println("Section is complete")
-        case _ =>
-          // Anything other than complete is BLOCKING our progress
-          section.timeline.warning(s"Waiting for prereq $prereq (${referencedSection.status})", None)
-          prereqsReady = false
-      }
-    }
-
-    if(!paramsReady) {
+    if(!section.paramsResolved()) {
       if(section.resolvable(fulfillment)) {
         section.setBlocked("Not all parameters are resolved!", DateTime.now())
         blocked += section
@@ -110,7 +93,7 @@ class CategorizedSections(fulfillment: Fulfillment) {
         section.setImpossible("Impossible because some parameters can never be resolved!", DateTime.now())
         impossible += section
       }
-    } else if(!prereqsReady) {
+    } else if(!section.prereqsReady(fulfillment)) {
       section.setBlocked("Not all prerequisites are complete!", DateTime.now())
       blocked += section
     } else {

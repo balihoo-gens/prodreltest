@@ -62,7 +62,6 @@ class SubTableActivityParameter(
   }
 }
 
-
 /** worker specific type to store swf execution ids */
 case class WorkflowExecutionIds(workflowId:String, runId:String) {
   override def toString:String = {
