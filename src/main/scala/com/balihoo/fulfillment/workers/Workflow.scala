@@ -61,11 +61,9 @@ class SubTableActivityParameter(
           )
         )
       )
-      //"additionalProperties" -> false
     )
   }
 }
-
 
 /** worker specific type to store swf execution ids */
 case class WorkflowExecutionIds(workflowId:String, runId:String) {

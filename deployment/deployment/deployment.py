@@ -37,7 +37,7 @@ class Deployment(object):
     def package(self, rootdir):
         self.log.debug("packaging " + rootdir)
         p = Packager(rootdir, log_filename=self._log_filename, debug=self._cfg.debug)
-        return p.package()
+        return p.package(self._cfg.env)
 
     def upload(self, pkgpath):
         self.log.debug("uploading " + pkgpath)
@@ -46,6 +46,7 @@ class Deployment(object):
             self._cfg.region,
             self._cfg.access_key,
             self._cfg.secret_key,
+            self._cfg.env,
         )
         return u.upload_dir(pkgpath)
 
@@ -86,8 +87,6 @@ class Deployment(object):
         pieces = [
             "#!/bin/bash",
             "set -e",
-            "AWSACCESSKEY=%s" % self._cfg.access_key,
-            "AWSSECRETKEY=%s" % self._cfg.secret_key,
             "AWSREGION=%s"    % self._cfg.region,
             "S3BUCKET=%s"     % self._cfg.s3bucket,
             "S3DIR=%s"        % s3dir,
