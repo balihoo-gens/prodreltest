@@ -1,7 +1,5 @@
 package com.balihoo.fulfillment.workers
 
-import java.net.{Inet4Address, URI}
-
 import com.fasterxml.jackson.databind.JsonNode
 import com.github.fge.jsonschema.main.{JsonSchemaFactory, JsonSchema}
 import org.joda.time.DateTime
