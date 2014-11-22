@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.workers
 
+import java.net.URI
+
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -7,8 +9,6 @@ import com.balihoo.fulfillment.util.Splogger
 abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
     with SendGridAdapterComponent =>
-
-  val _cfg: PropertiesLoader
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
@@ -21,10 +21,10 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
       new StringActivityParameter("zip", "The zip from the participant's marketing address"),
       new StringActivityParameter("country", "The country from the participant's marketing address"),
       new StringActivityParameter("phone", "The phone number from the participant's marketing address"),
-      new StringActivityParameter("webhookUrl", "The event notification webhook URL"),
+      new UriActivityParameter("webhookUrl", "The event notification webhook URL"),
       new StringActivityParameter("webhookUsername", "The event notification webhook username"),
       new EncryptedActivityParameter("webhookPassword", "The even notification webhook password"),
-      new StringActivityParameter("ipAddress", "The IP address SendGrid should use for sending email"),
+      new Ipv4ActivityParameter("ipAddress", "The IP address SendGrid should use for sending email"),
       new StringActivityParameter("whitelabel", "The SendGrid whitelabel for the subaccount")
     ), new StringActivityResult("The subaccount name"))
   }

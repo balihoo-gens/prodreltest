@@ -55,7 +55,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("source", "The URL of of the page to render"),
+        new UriActivityParameter("source", "The URL of of the page to render"),
         new StringActivityParameter("clipselector", "The selector used to clip the page", false),
         new StringActivityParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", false),
         new ObjectActivityParameter("headers", "Optional headers", false),

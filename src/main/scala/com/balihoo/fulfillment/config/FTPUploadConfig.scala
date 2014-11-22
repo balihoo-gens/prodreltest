@@ -28,8 +28,8 @@ class FTPUploadConfig(params: ActivityParameters, cfg: PropertiesLoader)
 object FTPUploadConfig {
   def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("sourceUrl", "The URL of the file to be uploaded"),
-      new StringActivityParameter("ftpHost", "The destination host name"),
+      new UriActivityParameter("sourceUrl", "The URL of the file to be uploaded"),
+      new HostnameActivityParameter("ftpHost", "The destination host name"),
       new IntegerActivityParameter("ftpPort", "The destination port number (default = 21)", required = false),
       new StringActivityParameter("ftpUsername", "The username for the destination FTP server"),
       new EncryptedActivityParameter("ftpPassword", "The password for the destination FTP server"),

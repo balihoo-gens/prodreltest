@@ -10,7 +10,7 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("from", ""),
+      new EmailActivityParameter("from", ""),
       new StringsActivityParameter("recipients", "Array of email addresses"),
       new StringActivityParameter("subject", ""),
       new StringActivityParameter("body", ""),

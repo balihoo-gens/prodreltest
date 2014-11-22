@@ -57,7 +57,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
         new StringActivityParameter("formid", "The form id of the form to render"),
         new StringActivityParameter("branddata", "The branddata to use as input to the form"),
         new StringActivityParameter("inputdata", "The inputdata to use as input to the form"),
-        new StringActivityParameter("endpoint", "The endpoint URL to use (overrides default)", false),
+        new UriActivityParameter("endpoint", "The endpoint URL to use (overrides default)", false),
         new StringActivityParameter("clipselector", "The selector used to clip the page", false),
         new StringActivityParameter("target", "The S3 filename of the resulting page")
       ), new StringActivityResult("the target URL if successfully saved"))

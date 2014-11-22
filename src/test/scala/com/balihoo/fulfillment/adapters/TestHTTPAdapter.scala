@@ -179,6 +179,26 @@ class TestHTTPAdapter extends Specification {
       json.value("testHeader").as[String] === headers.head._2
       json.value("body").as[String] === body
     }
+
+    "encode zero elements of form data" in {
+      val formData = Seq()
+      HTTPAdapter.encodeFormData(formData) === ""
+    }
+
+    "encode one element of form data" in {
+      val formData = Seq(("one thing", "another thing"))
+      HTTPAdapter.encodeFormData(formData) === "one+thing=another+thing"
+    }
+
+    "encode two elements of form data" in {
+      val formData = Seq(("one thing", "another thing"), ("one thing", "something completely different"))
+      HTTPAdapter.encodeFormData(formData) === "one+thing=another+thing&one+thing=something+completely+different"
+    }
+
+    "encode three elements of form data" in {
+      val formData = Seq(("one thing", "another thing"), ("one thing", "something completely different"), ("a&=b", "c&=d"))
+      HTTPAdapter.encodeFormData(formData) === "one+thing=another+thing&one+thing=something+completely+different&a%26%3Db=c%26%3Dd"
+    }
   }
 
   // Stop the HTTP server.

@@ -34,8 +34,8 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
       new StringActivityParameter("pageId", "The Facebook page ID"),
       new ObjectActivityParameter("target", "The targeting data"),
       new StringActivityParameter("message", "The message to post", required = false),
-      new StringActivityParameter("linkUrl", "A link to include in the post", required = false),
-      new StringActivityParameter("photoUrl", "The URL of the photo to include in the post", required = false),
+      new UriActivityParameter("linkUrl", "A link to include in the post", required = false),
+      new UriActivityParameter("photoUrl", "The URL of the photo to include in the post", required = false),
       new EnumActivityParameter("action", "", List("validate", "publish"))
     ), new StringActivityResult("the Facebook post ID if the action is \"publish\", otherwise ignore this value"))
   }
@@ -101,7 +101,7 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
   private def intsToIntegers(input: Seq[Int]): Seq[Integer] = input.map(Integer.valueOf(_))
 
   /**
-   * Converts a JSON string into a Target object.  The JSON object has several optional attributes for different types
+   * Converts a JSON object into a Target object.  The JSON object has several optional attributes for different types
    * of geographic data, as follows:
    * - countryCodes is an array of two character ISO country codes.
    * - regionIds is an array of Facebook region IDs.  A region is a state, province, or equivalent area.

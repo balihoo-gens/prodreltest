@@ -1,6 +1,9 @@
 package com.balihoo.fulfillment.workers
 
+import java.net.{Inet4Address, URI}
+
 import com.github.fge.jsonschema.core.report.ProcessingMessage
+import org.joda.time.DateTime
 
 import scala.collection.mutable
 
@@ -159,22 +162,27 @@ abstract class ActivityParameter(val name:String
 
   def jsonType:String
 
+  /**
+   * This can be overriden to provide additional schema values
+   */
+  def additionalSchemaValues: Map[String, JsValue] = Map()
+
   def parseValue(js:JsValue):Any
 
-  def toJson:JsValue = {
+  final def toJson:JsValue = {
     Json.toJson(Map(
       "name" -> Json.toJson(name),
       "type" -> Json.toJson(jsonType),
       "description" -> Json.toJson(description),
       "required" -> Json.toJson(required)
-    ))
+    ) ++ additionalSchemaValues)
   }
 
-  def toSchema:JsValue = {
+  final def toSchema:JsValue = {
     Json.obj(
       "type" -> jsonType,
       "description" -> description
-    )
+    ) ++ Json.obj(additionalSchemaValues.mapValues(v => Json.toJsFieldJsValueWrapper(v)).toSeq:_*)
   }
 
   // This one works for anything that is automatically/implicitly convertible via Json.validate
@@ -249,17 +257,9 @@ class StringsActivityParameter(override val name:String
 
   def jsonType = "array"
 
-  def parseValue(js:JsValue):Any = _parseBasic[List[String]](js)
+  override def additionalSchemaValues = Map("items" -> Json.obj("type" -> "string"))
 
-  override def toSchema:JsValue = {
-    Json.obj(
-      "type" -> jsonType,
-      "description" -> description,
-      "items" -> Json.obj(
-        "type" -> "string"
-      )
-    )
-  }
+  def parseValue(js:JsValue):Any = _parseBasic[List[String]](js)
 }
 
 class ObjectActivityParameter(override val name:String
@@ -269,15 +269,9 @@ class ObjectActivityParameter(override val name:String
 
   def jsonType = "object"
 
-  def parseValue(js:JsValue):Any = js.as[JsObject]
+  override def additionalSchemaValues = Map("properties" -> Json.obj())
 
-  override def toSchema:JsValue = {
-    Json.obj(
-      "type" -> jsonType,
-      "description" -> description,
-      "properties" -> Json.obj()
-    )
-  }
+  def parseValue(js:JsValue):Any = js.as[JsObject]
 }
 
 class EnumActivityParameter(override val name:String
@@ -288,17 +282,82 @@ class EnumActivityParameter(override val name:String
 
   def jsonType = "string"
 
-  def parseValue(js:JsValue):Any = _parseBasic[String](js)
+  override def additionalSchemaValues = Map("enum" -> Json.toJson(options))
 
-  override def toSchema:JsValue = {
-    Json.obj(
-      "type" -> jsonType,
-      "description" -> description,
-      "enum" -> Json.toJson(options)
-    )
-  }
+  def parseValue(js:JsValue):Any = _parseBasic[String](js)
 }
 
+class DateTimeActivityParameter(override val name:String
+                                ,override val description:String
+                                ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "string"
+
+  override def additionalSchemaValues = Map("format" -> Json.toJson("date-time"))
+
+  def parseValue(js: JsValue): Any = new DateTime(_parseBasic[String](js))
+}
+
+class UriActivityParameter(override val name:String
+                                ,override val description:String
+                                ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "string"
+
+  override def additionalSchemaValues = Map("format" -> Json.toJson("uri"))
+
+  def parseValue(js: JsValue): Any = _parseBasic[String](js)
+}
+
+class EmailActivityParameter(override val name:String
+                            ,override val description:String
+                            ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "string"
+
+  override def additionalSchemaValues = Map("format" -> Json.toJson("email"))
+
+  def parseValue(js: JsValue): Any = _parseBasic[String](js)
+}
+
+class Ipv4ActivityParameter(override val name:String
+                           ,override val description:String
+                           ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "string"
+
+  override def additionalSchemaValues = Map("format" -> Json.toJson("ipv4"))
+
+  def parseValue(js: JsValue): Any = _parseBasic[String](js)
+}
+
+class Ipv6ActivityParameter(override val name:String
+                            ,override val description:String
+                            ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "string"
+
+  override def additionalSchemaValues = Map("format" -> Json.toJson("ipv6"))
+
+  def parseValue(js: JsValue): Any = _parseBasic[String](js)
+}
+
+class HostnameActivityParameter(override val name:String
+                            ,override val description:String
+                            ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "string"
+
+  override def additionalSchemaValues = Map("format" -> Json.toJson("hostname"))
+
+  def parseValue(js: JsValue): Any = _parseBasic[String](js)
+}
 
 
 class ActivityParameters(val params:Map[String,Any], val input:String = "{}") {

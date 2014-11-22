@@ -6,7 +6,7 @@ import com.stackmob.newman.response.HttpResponse
 import sun.misc.BASE64Encoder
 import scala.concurrent._
 import scala.concurrent.duration._
-import java.net.URL
+import java.net.{URLEncoder, URL}
 import com.netaporter.uri.dsl._
 
 trait HTTPAdapterComponent {
@@ -16,8 +16,8 @@ trait HTTPAdapterComponent {
 abstract class AbstractHTTPAdapter {
   def delete(url: URL, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None): HttpResponse
   def get(url: URL, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None): HttpResponse
-  def post(url: URL, body: AnyRef, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None): HttpResponse
-  def put(url: URL, body: AnyRef, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None): HttpResponse
+  def post(url: URL, body: String, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None): HttpResponse
+  def put(url: URL, body: String, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None): HttpResponse
 
   /**
    * Builds a query string from a list of parameters and appends it to a URL.  If the URL already includes a query string,
@@ -37,8 +37,7 @@ abstract class AbstractHTTPAdapter {
 
 class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
   private implicit val httpClient = new ApacheHttpClient
-
-  private val encoder = new BASE64Encoder
+  private val base64Encoder = new BASE64Encoder
 
   /**
    * Synchronously executes the operation specified in the builder.
@@ -49,7 +48,7 @@ class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
    */
   private def execute(builder: Builder, headers: Seq[(String, String)], credentials: Option[(String, String)]) = {
     val fullHeaders = credentials match {
-      case Some((username, password)) => Seq(("Authorization", "Basic " + encoder.encode(s"$username:$password".getBytes))) ++ headers
+      case Some((username, password)) => Seq(("Authorization", "Basic " + base64Encoder.encode(s"$username:$password".getBytes))) ++ headers
       case _ => headers
     }
     Await.result(builder.addHeaders(fullHeaders.toList).apply, timeoutSeconds.seconds)
@@ -59,8 +58,27 @@ class HTTPAdapter(timeoutSeconds: Int) extends AbstractHTTPAdapter {
     execute(DELETE(appendQueryString(url, queryParams)), headers, credentials)
   override def get(url: URL, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None) =
     execute(GET(appendQueryString(url, queryParams)), headers, credentials)
-  override def post(url: URL, body: AnyRef, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None) =
+  override def post(url: URL, body: String, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None) =
     execute(POST(appendQueryString(url, queryParams)).setBody(body), headers, credentials)
-  override def put(url: URL, body: AnyRef, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None) =
+  override def put(url: URL, body: String, queryParams: Seq[(String, Any)] = Seq(), headers: Seq[(String, String)] = Seq(), credentials: Option[(String, String)] = None) =
     execute(PUT(appendQueryString(url, queryParams)).setBody(body), headers, credentials)
+}
+
+object HTTPAdapter {
+  val formContentTypeHeader = "Content-Type" -> "application/x-www-form-urlencoded"
+
+  /**
+   * Encodes form data for use as a request body.
+   * @param formData key/value pairs
+   * @return
+   */
+  def encodeFormData(formData: Seq[(String, Any)]): String = {
+    val charset = "UTF-8"
+    def encodeTuple(t: (String, Any)) = URLEncoder.encode(t._1, charset) + "=" + URLEncoder.encode(t._2.toString, charset)
+
+    formData match {
+      case h :: xs => xs.foldLeft(encodeTuple(h))((buffer, tuple) => buffer + "&" + encodeTuple(tuple))
+      case _ => ""
+    }
+  }
 }

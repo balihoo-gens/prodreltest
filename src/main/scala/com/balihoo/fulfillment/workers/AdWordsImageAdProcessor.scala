@@ -50,9 +50,9 @@ trait ImageAdCreatorComponent {
         new StringActivityParameter("account", "Participant AdWords account ID"),
         new StringActivityParameter("name", "Name of this ad (used to reference the ad later)"),
         new IntegerActivityParameter("adGroupId", "AdWords AdGroup ID"),
-        new StringActivityParameter("url", "Landing page URL"),
-        new StringActivityParameter("displayUrl", "Visible Ad URL"),
-        new StringActivityParameter("imageUrl", "URL Location of image data for this ad"),
+        new UriActivityParameter("url", "Landing page URL"),
+        new UriActivityParameter("displayUrl", "Visible Ad URL"),
+        new UriActivityParameter("imageUrl", "URL Location of image data for this ad"),
         new EnumActivityParameter("status", "Enabled by default", List("ENABLED", "PAUSED", "DISABLED"), false)
       ), new StringActivityResult("ImageAd ID"),
       "Create a Google AdWords Image Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.ImageAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad")

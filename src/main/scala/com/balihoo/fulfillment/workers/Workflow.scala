@@ -40,29 +40,25 @@ class SubTableActivityParameter(
 
   def jsonType = "object"
 
+  override def additionalSchemaValues = Map(
+    // "minProperties" -> Json.toJson(1),
+    "patternProperties" -> Json.obj(
+      "[\r\n.]+" -> Json.obj(
+        "type" -> "array",
+        //"minItems" -> 1,
+        "items" -> Json.obj(
+          "type" -> "string"
+        )
+      )
+    )
+    //"additionalProperties" -> Json.toJson(false)
+  )
+
   def parseValue(js:JsValue):SubTable = {
     js.validate[SubTable] match {
       case JsSuccess(submap, _) => submap
       case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
     }
-  }
-
-  override def toSchema:JsValue = {
-    Json.obj(
-      "type" -> jsonType,
-      "description" -> description,
-      //"minProperties" -> 1,
-      "patternProperties" -> Json.obj(
-        "[\r\n.]+" -> Json.obj(
-          "type" -> "array",
-          //"minItems" -> 1,
-          "items" -> Json.obj(
-            "type" -> "string"
-          )
-        )
-      )
-      //"additionalProperties" -> false
-    )
   }
 }
 

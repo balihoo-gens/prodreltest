@@ -11,6 +11,7 @@ import org.apache.commons.codec.digest.DigestUtils
 import org.junit.runner.RunWith
 import java.net.URL
 import com.netaporter.uri.dsl._
+import play.api.libs.json.Json
 
 @RunWith(classOf[JUnitRunner])
 class TestSendGridAdapter extends Specification with Mockito {
@@ -184,6 +185,73 @@ class TestSendGridAdapter extends Specification with Mockito {
       sendGridAdapter.setWhitelabel(errorSubaccount2Credentials.apiUser, whitelabel) must throwA[SendGridException]
       there was one(_httpAdapter).get(===(subaccountWhitelabelUrl), ===(setWhitelabelQueryParams(errorSubaccount2)), any[Seq[(String, String)]], any[Option[(String, String)]])
     }
+
+    "format recipient data correctly" in new Adapter {
+      val sendId = "WaterBuffalo-Eggplant"
+      val recipientCsv = Stream(
+        List("Name", "Email", "RecipientID", "FavoriteCereal", "SoonToBeDiabetic"),
+        List("Test1", "test1@balihoo.com", "t1", "Wheaties", "No"),
+        List("Test2", "test2@balihoo.com", "t2", "Corn Flakes", "No"),
+        List("Test3", "test3@balihoo.com", "t3", "Chocolate Frosted Sugar Bombs", "Yes")) // http://www.gocomics.com/calvinandhobbes/1986/03/22
+      val result = sendGridAdapter.testFormatRecipientData(sendId, recipientCsv)
+      result.value("to").as[List[String]] === List("test1@balihoo.com", "test2@balihoo.com", "test3@balihoo.com")
+      result.value("unique_args").as[Map[String, String]] === Map("sendId" -> sendId, "recipientId" -> "[RECIPIENT ID]")
+      result.value("sub").as[Map[String, List[String]]] === Map(
+        "[RECIPIENT ID]" -> List("t1", "t2", "t3"),
+        "%%Name%%" -> List("Test1", "Test2", "Test3"),
+        "%%Email%%" -> List("test1@balihoo.com", "test2@balihoo.com", "test3@balihoo.com"),
+        "%%RecipientID%%" -> List("t1", "t2", "t3"),
+        "%%FavoriteCereal%%" -> List("Wheaties", "Corn Flakes", "Chocolate Frosted Sugar Bombs"),
+        "%%SoonToBeDiabetic%%" -> List("No", "No", "Yes"))
+    }
+
+    "complain when recipient data is empty" in new Adapter {
+      val recipientCsv = Stream(
+        List("Name", "Email", "RecipientID", "FavoriteCereal", "SoonToBeDiabetic"))
+      sendGridAdapter.testFormatRecipientData("abc", recipientCsv) must throwA[SendGridException](message = "The recipient list is empty.")
+    }
+
+    "complain when recipient ID is missing from recipient data" in new Adapter {
+      val recipientCsv = Stream(
+        List("Name", "Email", "FavoriteCereal"),
+        List("Test1", "test1@balihoo.com", "Wheaties"))
+      sendGridAdapter.testFormatRecipientData("abc", recipientCsv) must throwA[SendGridException](message = "Missing recipientId column")
+    }
+
+    "complain when email is missing from recipient data" in new Adapter {
+      val recipientCsv = Stream(
+        List("Name", "RecipientID", "FavoriteCereal"),
+        List("Test1", "t1", "Wheaties"))
+      sendGridAdapter.testFormatRecipientData("abc", recipientCsv) must throwA[SendGridException](message = "Missing email column")
+    }
+
+    "complain when recipient data is a jagged array" in new Adapter {
+      val recipientCsv = Stream(
+        List("Name", "Email", "RecipientID", "FavoriteCereal"),
+        List("Test1", "test1@balihoo.com", "t1", "Wheaties"),
+        List("Test2", "test2@balihoo.com", "t2", "Corn Flakes"),
+        List("Test3", "test3@balihoo.com", "t3"))
+      val result = sendGridAdapter.testFormatRecipientData("abc", recipientCsv) must throwA[SendGridException](
+        message = "Unable to transpose recipient data. Please make sure all rows are the same length.")
+    }
+
+    "send an email" in new Adapter {
+      httpAdapterPost returns successResponse
+      sendGridAdapter.sendEmail(testSubAccountCredentials, emailSendId, email, recipientCsv)
+      there was one(_httpAdapter).post(===(emailSendUrl), ===(emailSendBody), any[Seq[(String, Any)]], ===(emailSendHeaders), any[Option[(String, String)]])
+    }
+
+    "handle a bad response when sending an email" in new Adapter {
+      httpAdapterPost returns permissionErrorResponse
+      sendGridAdapter.sendEmail(testSubAccountCredentials, emailSendId, email, recipientCsv) must throwA[SendGridException]
+      there was one(_httpAdapter).post(===(emailSendUrl), ===(emailSendBody), any[Seq[(String, Any)]], ===(emailSendHeaders), any[Option[(String, String)]])
+    }
+
+    "handle an error response when sending an email" in new Adapter {
+      httpAdapterPost returns serverErrorResponse
+      sendGridAdapter.sendEmail(testSubAccountCredentials, emailSendId, email, recipientCsv) must throwA[SendGridException]
+      there was one(_httpAdapter).post(===(emailSendUrl), ===(emailSendBody), any[Seq[(String, Any)]], ===(emailSendHeaders), any[Option[(String, String)]])
+    }
   }
 
   val testRootApiUser = "mainAccountUser"
@@ -202,6 +270,7 @@ class TestSendGridAdapter extends Specification with Mockito {
   val subaccountAppsUrl = new URL(v2ApiBaseUrlString / "customer.apps.json")
   val subaccountSendIpUrl = new URL(v2ApiBaseUrlString / "customer.sendip.json")
   val subaccountWhitelabelUrl = new URL(v2ApiBaseUrlString / "customer.whitelabel.json")
+  val emailSendUrl = new URL(v1ApiBaseUrlString / "mail.send.json")
   val realSubaccountParticipantId = "12345"
   val bogusSubaccountParticipantId = "manEatingBanana"
   val errorSubaccountParticipantId1 = "indigestion1"
@@ -223,6 +292,36 @@ class TestSendGridAdapter extends Specification with Mockito {
   val webhookUrlParam = "https://not_root%40domain:secret%20password@listens.to.everything/all/the/time"
   val ipAddress = "10.9.8.7"
   val whitelabel = "test.balihoo.com"
+  val emailSendId = "email838934984"
+  val emailSendHeaders = Seq("Content-Type" -> "application/x-www-form-urlencoded")
+  val email = Email(
+    fromAddress = "sclaus@north.pole",
+    fromName = "Santa Claus",
+    replyToAddress = "noreply@naughtylist.north.pole",
+    subject = "You better watch out",
+    body = "<html><body>You asked for a %%other%%.  Be good.</body></html>")
+  val recipientCsv = Stream(
+    List("recipientid", "email", "want"),
+    List("r1", "r1@domain", "widget"),
+    List("r2", "r2@domain", "gadget"))
+  val formattedRecipientData = Json.obj(
+    "to" -> Json.arr("r1@domain", "r2@domain"),
+    "sub" -> Json.obj(
+      "[RECIPIENT ID]" -> Json.arr("r1", "r2"),
+      "%%recipientid%%" -> Json.arr("r1", "r2"),
+      "%%email%%" -> Json.arr("r1@domain", "r2@domain"),
+      "%%want%%" -> Json.arr("widget", "gadget")),
+    "unique_args" -> Json.obj("sendId" -> emailSendId, "recipientId" -> "[RECIPIENT ID]")).toString
+  val emailSendBody = HTTPAdapter.encodeFormData(Seq(
+      "to" -> "test@balihoo.com",
+      "subject" -> email.subject,
+      "html" -> email.body,
+      "from" -> email.fromAddress,
+      "fromName" -> email.fromName,
+      "replyTo" -> email.replyToAddress,
+      "x-smtpapi" -> formattedRecipientData,
+      "api_user" -> testSubAccountCredentials.apiUser,
+      "api_key" -> testSubAccountCredentials.apiKey))
 
   val realSubaccount = new SendGridSubaccount(
     _credentials = realSubaccountCredentials,
@@ -391,6 +490,7 @@ class TestSendGridAdapter extends Specification with Mockito {
   trait Adapter extends Scope {
     val _httpAdapter = mock[HTTPAdapter]
     def httpAdapterGet = _httpAdapter.get(any[URL], any[Seq[(String, Any)]], any[Seq[(String, String)]], any[Option[(String, String)]])
+    def httpAdapterPost = _httpAdapter.post(any[URL], any[String], any[Seq[(String, Any)]], any[Seq[(String, String)]], any[Option[(String, String)]])
 
     val sendGridAdapter = new AbstractSendGridAdapter
       with PropertiesLoaderComponent
@@ -409,6 +509,11 @@ class TestSendGridAdapter extends Specification with Mockito {
       val splog = mock[Splogger]
 
       val httpAdapter = _httpAdapter
+
+      /**
+       * Exposing this method for testing.
+       */
+      def testFormatRecipientData(sendId: String, recipientCsv: Stream[List[String]]) = formatRecipientData(sendId, recipientCsv)
     }
   }
 }

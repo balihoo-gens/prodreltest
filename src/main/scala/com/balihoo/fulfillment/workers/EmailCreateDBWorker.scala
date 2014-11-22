@@ -32,7 +32,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new StringActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
+        new UriActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
         new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated"),
         new ObjectActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)")
       ),

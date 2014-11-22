@@ -8,6 +8,7 @@ import com.stackmob.newman.response.HttpResponse
 import org.apache.commons.codec.digest.DigestUtils
 import play.api.libs.json.{JsObject, Json}
 import com.netaporter.uri.dsl._
+import scala.util.{Success, Try}
 
 trait SendGridAdapterComponent {
   def sendGridAdapter: AbstractSendGridAdapter
@@ -63,7 +64,7 @@ abstract class AbstractSendGridAdapter {
 
   /**
    * Produces the credentials for a SendGrid user.  Use this method when you already know the username and you only need
-   * to get the password.  If you need both, use [[getCredentials(SendGridSubaccount)*]] instead.
+   * to get the password.  If you need both, use [[getCredentials(SendGridSubaccountId):SendGridCredentials]] instead.
    * @param apiUser the API user
    * @return the credentials
    */
@@ -265,6 +266,69 @@ abstract class AbstractSendGridAdapter {
   }
 
   /**
+   * Sends an email to a list of recipients
+   * @param credentials the SendGrid subaccount to use for the send
+   * @param sendId a unique identifier for the email send
+   * @param email describes the email to send
+   * @param recipientCsv the recipient list, as read from a CSV file with a header row
+   */
+  def sendEmail(credentials: SendGridCredentials, sendId: String, email: Email, recipientCsv: Stream[List[String]]): Unit = {
+    splog.debug("Sending email for " + credentials.apiUser + " with subject: " + email.subject)
+    val url = new URL(v1ApiBaseUrl, "mail.send.json")
+    val formData = Seq(
+      "to" -> "test@balihoo.com",
+      "subject" -> email.subject,
+      "html" -> email.body,
+      "from" -> email.fromAddress,
+      "fromName" -> email.fromName,
+      "replyTo" -> email.replyToAddress,
+      "x-smtpapi" -> formatRecipientData(sendId, recipientCsv),
+      "api_user" -> credentials.apiUser,
+      "api_key" -> credentials.apiKey)
+    val response = httpAdapter.post(url, HTTPAdapter.encodeFormData(formData), headers = Seq(HTTPAdapter.formContentTypeHeader))
+    checkResponseForSuccess(response)
+  }
+
+  /**
+   * Formats the recipient list to match SendGrid's (somewhat funky) requirements.
+   * @param sendId
+   * @param recipientCsv
+   * @return
+   */
+  protected def formatRecipientData(sendId: String, recipientCsv: Stream[List[String]]): JsObject = {
+    // Do we have data after the header row?
+    if (recipientCsv.length <= 1) throw new SendGridException("The recipient list is empty.")
+
+    // Identify the recipientId and email column indices using a case-insensitive comparison
+    val headingMap = recipientCsv.head.map(_.toLowerCase()).zipWithIndex.toMap
+    val recipientIdIndex = Try(headingMap("recipientid")) match {
+      case Success(i) => i
+      case _ => throw new SendGridException("Missing recipientId column")
+    }
+    val emailIndex = Try(headingMap("email")) match {
+      case Success(i) => i
+      case _ => throw new SendGridException("Missing email column")
+    }
+
+    // Build SendGrid substitution lists
+    val transposedData = Try(recipientCsv.transpose) match {
+      case Success(data) => data
+      case _ => throw new SendGridException("Unable to transpose recipient data. Please make sure all rows are the same length.")
+    }
+    val subDataBase = transposedData.map(column => ("%%" + column.head + "%%") #:: column.tail) // Wrap column headings
+    val subData = ("[RECIPIENT ID]" #:: transposedData(recipientIdIndex).tail) #:: subDataBase // Add a special recipient ID column
+    val sub = subData.foldLeft(Json.obj())((buffer, column) => buffer ++ Json.obj(column.head -> column.tail))
+
+    // Get the recipient email list
+    val to = transposedData(emailIndex).tail // Drop the column heading to get a pure list of email addresses
+
+    // [RECIPIENT ID] tells SendGrid which substitution list to use as the source for recipient ID values
+    val uniqueArgs = Json.obj("sendId" -> sendId, "recipientId" -> "[RECIPIENT ID]")
+
+    Json.obj("to" -> to, "sub" -> sub, "unique_args" -> uniqueArgs)
+  }
+
+  /**
    * Checks the HTTP response for a 200 code and a SendGrid success message.
    * @param response
    * @throws SendGridException if the code or message are wrong.
@@ -335,5 +399,7 @@ class SendGridSubaccount(_credentials: SendGridCredentials, _firstName: String, 
 
   override def toString = credentials.apiUser
 }
+
+case class Email(fromAddress: String, fromName: String, replyToAddress: String, subject: String, body: String)
 
 class SendGridException(message: String) extends Exception(message)
