@@ -4,7 +4,7 @@ import com.github.fge.jsonschema.core.report.ProcessingMessage
 
 import scala.collection.mutable
 
-import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
 import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
 
 import org.keyczar.Crypter
@@ -22,7 +22,8 @@ class ActivitySpecification(val params:List[ActivityParameter]
   val paramsMap:Map[String,ActivityParameter] = (for(param <- params) yield param.name -> param).toMap
 
   private val __factory = JsonSchemaFactory.byDefault()
-  private val __schema:JsonSchema = __factory.getJsonSchema(parameterSchema.as[JsonNode])
+  private val mapper = new ObjectMapper()
+  private val __schema:JsonSchema = __factory.getJsonSchema(mapper.readTree(Json.stringify(parameterSchema)))
 
   def getSpecification:JsValue = {
     Json.obj(
@@ -52,27 +53,15 @@ class ActivitySpecification(val params:List[ActivityParameter]
     report.isSuccess match {
       case false =>
         val gripes = mutable.MutableList[String]()
-//        throw new Exception(report.toString)
         for(m:ProcessingMessage <- report) {
           val report = Json.toJson(m.asJson).as[JsObject]
-          report.value("keyword").as[String] match {
-            case "type" =>
-              val domain = report.value("domain").as[String]
-              val level = report.value("level").as[String]
-              val found = report.value("found").as[String]
-              val expected = report.value("expected").as[List[String]]
-              gripes += s"$domain type $level: found '$found' expected '${expected.mkString(", ")}'"
-            case "required" =>
-              val domain = report.value("domain").as[String]
-              val level = report.value("level").as[String]
-              val keyword = report.value("keyword").as[String]
-              val item = report.value(keyword).as[List[String]]
-              gripes += s"$domain $level: '${item.mkString(", ")}' is $keyword"
-            case _ =>
-              gripes += report.toString()
-          }
+          val domain = report.value("domain").as[String]
+          val level = report.value("level").as[String]
+          val pointer = report.value("instance").as[JsObject].value("pointer").as[String]
+          val message = report.value("message").as[String]
+          gripes += s"$domain $level: $pointer $message"
         }
-        throw new Exception(gripes.mkString(","))
+        throw new Exception(gripes.mkString("\n"))
       case _ =>
     }
   }
@@ -204,12 +193,35 @@ class EncryptedActivityParameter(override val name:String
 
 class StringActivityParameter(override val name:String
                               ,override val description:String
-                              ,override val required:Boolean = true)
+                              ,override val required:Boolean = true
+                              ,val maxLength:Option[Int] = None
+                              ,val minLength:Option[Int] = None
+                              ,val pattern:Option[String] = None)
   extends ActivityParameter(name, description, required) {
 
   def jsonType = "string"
 
   def parseValue(js:JsValue):Any = _parseBasic[String](js)
+
+  override def toSchema:JsValue = {
+    val schema = mutable.Map[String, JsValue]()
+    schema("type") = Json.toJson(jsonType)
+    schema("description") = Json.toJson(description)
+    maxLength.nonEmpty match {
+      case true => schema("maxLength") = Json.toJson[Int](maxLength.get)
+      case _ =>
+    }
+    minLength.nonEmpty match {
+      case true => schema("minLength") = Json.toJson[Int](minLength.get)
+      case _ =>
+    }
+    pattern.nonEmpty match {
+      case true => schema("pattern") = Json.toJson(pattern.get)
+      case _ =>
+    }
+
+    Json.toJson(schema.toMap)
+  }
 }
 
 class IntegerActivityParameter(override val name:String

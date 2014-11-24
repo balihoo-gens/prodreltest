@@ -109,19 +109,17 @@ trait CampaignCreatorComponent {
         new StringActivityParameter("name", "Name of the Campaign"),
         new EnumActivityParameter("channel", "The advertising channel", List("SEARCH", "DISPLAY", "SHOPPING")),
         new NumberActivityParameter("budget", "The monthly budget"),
-        new EnumActivityParameter("status", "Always ACTIVE on Campaign creation", List("ACTIVE", "PAUSED", "DELETED"), false),
-        new StringActivityParameter("startDate", "YYYYMMDD Ignored on update."),
-        new StringActivityParameter("endDate", "YYYYMMDD"),
+        new EnumActivityParameter("status", "Always ACTIVE on Campaign creation", List("ACTIVE", "PAUSED", "DELETED"), required=false),
+        new StringActivityParameter("startDate", "YYYYMMDD Ignored on update.", pattern=Some("[0-9]{8}")),
+        new StringActivityParameter("endDate", "YYYYMMDD", pattern=Some("[0-9]{8}")),
         new StringsActivityParameter("targetzips", "An array of zip codes"),
         new StringsActivityParameter("adschedule", "An array of one or more of M,T,W,Th,F,S,Su"),
-        new StringActivityParameter("street address", "LocationExtension: Street address line 1", false),
-        new StringActivityParameter("city", "LocationExtension: Name of the city", false),
-        new StringActivityParameter("postal code", "LocationExtension: Postal code", false),
-        new StringActivityParameter("country code", "LocationExtension: Country code", false),
-
-        // TODO FIXME We should have an optional max/min on StringActivityParameter!
-        new StringActivityParameter("company name", "LocationExtension(Optional): The name of the company located at the given address. The length of this string should be between 1 and 80, inclusive.", false),
-        new StringActivityParameter("phone number", "LocationExtension(Optional): The phone number for the location", false)
+        new StringActivityParameter("street address", "LocationExtension: Street address line 1", required=false),
+        new StringActivityParameter("city", "LocationExtension: Name of the city", required=false),
+        new StringActivityParameter("postal code", "LocationExtension: Postal code", required=false),
+        new StringActivityParameter("country code", "LocationExtension: Country code", required=false),
+        new StringActivityParameter("company name", "LocationExtension(Optional): The name of the company located at the given address.", required=false, maxLength = Some(80), minLength = Some(1)),
+        new StringActivityParameter("phone number", "LocationExtension(Optional): The phone number for the location", required=false)
       ), new StringActivityResult("AdWords Campaign ID"))
     }
 
