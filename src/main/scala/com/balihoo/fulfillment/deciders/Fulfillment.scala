@@ -387,10 +387,9 @@ class Fulfillment(val history:List[SWFEvent]) {
       sectionsJson(name) = section.toJson
     }
 
-    val jtimeline = Json.toJson(for(entry <- timeline.events) yield entry.toJson)
 
     Json.obj(
-      "timeline" -> jtimeline,
+      "timeline" -> timeline.toJson,
       "sections" -> Json.toJson(sectionsJson.toMap),
       "status" -> Json.toJson(status.toString)
     )
