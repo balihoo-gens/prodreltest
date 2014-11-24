@@ -49,9 +49,9 @@ trait TextAdCreatorComponent {
       new ActivitySpecification(List(
         new StringActivityParameter("account", "Participant AdWords account ID"),
         new IntegerActivityParameter("adGroupId", "AdWords AdGroup ID"),
-        new StringActivityParameter("headline", "Headline of the ad (25 chars)"),
-        new StringActivityParameter("description1", "First line of ad text (35 chars)"),
-        new StringActivityParameter("description2", "Second line of ad text (35 chars)"),
+        new StringActivityParameter("headline", "Headline of the ad", maxLength=Some(25)),
+        new StringActivityParameter("description1", "First line of ad text", maxLength=Some(35)),
+        new StringActivityParameter("description2", "Second line of ad text", maxLength=Some(35)),
         new StringActivityParameter("url", "Landing page URL (domain must match displayUrl)"),
         new StringActivityParameter("displayUrl", "Visible Ad URL")
       ), new StringActivityResult("TextAd ID"),

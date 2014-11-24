@@ -237,15 +237,10 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val param = new SectionParameter(Json.parse(input))
 
-      try {
-        param.evaluate(null)
-        assert(assertion=false, "There should have been an exception!")
-      } catch {
-        case e:Exception =>
-          e.getMessage mustEqual "ERROR During <(md5)> java.lang.IndexOutOfBoundsException: Index 0 not found! : input '{\"what do I do with an object\":\"tuna\"}..."
-      }
+      param.evaluate(null)
 
-      true
+      param.isResolvable mustEqual false
+
     }
 
     "  evaluate compound operator" in {

@@ -43,7 +43,7 @@ class SubTableActivityParameter(
   def parseValue(js:JsValue):SubTable = {
     js.validate[SubTable] match {
       case JsSuccess(submap, _) => submap
-      case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
+      case JsError(e) => throw new Exception(s"unable to parse substitutions map: ${e.toString}")
     }
   }
 
@@ -51,11 +51,11 @@ class SubTableActivityParameter(
     Json.obj(
       "type" -> jsonType,
       "description" -> description,
-      //"minProperties" -> 1,
+      "minProperties" -> 1,
       "patternProperties" -> Json.obj(
         "[\r\n.]+" -> Json.obj(
           "type" -> "array",
-          //"minItems" -> 1,
+          "minItems" -> 1,
           "items" -> Json.obj(
             "type" -> "string"
           )
@@ -114,9 +114,9 @@ abstract class AbstractWorkflowGenerator
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new StringActivityParameter("template", "the template for the workflows", true),
-        new SubTableActivityParameter("substitutions", "substitution data for workflows", false),
-        new StringsActivityParameter("tags", "tags to put on the resulting workflows", false)
+        new StringActivityParameter("template", "the template for the workflows"),
+        new SubTableActivityParameter("substitutions", "substitution data for workflows", required=false),
+        new StringsActivityParameter("tags", "tags to put on the resulting workflows", required=false)
     ), new WorkflowIdsActivityResult("list of workflow ids"))
   }
 
