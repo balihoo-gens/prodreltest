@@ -26,7 +26,6 @@ class ActivitySpecification(val params:List[ActivityParameter]
 
   def getSpecification:JsValue = {
     Json.obj(
-      "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
       "result" -> result.toJson,
       "description" -> Json.toJson(description),
       "schema" -> parameterSchema
@@ -52,7 +51,6 @@ class ActivitySpecification(val params:List[ActivityParameter]
     report.isSuccess match {
       case false =>
         val gripes = mutable.MutableList[String]()
-//        throw new Exception(report.toString)
         for(m:ProcessingMessage <- report) {
           val report = Json.toJson(m.asJson).as[JsObject]
           report.value("keyword").as[String] match {

@@ -231,8 +231,8 @@
                 </form>
                 Do you really want to terminate this Fulfillment?
                 <span class="pull-right">
-                    <i class="fa fa-check muted green action f30" ng-click="terminateWorkflow() && closeThisDialog()"></i>
-                    <i class="fa fa-remove muted red action f30" ng-click="closeThisDialog()"></i>
+                    <i class="fa fa-check muted green action f30" ng-click="closeThisDialog('closing'); terminateWorkflow()"></i>
+                    <i class="fa fa-remove muted red action f30" ng-click="closeThisDialog('closing')"></i>
                 </span>
             </div>
         </script>

@@ -27,19 +27,6 @@ class TestActivitySpecification extends Specification with Mockito
       val schema = """{"$schema":"http://json-schema.org/draft-04/schema","type":"object","required":["param1"],"properties":{"param1":{"type":"string","description":"Param 1 is an Ocelot"},"param2":{"type":"number","description":"Param 2 is NOT an Ocelot"}}}"""
 
       spec.getSpecification mustEqual Json.toJson(Map(
-        "parameters" -> Json.toJson(Map(
-          "param1" -> Json.toJson(Map(
-            "name" -> Json.toJson("param1"),
-            "type" -> Json.toJson("string"),
-            "description" -> Json.toJson("Param 1 is an Ocelot"),
-            "required" -> Json.toJson(true)
-          )),
-          "param2" -> Json.toJson(Map(
-            "name" -> Json.toJson("param2"),
-            "type" -> Json.toJson("number"),
-            "description" -> Json.toJson("Param 2 is NOT an Ocelot"),
-            "required" -> Json.toJson(false)
-          )))),
         "result" -> Json.toJson(Map(
           "type" -> Json.toJson("string"),
           "description" -> Json.toJson("really interesting description")

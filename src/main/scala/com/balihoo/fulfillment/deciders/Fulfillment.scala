@@ -32,6 +32,7 @@ class Fulfillment(val history:List[SWFEvent]) {
   val eventHandlers = collection.mutable.Map[EventType, (SWFEvent) => (Any)]()
   val registry = collection.mutable.Map[Int, String]()
   val nameToSection = collection.mutable.Map[String, FulfillmentSection]()
+  val tags = collection.mutable.Map[String, String]()
   val timeline = new Timeline
   val timers = collection.mutable.Map[String, String]()
   var status = FulfillmentStatus.IN_PROGRESS
@@ -48,8 +49,8 @@ class Fulfillment(val history:List[SWFEvent]) {
   _addEventHandler(EventType.ScheduleActivityTaskFailed, processScheduleActivityTaskFailed)
   _addEventHandler(EventType.TimerStarted, processTimerStarted)
   _addEventHandler(EventType.TimerFired, processTimerFired)
-  _addEventHandler(EventType.MarkerRecorded, processMarkerRecorded)
-  _addEventHandler(EventType.RecordMarkerFailed, processRecordMarkerFailed)
+  _addEventHandler(EventType.MarkerRecorded, processIgnoredEventType)
+  _addEventHandler(EventType.RecordMarkerFailed, processIgnoredEventType)
   _addEventHandler(EventType.WorkflowExecutionCanceled, processCancel)
   _addEventHandler(EventType.WorkflowExecutionTimedOut, processTimedOut)
   _addEventHandler(EventType.WorkflowExecutionTerminated, processTerminated)
@@ -149,20 +150,32 @@ class Fulfillment(val history:List[SWFEvent]) {
   }
 
   def initializeWithInput(fulfillmentInput:JsObject, when:DateTime) = {
-    for((jk, jv) <- fulfillmentInput.fields) {
-      jk match {
-        case "sections" =>
-          val sections = jv.as[JsObject]
-          for((sectionName, section) <- sections.fields) {
-            nameToSection += (jk -> new FulfillmentSection(sectionName, section.as[JsObject], when))
+    fulfillmentInput.keys contains "sections" match { // This check is temporary for near-term backwards compatibility
+      case true =>
+        for((jk, jv) <- fulfillmentInput.fields) {
+          jk match {
+            case "sections" =>
+              _processSections(jv.as[JsObject], when)
+            case "tags" =>
+              val rtags = jv.as[JsObject]
+              for((name, value) <- rtags.fields) {
+                tags(name) = value.as[String]
+              }
+            case _ =>
+              timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(DateTime.now()))
           }
-        case "tags" =>
-        case _ =>
-          timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(DateTime.now()))
-      }
+        }
+      case false =>
+        _processSections(fulfillmentInput, when)
     }
 
     ensureSanity(when)
+  }
+
+  protected def _processSections(sections:JsObject, when:DateTime) = {
+    for((sectionName, section) <- sections.fields) {
+      nameToSection(sectionName) = new FulfillmentSection(sectionName, section.as[JsObject], when)
+    }
   }
 
   protected def processEvent(event:SWFEvent) = {
@@ -318,6 +331,7 @@ class Fulfillment(val history:List[SWFEvent]) {
     }
   }
 
+  /*
   protected def processMarkerRecorded(event: SWFEvent) = {
     val markerName = event.get[String]("markerName")
     val marker = markerName.split(Constants.delimiter)
@@ -349,7 +363,7 @@ class Fulfillment(val history:List[SWFEvent]) {
       case _ =>
         timeline.warning(s"Failed Marker $markerName is unhandled!", None)
     }
-  }
+  } */
 
   protected def processCancel(event: SWFEvent) = {
     timeline.warning("CANCELLED: "+event.get[String]("details"), Some(event.eventDateTime))

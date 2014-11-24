@@ -459,7 +459,8 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         params['workflowId'] = $scope.params.workflowId;
         $http.post('workflow/cancel', params )
             .success(function(data) {
-                         toastr.info(data, "Cancel Requested!")
+                         toastr.info(data, "Cancel Requested!");
+                         $scope.getWorkflow();
                      })
             .error(function(error) {
                        toastr.error(error.details, error.error)
@@ -483,7 +484,8 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         params['details'] = $scope.terminateDetails;
         $http.post('workflow/terminate', params )
             .success(function(data) {
-                       toastr.info(data, "Workflow Terminated!")
+                       toastr.info(data, "Workflow Terminated!");
+                       $scope.getWorkflow();
                      })
             .error(function(error) {
                        toastr.error(error.details, error.error)
@@ -765,6 +767,13 @@ app.controller('processController', function($scope, $route, $http, $location, e
             }
 
             domain[worker.activityName].push(worker);
+
+            $.each(worker.specification.schema.properties,
+                   function (i, e) {
+                       e._name = i;
+                       e._required = $.inArray(i, worker.specification.schema.required) > -1;
+
+            });
 
         }
     };
