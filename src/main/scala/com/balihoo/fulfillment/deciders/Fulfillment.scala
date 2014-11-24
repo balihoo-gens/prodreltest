@@ -150,7 +150,16 @@ class Fulfillment(val history:List[SWFEvent]) {
 
   def initializeWithInput(fulfillmentInput:JsObject, when:DateTime) = {
     for((jk, jv) <- fulfillmentInput.fields) {
-      nameToSection += (jk -> new FulfillmentSection(jk, jv.as[JsObject], when))
+      jk match {
+        case "sections" =>
+          val sections = jv.as[JsObject]
+          for((sectionName, section) <- sections.fields) {
+            nameToSection += (jk -> new FulfillmentSection(sectionName, section.as[JsObject], when))
+          }
+        case "tags" =>
+        case _ =>
+          timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(DateTime.now()))
+      }
     }
 
     ensureSanity(when)
@@ -164,11 +173,6 @@ class Fulfillment(val history:List[SWFEvent]) {
         timeline.error(s"Problem processing ${event.eventTypeString}: ${e.getMessage}", Some(event.eventDateTime))
     }
 
-    // We look through the section references to see if anything needs to be promoted from CONTINGENT -> READY.
-    // Sections get promoted when they're in a SectionReference list and the prior section is TERMINAL
-//    for((name, section) <- nameToSection) {
-//      section.promoteContingentReferences(this)
-//    }
   }
 
   protected def processUnhandledEventType(event:SWFEvent) = {
