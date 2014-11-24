@@ -1,7 +1,5 @@
 package com.balihoo.fulfillment.workers
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.specs2.runner._
@@ -10,13 +8,8 @@ import play.api.libs.json._
 import org.junit.runner._
 
 import scala.language.implicitConversions
-import scala.collection.convert.wrapAsJava._
-import scala.collection.mutable
-import com.amazonaws.services.simpleworkflow.model._
 
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.config._
-import com.balihoo.fulfillment.util.Splogger
 
 /**
  * Example on how to mock up all the layers of the cake pattern
@@ -55,13 +48,11 @@ class TestAdWordsCampaignProcessor extends Specification with Mockito
       val creator = new AdWordsCampaignProcessorTest
       creator.name.toString mustEqual "workername"
     }
+
     "return a valid spec" in {
       val creator = new AdWordsCampaignProcessorTest
       val spec = creator.getSpecification
       spec mustNotEqual null
-      val factory = JsonSchemaFactory.byDefault()
-
-      val schema:JsonSchema = factory.getJsonSchema(spec.parameterSchema.as[JsonNode])
 
       val input =
         Json.parse(""" {
@@ -69,17 +60,18 @@ class TestAdWordsCampaignProcessor extends Specification with Mockito
           "channel" : "DISPLAY",
           "budget" : 34545.0,
 "adschedule" : ["34545yay"],
-"endDate" : "34545yay",
-"name" : "34545yay",
-"startDate" : "34545yay",
+"endDate" : "34546767",
+"name" : "some name",
+"startDate" : "34543465",
 "targetzips" : ["34545yay"]
           }
 
-        """).as[JsonNode]
+        """)
 
-      val report = schema.validate(input)
+      spec.validate(input)
 
-      report.isSuccess
+      true
+
     }
   }
 }
