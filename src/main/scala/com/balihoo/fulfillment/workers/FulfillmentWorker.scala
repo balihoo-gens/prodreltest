@@ -175,6 +175,9 @@ abstract class FulfillmentWorker {
       val result:String = code
       completeTask(result)
     } catch {
+      case cancel:CancelTaskException =>
+        splog("INFO", cancel.details + " " + cancel.getMessage)
+        cancelTask(cancel.details)
       case e:Exception =>
         failTask(e.getMessage, e.getStackTraceString take 150)
     }
@@ -292,6 +295,8 @@ abstract class FulfillmentWorker {
   }
 
 }
+
+class CancelTaskException(val exception:String, val details:String) extends Exception(exception)
 
 class TaskResolution(val resolution:String, val details:String) {
   val when = UTCFormatter.format(DateTime.now)
