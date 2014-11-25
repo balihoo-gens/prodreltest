@@ -23,7 +23,9 @@ class ActivitySpecification(val params:List[ActivityParameter]
 
   private val __factory = JsonSchemaFactory.byDefault()
   private val mapper = new ObjectMapper()
-  private val __schema:JsonSchema = __factory.getJsonSchema(mapper.readTree(Json.stringify(parameterSchema)))
+  private val __schema:JsonSchema = __factory.getJsonSchema(jsValue2JsNode(parameterSchema))
+
+  private def jsValue2JsNode(jsValue: JsValue) = mapper.readTree(Json.stringify(jsValue))
 
   def getSpecification:JsValue = {
     Json.obj(
@@ -48,7 +50,7 @@ class ActivitySpecification(val params:List[ActivityParameter]
   }
 
   def validate(js:JsValue) = {
-    val report = __schema.validate(js.as[JsonNode])
+    val report = __schema.validate(jsValue2JsNode(js))
 
     report.isSuccess match {
       case false =>
@@ -229,9 +231,15 @@ class IntegerActivityParameter(override val name:String
                                ,override val required:Boolean = true)
   extends ActivityParameter(name, description, required) {
 
-  def jsonType = "integer"
+  override def jsonType = "integer"
 
-  def parseValue(js:JsValue):Any = _parseBasic[Long](js)
+  override def parseValue(js:JsValue):Any = _parseBasic[Int](js)
+}
+
+class LongActivityParameter(override val name:String
+                            ,override val description:String
+                            ,override val required:Boolean = true) extends IntegerActivityParameter(name, description, required) {
+  override def parseValue(js:JsValue):Any = _parseBasic[Long](js)
 }
 
 class NumberActivityParameter(override val name:String
