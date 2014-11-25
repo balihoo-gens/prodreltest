@@ -1,7 +1,8 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{InputStreamReader, File}
+import java.io.{InputStream, File, InputStreamReader}
 import java.nio.charset.Charset
+import java.nio.file._
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.{S3Object, CannedAccessControlList, PutObjectRequest}
 import com.amazonaws.auth.BasicAWSCredentials
@@ -15,6 +16,8 @@ trait S3AdapterComponent {
 abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
   this: PropertiesLoaderComponent =>
 
+  val tmpDir = System.getProperty("java.io.tmpdir")
+
   def putPublic(bucket: String, key: String, file: File) = {
     client.putObject(
       new PutObjectRequest(bucket, key, file)
@@ -26,6 +29,19 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
     val s3obj = client.getObject(bucket, key)
     callback(s3obj)
   }
+
+  def getAsTempFile(bucket: String, key: String, filePrefix: Option[String] = None) = {
+    withS3Object(bucket, key) { s3obj =>
+      val prefix = filePrefix.getOrElse(getClass.getSimpleName)
+      // TODO (jmelanson) inject and use FilesystemComponent
+      val tmpFile = File.createTempFile(prefix, ".db")
+      val bytesCount = fileCopy(s3obj.getObjectContent, Paths.get(tmpFile.getPath))
+      if (bytesCount == 0.toLong) throw new RuntimeException("No data copied from s3 object.")
+      tmpFile
+    }
+  }
+
+  protected def fileCopy(is: InputStream, path: Path) = Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING)
 
   /**
    * Warning: don't forget to close your reader!

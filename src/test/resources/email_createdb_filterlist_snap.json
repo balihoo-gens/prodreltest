@@ -1,0 +1,73 @@
+{
+  "createdb": {
+    "action": {
+      "name": "Email-filterlist",
+      "version": "1",
+      "failure": {
+        "max": "1",
+        "delay": "0"
+      },
+      "cancelation": {
+        "max": "1",
+        "delay": "0"
+      }
+    },
+    "params": {
+      "pageSize": 10000,
+      "source": [
+        {
+          "createdb": {
+            "action": {
+              "name": "Email-createdb",
+              "version": "1",
+              "failure": {
+                "max": "1",
+                "delay": "0"
+              },
+              "cancelation": {
+                "max": "1",
+                "delay": "0"
+              }
+            },
+            "params": {
+              "source": "s3://balihoo.dev.fulfillment/lists/snap/member_current.csv",
+              "dbname": "snapee.db",
+              "dtd": {
+                "columns": [
+                  {
+                    "name": "email",
+                    "type": "varchar(100)",
+                    "source": "email"
+                  },
+                  {
+                    "name": "firstname",
+                    "type": "varchar(50)",
+                    "source": "firstname"
+                  },
+                  {
+                    "name": "lastname",
+                    "type": "varchar(50)",
+                    "source": "lastname"
+                  }
+                ]
+              }
+            },
+            "prereqs": [],
+            "status": "READY",
+            "essential": true
+          }
+        }
+      ],
+      "query": {
+        "select": {
+          "email": [],
+          "firstname": "$v like 'a%'",
+          "lastname":  "$v like 'a%'"
+        }
+      }
+    },
+    "prereqs": [],
+    "status": "READY",
+    "essential": true
+  }
+}

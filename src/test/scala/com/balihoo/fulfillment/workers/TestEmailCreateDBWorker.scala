@@ -143,8 +143,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
       there was one(worker.dbMock).close()
       there was one(worker.readerMock).close()
-      there was one(worker.s3Adapter).putPublic(===("mock"), beMatching(s"mock/\\d+/${data.dbname}"), ===(worker.dbFileMock))
-      there was one(worker.dbMock).destroy()
+      there was one(worker.s3Adapter).putPublic(===("mock"), beMatching(s"mock/\\d+/${data.dbname}"), any[File])
+      there was one(worker.dbFileMock).delete()
 
       /* make sure output is complete s3 url */
       worker.test_complete_result must beMatching(s"s3://mock/mock/\\d+/" + data.dbname)
@@ -216,20 +216,19 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       with CsvAdapterComponent
       with LightweightDatabaseAdapterComponent {
 
-      trait TestDbType extends LightweightDatabase with LightweightFileDatabase
-      override type DbType = TestDbType
       override val s3Adapter = mock[AbstractS3Adapter]
       override val csvAdapter = mock[CsvAdapter]
       override val liteDbAdapter = mock[LightweightDatabaseAdapter]
       val readerMock = mock[InputStreamReader]
-      val dbMock = mock[DbType]
       val dbFileMock = mock[File]
+      val dbMock = mock[LightweightDatabase with LightweightFileDatabase]
       val dbBatchMock = mock[DbBatch]
       override val insertBatchSize = 2
       var test_complete_result = ""
       override def completeTask(result: String) = {
         test_complete_result = result
       }
+      override def newTempFile(dbname: String) = dbFileMock
     }
 
     def givenFailOnBadRecord(value: Boolean = true) = {
@@ -245,9 +244,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
 
     def givenLiteDb() = {
-      worker.dbMock.file returns worker.dbFileMock
       worker.dbMock.batch(anyString) returns worker.dbBatchMock
-      worker.liteDbAdapter.create(===(data.dbname)) returns worker.dbMock
+      worker.liteDbAdapter.create(any[File]) returns worker.dbMock
     }
 
   }
