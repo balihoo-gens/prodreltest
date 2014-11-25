@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.deciders
 
 import com.balihoo.fulfillment.util.UTCFormatter
+import com.fasterxml.jackson.core.JsonParseException
 import org.joda.time.{Seconds, DateTime}
 
 import com.amazonaws.services.simpleworkflow.model._
@@ -80,7 +81,8 @@ class FulfillmentSection(val name: String
   val params = collection.mutable.Map[String, SectionParameter]()
   val prereqs = mutable.MutableList[String]()
   val timeline = new Timeline
-  var value: JsValue = JsNull
+  private var _value: JsValue = JsNull
+  def value = _value
 
   var status = SectionStatus.CONTINGENT
 
@@ -137,7 +139,7 @@ class FulfillmentSection(val name: String
           waitUntil = Some(new DateTime(v.as[String]))
 
         case "value" =>
-          value = v
+          _value = v
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
@@ -229,7 +231,14 @@ class FulfillmentSection(val name: String
   def setCompleted(result:String, when:DateTime) = {
     status = SectionStatus.COMPLETE
     timeline.success("Completed", Some(when))
-    value = JsString(result)
+    try {
+      // We expect results to come back as legal JSON...
+      _value = Json.parse(result)
+    } catch {
+      case jpe:JsonParseException =>
+        // Wasn't json encoded, it's automatically a JSON string..
+        _value = JsString(result)
+    }
   }
 
   def setFailed(reason:String, details:String, when:DateTime) = {
@@ -331,7 +340,7 @@ class FulfillmentSection(val name: String
       if(!param.isResolved) {
         throw new Exception(s"Unresolved parameter '$name'!")
       }
-      oparams(name) = Json.toJson(param.getResult.get)
+      oparams(name) = param.getResult.get
     }
 
     oparams.toMap

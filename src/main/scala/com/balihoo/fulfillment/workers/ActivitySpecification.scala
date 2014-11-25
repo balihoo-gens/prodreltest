@@ -27,7 +27,6 @@ class ActivitySpecification(val params:List[ActivityParameter]
 
   def getSpecification:JsValue = {
     Json.obj(
-      "parameters" -> Json.toJson((for(param <- params) yield param.name -> param.toJson).toMap),
       "result" -> result.toJson,
       "description" -> Json.toJson(description),
       "schema" -> parameterSchema
