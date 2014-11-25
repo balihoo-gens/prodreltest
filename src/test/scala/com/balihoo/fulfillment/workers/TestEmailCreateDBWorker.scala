@@ -143,11 +143,11 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
       there was one(worker.dbMock).close()
       there was one(worker.readerMock).close()
-      there was one(worker.s3Adapter).putPublic(===("mock"), beMatching(s"mock/\\d+/${data.dbname}"), ===(worker.dbFileMock))
+      there was one(worker.s3Adapter).putPublic(===("mock"), ===(s"mock/${data.dbname}"), ===(worker.dbFileMock))
       there was one(worker.dbMock).destroy()
 
       /* make sure output is complete s3 url */
-      worker.test_complete_result must beMatching(s"s3://mock/mock/\\d+/" + data.dbname)
+      worker.test_complete_result must ===(s"s3://mock/mock/${data.dbname}")
     }
   }
 

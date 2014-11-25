@@ -73,17 +73,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
    * Uploads local db to S3.
    * @return url to the resulting db s3 object.
    */
-  private def s3upload(file: File, name: String) = {
+  private def s3upload(file: File, targetKey: String) = {
     splog.info("Uploading DB file to S3")
     val targetBucket = swfAdapter.config.getString("s3bucket")
-    /* left pad sub dir with slash if not present */
-    val targetDir = {
-      val dir = swfAdapter.config.getString("s3dir")
-      if (dir.startsWith("/")) dir.substring(1) else dir
-    }
 
     val start = System.currentTimeMillis
-    val targetKey = s"$targetDir/$start/$name"
 
     s3Adapter.putPublic(targetBucket, targetKey, file)
     splog.info(s"Uploaded to S3 time=${System.currentTimeMillis - start}")
@@ -195,6 +189,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
    */
   private def csvStreamFromS3Content(bucket: String, key: String) = {
     splog.info(s"Streaming CSV content from S3 bucket=$bucket key=$key")
+    s3Adapter.withS3Object(bucket, key) { s3obj =>
+      val md = s3obj.getObjectMetadata
+      val lm = md.getLastModified
+
+    }
     val reader = s3Adapter.getObjectContentAsReader(bucket, key)
     val csvStream = csvAdapter.parseReaderAsStream(reader)
     if (csvStream.isEmpty) throw new RuntimeException("csv stream is empty")
@@ -207,6 +206,13 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     /* extract and validate params */
     val (bucket, key, filename, tableDefinition) = getParams(params)
+
+    /* left pad sub dir with slash if not present */
+    val targetKey = {
+      val dir = swfAdapter.config.getString("s3dir")
+      if (dir.startsWith("/")) dir.substring(1) else dir
+      s"$dir/$filename"
+    }
 
     val (csvReader, csvStream) = csvStreamFromS3Content(bucket, key)
 
@@ -229,7 +235,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       csvReader.close()
     }
 
-    val s3url = s3upload(db.file, filename)
+    val s3url = s3upload(db.file, targetKey)
 
     db.destroy()
 
