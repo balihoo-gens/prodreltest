@@ -37,18 +37,16 @@ class AbstractRESTClient extends FulfillmentWorker {
         case _ => throw new IllegalArgumentException(s"Invalid method: $method")
       }
 
-      if(300 <= response.code.code && response.code.code < 500) {
-        // Rediraction or Client Error
-        throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
+      if(200 <= response.code.code && response.code.code < 300) {
+        // SUCCESS!
+        response.bodyString
       } else if(500 <= response.code.code && response.code.code < 600) {
         // Server Error
         throw new CancelTaskException("Server Error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
       }
-      // Default case.. just return the body
-      // if(200 <= response.code.code && response.code.code < 300) {
-      // SUCCESS!
 
-      response.bodyString
+      // Redirection or Client Error or anything else we didn't anticipate
+      throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
     }
   }
 }
