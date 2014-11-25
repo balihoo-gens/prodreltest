@@ -81,7 +81,8 @@ class FulfillmentSection(val name: String
   val params = collection.mutable.Map[String, SectionParameter]()
   val prereqs = mutable.MutableList[String]()
   val timeline = new Timeline
-  var value: JsValue = JsNull
+  private var _value: JsValue = JsNull
+  def value = _value
 
   var status = SectionStatus.CONTINGENT
 
@@ -138,7 +139,7 @@ class FulfillmentSection(val name: String
           waitUntil = Some(new DateTime(v.as[String]))
 
         case "value" =>
-          value = v
+          _value = v
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
@@ -232,13 +233,11 @@ class FulfillmentSection(val name: String
     timeline.success("Completed", Some(when))
     try {
       // We expect results to come back as legal JSON...
-      value = Json.parse(result)
+      _value = Json.parse(result)
     } catch {
       case jpe:JsonParseException =>
         // Wasn't json encoded, it's automatically a JSON string..
-        value = JsString(result)
-      case e:Exception =>
-        throw e
+        _value = JsString(result)
     }
   }
 

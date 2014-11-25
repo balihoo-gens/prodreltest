@@ -228,7 +228,7 @@ object JsonOps {
       ),
       (args) => {
         val path = new ReferencePath(args[String]("path"))
-          path.getValue(args[JsValue]("json"))
+        path.getValue(args[JsValue]("json"))
       })
 
   protected val urlEncodeOperator =
