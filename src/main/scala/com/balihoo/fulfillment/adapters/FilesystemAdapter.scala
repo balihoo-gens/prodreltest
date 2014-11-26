@@ -28,7 +28,7 @@ trait LocalFilesystemAdapterComponent extends FilesystemAdapterComponent {
 
   class LocalFilesystemAdapter extends FilesystemAdapter {
 
-    override def newTempFile(name: String, extension: String = ".tmp") = {
+    override def newTempFile(name: String, extension: String = ".tmp"): File = {
       require(!name.trim.isEmpty)
       require(!extension.trim.isEmpty)
       val file = File.createTempFile(name, extension)
@@ -38,7 +38,7 @@ trait LocalFilesystemAdapterComponent extends FilesystemAdapterComponent {
 
     override def newFileOutputStream(file: File): FileOutputStream = new FileOutputStream(file)
 
-    override def newTempFileOutputStream(name: String, extension: String = ".tmp") = {
+    override def newTempFileOutputStream(name: String, extension: String = ".tmp"): (File, FileOutputStream) = {
       val file = newTempFile(name, extension)
       (file, newFileOutputStream(file))
     }

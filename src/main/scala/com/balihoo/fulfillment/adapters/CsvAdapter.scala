@@ -61,7 +61,7 @@ trait ScalaCsvAdapterComponent extends CsvAdapterComponent {
       override val quoting: Quoting = QUOTE_ALL
     }
 
-    override def parseReaderAsStream(reader: Reader) = CSVReader.open(reader)(csvFormat).toStream()
+    override def parseReaderAsStream(reader: Reader): Stream[List[String]] = CSVReader.open(reader)(csvFormat).toStream()
 
     override def newWriter(os: OutputStream): CsvWriter = new ScalaCsvWriter(CSVWriter.open(os)(csvFormat))
 
