@@ -28,6 +28,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   val skippedColumnName = "__skipped_column__"
   val insertBatchSize = 100000
   val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
+  val s3dir = this.swfAdapter.config.getString("s3dir")
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -189,11 +190,6 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
    */
   private def csvStreamFromS3Content(bucket: String, key: String) = {
     splog.info(s"Streaming CSV content from S3 bucket=$bucket key=$key")
-    s3Adapter.withS3Object(bucket, key) { s3obj =>
-      val md = s3obj.getObjectMetadata
-      val lm = md.getLastModified
-
-    }
     val reader = s3Adapter.getObjectContentAsReader(bucket, key)
     val csvStream = csvAdapter.parseReaderAsStream(reader)
     if (csvStream.isEmpty) throw new RuntimeException("csv stream is empty")
@@ -206,14 +202,6 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     /* extract and validate params */
     val (bucket, key, filename, tableDefinition) = getParams(params)
-
-    /* left pad sub dir with slash if not present */
-    val targetKey = {
-      val dir = swfAdapter.config.getString("s3dir")
-      if (dir.startsWith("/")) dir.substring(1) else dir
-      s"$dir/$filename"
-    }
-
     val (csvReader, csvStream) = csvStreamFromS3Content(bucket, key)
 
     splog.info("Creating DB file")
@@ -235,7 +223,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       csvReader.close()
     }
 
-    val s3url = s3upload(db.file, targetKey)
+    val s3url = s3upload(db.file, s"$s3dir/$filename")
 
     db.destroy()
 
