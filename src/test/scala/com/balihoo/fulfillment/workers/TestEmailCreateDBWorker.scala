@@ -61,6 +61,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "fail task if csv stream empty" in new TestContext {
       givenReader()
       givenCsvStream(Stream.empty)
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -71,6 +72,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "fail task if csv stream has no records" in new TestContext {
       givenReader()
       givenCsvStream(data.header #:: Stream.empty)
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -82,6 +84,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       givenFailOnBadRecord()
       givenReader()
       givenCsvStream(data.header #:: Stream.empty)
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -92,6 +95,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "complete task if db file could be created from csv and uploaded to s3" in new TestContext {
       givenReader()
       givenCsvStream()
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -214,11 +218,13 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       with LoggingWorkflowAdapterTestImpl
       with S3AdapterComponent
       with CsvAdapterComponent
+      with FilesystemAdapterComponent
       with LightweightDatabaseAdapterComponent {
 
       override val s3Adapter = mock[AbstractS3Adapter]
       override val csvAdapter = mock[CsvAdapter]
       override val liteDbAdapter = mock[LightweightDatabaseAdapter]
+      override val filesystemAdapter = mock[FilesystemAdapter]
       val readerMock = mock[InputStreamReader]
       val dbFileMock = mock[File]
       val dbMock = mock[LightweightDatabase with LightweightFileDatabase]
@@ -228,7 +234,6 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       override def completeTask(result: String) = {
         test_complete_result = result
       }
-      override def newTempFile(dbname: String) = dbFileMock
     }
 
     def givenFailOnBadRecord(value: Boolean = true) = {
@@ -246,6 +251,10 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     def givenLiteDb() = {
       worker.dbMock.batch(anyString) returns worker.dbBatchMock
       worker.liteDbAdapter.create(any[File]) returns worker.dbMock
+    }
+
+    def givenTempDbFile() = {
+      worker.filesystemAdapter.newTempFile(===("email-createdb-" + data.dbname), ===(".sqllite")) returns worker.dbFileMock
     }
 
   }

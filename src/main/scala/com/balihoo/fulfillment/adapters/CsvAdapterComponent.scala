@@ -69,9 +69,9 @@ trait ScalaCsvAdapterComponent extends CsvAdapterComponent {
 
   class ScalaCsvWriter(csvWriter: com.github.tototoshi.csv.CSVWriter) extends CsvWriter {
 
-    def writeRow(fields: Seq[Any]) = csvWriter.writeRow(fields)
+    override def writeRow(fields: Seq[Any]) = csvWriter.writeRow(fields)
 
-    def writeRows(allRows: Seq[Seq[Any]]) = csvWriter.writeAll(allRows)
+    override def writeRows(allRows: Seq[Seq[Any]]) = csvWriter.writeAll(allRows)
 
   }
 

@@ -242,9 +242,9 @@ trait LightweightDatabaseAdapterComponent {
     override def hasNext: Boolean = currentPage < pageCount
 
     override def next: DbResultSetPage = {
-      currentPage += 1
-      val offset = (currentPage - 1) * pageSize
+      val offset = currentPage * pageSize
       statement.execute(sql + s" limit $pageSize offset $offset")
+      currentPage += 1
       new JdbcDbResultSetPage(statement.getResultSet)
     }
 

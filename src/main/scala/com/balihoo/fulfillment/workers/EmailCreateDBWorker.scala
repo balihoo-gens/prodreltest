@@ -19,6 +19,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
     with S3AdapterComponent
     with CsvAdapterComponent
+    with FilesystemAdapterComponent
     with LightweightDatabaseAdapterComponent =>
 
   /** Table definition JSON format. */
@@ -201,12 +202,6 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     (reader, csvStream)
   }
 
-  protected def newTempFile(dbname: String) = {
-    val file = File.createTempFile("email_create_db_" + dbname.take(50) , ".sqllite")
-    file.deleteOnExit()
-    file
-  }
-
   override def handleTask(params: ActivityParameters) = {
 
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
@@ -217,7 +212,8 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     val (csvReader, csvStream) = csvStreamFromS3Content(bucket, key)
 
     splog.info("Creating DB")
-    val dbFile = newTempFile(dbname)
+    val dbFile = filesystemAdapter.newTempFile("email-createdb-" + dbname.take(50), ".sqllite")
+    splog.info("Using temp db file path=" + dbFile.getAbsolutePath)
     val db = liteDbAdapter.create(dbFile)
 
     try {
@@ -367,6 +363,7 @@ class EmailCreateDBWorker(override val _cfg: PropertiesLoader, override val _spl
   with ScalaCsvAdapterComponent
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
+  with LocalFilesystemAdapterComponent
   with SqlLiteLightweightDatabaseAdapterComponent {
     override val s3Adapter = new S3Adapter(_cfg)
 }

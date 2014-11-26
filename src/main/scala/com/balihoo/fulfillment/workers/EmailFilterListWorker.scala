@@ -27,7 +27,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   val s3keySepCharPattern = "[/]".r
   val s3filenameSepCharPattern = "[\\.]".r
   val s3BucketConfig = "s3bucket"
-  val s3KeyConfig = "s3key"
+  val s3DirConfig = "s3dir"
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -74,7 +74,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
     val destinationS3Bucket = this.swfAdapter.config.getString(s3BucketConfig)
-    val destinationS3Key = this.swfAdapter.config.getString(s3KeyConfig)
+    val destinationS3Key = this.swfAdapter.config.getString(s3DirConfig)
 
     splog.info(s"Downloading db file sourceBucket=$sourceBucket sourceKey=$sourceKey")
     val s3TempFile = s3Adapter.getAsTempFile(sourceBucket, sourceKey, None)
