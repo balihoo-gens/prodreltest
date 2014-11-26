@@ -11,7 +11,7 @@ import org.specs2.specification.Scope
 import scala.util.Try
 
 @RunWith(classOf[JUnitRunner])
-class TestSqlLiteDbAdapterComponent extends Specification with Mockito {
+class TestSqlLiteDbAdapter extends Specification with Mockito {
 
   "LightweightDatabaseAdapter" should {
     "return 0 when count is 0" in new TestContext {

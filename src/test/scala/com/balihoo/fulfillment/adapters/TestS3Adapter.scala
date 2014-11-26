@@ -18,7 +18,7 @@ import org.specs2.specification.Scope
 import scala.util.Try
 
 @RunWith(classOf[JUnitRunner])
-class TestS3AdapterComponent extends Specification with Mockito {
+class TestS3Adapter extends Specification with Mockito {
   
   "withS3Object" should {
     "invoke aws client and invoke callback function with s3 object" in new TestContext {

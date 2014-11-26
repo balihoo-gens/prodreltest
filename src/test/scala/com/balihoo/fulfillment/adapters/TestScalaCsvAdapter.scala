@@ -9,7 +9,7 @@ import org.specs2.runner.JUnitRunner
 import org.specs2.specification.Scope
 
 @RunWith(classOf[JUnitRunner])
-class TestScalaCsvAdapterComponent extends Specification with Mockito {
+class TestScalaCsvAdapter extends Specification with Mockito {
 
   "csvAdapter" should {
     "return a CSV writer/reader that can be used to write and read from a CSV file" in new TestContext with TempFileOutputStreamContext with TempFileReaderContext {
