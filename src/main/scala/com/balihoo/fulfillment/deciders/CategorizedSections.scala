@@ -3,6 +3,10 @@ package com.balihoo.fulfillment.deciders
 import org.joda.time.DateTime
 
 import scala.collection.mutable
+
+
+class CategorizationInvalid extends Exception
+
 /**
  * Bin the sections by status. So we can make decisions
  * @param fulfillment SectionMap
@@ -27,6 +31,22 @@ class CategorizedSections(fulfillment: Fulfillment) {
 
   def categorize() = {
 
+    var categorized = false
+
+    while(!categorized) {
+      _reset()
+      try {
+        _categorize()
+      } catch {
+        case ci:CategorizationInvalid =>
+          categorized = false
+      }
+      categorized = true
+    }
+  }
+
+  protected def _reset() = {
+
     essentialComplete = 0
     essentialTotal = 0
 
@@ -42,12 +62,26 @@ class CategorizedSections(fulfillment: Fulfillment) {
     ready.clear()
     impossible.clear()
 
+  }
+
+  protected def _categorize() = {
+
+    val sectionCount = fulfillment.nameToSection.size
+
     for((name, section) <- fulfillment.nameToSection) {
-      if(section.essential) { essentialTotal += 1 }
+      if(sectionCount != fulfillment.nameToSection.size) {
+        throw new CategorizationInvalid
+      }
+
+      if(section.essential) {
+        essentialTotal += 1
+      }
       section.status match {
         case SectionStatus.COMPLETE =>
           complete += section
-          if(section.essential) { essentialComplete += 1 }
+          if(section.essential) {
+            essentialComplete += 1
+          }
         case SectionStatus.SCHEDULED =>
           inprogress += section
         case SectionStatus.STARTED =>
@@ -73,6 +107,7 @@ class CategorizedSections(fulfillment: Fulfillment) {
         case _ => println(section.status + " is not handled here!")
       }
     }
+
   }
 
   /**
@@ -98,6 +133,7 @@ class CategorizedSections(fulfillment: Fulfillment) {
       blocked += section
     } else {
       // Whoohoo! we're ready to run!
+      section.setReady("All parameters and prereqs are resolved!", DateTime.now())
       ready += section
     }
 

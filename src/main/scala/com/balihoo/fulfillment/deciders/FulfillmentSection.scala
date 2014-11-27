@@ -73,13 +73,15 @@ class Timeline {
   def toJson: JsValue = Json.toJson(for(entry <- events) yield entry.toJson)
 }
 
-class FulfillmentSection(val name: String
+class FulfillmentSection(sname: String
                          ,val jsonNode: JsObject
                          ,val creationDate:DateTime) {
 
   var action: Option[ActivityType] = None
   val params = collection.mutable.Map[String, SectionParameter]()
   val prereqs = mutable.MutableList[String]()
+  val subsections = mutable.MutableList[String]()
+  val evaluationContext = collection.mutable.Map[String, JsValue]()
   val timeline = new Timeline
   private var _value: JsValue = JsNull
   def value = _value
@@ -105,6 +107,17 @@ class FulfillmentSection(val name: String
   var scheduleToCloseTimeout: Option[String] = None
   var heartbeatTimeout: Option[String] = None
   var waitUntil: Option[DateTime] = None
+
+  private var _name = sname
+  def name = _name
+
+  val multiParamName:Option[String] = sname.contains("*") match {
+    case true =>
+      val parts = sname.split("""\*""")
+      _name = parts(0).trim
+      Some(parts(1).trim)
+    case false => None
+  }
   
   jsonInit(jsonNode)
 
@@ -347,8 +360,16 @@ class FulfillmentSection(val name: String
   }
 
   def evaluateParameters(fulfillment:Fulfillment) = {
-    for((name, param) <- params) {
-      param.evaluate(fulfillment)
+    if(multiParamName.isDefined) {
+      val multiParam = params(multiParamName.get)
+      multiParam.evaluate(fulfillment, evaluationContext.toMap)
+      if(multiParam.isResolved) {
+        createSubsections(fulfillment, multiParam.getResult.get)
+      }
+    } else {
+      for((name, param) <- params) {
+        param.evaluate(fulfillment, evaluationContext.toMap)
+      }
     }
   }
 
@@ -384,6 +405,49 @@ class FulfillmentSection(val name: String
     true
   }
 
+  def createSubsections(fulfillment:Fulfillment, multiResult:JsValue):Seq[FulfillmentSection] = {
+
+    val newSections = collection.mutable.MutableList()
+
+    multiResult match {
+      case arr:JsArray =>
+        for((p, index) <- arr.value.zipWithIndex) {
+          val newSectionName = s"${name}[$index]"
+          if(!subsections.contains(newSectionName)) {
+            val newSection = new FulfillmentSection(newSectionName, jsonNode, DateTime.now())
+            // overwrite the multi-param with the resolved value
+            newSection.evaluationContext("multi-index") = JsNumber(index)
+            newSection.evaluationContext("multi-value") = p
+            newSection.params(multiParamName.get) = new SectionParameter(p)
+            // TODO maybe a fulfillment.addSection() makes more sense..
+            fulfillment.nameToSection(newSection.name) = newSection
+            fulfillment.timeline.note(s"Adding new section $newSectionName", Some(DateTime.now()))
+            subsections += newSection.name
+          }
+        }
+      case obj:JsObject =>
+        for((key, value) <- obj.fields) {
+          val newSectionName = s"${name}[$key]"
+          if(!subsections.contains(newSectionName)) {
+            val newSection = new FulfillmentSection(newSectionName, jsonNode, DateTime.now())
+            // overwrite the multi-param with the resolved value
+            newSection.evaluationContext("multi-key") = JsString(key)
+            newSection.evaluationContext("multi-value") = value
+            newSection.params(multiParamName.get) = new SectionParameter(value)
+            // TODO maybe a fulfillment.addSection() makes more sense..
+            fulfillment.nameToSection(newSection.name) = newSection
+            fulfillment.timeline.note(s"Adding new section $newSectionName", Some(DateTime.now()))
+            subsections += newSection.name
+          }
+        }
+      case _ =>
+        throw new Exception("Expected an Array or Object for a multi-param result!")
+    }
+
+    newSections
+
+  }
+
   override def toString = {
     Json.stringify(toJson)
   }
@@ -410,6 +474,8 @@ class FulfillmentSection(val name: String
       "failureParams" -> failureParams.toJson,
       "timeoutParams" -> timeoutParams.toJson,
       "cancelationParams" -> cancelationParams.toJson,
+      "subsections" -> subsections.toList,
+      "evaluationContext" -> Json.toJson(evaluationContext.toMap),
       "waitUntil" ->
         (waitUntil.isDefined match {
           case true =>
@@ -428,6 +494,7 @@ class SectionParameter(input:JsValue) {
   protected val timeline = new Timeline
   protected var record:JsValue = JsNull
   protected var fulfillment:Option[Fulfillment] = None
+  protected val evaluationContext = mutable.Map[String, JsValue]()
   protected val inputString = Json.stringify(input)
   protected val needsEvaluation = inputString contains "<("
 
@@ -462,6 +529,8 @@ class SectionParameter(input:JsValue) {
               case _ =>
                 throw new Exception("Section References must be a String or Array[String]")
             })
+        } else if(firstKey.startsWith("<(context)>")) {
+          return _processContext(jObj.value("<(context)>").as[String])
         } else if(firstKey.startsWith("<(")) {
           return _processOperator(jObj)
         }
@@ -483,6 +552,10 @@ class SectionParameter(input:JsValue) {
     JsonOps(JsonOpName.withName(opName.toLowerCase), _evaluateJsValue(operand))
   }
 
+  protected def _processContext(key:String):JsValue = {
+    evaluationContext.getOrElse(key, throw new Exception(s"'$key' not available!"))
+  }
+
   protected def _processReference(nameList:List[String]):JsValue = {
     val sectionRef = new SectionReferences(nameList, fulfillment.get)
     sectionRef.resolved() match {
@@ -499,10 +572,12 @@ class SectionParameter(input:JsValue) {
     }
   }
 
-  def evaluate(f:Fulfillment) = {
+  def evaluate(f:Fulfillment, context:Map[String, JsValue]) = {
     if(!evaluated) {
       evaluated = true // Dont' confuse with 'resolved'! This just means we touched it.
       fulfillment = Some(f)
+      evaluationContext.clear()
+      evaluationContext ++= context
       try {
         result = Some(_evaluateJsValue(input))
       } catch {

@@ -21,7 +21,7 @@ object FulfillmentStatus extends Enumeration {
   val TIMED_OUT = Value("TIMED_OUT") // SWF STATUS
 }
 
-
+class SectionDoesNotExist(name:String) extends Exception(name)
 
 /**
  * Build and update Fulfillment from a JSONized SWF execution history
@@ -60,18 +60,30 @@ class Fulfillment(val history:List[SWFEvent]) {
   _addEventHandler(EventType.DecisionTaskStarted, processIgnoredEventType)
   _addEventHandler(EventType.DecisionTaskCompleted, processIgnoredEventType)
 
-  try {
-    for(event: SWFEvent <- history) {
-      processEvent(event)
+  val categorized = new CategorizedSections(this)
+
+  for(event: SWFEvent <- history) {
+    if(status != FulfillmentStatus.FAILED) {
+      try {
+        processEvent(event)
+      } catch {
+        case sdne:SectionDoesNotExist =>
+          categorized.categorize() // Might generate our missing section!
+          try {
+            processEvent(event) // Try again!
+          } catch {
+            case e:Exception =>
+              timeline.error(e.getMessage, Some(DateTime.now))
+              status = FulfillmentStatus.FAILED
+          }
+        case e:Exception =>
+          timeline.error(e.getMessage, Some(DateTime.now))
+          status = FulfillmentStatus.FAILED
+      }
     }
-  } catch {
-    case e:Exception =>
-      timeline.error(e.getMessage, Some(DateTime.now))
-      status = FulfillmentStatus.FAILED
   }
 
-  // Now that all of the JsObjects have been processed our sections have been created and are up to date.
-  val categorized = new CategorizedSections(this)
+  categorized.categorize() // A final categorization
 
   protected def _addEventHandler(eventType:EventType, handler:(SWFEvent)=>(Any)) = {
     eventHandlers(eventType) = handler
@@ -132,7 +144,7 @@ class Fulfillment(val history:List[SWFEvent]) {
     } catch {
       case nsee:NoSuchElementException =>
         println(s"No section $name")
-        throw new Exception(s"There is no section '$name'", nsee)
+        throw new SectionDoesNotExist(name)
       case e:Exception =>
         throw new Exception(s"Error while looking up section '$name'", e)
     }
@@ -182,8 +194,11 @@ class Fulfillment(val history:List[SWFEvent]) {
     try {
       eventHandlers.getOrElse(event.eventType, processUnhandledEventType _)(event)
     } catch {
+      case sdne:SectionDoesNotExist =>
+        throw sdne
       case e:Exception =>
         timeline.error(s"Problem processing ${event.eventTypeString}: ${e.getMessage}", Some(event.eventDateTime))
+        throw e
     }
 
   }
