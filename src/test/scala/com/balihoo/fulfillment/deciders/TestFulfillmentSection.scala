@@ -437,7 +437,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val fulfillment = new Fulfillment(List())
       section.evaluateParameters(fulfillment)
 
-      fulfillment.categorized.categorize()
+      fulfillment.categorize()
 
       println(section.name)
       println(section.multiParamName.get)
@@ -488,7 +488,7 @@ class TestFulfillmentSection extends Specification with Mockito
       val fulfillment = new Fulfillment(List())
       section.evaluateParameters(fulfillment)
 
-      fulfillment.categorized.categorize()
+      fulfillment.categorize()
 
       println(section.name)
       println(section.multiParamName.get)

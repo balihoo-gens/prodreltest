@@ -6,6 +6,7 @@ import org.joda.time.DateTime
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 
+import scala.collection.mutable
 
 object FulfillmentStatus extends Enumeration {
   val IN_PROGRESS = Value("IN_PROGRESS")
@@ -60,7 +61,8 @@ class Fulfillment(val history:List[SWFEvent]) {
   _addEventHandler(EventType.DecisionTaskStarted, processIgnoredEventType)
   _addEventHandler(EventType.DecisionTaskCompleted, processIgnoredEventType)
 
-  val categorized = new CategorizedSections(this)
+  val categorized = 
+    (for(status <- SectionStatus.values.toList) yield status -> mutable.MutableList[FulfillmentSection]()).toMap
 
   for(event: SWFEvent <- history) {
     if(status != FulfillmentStatus.FAILED) {
@@ -68,7 +70,7 @@ class Fulfillment(val history:List[SWFEvent]) {
         processEvent(event)
       } catch {
         case sdne:SectionDoesNotExist =>
-          categorized.categorize() // Might generate our missing section!
+          categorize() // Might generate our missing section!
           try {
             processEvent(event) // Try again!
           } catch {
@@ -83,7 +85,79 @@ class Fulfillment(val history:List[SWFEvent]) {
     }
   }
 
-  categorized.categorize() // A final categorization
+  categorize() // A final categorization
+
+  var essentialComplete = 0
+  var essentialTotal = 0
+
+  def categorize() = {
+
+    var complete = false
+
+    while(!complete) {
+      _resetCategorization()
+      try {
+        _categorize()
+      } catch {
+        case ci:CategorizationInvalid =>
+          complete = false
+      }
+      complete = true
+    }
+  }
+
+  protected def _resetCategorization() = {
+    essentialComplete = 0
+    essentialTotal = 0
+    categorized.foreach(m => m._2.clear()) // Empty out all the categorized sections
+  }
+
+  protected def _categorize() = {
+
+    val initialSectionCount = size
+
+    for((name, section) <- nameToSection) {
+      if(size != initialSectionCount) {
+        throw new CategorizationInvalid
+      }
+
+      section.refineReadyStatus(this)
+      categorized(section.status) += section
+    }
+
+    essentialTotal = categorized.values.foldLeft(0){ (z, l) => z + l.count(_.essential) }
+    essentialComplete = categorized(SectionStatus.COMPLETE).count(_.essential)
+
+  }
+
+  def workComplete() : Boolean = {
+    if(size == 0) { return false; }
+
+    essentialTotal match {
+      case 0 =>
+        // No essential sections.. we just want everything complete or contingent
+        size == (categorized(SectionStatus.COMPLETE).length + categorized(SectionStatus.CONTINGENT).length)
+      case _ =>
+        // If there are essential sections.. they MUST ALL be COMPLETE
+        essentialComplete == essentialTotal
+    }
+  }
+
+  def hasPendingSections: Boolean = {
+    (categorized(SectionStatus.STARTED).length + 
+    categorized(SectionStatus.SCHEDULED).length +
+    categorized(SectionStatus.DEFERRED).length) > 0
+  }
+
+  def checkPromoted: Boolean = {
+    for(section <- categorized(SectionStatus.CONTINGENT)) {
+      if(section.status == SectionStatus.READY) {
+        return true
+      }
+    }
+
+    false
+  }
 
   protected def _addEventHandler(eventType:EventType, handler:(SWFEvent)=>(Any)) = {
     eventHandlers(eventType) = handler
@@ -428,3 +502,5 @@ class Fulfillment(val history:List[SWFEvent]) {
     )
   }
 }
+
+class CategorizationInvalid extends Exception

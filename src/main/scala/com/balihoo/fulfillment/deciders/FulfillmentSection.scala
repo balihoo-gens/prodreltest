@@ -447,6 +447,26 @@ class FulfillmentSection(sname: String
     newSections
 
   }
+  
+  def refineReadyStatus(fulfillment:Fulfillment, when:DateTime = DateTime.now()) = {
+
+    if(List(SectionStatus.BLOCKED, SectionStatus.READY).contains(status)) {
+      evaluateParameters(fulfillment)
+
+      if(!paramsResolved()) {
+        if(resolvable(fulfillment)) {
+          setBlocked("Not all parameters are resolved!", when)
+        } else {
+          setImpossible("Impossible because some parameters can never be resolved!", when)
+        }
+        } else if(!prereqsReady(fulfillment)) {
+          setBlocked("Not all prerequisites are complete!", when)
+        } else {
+          // Whoohoo! we're ready to run!
+          setReady("All parameters and prereqs are resolved!", when)
+        }
+    }
+  }
 
   override def toString = {
     Json.stringify(toJson)
