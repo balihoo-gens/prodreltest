@@ -4,17 +4,17 @@
       "name": "Email-createdb",
       "version": "1",
       "failure": {
-        "max": "5",
-        "delay": "300"
+        "max": "1",
+        "delay": "0"
       },
       "cancelation": {
-        "max": "5",
-        "delay": "300"
+        "max": "1",
+        "delay": "0"
       }
     },
     "params": {
       "source": "s3://balihoo.dev.fulfillment/lists/snap/member_current.csv",
-      "dbname": "member_current.db",
+      "dbname": "member_current_processed.db",
       "dtd": {
         "columns": [
           {
