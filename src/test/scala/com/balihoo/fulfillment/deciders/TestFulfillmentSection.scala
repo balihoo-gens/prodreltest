@@ -439,10 +439,10 @@ class TestFulfillmentSection extends Specification with Mockito
 
       fulfillment.categorize()
 
-      println(section.name)
-      println(section.multiParamName.get)
+//      println(section.name)
+//      println(section.multiParamName.get)
 
-      println(fulfillment.nameToSection)
+//      println(fulfillment.nameToSection)
 
       true
     }
@@ -490,10 +490,10 @@ class TestFulfillmentSection extends Specification with Mockito
 
       fulfillment.categorize()
 
-      println(section.name)
-      println(section.multiParamName.get)
+//      println(section.name)
+//      println(section.multiParamName.get)
 
-      println(fulfillment.nameToSection)
+//      println(fulfillment.nameToSection)
 
       true
     }
