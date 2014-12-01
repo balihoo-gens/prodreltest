@@ -29,6 +29,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   val skippedColumnName = "__skipped_column__"
   val insertBatchSize = 100000
   val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
+  val s3dir = this.swfAdapter.config.getString("s3dir")
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -74,17 +75,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
    * Uploads local db to S3.
    * @return url to the resulting db s3 object.
    */
-  private def s3upload(file: File, name: String) = {
+  private def s3upload(file: File, targetKey: String) = {
     splog.info("Uploading DB file to S3")
     val targetBucket = swfAdapter.config.getString("s3bucket")
-    /* left pad sub dir with slash if not present */
-    val targetDir = {
-      val dir = swfAdapter.config.getString("s3dir")
-      if (dir.startsWith("/")) dir.substring(1) else dir
-    }
 
     val start = System.currentTimeMillis
-    val targetKey = s"$targetDir/$start/$name"
 
     s3Adapter.putPublic(targetBucket, targetKey, file)
     splog.info(s"Uploaded to S3 time=${System.currentTimeMillis - start}")
