@@ -130,7 +130,7 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
         "insert into recipients (id, name) values (5, 'Sarah')")
     }
 
-    val component = new AnyRef with SqlLiteLightweightDatabaseAdapterComponent with SploggerComponent {
+    val component = new AnyRef with SQLiteLightweightDatabaseAdapterComponent with SploggerComponent {
       override val splog = mock[Splogger]
     }
     val liteDbAdapter = component.liteDbAdapter

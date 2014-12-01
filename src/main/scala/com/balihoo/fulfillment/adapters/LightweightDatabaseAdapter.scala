@@ -280,13 +280,13 @@ trait LightweightDatabaseAdapterComponent {
  * @inheritdoc
  * sqllite implementation
  */
-trait SqlLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdapterComponent {
+trait SQLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdapterComponent {
 
   this: SploggerComponent =>
 
-  override val liteDbAdapter: LightweightDatabaseAdapter = new SqlLiteLightweightDatabaseAdapter
+  override val liteDbAdapter: LightweightDatabaseAdapter = new SQLiteLightweightDatabaseAdapter
 
-  private[this] class SqlLiteLightweightDatabaseAdapter extends LightweightDatabaseAdapter {
+  private[this] class SQLiteLightweightDatabaseAdapter extends LightweightDatabaseAdapter {
 
     /* Load driver, make sure it exists */
     Class.forName("org.sqlite.JDBC")
@@ -294,14 +294,14 @@ trait SqlLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdap
     override def create(file: File): LightweightDatabase = {
       val path = file.getAbsolutePath
       val connection = DriverManager.getConnection(s"jdbc:sqlite:$path")
-      val db = new SqlLiteLightweightDatabase(file, connection)
+      val db = new SQLiteLightweightDatabase(file, connection)
       db.optimize()
       db
     }
 
   }
 
-  private[this] class SqlLiteLightweightDatabase(override val file: File, connection: Connection)
+  private[this] class SQLiteLightweightDatabase(override val file: File, connection: Connection)
     extends JdbcLightweightDatabase(connection, splog)
       with LightweightFileDatabase {
 

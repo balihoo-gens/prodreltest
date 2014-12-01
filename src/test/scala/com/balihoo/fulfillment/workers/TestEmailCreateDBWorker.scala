@@ -254,7 +254,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
 
     def givenTempDbFile() = {
-      worker.filesystemAdapter.newTempFile(===("email-createdb-" + data.dbname), ===(".sqllite")) returns worker.dbFileMock
+      worker.filesystemAdapter.newTempFile(===("email-createdb-" + data.dbname), ===(".sqlite")) returns worker.dbFileMock
     }
 
   }

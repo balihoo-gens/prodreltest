@@ -212,7 +212,8 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     val (csvReader, csvStream) = csvStreamFromS3Content(bucket, key)
 
     splog.info("Creating DB")
-    val dbFile = filesystemAdapter.newTempFile("email-createdb-" + dbname.take(50), ".sqllite")
+    val dbFile = filesystemAdapter.newTempFile("email-createdb-" + dbname.take(50), ".sqlite")
+
     splog.info("Using temp db file path=" + dbFile.getAbsolutePath)
     val db = liteDbAdapter.create(dbFile)
 
@@ -364,7 +365,7 @@ class EmailCreateDBWorker(override val _cfg: PropertiesLoader, override val _spl
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
   with LocalFilesystemAdapterComponent
-  with SqlLiteLightweightDatabaseAdapterComponent {
+  with SQLiteLightweightDatabaseAdapterComponent {
     override val s3Adapter = new S3Adapter(_cfg)
 }
 

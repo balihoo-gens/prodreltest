@@ -61,7 +61,7 @@ class TestS3Adapter extends Specification with Mockito {
       givenS3Object()
       givenS3ObjectContent()
       givenNoDataCopied()
-      Try(s3Adapter.getAsTempFile(data.bucket, data.key)) must beAFailedTry.withThrowable[RuntimeException]
+      s3Adapter.getAsTempFile(data.bucket, data.key) must throwA[RuntimeException]
     }
   }
 

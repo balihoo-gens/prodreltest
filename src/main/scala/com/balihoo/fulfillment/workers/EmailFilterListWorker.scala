@@ -227,7 +227,7 @@ case class QueryDefinition(select: JsObject, tableName: Option[String] = Some("r
 class EmailFilterListWorker(override val _cfg: PropertiesLoader, override val _splog: Splogger)
   extends AbstractEmailFilterListWorker
     with LoggingWorkflowAdapterImpl
-    with SqlLiteLightweightDatabaseAdapterComponent
+    with SQLiteLightweightDatabaseAdapterComponent
     with S3AdapterComponent
     with ScalaCsvAdapterComponent
     with LocalFilesystemAdapterComponent {
