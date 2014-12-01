@@ -96,11 +96,11 @@ class Fulfillment(val history:List[SWFEvent]) {
       _resetCategorization()
       try {
         _categorize()
+        complete = true
       } catch {
         case ci:CategorizationInvalid =>
-          complete = false
+          timeline.note("Sections added.. Recategorizing")
       }
-      complete = true
     }
   }
 
@@ -148,13 +148,7 @@ class Fulfillment(val history:List[SWFEvent]) {
   }
 
   def checkPromoted: Boolean = {
-    for(section <- categorized(SectionStatus.CONTINGENT)) {
-      if(section.status == SectionStatus.READY) {
-        return true
-      }
-    }
-
-    false
+    categorized(SectionStatus.CONTINGENT).exists(s => s.status == SectionStatus.READY)
   }
 
   protected def _addEventHandler(eventType:EventType, handler:(SWFEvent)=>(Any)) = {
@@ -215,7 +209,6 @@ class Fulfillment(val history:List[SWFEvent]) {
       nameToSection(name)
     } catch {
       case nsee:NoSuchElementException =>
-        println(s"No section $name")
         throw new SectionDoesNotExist(name)
       case e:Exception =>
         throw new Exception(s"Error while looking up section '$name'", e)
@@ -234,22 +227,22 @@ class Fulfillment(val history:List[SWFEvent]) {
   }
 
   def initializeWithInput(fulfillmentInput:JsObject, when:DateTime) = {
-    fulfillmentInput.keys contains "sections" match { // This check is temporary for near-term backwards compatibility
-      case true =>
-        for((jk, jv) <- fulfillmentInput.fields) {
-          jk match {
-            case "sections" =>
-              _processSections(jv.as[JsObject], when)
-            case "tags" =>
-              val rtags = jv.as[JsObject]
-              for((name, value) <- rtags.fields) {
-                tags(name) = value.as[String]
-              }
-            case _ =>
-              timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(when))
-          }
+    if(fulfillmentInput.keys contains "sections") {
+      // This check is temporary for near-term backwards compatibility
+      for((jk, jv) <- fulfillmentInput.fields) {
+        jk match {
+          case "sections" =>
+            _processSections(jv.as[JsObject], when)
+          case "tags" =>
+            val rtags = jv.as[JsObject]
+            for((name, value) <- rtags.fields) {
+              tags(name) = value.as[String]
+            }
+          case _ =>
+            timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(when))
         }
-      case false =>
+      }
+    } else {
         timeline.warning("Fulfillment Document format is deprecated! See https://github.com/balihoo/fulfillment/wiki/Fulfillment-Document-Structure", Some(when))
         _processSections(fulfillmentInput, when)
     }

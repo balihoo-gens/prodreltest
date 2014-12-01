@@ -428,23 +428,28 @@ class TestFulfillmentSection extends Specification with Mockito
 				              "param2" : "2"
 
                   },
+         "multiParam" : "multiparam",
          "prereqs" : [],
          "status" : "READY"
 	      }""").as[JsObject]
 
-      val section = new FulfillmentSection("sectionname * multiparam", json, DateTime.now())
+      val section = new FulfillmentSection("sectionname", json, DateTime.now())
 
       val fulfillment = new Fulfillment(List())
+      fulfillment.nameToSection("sectionname") = section
       section.evaluateParameters(fulfillment)
 
       fulfillment.categorize()
 
-//      println(section.name)
-//      println(section.multiParamName.get)
+      fulfillment.getSectionByName("sectionname[0]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[0]").params("multiparam").getResult.get mustEqual JsString("carrot")
 
-//      println(fulfillment.nameToSection)
+      fulfillment.getSectionByName("sectionname[1]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[1]").params("multiparam").getResult.get mustEqual JsString("banana")
 
-      true
+      fulfillment.getSectionByName("sectionname[2]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[2]").params("multiparam").getResult.get mustEqual JsString("faucet")
+
     }
 
     "  handle specification of multi param object" in {
@@ -479,23 +484,25 @@ class TestFulfillmentSection extends Specification with Mockito
 				              "param2" : "2"
 
                   },
+         "multiParam" : "multiparam",
          "prereqs" : [],
          "status" : "READY"
 	      }""").as[JsObject]
 
-      val section = new FulfillmentSection("sectionname * multiparam", json, DateTime.now())
+      val section = new FulfillmentSection("sectionname", json, DateTime.now())
 
       val fulfillment = new Fulfillment(List())
+      fulfillment.nameToSection("sectionname") = section
       section.evaluateParameters(fulfillment)
 
       fulfillment.categorize()
 
-//      println(section.name)
-//      println(section.multiParamName.get)
+      fulfillment.getSectionByName("sectionname[carrot]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[carrot]").params("multiparam").getResult.get mustEqual JsString("cww___")
 
-//      println(fulfillment.nameToSection)
+      fulfillment.getSectionByName("sectionname[banana]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[banana]").params("multiparam").getResult.get mustEqual JsString("bn___")
 
-      true
     }
   }
 }
