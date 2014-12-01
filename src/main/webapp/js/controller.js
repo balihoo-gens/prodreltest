@@ -779,12 +779,14 @@ app.controller('processController', function($scope, $route, $http, $location, e
 
             domain[worker.activityName].push(worker);
 
-            $.each(worker.specification.schema.properties,
-                   function (i, e) {
-                       e._name = i;
-                       e._required = $.inArray(i, worker.specification.schema.required) > -1;
+            if(worker.specification.hasOwnProperty("schema")) {
+                $.each(worker.specification.schema.properties,
+                       function (i, e) {
+                           e._name = i;
+                           e._required = $.inArray(i, worker.specification.schema.required) > -1;
 
-            });
+                       });
+            }
 
         }
     };

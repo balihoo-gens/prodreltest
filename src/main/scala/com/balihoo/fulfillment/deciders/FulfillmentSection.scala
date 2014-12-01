@@ -255,7 +255,7 @@ class FulfillmentSection(sname: String
     }
     parent match {
       case fs:Some[FulfillmentSection] =>
-        fs.get.resolveMultiSection
+        fs.get.resolveMultiSection()
       case _ =>
     }
   }
@@ -297,7 +297,7 @@ class FulfillmentSection(sname: String
     timeline.error(reason, Some(when))
     parent match {
       case fs:Some[FulfillmentSection] =>
-        fs.get.resolveMultiSection
+        fs.get.resolveMultiSection()
       case _ =>
     }
   }
@@ -307,7 +307,7 @@ class FulfillmentSection(sname: String
     timeline.error(reason, Some(when))
     parent match {
       case fs:Some[FulfillmentSection] =>
-        fs.get.resolveMultiSection
+        fs.get.resolveMultiSection()
       case _ =>
     }
   }
@@ -464,6 +464,7 @@ class FulfillmentSection(sname: String
 
     multiResult match {
       case arr:JsArray =>
+        status = SectionStatus.STARTED
         for((p, index) <- arr.value.zipWithIndex) {
           val newSectionName = s"$name[$index]"
           if(!subsections.contains(newSectionName)) {
@@ -480,6 +481,7 @@ class FulfillmentSection(sname: String
           }
         }
       case obj:JsObject =>
+        status = SectionStatus.STARTED
         for((key, value) <- obj.fields) {
           val newSectionName = s"$name[$key]"
           if(!subsections.contains(newSectionName)) {
