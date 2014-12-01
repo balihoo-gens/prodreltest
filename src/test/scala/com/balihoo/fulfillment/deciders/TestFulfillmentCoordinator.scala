@@ -203,7 +203,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.size mustEqual 3
 
-      map.timeline.events(0).message mustEqual "Problem processing WorkflowExecutionStarted: Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+      map.timeline.events(1).message mustEqual "Problem processing WorkflowExecutionStarted: Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }
   }
 

@@ -22,8 +22,6 @@ object FulfillmentStatus extends Enumeration {
   val TIMED_OUT = Value("TIMED_OUT") // SWF STATUS
 }
 
-class SectionDoesNotExist(name:String) extends Exception(name)
-
 /**
  * Build and update Fulfillment from a JSONized SWF execution history
  * @param history:List[SWFEvent]
@@ -37,6 +35,8 @@ class Fulfillment(val history:List[SWFEvent]) {
   val timeline = new Timeline
   val timers = collection.mutable.Map[String, String]()
   var status = FulfillmentStatus.IN_PROGRESS
+  val categorized = 
+    (for(status <- SectionStatus.values.toList) yield status -> mutable.MutableList[FulfillmentSection]()).toMap
 
   _addEventHandler(EventType.WorkflowExecutionStarted, processWorkflowExecutionStarted)
   _addEventHandler(EventType.ActivityTaskScheduled, processActivityTaskScheduled)
@@ -61,9 +61,6 @@ class Fulfillment(val history:List[SWFEvent]) {
   _addEventHandler(EventType.DecisionTaskStarted, processIgnoredEventType)
   _addEventHandler(EventType.DecisionTaskCompleted, processIgnoredEventType)
 
-  val categorized = 
-    (for(status <- SectionStatus.values.toList) yield status -> mutable.MutableList[FulfillmentSection]()).toMap
-
   for(event: SWFEvent <- history) {
     if(status != FulfillmentStatus.FAILED) {
       try {
@@ -85,6 +82,7 @@ class Fulfillment(val history:List[SWFEvent]) {
     }
   }
 
+  // All history events have been processed
   categorize() // A final categorization
 
   var essentialComplete = 0
@@ -114,7 +112,7 @@ class Fulfillment(val history:List[SWFEvent]) {
 
   protected def _categorize() = {
 
-    val initialSectionCount = size
+    val initialSectionCount = size()
 
     for((name, section) <- nameToSection) {
       if(size != initialSectionCount) {
@@ -248,10 +246,11 @@ class Fulfillment(val history:List[SWFEvent]) {
                 tags(name) = value.as[String]
               }
             case _ =>
-              timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(DateTime.now()))
+              timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(when))
           }
         }
       case false =>
+        timeline.warning("Fulfillment Document format is deprecated! See https://github.com/balihoo/fulfillment/wiki/Fulfillment-Document-Structure", Some(when))
         _processSections(fulfillmentInput, when)
     }
 
@@ -502,5 +501,7 @@ class Fulfillment(val history:List[SWFEvent]) {
     )
   }
 }
+
+class SectionDoesNotExist(name:String) extends Exception(name)
 
 class CategorizationInvalid extends Exception
