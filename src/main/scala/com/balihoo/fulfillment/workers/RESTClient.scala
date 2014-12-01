@@ -43,10 +43,10 @@ class AbstractRESTClient extends FulfillmentWorker {
       } else if(500 <= response.code.code && response.code.code < 600) {
         // Server Error
         throw new CancelTaskException("Server Error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
+      } else {
+        // Redirection or Client Error or anything else we didn't anticipate
+        throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
       }
-
-      // Redirection or Client Error or anything else we didn't anticipate
-      throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
     }
   }
 }

@@ -203,7 +203,7 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
       map.size mustEqual 3
 
-      map.timeline.events(0).message mustEqual "Problem processing WorkflowExecutionStarted: Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
+      map.timeline.events(1).message mustEqual "Problem processing WorkflowExecutionStarted: Fulfillment is impossible! Prereq (doesnotexist) for batter does not exist!"
     }
   }
 
@@ -363,26 +363,5 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 	Section HumanFoot is TERMINAL!"""
 
     }
-  }
-
-  "Foreach Operator" should {
-
-    "  parse properly" in {
-
-      val input = s"""{
-        "HumanFoot * foodItem": {
-            "action": "StringFormat",
-            "params": {
-                "format": "You want gravy on that {foodItem}",
-                "foodItem": ["cellar door", "stork ankles"]
-            },
-            "status" : "READY"
-        }
-      }"""
-      val sections = generateFulfillment(input)
-
-      true
-    }
-
   }
 }

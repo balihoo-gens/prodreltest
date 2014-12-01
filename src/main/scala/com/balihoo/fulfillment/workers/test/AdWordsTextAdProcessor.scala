@@ -35,7 +35,7 @@ object adWordsAdGroupTextAd {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | PPC test ( Client ID: 100-019-2687 )
 
-      val campaignParams = Json.obj(
+      val campaignParamsJson = Json.obj(
          "name" -> "PPC Campaign",
           "channel" -> "SEARCH"
           ,"account" -> "100-019-2687"
@@ -45,6 +45,7 @@ object adWordsAdGroupTextAd {
           ,"endDate" -> "20161012"
           ,"targetzips" -> "83713,83704"
       )
+      val campaignParams = campaignCreator.getSpecification.getParameters(campaignParamsJson)
       val campaign = campaignCreator.getCampaign(campaignParams)
       val adgroupParams = Json.toJson(Map(
          "name" -> "Secondary Market"
@@ -93,11 +94,12 @@ object adWordsGetAdGroupTextAd {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | PPC test ( Client ID: 100-019-2687 )
 
-      val campaignParams = Json.obj(
+      val campaignParamsJson = Json.obj(
         "name" -> "PPC Campaign",
           "channel" -> "SEARCH"
         ,"account" -> "100-019-2687"
       )
+      val campaignParams = campaignCreator.getSpecification.getParameters(campaignParamsJson)
       val campaign = campaignCreator.getCampaign(campaignParams)
       val adgroupParams = new ActivityParameters(Map(
         "name" -> "Secondary Market",
@@ -128,11 +130,12 @@ object adWordsUpdateAdGroupTextAd {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687") //  Balihoo > Balihoo Dogtopia | PPC test ( Client ID: 100-019-2687 )
 
-      val campaignParams = Json.obj(
+      val campaignParamsJson = Json.obj(
         "name" -> "PPC Campaign",
         "channel" -> "SEARCH"
         ,"account" -> "100-019-2687"
       )
+      val campaignParams = campaignCreator.getSpecification.getParameters(campaignParamsJson)
       val campaign = campaignCreator.getCampaign(campaignParams)
       val adgroupParams = Map(
          "name" -> "Secondary Market",

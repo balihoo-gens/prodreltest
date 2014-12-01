@@ -123,14 +123,6 @@ trait CampaignCreatorComponent {
       ), new StringActivityResult("AdWords Campaign ID"))
     }
 
-    def getCampaign(params:String):Campaign = {
-      getCampaign(Json.parse(params).as[JsObject])
-    }
-
-    def getCampaign(params:JsObject):Campaign = {
-      getCampaign(getSpecification.getParameters(params))
-    }
-
     def getCampaign(params: ActivityParameters):Campaign = {
 
       val name = params[String]("name")
@@ -170,14 +162,6 @@ trait CampaignCreatorComponent {
           case _ => throw new Exception(s"Campaign id $id is ambiguous!")
         }
       })
-    }
-
-    def createCampaign(params:String):Campaign = {
-      createCampaign(Json.parse(params).as[JsObject])
-    }
-
-    def createCampaign(params:JsObject):Campaign = {
-      createCampaign(getSpecification.getParameters(params))
     }
 
     def createCampaign(params:ActivityParameters):Campaign = {
@@ -253,14 +237,6 @@ trait CampaignCreatorComponent {
       setTargetZips(madeCampaign, params("targetzips"))
       setAdSchedule(madeCampaign, params("adschedule"))
       madeCampaign
-    }
-
-    def updateCampaign(campaign: Campaign, params:String):Campaign = {
-      updateCampaign(campaign, Json.parse(params).as[JsObject])
-    }
-
-    def updateCampaign(campaign: Campaign, params:JsObject):Campaign = {
-      updateCampaign(campaign, getSpecification.getParameters(params))
     }
 
     def updateCampaign(campaign: Campaign, params: ActivityParameters) = {

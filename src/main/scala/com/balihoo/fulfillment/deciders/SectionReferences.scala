@@ -65,7 +65,7 @@ class SectionReferences(sectionNames:Seq[String], fulfillment:Fulfillment) {
     for(sectionRef <- sections) {
       sectionRef.section match {
         case section: Some[FulfillmentSection] =>
-          section.get.resolvable(fulfillment) match {
+          section.get.isResolvable match {
             case true =>
               return true
             case _ =>
