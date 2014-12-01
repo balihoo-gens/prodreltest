@@ -35,8 +35,9 @@ class Fulfillment(val history:List[SWFEvent]) {
   val timeline = new Timeline
   val timers = collection.mutable.Map[String, String]()
   var status = FulfillmentStatus.IN_PROGRESS
-  val categorized = 
-    (for(status <- SectionStatus.values.toList) yield status -> mutable.MutableList[FulfillmentSection]()).toMap
+  var essentialComplete = 0
+  var essentialTotal = 0
+  var categorized = _resetCategorization()
 
   _addEventHandler(EventType.WorkflowExecutionStarted, processWorkflowExecutionStarted)
   _addEventHandler(EventType.ActivityTaskScheduled, processActivityTaskScheduled)
@@ -61,39 +62,41 @@ class Fulfillment(val history:List[SWFEvent]) {
   _addEventHandler(EventType.DecisionTaskStarted, processIgnoredEventType)
   _addEventHandler(EventType.DecisionTaskCompleted, processIgnoredEventType)
 
-  for(event: SWFEvent <- history) {
-    if(status != FulfillmentStatus.FAILED) {
-      try {
-        processEvent(event)
-      } catch {
-        case sdne:SectionDoesNotExist =>
-          categorize() // Might generate our missing section!
-          try {
-            processEvent(event) // Try again!
-          } catch {
-            case e:Exception =>
-              timeline.error(e.getMessage, Some(DateTime.now))
-              status = FulfillmentStatus.FAILED
-          }
-        case e:Exception =>
-          timeline.error(e.getMessage, Some(DateTime.now))
-          status = FulfillmentStatus.FAILED
+
+  processEvents()
+
+  def processEvents() = {
+
+    for(event: SWFEvent <- history) {
+      if(status != FulfillmentStatus.FAILED) {
+        try {
+          processEvent(event)
+        } catch {
+          case sdne:SectionDoesNotExist =>
+            categorize() // Might generate our missing section!
+            try {
+              processEvent(event) // Try again!
+            } catch {
+              case e:Exception =>
+                timeline.error(e.getMessage, Some(DateTime.now))
+                status = FulfillmentStatus.FAILED
+            }
+          case e:Exception =>
+            timeline.error(e.getMessage, Some(DateTime.now))
+            status = FulfillmentStatus.FAILED
+        }
       }
     }
+
+    // All history events have been processed
+    categorize() // A final categorization
   }
-
-  // All history events have been processed
-  categorize() // A final categorization
-
-  var essentialComplete = 0
-  var essentialTotal = 0
 
   def categorize() = {
 
     var complete = false
 
     while(!complete) {
-      _resetCategorization()
       try {
         _categorize()
         complete = true
@@ -104,13 +107,15 @@ class Fulfillment(val history:List[SWFEvent]) {
     }
   }
 
-  protected def _resetCategorization() = {
+  protected def _resetCategorization():Map[SectionStatus.Value, mutable.MutableList[FulfillmentSection]] = {
     essentialComplete = 0
     essentialTotal = 0
-    categorized.foreach(m => m._2.clear()) // Empty out all the categorized sections
+    (for(status <- SectionStatus.values.toList) yield status -> mutable.MutableList[FulfillmentSection]()).toMap
   }
 
   protected def _categorize() = {
+
+    categorized = _resetCategorization()
 
     val initialSectionCount = size()
 

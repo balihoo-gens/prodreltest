@@ -364,25 +364,4 @@ class TestFulfillmentCoordinator extends Specification with Mockito
 
     }
   }
-
-  "Foreach Operator" should {
-
-    "  parse properly" in {
-
-      val input = s"""{
-        "HumanFoot * foodItem": {
-            "action": "StringFormat",
-            "params": {
-                "format": "You want gravy on that {foodItem}",
-                "foodItem": ["cellar door", "stork ankles"]
-            },
-            "status" : "READY"
-        }
-      }"""
-      val sections = generateFulfillment(input)
-
-      true
-    }
-
-  }
 }

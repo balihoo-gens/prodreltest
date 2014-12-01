@@ -415,7 +415,7 @@ class FulfillmentSection(val name: String
     }
   }
 
-  def resolvable(fulfillment:Fulfillment): Boolean = {
+  def isResolvable: Boolean = {
     if(List(SectionStatus.IMPOSSIBLE, SectionStatus.TERMINAL).contains(status)) {
       return false
     }
@@ -497,7 +497,7 @@ class FulfillmentSection(val name: String
       evaluateParameters(fulfillment)
 
       if(!paramsResolved()) {
-        if(resolvable(fulfillment)) {
+        if(isResolvable) {
           setBlocked("Not all parameters are resolved!", when)
         } else {
           setImpossible("Impossible because some parameters can never be resolved!", when)
@@ -538,6 +538,7 @@ class FulfillmentSection(val name: String
       "timeoutParams" -> timeoutParams.toJson,
       "cancelationParams" -> cancelationParams.toJson,
       "subsections" -> subsections.keys,
+      "parent" -> (if(parent.isDefined) parent.get.name else JsNull),
       "evaluationContext" -> Json.toJson(evaluationContext.toMap),
       "waitUntil" ->
         (waitUntil.isDefined match {

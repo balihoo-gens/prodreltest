@@ -243,6 +243,7 @@ abstract class FulfillmentWorker {
       if (_lastTaskToken != null && _lastTaskToken.nonEmpty) {
         val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
         response.setTaskToken(_lastTaskToken)
+        // http://docs.aws.amazon.com/amazonswf/latest/apireference/API_ActivityTaskFailedEventAttributes.html
         response.setReason(reason take 256)
         response.setDetails(details take 32768)
         swfAdapter.client.respondActivityTaskFailed(response)
@@ -260,6 +261,7 @@ abstract class FulfillmentWorker {
     canceledTasks += 1
     val response:RespondActivityTaskCanceledRequest = new RespondActivityTaskCanceledRequest
     response.setTaskToken(_lastTaskToken)
+    // http://docs.aws.amazon.com/amazonswf/latest/apireference/API_ActivityTaskCanceledEventAttributes.html
     response.setDetails(details take 32768)
     swfAdapter.client.respondActivityTaskCanceled(response)
     _resolveTask(new TaskResolution("Canceled", details))

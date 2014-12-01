@@ -513,6 +513,7 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
             section.editingStatus = false;
             section.originalStatus = section.status;
             section.showContents = false;
+            section.hidden = section.parent != null;
             for(pname in section.params) {
                 var param = section.params[pname];
                 section.params[pname] = {
@@ -605,6 +606,13 @@ app.controller('workflowController', function($scope, $route, $http, $location, 
         for(var sname in $scope.workflow.sections) {
             var section = $scope.workflow.sections[sname];
             section.showContents = section == ssection;
+        }
+    };
+
+    $scope.toggleSubsections = function(section) {
+        for(var s in section.subsections) {
+            var sname = section.subsections[s];
+            $scope.workflow.sections[sname].hidden = !$scope.workflow.sections[sname].hidden;
         }
     };
 
