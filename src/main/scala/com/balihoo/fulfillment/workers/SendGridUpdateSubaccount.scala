@@ -33,12 +33,12 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
-      val subaccountUser = params("subaccount")
+      val subaccountUser = params[String]("subaccount")
       val webhookUrl = params[URI]("webhookUrl").toURL
-      val webhookUsername = params("webhookUsername")
-      val webhookPassword = params("webhookPassword")
-      val ipAddress = params("ipAddress")
-      val whitelabel = params("whitelabel")
+      val webhookUsername = params[String]("webhookUsername")
+      val webhookPassword = params[String]("webhookPassword")
+      val ipAddress = params[String]("ipAddress")
+      val whitelabel = params[String]("whitelabel")
       val credentials = sendGridAdapter.getCredentials(subaccountUser)
       val subaccount = new SendGridSubaccount(
         _credentials = credentials,

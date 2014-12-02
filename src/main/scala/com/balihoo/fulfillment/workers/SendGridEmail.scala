@@ -37,28 +37,28 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
     withTaskHandling {
       val credentials = sendGridAdapter.getCredentials(params("subaccount"))
       val uniqueArgs = params[JsObject]("uniqueArgs")
-      val subject = params("subject")
-      val fromAddress = params("fromAddress")
-      val fromName = params("fromName")
-      val replyToAddress = params("replyToAddress")
+      val subject = params[String]("subject")
+      val fromAddress = params[String]("fromAddress")
+      val fromName = params[String]("fromName")
+      val replyToAddress = params[String]("replyToAddress")
       val bodyUri = params[URI]("htmlUrl")
       val body = Try(Source.fromURL(bodyUri.toURL).mkString) match {
         case Success(body) => body
         case Failure(e) => throw new SendGridException(s"Unable to get email body from $bodyUri", e)
       }
       val sendTime = params[DateTime]("sendTime")
-      val recipientIdHeading = params("recipientIdHeading")
-      val emailHeading = params("emailHeading")
+      val recipientIdHeading = params[String]("recipientIdHeading")
+      val emailHeading = params[String]("emailHeading")
       val email = Email(fromAddress = fromAddress, fromName = fromName, replyToAddress = replyToAddress, subject = subject, body = body)
       val recipientListUri = params[URI]("recipientListUrl")
 
-      withResources {
-        val recipientReader = Try(recipientListUri.toURL.openStream()) match {
-          case Success(stream) => managed(new InputStreamReader(stream)).reflect[InputStreamReader]
-          case Failure(e) => throw new SendGridException(s"Unable to get recipient list from $recipientListUri", e)
+      try {
+        for (recipientReader <- managed(new InputStreamReader(recipientListUri.toURL.openStream()))) {
+          val recipientCsv = csvAdapter.parseReaderAsStream(recipientReader)
+          sendGridAdapter.sendEmail(credentials, uniqueArgs, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
         }
-        val recipientCsv = csvAdapter.parseReaderAsStream(recipientReader)
-        sendGridAdapter.sendEmail(credentials, uniqueArgs, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
+      } catch {
+        case e: Exception => throw new SendGridException(s"Unable to get recipient list from $recipientListUri", e)
       }
 
       "OK"

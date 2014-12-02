@@ -285,8 +285,8 @@ abstract class AbstractSendGridAdapter {
       "subject" -> email.subject,
       "html" -> email.body,
       "from" -> email.fromAddress,
-      "fromName" -> email.fromName,
-      "replyTo" -> email.replyToAddress,
+      "fromname" -> email.fromName,
+      "replyto" -> email.replyToAddress,
       "x-smtpapi" -> formatRecipientData(uniqueArgs, sendTime, recipientCsv, recipientIdHeading, emailHeading),
       "api_user" -> credentials.apiUser,
       "api_key" -> credentials.apiKey)
