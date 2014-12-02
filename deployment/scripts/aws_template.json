@@ -78,20 +78,26 @@
 
   "Mappings" : {
     "AWSInstanceType2Arch" : {
-      "t1.micro"    : { "Arch" : "64" },
-      "t2.micro"    : { "Arch" : "64" },
-      "t2.small"    : { "Arch" : "64" },
-      "t2.medium"   : { "Arch" : "64" },
-      "m1.small"    : { "Arch" : "64" },
-      "m1.medium"   : { "Arch" : "64" },
-      "m1.large"    : { "Arch" : "64" },
-      "m1.xlarge"   : { "Arch" : "64" }
+      "t1.micro"    : { "AMIMap" : "AWSRegion2AMIvPV" },
+      "t2.micro"    : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "t2.small"    : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "t2.medium"   : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "m1.small"    : { "AMIMap" : "AWSRegion2AMIvPV" },
+      "m1.medium"   : { "AMIMap" : "AWSRegion2AMIvPV" },
+      "m1.large"    : { "AMIMap" : "AWSRegion2AMIvPV" },
+      "m1.xlarge"   : { "AMIMap" : "AWSRegion2AMIvPV" }
     },
 
-    "AWSRegion2AMI" : {
+    "AWSRegion2AMIvPV" : {
       "us-east-1"      : { "Amazon" : "ami-7c807d14", "Ubuntu" : "ami-d2ff23ba" },
       "us-west-1"      : { "Amazon" : "ami-a8d3d4ed", "Ubuntu" : "ami-73717d36" },
       "us-west-2"      : { "Amazon" : "ami-1b3b462b", "Ubuntu" : "ami-f1ce8bc1" }
+    },
+
+    "AWSRegion2AMIvHVM" : {
+      "us-east-1"      : { "Amazon" : "ami-", "Ubuntu" : "ami-4ceaed4d" },
+      "us-west-1"      : { "Amazon" : "ami-", "Ubuntu" : "ami-d5180890" },
+      "us-west-2"      : { "Amazon" : "ami-", "Ubuntu" : "ami-838dd9b3" }
     }
 
   },
@@ -164,30 +170,38 @@
       }
     },
 
-
-
-
-
-
-
-
-
-    "InstanceSecurityGroup" : {
+    "SSHSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
         "GroupDescription" : "Enable SSH access",
         "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : { "Ref" : "AccessIPMask" } } ]
+      }
+    },
+
+    "WebSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "GroupDescription" : "Enable Web access",
+        "SecurityGroupIngress" : [
+          { "IpProtocol" : "tcp", "FromPort" : { "Ref": "WebPort" }, "ToPort" : { "Ref": "WebPort" }, "CidrIp" : { "Ref" : "AccessIPMask" } }
+        ]
       }
     },
 
     "WorkerLaunchConfig" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
+        "AssociatePublicIpAddress" : "true",
         "KeyName" : { "Ref" : "KeyName" },
-        "ImageId" : { "Fn::FindInMap" : [ "AWSRegion2AMI", { "Ref" : "AWS::Region" }, { "Ref" : "LinuxDistro" } ] },
+        "ImageId" : { "Fn::FindInMap" : [
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "WorkerInstanceType" }, "AMIMap" ] },
+          { "Ref" : "AWS::Region" },
+          { "Ref" : "LinuxDistro" }
+        ] },
         "SecurityGroups" : [
-          { "Ref" : "InstanceSecurityGroup" },
-          "splunk-access"
+          { "Ref" : "SSHSecurityGroup" }
         ],
         "InstanceType" : { "Ref" : "WorkerInstanceType" },
         "IamInstanceProfile" : "arn:aws:iam::596229110736:instance-profile/fulfillment-profile",
@@ -198,7 +212,8 @@
     "WorkerAutoScalingGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : { "Fn::GetAZs" : ""},
+        "AvailabilityZones" : [{ "Fn::GetAtt" : [ "Subnet", "AvailabilityZone" ] }],
+        "VPCZoneIdentifier" : [{ "Ref" : "Subnet" }],
         "LaunchConfigurationName" : { "Ref" : "WorkerLaunchConfig" },
         "MinSize" : { "Ref" : "MinInstances" },
         "MaxSize" : { "Ref" : "MaxInstances" },
@@ -272,17 +287,19 @@
       }
     },
 
-
-
     "DashboardLaunchConfig" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
-        "ImageId" : { "Fn::FindInMap" : [ "AWSRegion2AMI", { "Ref" : "AWS::Region" }, { "Ref" : "LinuxDistro" } ] },
+        "AssociatePublicIpAddress" : "true",
+        "ImageId" : { "Fn::FindInMap" : [
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "WorkerInstanceType" }, "AMIMap" ] },
+          { "Ref" : "AWS::Region" },
+          { "Ref" : "LinuxDistro" }
+        ] },
         "KeyName" : { "Ref" : "KeyName" },
         "SecurityGroups" : [
-          { "Ref" : "DashboardSecurityGroup" },
-          { "Ref" : "InstanceSecurityGroup" },
-          "splunk-access"
+          { "Ref" : "WebSecurityGroup" },
+          { "Ref" : "SSHSecurityGroup" }
         ],
         "InstanceType" : { "Ref" : "DashboardInstanceType" },
         "IamInstanceProfile" : "arn:aws:iam::596229110736:instance-profile/fulfillment-profile",
@@ -293,7 +310,8 @@
     "DashboardAutoScalingGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : { "Fn::GetAZs" : ""},
+        "AvailabilityZones" : [{ "Fn::GetAtt" : [ "Subnet", "AvailabilityZone" ] }],
+        "VPCZoneIdentifier" : [{ "Ref" : "Subnet" }],
         "LaunchConfigurationName" : { "Ref" : "DashboardLaunchConfig" },
         "MinSize" : "1",
         "MaxSize" : "1",
@@ -302,16 +320,6 @@
             "Value" : { "Fn::Join" : [ "-", [ "balihoo-fulfillment-web", { "Ref" : "Environment" } ] ] },
             "PropagateAtLaunch" : "true"
         } ]
-      }
-    },
-
-    "DashboardSecurityGroup" : {
-      "Type" : "AWS::EC2::SecurityGroup",
-      "Properties" : {
-        "GroupDescription" : "Enable SSH access",
-        "SecurityGroupIngress" : [
-          { "IpProtocol" : "tcp", "FromPort" : { "Ref": "WebPort" }, "ToPort" : { "Ref": "WebPort" }, "CidrIp" : { "Ref" : "AccessIPMask" } }
-        ]
       }
     }
   }
