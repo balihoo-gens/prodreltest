@@ -67,7 +67,7 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
 }
 
 class SendGridEmail(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractSendGridUpdateSubaccount
+  extends AbstractSendGridEmail
   with LoggingWorkflowAdapterImpl
   with SendGridAdapterComponent
   with ScalaCsvAdapterComponent {
