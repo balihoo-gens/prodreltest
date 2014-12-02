@@ -228,7 +228,7 @@ object JsonOps {
       ),
       (args) => {
         val path = new ReferencePath(args[String]("path"))
-        Json.toJson(path.getValue(args[JsValue]("json")))
+        path.getValue(args[JsValue]("json"))
       })
 
   protected val urlEncodeOperator =
@@ -345,7 +345,7 @@ class ReferencePath(path:String) {
             case jObj:JsObject =>
               current = jObj.value(component.key.get)
             case _ =>
-              throw new Exception(s"Expected JSON Object with key '${component.key.get}'!")
+              throw new Exception(s"Expected JSON Object!")
           }
         case _ =>
           current match {
@@ -353,7 +353,7 @@ class ReferencePath(path:String) {
               val l = jArr.as[List[JsValue]]
               current = l(component.index.get)
             case _ =>
-              throw new Exception(s"Expected JSON Array to index with ${component.index.get}!")
+              throw new Exception(s"Expected JSON Array!")
 
           }
       }

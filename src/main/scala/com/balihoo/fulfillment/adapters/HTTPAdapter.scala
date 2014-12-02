@@ -70,15 +70,13 @@ object HTTPAdapter {
   /**
    * Encodes form data for use as a request body.
    * @param formData key/value pairs
+   * @param charset defaults to UTF-8
    * @return
    */
-  def encodeFormData(formData: Seq[(String, Any)]): String = {
-    val charset = "UTF-8"
+  def encodeFormData(formData: Seq[(String, Any)], charset: String = "UTF-8"): String = {
     def encodeTuple(t: (String, Any)) = URLEncoder.encode(t._1, charset) + "=" + URLEncoder.encode(t._2.toString, charset)
 
-    formData match {
-      case h :: xs => xs.foldLeft(encodeTuple(h))((buffer, tuple) => buffer + "&" + encodeTuple(tuple))
-      case _ => ""
-    }
+    if (formData.isEmpty) ""
+    else formData.map(encodeTuple).reduce { (x, y) => x + "&" + y }
   }
 }

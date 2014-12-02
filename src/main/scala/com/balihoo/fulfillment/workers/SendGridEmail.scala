@@ -1,13 +1,15 @@
 package com.balihoo.fulfillment.workers
 
 import java.io.InputStreamReader
-import java.net.URL
-
+import java.net.URI
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
 import org.joda.time.DateTime
+import play.api.libs.json.JsObject
 import scala.io.Source
+import scala.util.{Try, Success, Failure}
+import resource._
 
 abstract class AbstractSendGridEmail extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
@@ -16,7 +18,7 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("sendId", "A string that uniquely identifies this email send for tracking purposes"),
+      new ObjectActivityParameter("uniqueArgs", "An associative array of values that will appear in the event data"),
       new StringActivityParameter("subaccount", "The SendGrid subaccount username"),
       new UriActivityParameter("recipientListUrl", "The URL of the recipient list"),
       new StringActivityParameter("subject", "The email subject"),
@@ -24,7 +26,9 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
       new StringActivityParameter("fromName", "The from name"),
       new EmailActivityParameter("replyToAddress", "The reply-to address"),
       new UriActivityParameter("htmlUrl", "The URL of the file containing the email body"),
-      new DateTimeActivityParameter("sendTime", "The desired send time (< 24 hours in the future)")
+      new DateTimeActivityParameter("sendTime", "The desired send time (< 24 hours in the future)"),
+      new StringActivityParameter("recipientIdHeading", "The heading of the recipientId column"),
+      new StringActivityParameter("emailHeading", "The heading of the email column")
     ), new StringActivityResult("A success message that makes you feel good, but can be ignored"))
   }
 
@@ -32,18 +36,31 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
     withTaskHandling {
       val credentials = sendGridAdapter.getCredentials(params("subaccount"))
-      val sendId = params("sendId")
+      val uniqueArgs = params[JsObject]("uniqueArgs")
       val subject = params("subject")
       val fromAddress = params("fromAddress")
       val fromName = params("fromName")
       val replyToAddress = params("replyToAddress")
-      val body = Source.fromURL(params[String]("htmlUrl")).mkString
+      val bodyUri = params[URI]("htmlUrl")
+      val body = Try(Source.fromURL(bodyUri.toURL).mkString) match {
+        case Success(body) => body
+        case Failure(e) => throw new SendGridException(s"Unable to get email body from $bodyUri", e)
+      }
       val sendTime = params[DateTime]("sendTime")
+      val recipientIdHeading = params("recipientIdHeading")
+      val emailHeading = params("emailHeading")
       val email = Email(fromAddress = fromAddress, fromName = fromName, replyToAddress = replyToAddress, subject = subject, body = body)
-      val recipientReader = new InputStreamReader(new URL(params("recipientListUrl")).openStream())
-      val recipientCsv = csvAdapter.parseReaderAsStream(recipientReader)
-      sendGridAdapter.sendEmail(credentials, sendId, email, recipientCsv)
-      recipientReader.close
+      val recipientListUri = params[URI]("recipientListUrl")
+
+      withResources {
+        val recipientReader = Try(recipientListUri.toURL.openStream()) match {
+          case Success(stream) => managed(new InputStreamReader(stream)).reflect[InputStreamReader]
+          case Failure(e) => throw new SendGridException(s"Unable to get recipient list from $recipientListUri", e)
+        }
+        val recipientCsv = csvAdapter.parseReaderAsStream(recipientReader)
+        sendGridAdapter.sendEmail(credentials, uniqueArgs, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
+      }
+
       "OK"
     }
   }

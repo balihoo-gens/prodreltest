@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.config
 
+import java.net.URI
+
 import com.balihoo.fulfillment.workers._
 
 trait FTPUploadConfigComponent {
@@ -9,13 +11,13 @@ trait FTPUploadConfigComponent {
 abstract class AbstractFTPUploadConfig(params: ActivityParameters) {
   this: PropertiesLoaderComponent =>
 
-  val sourceUrl: String = params[String]("sourceUrl")
-  val ftpHost: String = params[String]("ftpHost")
-  val ftpPort: Int = params.getOrElse[Int]("ftpPort", 21)
-  val ftpUsername: String = params("ftpUsername")
-  val ftpPassword: String = params("FtpPassword")
-  val ftpDirectory: String = params.getOrElse("ftpDirectory", "/")
-  val ftpFilename: String = params("ftpFilename")
+  val sourceUrl = params[URI]("sourceUrl").toURL
+  val ftpHost = params("ftpHost")
+  val ftpPort = params.getOrElse[Int]("ftpPort", 21)
+  val ftpUsername = params("ftpUsername")
+  val ftpPassword = params("FtpPassword")
+  val ftpDirectory = params.getOrElse("ftpDirectory", "/")
+  val ftpFilename = params("ftpFilename")
 }
 
 class FTPUploadConfig(params: ActivityParameters, cfg: PropertiesLoader)

@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.workers
 
 import java.io.{InputStreamReader, File}
-import java.net.URISyntaxException
+import java.net.{URI, URISyntaxException}
 import java.text.SimpleDateFormat
 
 import com.balihoo.fulfillment.adapters._
@@ -34,10 +34,6 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "fail task if source param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map())
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
-    }
-    "fail task if source param is invalid uri" in new TestContext {
-      val activityParameter = new ActivityParameters(Map("source" -> "invalid uri"))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[URISyntaxException]
     }
     "fail task if dbname param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map("source" -> data.source, "dtd" -> data.dtd))
@@ -158,8 +154,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     object data {
       val s3bucket = "balihoo.fulfillment.stuff"
       val s3key = "my/key/file.csv"
-      val source = s"s3://$s3bucket/$s3key"
-      val sourceWithInvalidScheme = s"http://$s3bucket/$s3key"
+      val source = new URI(s"s3://$s3bucket/$s3key")
+      val sourceWithInvalidScheme = new URI(s"http://$s3bucket/$s3key")
       val dbname = "test.db"
       val dtd = Json.obj("columns" -> Json.arr(
         Json.obj(

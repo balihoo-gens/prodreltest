@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.workers
 
 import java.io.File
+import java.net.URI
 import java.text.SimpleDateFormat
 
 import com.balihoo.fulfillment.adapters._
@@ -47,13 +48,13 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     splog.info("Parsing parameters source, dbname and dtd")
 
-    val maybeSource = parameters.get[String]("source")
+    val maybeSource = parameters.get[URI]("source")
     val maybeDbName = parameters.get[String]("dbname")
     val maybeDtd = parameters.get[JsObject]("dtd")
 
-    if (!maybeSource.isDefined || maybeSource.get.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
-    val sourceUri = new java.net.URI(maybeSource.get)
-    if (!maybeSource.get.trim.startsWith("s3")) throw new IllegalArgumentException("source protocol is unsupported for now")
+    if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
+    val sourceUri = maybeSource.get
+    if (sourceUri.getScheme.toLowerCase != "s3") throw new IllegalArgumentException("source protocol is unsupported for now")
     if (!maybeDbName.isDefined || maybeDbName.get.trim.isEmpty) throw new IllegalArgumentException("dbname parameter is empty")
     if (!maybeDtd.isDefined) throw new IllegalArgumentException("dtd parameter is empty")
 

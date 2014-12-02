@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import java.net.URL
+import java.net.{URI, URL}
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -41,27 +41,27 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
   }
 
   /**
-   * Gets the filename of an optional URL.
-   * @param url The URL
-   * @return The name of the file referenced by the URL, or null if there's no URL
+   * Gets the filename of an optional URI.
+   * @param uri The URI
+   * @return The name of the file referenced by the URI, or null if there's no URI
    */
-  private def getPhotoName(url: Option[String]): String = {
-    url match {
-      case Some(u) => FilenameUtils.getName(u)
+  private def getPhotoName(uri: Option[URI]): String = {
+    uri match {
+      case Some(u) => FilenameUtils.getName(u.toString)
       case None => null
     }
   }
 
   /**
    * Downloads an optional photo and turns it into a byte array.
-   * @param url The photo's URL
-   * @return the file contents, or null if there's no URL
+   * @param uri The photo's URI
+   * @return the file contents, or null if there's no URI
    */
-  private def getPhotoBytes(url: Option[String]): Array[Byte] = {
-    url match {
+  private def getPhotoBytes(uri: Option[URI]): Array[Byte] = {
+    uri match {
       case Some(u) =>
         splog.info(s"Facebook poster downloading $u")
-        IOUtils.toByteArray(new URL(u))
+        IOUtils.toByteArray(u)
       case None => null
     }
   }
@@ -70,26 +70,26 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     withTaskHandling {
-      val appId:String = params[String]("appId")
-      val appSecret:String = params[String]("appSecret")
+      val appId = params[String]("appId")
+      val appSecret = params[String]("appSecret")
       val accessToken = params[String]("accessToken")
       val connection = new FacebookConnection(appId, appSecret, accessToken)
       val postType = params[String]("postType")
-      val pageId:String = params[String]("pageId")
+      val pageId = params[String]("pageId")
       val target = createTarget(params[JsObject]("target"))
-      val message:String = params.getOrElse[String]("message", null)
-      lazy val linkUrl:String = params.getOrElse[String]("linkUrl", null)
-      lazy val photoUrl = params.get[String]("photoUrl")
-      lazy val photoBytes = getPhotoBytes(photoUrl)
-      lazy val photoName = getPhotoName(photoUrl)
+      val message = params.getOrElse[String]("message", null)
+      lazy val linkUri = params.getOrElse[URI]("linkUrl", null)
+      lazy val photoUri = params.get[URI]("photoUrl")
+      lazy val photoBytes = getPhotoBytes(photoUri)
+      lazy val photoName = getPhotoName(photoUri)
       val action = params[String]("action")
       splog.info(s"Facebook poster was asked to $action a $postType. The page ID is $pageId.")
 
       (action, postType) match {
-        case ("validate", "link") => facebookAdapter.validateLinkPost(connection, pageId, target, linkUrl, message); "OK"
+        case ("validate", "link") => facebookAdapter.validateLinkPost(connection, pageId, target, linkUri.toString, message); "OK"
         case ("validate", "photo") => facebookAdapter.validatePhotoPost(connection, pageId, target, photoBytes, photoName, message); "OK"
         case ("validate", "status update") => facebookAdapter.validateStatusUpdate(connection, pageId, target, message); "OK"
-        case ("publish", "link") => facebookAdapter.publishLinkPost(connection, pageId, target, linkUrl, message)
+        case ("publish", "link") => facebookAdapter.publishLinkPost(connection, pageId, target, linkUri.toString, message)
         case ("publish", "photo") => facebookAdapter.publishPhotoPost(connection, pageId, target, photoBytes, photoName, message)
         case ("publish", "status update") => facebookAdapter.publishStatusUpdate(connection, pageId, target, message)
         case _ => throw new IllegalArgumentException(s"Invalid action or post type: $action $postType")

@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.deciders
 
 import com.balihoo.fulfillment.util.UTCFormatter
+import com.fasterxml.jackson.core.JsonParseException
 import org.joda.time.{Seconds, DateTime}
 
 import com.amazonaws.services.simpleworkflow.model._
@@ -68,6 +69,8 @@ class Timeline {
   def success(message:String, when:Option[DateTime]) = {
     events += new TimelineEvent(TimelineEventType.SUCCESS, message, when)
   }
+
+  def toJson: JsValue = Json.toJson(for(entry <- events) yield entry.toJson)
 }
 
 class FulfillmentSection(val name: String
@@ -78,7 +81,8 @@ class FulfillmentSection(val name: String
   val params = collection.mutable.Map[String, SectionParameter]()
   val prereqs = mutable.MutableList[String]()
   val timeline = new Timeline
-  var value: JsValue = JsNull
+  private var _value: JsValue = JsNull
+  def value = _value
 
   var status = SectionStatus.CONTINGENT
 
@@ -135,7 +139,7 @@ class FulfillmentSection(val name: String
           waitUntil = Some(new DateTime(v.as[String]))
 
         case "value" =>
-          value = v
+          _value = v
 
         case _ =>
           // Add anything we don't recognize as a note in the timeline
@@ -227,7 +231,14 @@ class FulfillmentSection(val name: String
   def setCompleted(result:String, when:DateTime) = {
     status = SectionStatus.COMPLETE
     timeline.success("Completed", Some(when))
-    value = JsString(result)
+    try {
+      // We expect results to come back as legal JSON...
+      _value = Json.parse(result)
+    } catch {
+      case jpe:JsonParseException =>
+        // Wasn't json encoded, it's automatically a JSON string..
+        _value = JsString(result)
+    }
   }
 
   def setFailed(reason:String, details:String, when:DateTime) = {
@@ -329,7 +340,7 @@ class FulfillmentSection(val name: String
       if(!param.isResolved) {
         throw new Exception(s"Unresolved parameter '$name'!")
       }
-      oparams(name) = Json.toJson(param.getResult.get)
+      oparams(name) = param.getResult.get
     }
 
     oparams.toMap
@@ -337,17 +348,7 @@ class FulfillmentSection(val name: String
 
   def evaluateParameters(fulfillment:Fulfillment) = {
     for((name, param) <- params) {
-      try {
-        param.evaluate(fulfillment)
-      } catch {
-        // We don't return or rethrow from any of these. We want to keep processing!
-        case rne:ReferenceNotResolved =>
-          timeline.note(s"Reference not resolved! ${rne.getMessage}", Some(DateTime.now()))
-        case rnr:ReferenceNotResolvable =>
-          timeline.warning(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
-        case e:Exception =>
-          timeline.error(e.getMessage, Some(DateTime.now()))
-      }
+      param.evaluate(fulfillment)
     }
   }
 
@@ -393,11 +394,9 @@ class FulfillmentSection(val name: String
       jparams(pname) = param.toJson
     }
 
-    val jtimeline = Json.toJson(for(entry <- timeline.events) yield entry.toJson)
-
     Json.obj(
       "status" -> status.toString,
-      "timeline" -> jtimeline,
+      "timeline" -> timeline.toJson,
       "value" -> value,
       "input" -> jsonNode,
       "params" -> Json.toJson(jparams.toMap),
@@ -426,6 +425,7 @@ class ReferenceNotResolvable(message:String) extends Exception(message)
 
 class SectionParameter(input:JsValue) {
 
+  protected val timeline = new Timeline
   protected var record:JsValue = JsNull
   protected var fulfillment:Option[Fulfillment] = None
   protected val inputString = Json.stringify(input)
@@ -503,7 +503,19 @@ class SectionParameter(input:JsValue) {
     if(!evaluated) {
       evaluated = true // Dont' confuse with 'resolved'! This just means we touched it.
       fulfillment = Some(f)
-      result = Some(_evaluateJsValue(input))
+      try {
+        result = Some(_evaluateJsValue(input))
+      } catch {
+        // We don't return or rethrow from any of these. We want to keep processing!
+        case rne:ReferenceNotResolved =>
+          timeline.warning(s"Reference not resolved! ${rne.getMessage}", Some(DateTime.now()))
+        case rnr:ReferenceNotResolvable =>
+          timeline.error(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
+          resolvable = false
+        case e:Exception =>
+          timeline.error(e.getMessage, Some(DateTime.now()))
+          resolvable = false
+      }
     }
   }
 
@@ -530,7 +542,8 @@ class SectionParameter(input:JsValue) {
       "resolvable" -> resolvable,
       "resolved" -> result.isDefined,
       "evaluated" -> evaluated,
-      "needsEvaluation" -> needsEvaluation
+      "needsEvaluation" -> needsEvaluation,
+      "timeline" -> timeline.toJson
     )
   }
 }

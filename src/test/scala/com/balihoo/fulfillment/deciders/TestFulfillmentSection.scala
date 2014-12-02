@@ -183,13 +183,13 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val reference = new SectionReference("none/first/second[3]/fourth")
       reference.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
-      reference.section.get.value = Json.parse(result)
+      reference.section.get.setCompleted(result, DateTime.now())
 
       reference.getValue mustEqual JsString("donkey tooth")
 
       val reference2 = new SectionReference("none/first/second/[1]")
       reference2.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
-      reference2.section.get.value = Json.parse(result)
+      reference2.section.get.setCompleted(result, DateTime.now())
 
       reference2.getValue mustEqual JsString("o'brien")
     }
@@ -237,15 +237,10 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val param = new SectionParameter(Json.parse(input))
 
-      try {
-        param.evaluate(null)
-        assert(assertion=false, "There should have been an exception!")
-      } catch {
-        case e:Exception =>
-          e.getMessage mustEqual "ERROR During <(md5)> java.lang.IndexOutOfBoundsException: Index 0 not found! : input '{\"what do I do with an object\":\"tuna\"}..."
-      }
+      param.evaluate(null)
 
-      true
+      param.isResolvable mustEqual false
+
     }
 
     "  evaluate compound operator" in {

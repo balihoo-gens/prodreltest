@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import java.net.URL
+import java.net.{URI, URL}
 
 import com.balihoo.fulfillment.adapters.{HTTPAdapter, HTTPAdapterComponent, LoggingWorkflowAdapterImpl, LoggingWorkflowAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
@@ -17,13 +17,13 @@ class AbstractRESTClient extends FulfillmentWorker {
       new ObjectActivityParameter("headers", "This object's attributes will be added to the HTTP request headers.", false),
       new EnumActivityParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
       new StringActivityParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
-    ), new ObjectActivityResult("An object containing statusCode and body attributes"))
+    ), new StringActivityResult("Rest response data"))
   }
 
   override def handleTask(params: ActivityParameters) = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
     withTaskHandling {
-      val url = new URL(params("url"))
+      val url = params[URI]("url").toURL
       val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
       val method = params[String]("method")
       lazy val body = params[String]("body")
@@ -37,8 +37,16 @@ class AbstractRESTClient extends FulfillmentWorker {
         case _ => throw new IllegalArgumentException(s"Invalid method: $method")
       }
 
-      val responseMap = Map("statusCode" -> response.code.code.toString, "body" -> response.bodyString)
-      Json.stringify(Json.toJson(responseMap))
+      if(200 <= response.code.code && response.code.code < 300) {
+        // SUCCESS!
+        response.bodyString
+      } else if(500 <= response.code.code && response.code.code < 600) {
+        // Server Error
+        throw new CancelTaskException("Server Error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
+      }
+
+      // Redirection or Client Error or anything else we didn't anticipate
+      throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
     }
   }
 }

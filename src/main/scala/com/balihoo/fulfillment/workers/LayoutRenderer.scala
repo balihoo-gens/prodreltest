@@ -6,7 +6,7 @@ import com.balihoo.fulfillment.util.Splogger
 import play.api.libs.json.{Json, JsObject}
 import scala.io.Source
 import java.io._
-import java.net.URLEncoder
+import java.net.{URI, URLEncoder}
 
 /*
  * this is the dependency-injectable class containing all functionality
@@ -57,8 +57,8 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
         new StringActivityParameter("formid", "The form id of the form to render"),
         new StringActivityParameter("branddata", "The branddata to use as input to the form"),
         new StringActivityParameter("inputdata", "The inputdata to use as input to the form"),
-        new UriActivityParameter("endpoint", "The endpoint URL to use (overrides default)", false),
-        new StringActivityParameter("clipselector", "The selector used to clip the page", false),
+        new UriActivityParameter("endpoint", "The endpoint URL to use (overrides default)", required=false),
+        new StringActivityParameter("clipselector", "The selector used to clip the page", required=false),
         new StringActivityParameter("target", "The S3 filename of the resulting page")
       ), new StringActivityResult("the target URL if successfully saved"))
   }
@@ -75,9 +75,9 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
         ("ignore", "undefined")
       }
 
-      val endPoint = params.getOrElse("endpoint", s"$formBuilderSite/forms/$id/render-layout")
+      val endPoint = params.getOrElse[URI]("endpoint", new URI(s"$formBuilderSite/forms/$id/render-layout"))
       val cleaninput = Json.stringify(Json.toJson(Map(
-        "source" -> endPoint,
+        "source" -> endPoint.toString,
         "data" -> s"inputdata=$bdata&inputdata=$idata",
         "target" -> params("target"),
         cliptuple

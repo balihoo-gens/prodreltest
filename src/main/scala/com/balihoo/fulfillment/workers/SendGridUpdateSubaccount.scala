@@ -34,7 +34,7 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
 
     withTaskHandling {
       val subaccountUser = params("subaccount")
-      val webhookUrl = params("webhookUrl")
+      val webhookUrl = params[URI]("webhookUrl").toURL
       val webhookUsername = params("webhookUsername")
       val webhookPassword = params("webhookPassword")
       val ipAddress = params("ipAddress")

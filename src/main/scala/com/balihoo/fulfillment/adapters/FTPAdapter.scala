@@ -14,7 +14,7 @@ abstract class AbstractFTPAdapter {
 
   def uploadFile(conf: FTPUploadConfig): Unit = {
     new FtpClient(conf.ftpHost, conf.ftpPort, conf.ftpUsername, conf.ftpPassword)
-      .send(new URL(conf.sourceUrl).openStream(), conf.ftpDirectory, conf.ftpFilename)
+      .send(conf.sourceUrl.openStream(), conf.ftpDirectory, conf.ftpFilename)
   }
 }
 
