@@ -8,8 +8,6 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
     with SendGridAdapterComponent =>
 
-  val _cfg: PropertiesLoader
-
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
       new StringActivityParameter("participantId", "The participant ID used to identify the SendGrid subaccount"),

@@ -10,7 +10,7 @@ abstract class AbstractEmailAddressVerifier extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("address", "Address to be verified with SES")
+      new EmailActivityParameter("address", "Address to be verified with SES")
     ), new ObjectActivityResult("Result of Verification"))
   }
 
