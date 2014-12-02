@@ -12,12 +12,12 @@ abstract class AbstractFTPUploadConfig(params: ActivityParameters) {
   this: PropertiesLoaderComponent =>
 
   val sourceUrl = params[URI]("sourceUrl").toURL
-  val ftpHost = params("ftpHost")
+  val ftpHost = params[String]("ftpHost")
   val ftpPort = params.getOrElse[Int]("ftpPort", 21)
-  val ftpUsername = params("ftpUsername")
-  val ftpPassword = params("FtpPassword")
+  val ftpUsername = params[String]("ftpUsername")
+  val ftpPassword = params[String]("FtpPassword")
   val ftpDirectory = params.getOrElse("ftpDirectory", "/")
-  val ftpFilename = params("ftpFilename")
+  val ftpFilename = params[String]("ftpFilename")
 }
 
 class FTPUploadConfig(params: ActivityParameters, cfg: PropertiesLoader)

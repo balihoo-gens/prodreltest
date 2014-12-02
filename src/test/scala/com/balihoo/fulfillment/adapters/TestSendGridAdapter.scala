@@ -322,8 +322,8 @@ class TestSendGridAdapter extends Specification with Mockito {
       "subject" -> email.subject,
       "html" -> email.body,
       "from" -> email.fromAddress,
-      "fromName" -> email.fromName,
-      "replyTo" -> email.replyToAddress,
+      "fromname" -> email.fromName,
+      "replyto" -> email.replyToAddress,
       "x-smtpapi" -> formattedRecipientData,
       "api_user" -> testSubAccountCredentials.apiUser,
       "api_key" -> testSubAccountCredentials.apiKey))
