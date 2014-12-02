@@ -504,5 +504,75 @@ class TestFulfillmentSection extends Specification with Mockito
       fulfillment.getSectionByName("sectionname[banana]").params("multiparam").getResult.get mustEqual JsString("bn___")
 
     }
+
+    "  Parse a json string " in {
+      val str = """{ \"key\" : [true, null, 25.8, \"string\", { \"object\" : 42 } ] }"""
+      val json = Json.parse(s"""{
+            "<(jsonparse)>" : "$str"
+        }""").as[JsObject]
+
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val jsonresult = param.getResult.get
+      ((jsonresult \ "key")(4) \ "object").as[Double] must beEqualTo(42)
+    }
+
+    "  Stringify a JSON object " in {
+      val str = """{"key":[true,null,25.8,"string",{"object":42}]}"""
+      val json = Json.parse(s"""{
+            "<(jsonstringify)>" : $str
+        }""").as[JsObject]
+
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val strresult = param.getResult.get.as[String]
+      strresult must beEqualTo(str)
+    }
+
+    "  get the substring " in {
+      val json = Json.parse(s"""{
+            "<(substring)>" : {
+              "input" : "een aap die geen bananen eet",
+              "beginIndex" : 4,
+              "endIndex" : 7
+            }
+        }""").as[JsObject]
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val strresult = param.getResult.get.as[String]
+      strresult must beEqualTo("aap")
+    }
+
+    "  replace values " in {
+      val json = Json.parse(s"""{
+            "<(replace)>" : {
+              "input" : "een aap die geen bananen eet",
+              "regex" : "aap",
+              "replacement" : "kanarie"
+            }
+        }""").as[JsObject]
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val strresult = param.getResult.get.as[String]
+      strresult must beEqualTo("een kanarie die geen bananen eet")
+    }
+
+    "  pick the right value " in {
+      val json = Json.parse(s"""{
+            "<(switch)>" : {
+              "expression" : "Hannibal",
+              "BA"      : "I pity the fool that picks me!",
+              "Face"    : "Got better things to do",
+              "Murdock" : { "I" : ["am", "crazy"] },
+              "Hannibal": "I love it when a plan comes together"
+            }
+        }""").as[JsObject]
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val strresult = param.getResult.get.as[String]
+      strresult must beEqualTo("I love it when a plan comes together")
+    }
+
+
   }
 }
