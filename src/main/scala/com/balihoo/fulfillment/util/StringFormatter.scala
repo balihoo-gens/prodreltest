@@ -17,3 +17,19 @@ object UTCFormatter {
   }
 
 }
+
+object Abbreviator {
+  /**
+    * abbreviate a string with dots
+    * @param s the string to abbreviate
+    * @param n the maximum number of characters of the resulting string
+    * @returns the abbreviated or original string
+    */
+  def ellipsis(s: String, n: Int) = {
+    if (s.size > n && n > 3) {
+      s"${s.take(n-3)}..."
+    } else {
+      s.take(n)
+    }
+  }
+}
