@@ -191,6 +191,7 @@ trait WorkflowInspectorComponent {
       new DecisionGenerator(fulfillment).makeDecisions()
 
       val sectionsJson = collection.mutable.Map[String, JsValue]()
+//      fulfillment.categorized.categorize()
       for((name, section:FulfillmentSection) <- fulfillment.nameToSection) {
         section.evaluateParameters(fulfillment) // NOTE: This may have the undesirable side effect of changing section statuses (not actually in the workflow, but in the returned data)
         sectionsJson(name) = section.toJson

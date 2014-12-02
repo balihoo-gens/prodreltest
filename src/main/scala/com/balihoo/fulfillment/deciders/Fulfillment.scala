@@ -6,6 +6,7 @@ import org.joda.time.DateTime
 import com.amazonaws.services.simpleworkflow.model._
 import play.api.libs.json._
 
+import scala.collection.mutable
 
 object FulfillmentStatus extends Enumeration {
   val IN_PROGRESS = Value("IN_PROGRESS")
@@ -21,8 +22,6 @@ object FulfillmentStatus extends Enumeration {
   val TIMED_OUT = Value("TIMED_OUT") // SWF STATUS
 }
 
-
-
 /**
  * Build and update Fulfillment from a JSONized SWF execution history
  * @param history:List[SWFEvent]
@@ -36,6 +35,9 @@ class Fulfillment(val history:List[SWFEvent]) {
   val timeline = new Timeline
   val timers = collection.mutable.Map[String, String]()
   var status = FulfillmentStatus.IN_PROGRESS
+  var essentialComplete = 0
+  var essentialTotal = 0
+  var categorized = _resetCategorization()
 
   _addEventHandler(EventType.WorkflowExecutionStarted, processWorkflowExecutionStarted)
   _addEventHandler(EventType.ActivityTaskScheduled, processActivityTaskScheduled)
@@ -60,18 +62,99 @@ class Fulfillment(val history:List[SWFEvent]) {
   _addEventHandler(EventType.DecisionTaskStarted, processIgnoredEventType)
   _addEventHandler(EventType.DecisionTaskCompleted, processIgnoredEventType)
 
-  try {
+
+  processEvents()
+
+  def processEvents() = {
+
     for(event: SWFEvent <- history) {
-      processEvent(event)
+      if(status != FulfillmentStatus.FAILED) {
+        try {
+          processEvent(event)
+        } catch {
+          case sdne:SectionDoesNotExist =>
+            categorize() // Might generate our missing section!
+            try {
+              processEvent(event) // Try again!
+            } catch {
+              case e:Exception =>
+                timeline.error(e.getMessage, Some(DateTime.now))
+                status = FulfillmentStatus.FAILED
+            }
+          case e:Exception =>
+            timeline.error(e.getMessage, Some(DateTime.now))
+            status = FulfillmentStatus.FAILED
+        }
+      }
     }
-  } catch {
-    case e:Exception =>
-      timeline.error(e.getMessage, Some(DateTime.now))
-      status = FulfillmentStatus.FAILED
+
+    // All history events have been processed
+    categorize() // A final categorization
   }
 
-  // Now that all of the JsObjects have been processed our sections have been created and are up to date.
-  val categorized = new CategorizedSections(this)
+  def categorize() = {
+
+    var complete = false
+
+    while(!complete) {
+      try {
+        _categorize()
+        complete = true
+      } catch {
+        case ci:CategorizationInvalid =>
+          timeline.note("Sections added.. Recategorizing")
+      }
+    }
+  }
+
+  protected def _resetCategorization():Map[SectionStatus.Value, mutable.MutableList[FulfillmentSection]] = {
+    essentialComplete = 0
+    essentialTotal = 0
+    (for(status <- SectionStatus.values.toList) yield status -> mutable.MutableList[FulfillmentSection]()).toMap
+  }
+
+  protected def _categorize() = {
+
+    categorized = _resetCategorization()
+
+    val initialSectionCount = size()
+
+    for((name, section) <- nameToSection) {
+      if(size != initialSectionCount) {
+        throw new CategorizationInvalid
+      }
+
+      section.refineReadyStatus(this)
+      categorized(section.status) += section
+    }
+
+    essentialTotal = categorized.values.foldLeft(0){ (z, l) => z + l.count(_.essential) }
+    essentialComplete = categorized(SectionStatus.COMPLETE).count(_.essential)
+
+  }
+
+  def workComplete() : Boolean = {
+    if(size == 0) { return false; }
+
+    essentialTotal match {
+      case 0 =>
+        // No essential sections.. we just want everything complete or contingent
+        size == (categorized(SectionStatus.COMPLETE).length + categorized(SectionStatus.CONTINGENT).length)
+      case _ =>
+        // If there are essential sections.. they MUST ALL be COMPLETE
+        essentialComplete == essentialTotal
+    }
+  }
+
+  def hasPendingSections: Boolean = {
+    (categorized(SectionStatus.STARTED).length + 
+    categorized(SectionStatus.SCHEDULED).length +
+    categorized(SectionStatus.DEFERRED).length) > 0
+  }
+
+  def checkPromoted: Boolean = {
+    categorized(SectionStatus.CONTINGENT).exists(s => s.status == SectionStatus.READY)
+  }
 
   protected def _addEventHandler(eventType:EventType, handler:(SWFEvent)=>(Any)) = {
     eventHandlers(eventType) = handler
@@ -131,8 +214,7 @@ class Fulfillment(val history:List[SWFEvent]) {
       nameToSection(name)
     } catch {
       case nsee:NoSuchElementException =>
-        println(s"No section $name")
-        throw new Exception(s"There is no section '$name'", nsee)
+        throw new SectionDoesNotExist(name)
       case e:Exception =>
         throw new Exception(s"Error while looking up section '$name'", e)
     }
@@ -150,22 +232,23 @@ class Fulfillment(val history:List[SWFEvent]) {
   }
 
   def initializeWithInput(fulfillmentInput:JsObject, when:DateTime) = {
-    fulfillmentInput.keys contains "sections" match { // This check is temporary for near-term backwards compatibility
-      case true =>
-        for((jk, jv) <- fulfillmentInput.fields) {
-          jk match {
-            case "sections" =>
-              _processSections(jv.as[JsObject], when)
-            case "tags" =>
-              val rtags = jv.as[JsObject]
-              for((name, value) <- rtags.fields) {
-                tags(name) = value.as[String]
-              }
-            case _ =>
-              timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(DateTime.now()))
-          }
+    if(fulfillmentInput.keys contains "sections") {
+      // This check is temporary for near-term backwards compatibility
+      for((jk, jv) <- fulfillmentInput.fields) {
+        jk match {
+          case "sections" =>
+            _processSections(jv.as[JsObject], when)
+          case "tags" =>
+            val rtags = jv.as[JsObject]
+            for((name, value) <- rtags.fields) {
+              tags(name) = value.as[String]
+            }
+          case _ =>
+            timeline.warning(s"Fulfillment parameter '$jk' is unexpected!", Some(when))
         }
-      case false =>
+      }
+    } else {
+        timeline.warning("Fulfillment Document format is deprecated! See https://github.com/balihoo/fulfillment/wiki/Fulfillment-Document-Structure", Some(when))
         _processSections(fulfillmentInput, when)
     }
 
@@ -182,8 +265,11 @@ class Fulfillment(val history:List[SWFEvent]) {
     try {
       eventHandlers.getOrElse(event.eventType, processUnhandledEventType _)(event)
     } catch {
+      case sdne:SectionDoesNotExist =>
+        throw sdne
       case e:Exception =>
         timeline.error(s"Problem processing ${event.eventTypeString}: ${e.getMessage}", Some(event.eventDateTime))
+        throw e
     }
 
   }
@@ -413,3 +499,7 @@ class Fulfillment(val history:List[SWFEvent]) {
     )
   }
 }
+
+class SectionDoesNotExist(name:String) extends Exception(name)
+
+class CategorizationInvalid extends Exception

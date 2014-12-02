@@ -26,25 +26,29 @@
                     <div class="col-md-12 col-sm-6">
                         <h3>Sections</h3>
                         <ul class="nav nav-pills nav-stacked">
-                            <li ng-repeat="(name, section) in workflow.sections" ng-class="{active : section.showContents}" >
-                                <a ng-click="showSection(section)" class="action">
+                            <li ng-repeat="(name, section) in workflow.sections" ng-class="{active : section.showContents, hidden : section.hidden}">
+                                <a ng-click="showSection(section)" class="action" >
                                     <span class="pull-right">
-                                    <span ng-hide="workflow.editable">
-                                        <span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
-                                    </span>
+                                        <span class="muted action" ng-show="section.subsections" ng-click="toggleSubsections(section)">
+                                            <i class="fa fa-navicon"></i>
 
-                                    <span ng-show="workflow.editable">
-                                        <span ng-hide="section.editingStatus" ng-click="section.editStatus(section)" class="label {{figureStatusLabel(section.status)}}" ng-class="{'status-edited' : section.statusChanged(section)}">{{section.status}}</span>
-                                        <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)" ng-blur="section.editingStatus = false">
-                                            <option>{{section.originalStatus}}</option>
-                                            <option ng-show="section.originalStatus != 'READY'">READY</option>
-                                            <option ng-show="section.originalStatus != 'TERMINAL'">TERMINAL</option>
-                                        </select>
-                                    </span>
+                                        </span>
+                                        <span ng-hide="workflow.editable">
+                                            <span class="label {{figureStatusLabel(section.status)}}">{{section.status}}</span>
+                                        </span>
 
-                                </span>
-                                    <b>{{name}}</b>
-                                    <img width="20" height="20" src="img/star_gold_256.png" style="margin-bottom:4px;margin-right:4px;" title="This section MUST be successful!!" ng-show="section.essential">
+                                        <span ng-show="workflow.editable">
+                                            <span ng-hide="section.editingStatus" ng-click="section.editStatus(section)" class="label {{figureStatusLabel(section.status)}}" ng-class="{'status-edited' : section.statusChanged(section)}">{{section.status}}</span>
+                                            <select class="form-control input-sm form-inline" ng-show="section.editingStatus" ng-model="section.status" ng-change="section.changeStatus(section)" ng-blur="section.editingStatus = false">
+                                                <option>{{section.originalStatus}}</option>
+                                                <option ng-show="section.originalStatus != 'READY'">READY</option>
+                                                <option ng-show="section.originalStatus != 'TERMINAL'">TERMINAL</option>
+                                            </select>
+                                        </span>
+
+                                    </span>
+                                    <b ng-class="{block : section.parent}">{{name}}</b>
+                                    <i class="fa fa-star" style="color:#f0ad4e" title="This section MUST be successful!!" ng-show="section.essential"></i>
                                     <span ng-show="section.waitUntil" title="{{section.waitUntil}}">will run {{section.waitUntil | momentFromNow}}</span>
                                 </a>
                             </li>
