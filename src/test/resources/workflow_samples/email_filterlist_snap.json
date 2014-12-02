@@ -1,0 +1,30 @@
+{
+  "createdb": {
+    "action": {
+      "name": "Email-filterlist",
+      "version": "1",
+      "failure": {
+        "max": "1",
+        "delay": "0"
+      },
+      "cancelation": {
+        "max": "1",
+        "delay": "0"
+      }
+    },
+    "params": {
+      "pageSize": 10000,
+      "source": "s3://balihoo.dev.fulfillment/tmp/Email-createdb/1416932012981/member_current_processed.db",
+      "query": {
+        "select": {
+          "email": [],
+          "firstname": "$v like 'a%'",
+          "lastname":  "$v like 'a%'"
+        }
+      }
+    },
+    "prereqs": [],
+    "status": "READY",
+    "essential": true
+  }
+}

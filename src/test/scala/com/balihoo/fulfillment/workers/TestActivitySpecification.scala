@@ -192,7 +192,7 @@ class TestActivitySpecification extends Specification with Mockito
               "param2" : "HOUDINI"
           }"""
 
-      spec.getParameters(input) must throwA(new Exception("""validation error: /param1 instance type (number) does not match any allowed primitive type (allowed: ["string"])
+      spec.getParameters(input) must throwA(new Exception("""validation error: /param1 instance type (integer) does not match any allowed primitive type (allowed: ["string"])
 validation error: /param2 instance value ("HOUDINI") not found in enum (possible values: ["FERRET","CHICKEN"])"""))
 
 
@@ -433,5 +433,32 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
 
       spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid hostname""") }
     }
+
+    "parse integer type" in {
+      val spec = new ActivitySpecification(List(
+        new IntegerActivityParameter("param1", "Param 1 is an integer")
+      ), new StringActivityResult("really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val input = """{"param1" : 1}"""
+
+      val params = spec.getParameters(input)
+      params[Int]("param1") must beEqualTo(1)
+
+    }
+
+    "parse long type" in {
+      val spec = new ActivitySpecification(List(
+        new LongActivityParameter("param1", "Param 1 is a long")
+      ), new StringActivityResult("really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val input = """{"param1" : 1}"""
+
+      val params = spec.getParameters(input)
+      params[Long]("param1") must beEqualTo(1.toLong)
+
+    }
+
   }
 }

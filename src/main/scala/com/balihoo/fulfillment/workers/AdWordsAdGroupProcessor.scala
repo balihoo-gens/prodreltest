@@ -79,14 +79,6 @@ trait AdGroupCreatorComponent {
       ), new StringActivityResult("AdGroup ID"))
     }
 
-    def getAdGroup(params:String):AdGroup = {
-      getAdGroup(Json.parse(params).as[JsObject])
-    }
-
-    def getAdGroup(params:JsObject):AdGroup = {
-      getAdGroup(getSpecification.getParameters(params))
-    }
-
     def getAdGroup(params: ActivityParameters): AdGroup = {
 
       val name = params[String]("name")
@@ -107,14 +99,6 @@ trait AdGroupCreatorComponent {
           case _ => throw new Exception(s"adGroup name $name is ambiguous in campaign $campaignId")
         }
       })
-    }
-
-    def createAdGroup(params:String):AdGroup = {
-      createAdGroup(Json.parse(params).as[JsObject])
-    }
-
-    def createAdGroup(params:JsObject):AdGroup = {
-      createAdGroup(getSpecification.getParameters(params))
     }
 
     /*
@@ -165,14 +149,6 @@ trait AdGroupCreatorComponent {
       _processOptionalParams(newGroup, params)
 
       newGroup
-    }
-
-    def updateAdGroup(adGroup: AdGroup, params:String):AdGroup = {
-      updateAdGroup(adGroup, Json.parse(params).as[JsObject])
-    }
-
-    def updateAdGroup(adGroup: AdGroup, params:JsObject):AdGroup = {
-      updateAdGroup(adGroup, getSpecification.getParameters(params))
     }
 
     def updateAdGroup(adGroup: AdGroup, params: ActivityParameters): AdGroup = {
