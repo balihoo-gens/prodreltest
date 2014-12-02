@@ -76,7 +76,7 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
         override def process(subs: Map[String,String]) = {
           var s = input
           for ((key,value) <- subs) {
-            s = s.replaceAllLiterally(s"${key}",value)
+            s = s.replaceAllLiterally(key, value)
           }
           results += s
         }
@@ -155,6 +155,17 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
         case _ => failure
       }
       success
+    }
+
+    "abbreviate a sublist" in {
+      val wfgen = new TestableWorkflowGenerator()
+      val wfc = new wfgen.WorkFlowCreator("", List[String]())
+
+      val subList = Map[String,String](
+        "123456789ABCDEF" -> "short",
+        "short" -> "123456789ABCDEF"
+      )
+      wfc.abbreviateSubs(subList) must beEqualTo("substituted: (1234567... -> short) (short -> 1234567...)")
     }
   }
 }

@@ -2,7 +2,7 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.util._
 import play.api.libs.json._
 import org.joda.time._
 import scala.util.Try
@@ -127,19 +127,14 @@ abstract class AbstractWorkflowGenerator
   class WorkFlowCreator(template: String, tags: List[String]) extends SubProcessor {
     val results = ArrayBuffer[WorkflowExecutionIds]()
 
-    /**strings can get long, abbreviate with dots */
-    def abbr(s: String, n: Int) = {
-      if (s.size > n) s"${s.take(n)}..." else s
-    }
-
     /** craft a log message that shows what was replaced, but avoid putting
       * in strings longer that 10 characters
       */
-    def logSubs(subs: Map[String,String]) = {
-      val logmsg = subs.foldLeft("substituted: ") {
-        (s,kv) => s"""$s ("${abbr(kv._1,10)}" -> "${abbr(kv._2,10)}")"""
+    def abbreviateSubs(subs: Map[String,String]):String = {
+      val abbr = Abbreviator.ellipsis _
+      subs.foldLeft("substituted:") {
+        (s,kv) => s"$s (${abbr(kv._1,10)} -> ${abbr(kv._2,10)})"
       }
-      splog.info(logmsg)
     }
 
     /** substitutes the values and submits the workflow */
@@ -152,6 +147,7 @@ abstract class AbstractWorkflowGenerator
         ffdoc = ffdoc.replaceAllLiterally(key,value)
         fftags = for (tag <- fftags) yield tag.replaceAllLiterally(key,value)
       }
+      splog.info(abbreviateSubs(subs))
 
       val result = submitTask(ffdoc, fftags)
       results += result
