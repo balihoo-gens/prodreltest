@@ -149,8 +149,8 @@ abstract class AbstractWorkflowGenerator
 
       //perform the replacements
       for ((key,value) <- subs) {
-        ffdoc = ffdoc.replaceAllLiterally(s"${key}",value)
-        fftags = for (tag <- fftags) yield tag.replaceAllLiterally(s"${key}",value)
+        ffdoc = ffdoc.replaceAllLiterally(key,value)
+        fftags = for (tag <- fftags) yield tag.replaceAllLiterally(key,value)
       }
 
       val result = submitTask(ffdoc, fftags)
