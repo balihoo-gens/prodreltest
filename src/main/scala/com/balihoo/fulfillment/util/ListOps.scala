@@ -14,7 +14,7 @@ object ListOps {
       None
     } else {
       f(l.head) match {
-        case Some(name) => Some(name)
+        case Some(value) => Some(value)
         case None => iterateUntilSome[T,U](l.tail,f)
       }
     }
