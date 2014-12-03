@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.workers
 
 import java.io.File
+import java.net.URI
 import java.text.SimpleDateFormat
 
 import com.balihoo.fulfillment.adapters._
@@ -34,7 +35,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new StringActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
+        new UriActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
         new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated"),
         new ObjectActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)")
       ),
@@ -49,13 +50,13 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     splog.info("Parsing parameters source, dbname and dtd")
 
-    val maybeSource = parameters.get[String]("source")
+    val maybeSource = parameters.get[URI]("source")
     val maybeDbName = parameters.get[String]("dbname")
     val maybeDtd = parameters.get[JsObject]("dtd")
 
-    if (!maybeSource.isDefined || maybeSource.get.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
-    val sourceUri = new java.net.URI(maybeSource.get)
-    if (!maybeSource.get.trim.startsWith("s3")) throw new IllegalArgumentException("source protocol is unsupported for now")
+    if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
+    val sourceUri = maybeSource.get
+    if (sourceUri.getScheme.toLowerCase != "s3") throw new IllegalArgumentException("source protocol is unsupported for now")
     if (!maybeDbName.isDefined || maybeDbName.get.trim.isEmpty) throw new IllegalArgumentException("dbname parameter is empty")
     if (!maybeDtd.isDefined) throw new IllegalArgumentException("dtd parameter is empty")
 

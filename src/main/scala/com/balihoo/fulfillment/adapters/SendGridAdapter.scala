@@ -6,8 +6,10 @@ import com.balihoo.fulfillment.util.{SploggerComponent, Splogger}
 import com.netaporter.uri.encoding.PercentEncoder
 import com.stackmob.newman.response.HttpResponse
 import org.apache.commons.codec.digest.DigestUtils
+import org.joda.time.DateTime
 import play.api.libs.json.{JsObject, Json}
 import com.netaporter.uri.dsl._
+import scala.util.{Success, Try}
 
 trait SendGridAdapterComponent {
   def sendGridAdapter: AbstractSendGridAdapter
@@ -63,7 +65,7 @@ abstract class AbstractSendGridAdapter {
 
   /**
    * Produces the credentials for a SendGrid user.  Use this method when you already know the username and you only need
-   * to get the password.  If you need both, use [[getCredentials(SendGridSubaccount)*]] instead.
+   * to get the password.  If you need both, use [[getCredentials(SendGridSubaccountId):SendGridCredentials]] instead.
    * @param apiUser the API user
    * @return the credentials
    */
@@ -103,7 +105,7 @@ abstract class AbstractSendGridAdapter {
   def checkSubaccountExists(subaccountId: SendGridSubaccountId): Option[String] = {
     splog.debug("Checking for existence of " + subaccountId)
     // As of 11/3/14, this doesn't work with the v2 or v3 API.
-    val url = new URL(v1ApiBaseUrl, "profile.get.json")
+    val url = buildUrl(v1ApiBaseUrl, "profile.get.json")
     val credentials = getCredentials(subaccountId)
     val result = httpAdapter.get(url, queryParams = credentials);
 
@@ -128,7 +130,7 @@ abstract class AbstractSendGridAdapter {
   def createSubaccount(subaccount: SendGridSubaccount): Unit = {
     splog.debug("Creating subaccount: " + subaccount.credentials.apiUser)
     // As of 11/3/14, this doesn't work with the v3 API.
-    val url = new URL(v2ApiBaseUrl, "customer.add.json")
+    val url = buildUrl(v2ApiBaseUrl, "customer.add.json")
     val queryParams = Seq(
       ("api_user", rootApiUser),
       ("api_key", rootApiKey),
@@ -155,7 +157,7 @@ abstract class AbstractSendGridAdapter {
    */
   def updateProfile(subaccount: SendGridSubaccount): Unit = {
     splog.debug("Updating profile for subaccount: " + subaccount.credentials.apiUser)
-    val url = new URL(v1ApiBaseUrl, "profile.set.json")
+    val url = buildUrl(v1ApiBaseUrl, "profile.set.json")
     val queryParams = Seq(
       ("api_user", subaccount.credentials.apiUser),
       ("api_key", subaccount.credentials.apiKey),
@@ -179,7 +181,7 @@ abstract class AbstractSendGridAdapter {
    */
   def activateApp(subaccountUser: String, appName: String): Unit = {
     splog.debug("Activating event notification app for subaccount: " + subaccountUser)
-    val url = new URL(v2ApiBaseUrl, "customer.apps.json")
+    val url = buildUrl(v2ApiBaseUrl, "customer.apps.json")
     val queryParams = Seq(
       ("api_user", rootApiUser),
       ("api_key", rootApiKey),
@@ -200,13 +202,13 @@ abstract class AbstractSendGridAdapter {
    * @param webhookUser
    * @param webhookPassword
    */
-  def configureEventNotificationApp(subaccountUser: String, webhookUrl: String, webhookUser: String, webhookPassword: String): Unit = {
+  def configureEventNotificationApp(subaccountUser: String, webhookUrl: URL, webhookUser: String, webhookPassword: String): Unit = {
     splog.debug("Configuring event notification app for subaccount: " + subaccountUser)
-    val url = new URL(v2ApiBaseUrl, "customer.apps.json")
+    val url = buildUrl(v2ApiBaseUrl, "customer.apps.json")
     // scala-uri doesn't encode the user info correctly, so the username and password are being encoded prior to being
     // added to the URL.  If this bug gets fixed in scala-uri, the encoding step here will need to be removed.
     // See https://github.com/NET-A-PORTER/scala-uri/issues/73
-    val urlParam = webhookUrl.withUser(encodeCredential(webhookUser)).withPassword(encodeCredential(webhookPassword)).toString
+    val urlParam = webhookUrl.toString.withUser(encodeCredential(webhookUser)).withPassword(encodeCredential(webhookPassword)).toString
     val queryParams = Seq(
       ("api_user", rootApiUser),
       ("api_key", rootApiKey),
@@ -234,7 +236,7 @@ abstract class AbstractSendGridAdapter {
    */
   def setIpAddress(subaccountUser: String, ipAddress: String): Unit = {
     splog.debug("Setting IP address for subaccount: " + subaccountUser)
-    val url = new URL(v2ApiBaseUrl, "customer.sendip.json")
+    val url = buildUrl(v2ApiBaseUrl, "customer.sendip.json")
     val queryParams = Seq(
       ("api_user", rootApiUser),
       ("api_key", rootApiKey),
@@ -253,7 +255,7 @@ abstract class AbstractSendGridAdapter {
    */
   def setWhitelabel(subaccountUser: String, whitelabel: String): Unit = {
     splog.debug("Setting whitelabel for subaccount: " + subaccountUser)
-    val url = new URL(v2ApiBaseUrl, "customer.whitelabel.json")
+    val url = buildUrl(v2ApiBaseUrl, "customer.whitelabel.json")
     val queryParams = Seq(
       ("api_user", rootApiUser),
       ("api_key", rootApiKey),
@@ -262,6 +264,86 @@ abstract class AbstractSendGridAdapter {
       ("mail_domain", whitelabel))
     val response = httpAdapter.get(url, queryParams = queryParams)
     checkResponseForSuccess(response)
+  }
+
+  /**
+   * Sends an email to a list of recipients
+   * @param credentials the SendGrid subaccount to use for the send
+   * @param uniqueArgs identifying information for the email send
+   * @param sendTime the scheduled send time
+   * @param email describes the email to send
+   * @param recipientCsv the recipient list, as read from a CSV file with a header row
+   * @param recipientIdHeading the heading of the recipientId column
+   * @param emailHeading the heading of the email column
+   */
+  def sendEmail(credentials: SendGridCredentials, uniqueArgs: JsObject, sendTime: DateTime, email: Email,
+                recipientCsv: Stream[List[String]], recipientIdHeading: String, emailHeading: String): Unit = {
+    splog.debug("Sending email for " + credentials.apiUser + " with subject: " + email.subject)
+    val url = buildUrl(v1ApiBaseUrl, "mail.send.json")
+    val formData = Seq(
+      "to" -> "test@balihoo.com",
+      "subject" -> email.subject,
+      "html" -> email.body,
+      "from" -> email.fromAddress,
+      "fromname" -> email.fromName,
+      "replyto" -> email.replyToAddress,
+      "x-smtpapi" -> formatRecipientData(uniqueArgs, sendTime, recipientCsv, recipientIdHeading, emailHeading),
+      "api_user" -> credentials.apiUser,
+      "api_key" -> credentials.apiKey)
+    val response = httpAdapter.post(url, HTTPAdapter.encodeFormData(formData), headers = Seq(HTTPAdapter.formContentTypeHeader))
+    checkResponseForSuccess(response)
+  }
+
+  /**
+   * Builds a URL using a base URL and a relative path.
+   * @param baseUrl
+   * @param path
+   * @throws SendGridException if it goes badly
+   * @return
+   */
+  private def buildUrl(baseUrl: URL, path: String): URL = {
+    Try(new URL(baseUrl, path)) match {
+      case Success(u) => u
+      case _ => throw new SendGridException(s"Unable to create URL using base: $baseUrl and path: $path")
+    }
+  }
+
+  /**
+   * Formats the recipient list to match SendGrid's (somewhat funky) requirements.
+   * @param uniqueArgs
+   * @param sendTime
+   * @param recipientCsv
+   * @param recipientIdHeading the heading of the recipientId column
+   * @param emailHeading the heading of the email column
+   * @return
+   */
+  protected def formatRecipientData(uniqueArgs: JsObject, sendTime: DateTime, recipientCsv: Stream[List[String]],
+                                    recipientIdHeading: String, emailHeading: String): JsObject = {
+    // Do we have data after the header row?
+    if (recipientCsv.drop(1).isEmpty) throw new SendGridException("The recipient list is empty.")
+
+    // Identify the recipientId and email column indices using a case-insensitive comparison
+    val headingMap = recipientCsv.head.map(_.toLowerCase()).zipWithIndex.toMap
+    val recipientIdIndex = headingMap.getOrElse(recipientIdHeading.toLowerCase, throw new SendGridException("Missing recipientId column"))
+    val emailIndex = headingMap.getOrElse(emailHeading.toLowerCase, throw new SendGridException("Missing email column"))
+
+    // Build SendGrid substitution lists
+    val transposedData = Try(recipientCsv.transpose) match {
+      case Success(data) => data
+      case _ => throw new SendGridException("Unable to transpose recipient data. Please make sure all rows are the same length.")
+    }
+    val subDataBase = transposedData.map(column => ("%%" + column.head + "%%") #:: column.tail) // Wrap column headings
+    val subData = ("[RECIPIENT ID]" #:: transposedData(recipientIdIndex).tail) #:: subDataBase // Add a special recipient ID column
+    val sub = subData.foldLeft(Json.obj())((buffer, column) => buffer ++ Json.obj(column.head -> column.tail))
+
+    // Get the recipient email list
+    val to = transposedData(emailIndex).tail // Drop the column heading to get a pure list of email addresses
+
+    // [RECIPIENT ID] tells SendGrid which substitution list to use as the source for recipient ID values
+    if (uniqueArgs.keys.contains("recipientId")) throw new SendGridException("uniqueArgs must not contain a key named recipientId.")
+    val completeUniqueArgs = uniqueArgs ++ Json.obj("recipientId" -> "[RECIPIENT ID]")
+
+    Json.obj("to" -> to, "sub" -> sub, "unique_args" -> completeUniqueArgs, "send_at" -> sendTime.getMillis / 1000L)
   }
 
   /**
@@ -336,4 +418,6 @@ class SendGridSubaccount(_credentials: SendGridCredentials, _firstName: String, 
   override def toString = credentials.apiUser
 }
 
-class SendGridException(message: String) extends Exception(message)
+case class Email(fromAddress: String, fromName: String, replyToAddress: String, subject: String, body: String)
+
+class SendGridException(message: String, e: Throwable = null) extends Exception(message, e)

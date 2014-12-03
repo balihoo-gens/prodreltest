@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.workers
 
+import java.net.URI
+
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
@@ -52,8 +54,8 @@ trait TextAdCreatorComponent {
         new StringActivityParameter("headline", "Headline of the ad", maxLength=Some(25)),
         new StringActivityParameter("description1", "First line of ad text", maxLength=Some(35)),
         new StringActivityParameter("description2", "Second line of ad text", maxLength=Some(35)),
-        new StringActivityParameter("url", "Landing page URL (domain must match displayUrl)"),
-        new StringActivityParameter("displayUrl", "Visible Ad URL")
+        new UriActivityParameter("url", "Landing page URL (domain must match displayUrl)"),
+        new UriActivityParameter("displayUrl", "Visible Ad URL")
       ), new StringActivityResult("TextAd ID"),
         "Create a Google AdWords Text Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201409/AdGroupAdService.TextAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad" )
     }
@@ -85,8 +87,8 @@ trait TextAdCreatorComponent {
       val headline = AdWordsPolicy.limitString(params("headline"), 25)
       val desc1 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params("description1"), 35))
       val desc2 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params("description2"), 35))
-      val displayUrl = AdWordsPolicy.displayUrl(params("displayUrl"))
-      val url = AdWordsPolicy.destinationUrl(params("url"))
+      val displayUrl = AdWordsPolicy.displayUrl(params[URI]("displayUrl").toString)
+      val url = AdWordsPolicy.destinationUrl(params[URI]("url").toString)
 
       AdWordsPolicy.matchDomains(url, displayUrl)
 

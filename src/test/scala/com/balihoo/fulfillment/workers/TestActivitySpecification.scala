@@ -1,7 +1,10 @@
 package com.balihoo.fulfillment.workers
 
+import java.net.URI
+
 import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
 import com.github.fge.jsonschema.main.{JsonSchemaFactory, JsonSchema}
+import org.joda.time.DateTime
 import org.keyczar.Crypter
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -249,6 +252,186 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
         val params = spec.getParameters(input)
 
         params[String]("param1") mustEqual "567erty"
+    }
+
+    "handle a good datetime" in {
+      val spec = new ActivitySpecification(List(
+        new DateTimeActivityParameter("param1", "ISO8601 goodness")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "2014-11-19T15:48:00-07:00"
+          |}
+        """.stripMargin
+
+      val params = spec.getParameters(input)
+
+      params[DateTime]("param1") === new DateTime("2014-11-19T15:48:00-07:00")
+    }
+
+    "reject a bad datetime" in {
+      val spec = new ActivitySpecification(List(
+        new DateTimeActivityParameter("param1", "ISO8601 goodness")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "banana peel"
+          |}
+        """.stripMargin
+
+      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is invalid against requested date format(s)""") }
+    }
+
+    "handle a good URI" in {
+      val spec = new ActivitySpecification(List(
+        new UriActivityParameter("param1", "A URI")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "http://resumes.balihoo.com/"
+          |}
+        """.stripMargin
+
+      val params = spec.getParameters(input)
+
+      params[URI]("param1") === new URI("http://resumes.balihoo.com/")
+    }
+
+    "reject a bad URI" in {
+      val spec = new ActivitySpecification(List(
+        new UriActivityParameter("param1", "A URI")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "banana peel"
+          |}
+        """.stripMargin
+
+      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid URI""") }
+    }
+
+    "handle a good email address" in {
+      val spec = new ActivitySpecification(List(
+        new EmailActivityParameter("param1", "An email address")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "Tester McTesty <test@balihoo.com>"
+          |}
+        """.stripMargin
+
+      val params = spec.getParameters(input)
+
+      params[String]("param1") === "Tester McTesty <test@balihoo.com>"
+    }
+
+    "reject a bad email address" in {
+      val spec = new ActivitySpecification(List(
+        new EmailActivityParameter("param1", "An email address")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "banana peel"
+          |}
+        """.stripMargin
+
+      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid email address""") }
+    }
+
+    "handle a good IPv4 address" in {
+      val spec = new ActivitySpecification(List(
+        new Ipv4ActivityParameter("param1", "An IPv4 address")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "1.2.3.4"
+          |}
+        """.stripMargin
+
+      val params = spec.getParameters(input)
+
+      params[String]("param1") === "1.2.3.4"
+    }
+
+    "reject a bad IPv4 address" in {
+      val spec = new ActivitySpecification(List(
+        new Ipv4ActivityParameter("param1", "An IPv4 address")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "banana peel"
+          |}
+        """.stripMargin
+
+      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid IPv4 address""") }
+    }
+
+    "handle a good IPv6 address" in {
+      val spec = new ActivitySpecification(List(
+        new Ipv6ActivityParameter("param1", "An IPv6 address")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "Dead:Beef:Cafe::bad:f00d:4:a11"
+          |}
+        """.stripMargin
+
+      val params = spec.getParameters(input)
+
+      params[String]("param1") === "Dead:Beef:Cafe::bad:f00d:4:a11"
+    }
+
+    "reject a bad IPv6 address" in {
+      val spec = new ActivitySpecification(List(
+        new Ipv6ActivityParameter("param1", "An IPv6 address")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "banana peel"
+          |}
+        """.stripMargin
+
+      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid IPv6 address""") }
+    }
+
+    "handle a good hostname" in {
+      val spec = new ActivitySpecification(List(
+        new HostnameActivityParameter("param1", "A hostname")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "test.balihoo.com"
+          |}
+        """.stripMargin
+
+      val params = spec.getParameters(input)
+
+      params[String]("param1") === "test.balihoo.com"
+    }
+
+    "reject a bad hostname" in {
+      val spec = new ActivitySpecification(List(
+        new HostnameActivityParameter("param1", "A hostname")
+      ), new StringActivityResult("Nothing"))
+
+      val input =
+        """{
+          |  "param1" : "banana peel"
+          |}
+        """.stripMargin
+
+      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid hostname""") }
     }
 
     "parse integer type" in {

@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.workers
 
+import java.net.{URI, URL}
+
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
@@ -50,9 +52,9 @@ trait ImageAdCreatorComponent {
         new StringActivityParameter("account", "Participant AdWords account ID"),
         new StringActivityParameter("name", "Name of this ad (used to reference the ad later)"),
         new IntegerActivityParameter("adGroupId", "AdWords AdGroup ID"),
-        new StringActivityParameter("url", "Landing page URL"),
-        new StringActivityParameter("displayUrl", "Visible Ad URL"),
-        new StringActivityParameter("imageUrl", "URL Location of image data for this ad"),
+        new UriActivityParameter("url", "Landing page URL"),
+        new UriActivityParameter("displayUrl", "Visible Ad URL"),
+        new UriActivityParameter("imageUrl", "URL Location of image data for this ad"),
         new EnumActivityParameter("status", "Enabled by default", List("ENABLED", "PAUSED", "DISABLED"), false)
       ), new StringActivityResult("ImageAd ID"),
       "Create a Google AdWords Image Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201409/AdGroupAdService.ImageAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad")
@@ -80,7 +82,7 @@ trait ImageAdCreatorComponent {
       })
     }
 
-    def makeImageFromUrl(imageUrl:String):Image = {
+    def makeImageFromUrl(imageUrl:URL):Image = {
       val bytes =  adWordsAdapter.withErrorsHandled[Array[Byte]]("Fetching image data", {
         com.google.api.ads.common.lib.utils.Media.getMediaDataFromUrl(imageUrl)
       })
@@ -95,9 +97,9 @@ trait ImageAdCreatorComponent {
     def newImageAd(params:ActivityParameters): ImageAd = {
 
       val name = params("name")
-      val url = AdWordsPolicy.destinationUrl(params("url"))
-      val displayUrl = AdWordsPolicy.displayUrl(params("displayUrl"))
-      val imageUrl = params("imageUrl")
+      val url = AdWordsPolicy.destinationUrl(params[URI]("url").toString)
+      val displayUrl = AdWordsPolicy.displayUrl(params[URI]("displayUrl").toString)
+      val imageUrl = params[URI]("imageUrl").toURL
 
       AdWordsPolicy.matchDomains(url, displayUrl)
 
@@ -118,8 +120,8 @@ trait ImageAdCreatorComponent {
 
     def updateImageAd(existingAd:ImageAd, params:ActivityParameters): ImageAd = {
 
-      val url = AdWordsPolicy.destinationUrl(params("url"))
-      val displayUrl = AdWordsPolicy.displayUrl(params("displayUrl"))
+      val url = AdWordsPolicy.destinationUrl(params[URI]("url").toString)
+      val displayUrl = AdWordsPolicy.displayUrl(params[URI]("displayUrl").toString)
 
       if (existingAd.getUrl == url && existingAd.getDisplayUrl == displayUrl) {
         existingAd
