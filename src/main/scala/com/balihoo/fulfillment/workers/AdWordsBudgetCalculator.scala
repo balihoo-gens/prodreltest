@@ -5,12 +5,11 @@ import java.io.InputStream
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters._
 
-import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.util.{UTCFormatter, Splogger}
 import com.google.api.ads.adwords.lib.jaxb.v201409._
 import org.joda.time.{Days, DateTime}
 
 import scala.collection.JavaConversions._
-import scala.collection.parallel.mutable
 import scala.io.Source
 
 abstract class AbstractAdWordsBudgetCalculator extends FulfillmentWorker {
@@ -45,18 +44,16 @@ trait BudgetCalculatorComponent {
   abstract class AbstractBudgetCalculator {
     this: AdWordsAdapterComponent =>
 
-    var brandAccountCache = collection.mutable.Map[String, String]()
-
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
         new StringActivityParameter("account", "Participant AdWords account ID"),
         new StringActivityParameter("campaignId", "AdWords Campaign ID"),
-        new NumberActivityParameter("budget", "The period budget"),
-        new StringActivityParameter("startDate", "YYYYMMDD", pattern=Some("[0-9]{8}")),
-        new StringActivityParameter("endDate", "YYYYMMDD", pattern=Some("[0-9]{8}")),
-        new StringActivityParameter("today", "YYYYMMDD", pattern=Some("[0-9]{8}")),
+        new NumberActivityParameter("budget", "The target spend for the period from startDate to endDate"),
+        new DateTimeActivityParameter("startDate", "The first date of the budget period"),
+        new DateTimeActivityParameter("today", "Expected to be within startDate and endDate"),
+        new DateTimeActivityParameter("endDate", "The last date of the budget period"),
         new EnumsActivityParameter("adschedule", "Days of the week for spend", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun"))
-      ), new StringActivityResult("Calculated Daily budget"))
+      ), new StringActivityResult("Amount that must be spent per-remaining schedule day to spend the entire budget."))
     }
 
     def computeDailyBudget(params:ActivityParameters):Float = {
@@ -65,12 +62,20 @@ trait BudgetCalculatorComponent {
       val today = params[DateTime]("today")
       val endDate = params[DateTime]("endDate")
       val adschedule = params[List[String]]("adschedule")
-      val budget = params[Float]("budget")
+      val budget = params[Double]("budget").toFloat
+
+      if(today.isBefore(startDate)) {
+        throw new Exception(s"today (${UTCFormatter.format(today)}) is before startDate(${UTCFormatter.format(startDate)})")
+      }
+
+      if(today.isAfter(endDate)) {
+        throw new Exception(s"today (${UTCFormatter.format(today)}) is after endDate(${UTCFormatter.format(endDate)})")
+      }
 
       val rep = _getDailyCost(params[String]("campaignId")
-        ,params[String]("startDate")
-        ,params[String]("today")
-        ,"context lol")
+        ,startDate.toString("YYYYMMdd")
+        ,today.toString("YYYYMMdd")
+        ,"Fetching Daily Spend")
 
       var spent = 0f
       for((date, cost) <- rep) {
@@ -78,19 +83,15 @@ trait BudgetCalculatorComponent {
       }
 
       var futureDays = 0
-      for(day <- 0 to Days.daysBetween(today.minusDays(1), endDate.plusDays(1)).getDays) {
-        if(adschedule.contains(today.plusDays(day))) {
+      for(day <- 0 to Days.daysBetween(today, endDate).getDays) {
+        if(adschedule.contains(today.plusDays(day).dayOfWeek().getAsShortText)) {
           futureDays += 1
         }
       }
 
       val budgetRemaining = budget - spent
       if(budgetRemaining > 0) {
-        if(futureDays > 0) {
-          return budgetRemaining / futureDays
-        } else {
-          return budgetRemaining
-        }
+        return budgetRemaining / (if(futureDays > 0) futureDays else 1)
       }
 
       0.0f
@@ -102,7 +103,7 @@ trait BudgetCalculatorComponent {
 
     protected def _getDailyCost(campaignId:String, startDate:String, endDate:String, context:String):Map[DateTime, Long] = {
 
-      adWordsAdapter.withErrorsHandled[Map[DateTime, Long]](context, {
+      adWordsAdapter.withErrorsHandled[Map[DateTime, Long]](s"$context $campaignId $startDate $endDate", {
         // https://developers.google.com/adwords/api/docs/appendix/reports#campaign
         val selector = new Selector()
         selector.getFields.addAll(seqAsJavaList(List(
@@ -135,9 +136,7 @@ trait BudgetCalculatorComponent {
 
         results.toMap
       })
-
     }
-
   }
 
   class BudgetCalculator(awa: AdWordsAdapter)

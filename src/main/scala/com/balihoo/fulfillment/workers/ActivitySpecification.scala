@@ -7,7 +7,7 @@ import org.joda.time.DateTime
 
 import scala.collection.mutable
 
-import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
 
 import org.keyczar.Crypter

@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import play.api.libs.json.Json
 
 abstract class BudgetCalculateTest(cfg: PropertiesLoader)
   extends AdWordsAdapterComponent
@@ -41,17 +42,17 @@ object adWordsCalculateBudget {
       val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
 
 
-      val budgetCalcParams = Map(
-        "name" -> "Drab",
-        "campaignId" -> s"${campaign.getId}",
-        "startDate" -> "20141115",
-        "today" -> "20141203",
-        "endDate" -> "20141231",
-        "budget" -> "4000",
-        "adschedule" -> List("Mon", "Tue")
+      val budgetCalcParams = Json.obj(
+        "account" -> "282-338-1220",
+        "campaignId" -> campaign.getId.toString,
+        "startDate" -> "2014-11-01T12:12:12Z",
+        "today" -> "2014-12-29T12:12:12Z",
+        "endDate" -> "2014-12-29T12:12:12Z",
+        "budget" -> 100,
+        "adschedule" -> List("Mon", "Tue", "Fri")
       )
 
-      val budget = budgetCalculator.computeDailyBudget(new ActivityParameters(budgetCalcParams))
+      val budget = budgetCalculator.computeDailyBudget(budgetCalculator.getSpecification.getParameters(budgetCalcParams))
 
       println(budget)
     }
