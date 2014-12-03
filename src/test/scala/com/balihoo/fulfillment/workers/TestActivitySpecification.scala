@@ -277,5 +277,18 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
 
     }
 
+    "parse enums type" in {
+
+      val spec = new ActivitySpecification(List(
+        new EnumsActivityParameter("param1", "Param 1 is an enumses", options=List("BEETLE", "JUICE", "IS", "WEIRD"))
+      ), new StringActivityResult("really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val input = """{"param1" : 1}"""
+
+      val params = spec.getParameters(input)
+      params[Long]("param1") must beEqualTo(1.toLong)
+    }
+
   }
 }

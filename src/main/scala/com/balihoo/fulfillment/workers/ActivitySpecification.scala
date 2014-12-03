@@ -268,6 +268,27 @@ class StringsActivityParameter(override val name:String
 
   def jsonType = "array"
 
+  def parseValue(js: JsValue): Any = _parseBasic[List[String]](js)
+
+  override def toSchema: JsValue = {
+    Json.obj(
+      "type" -> jsonType,
+      "description" -> description,
+      "items" -> Json.obj(
+        "type" -> "string"
+      )
+    )
+  }
+}
+
+class EnumsActivityParameter(override val name:String
+                               ,override val description:String
+                               ,val options:Seq[String]
+                               ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "array"
+
   def parseValue(js:JsValue):Any = _parseBasic[List[String]](js)
 
   override def toSchema:JsValue = {
@@ -275,7 +296,8 @@ class StringsActivityParameter(override val name:String
       "type" -> jsonType,
       "description" -> description,
       "items" -> Json.obj(
-        "type" -> "string"
+        "type" -> "string",
+        "enum" -> Json.toJson(options)
       )
     )
   }

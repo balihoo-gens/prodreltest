@@ -2,8 +2,8 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201406.cm._
+import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201409.cm._
 
 import com.balihoo.fulfillment.util.Splogger
 
@@ -55,7 +55,7 @@ trait TextAdCreatorComponent {
         new StringActivityParameter("url", "Landing page URL (domain must match displayUrl)"),
         new StringActivityParameter("displayUrl", "Visible Ad URL")
       ), new StringActivityResult("TextAd ID"),
-        "Create a Google AdWords Text Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201406/AdGroupAdService.TextAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad" )
+        "Create a Google AdWords Text Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201409/AdGroupAdService.TextAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad" )
     }
 
     def getTextAd(params: ActivityParameters): TextAd = {
