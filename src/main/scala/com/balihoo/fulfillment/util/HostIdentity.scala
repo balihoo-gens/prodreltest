@@ -1,48 +1,70 @@
 package com.balihoo.fulfillment.util
 
 import scala.sys.process._
+
 object HostIdentity {
 
+  private var _hostName:Option[String] = None
+
   def getHostAddress:String = {
-    new java.io.File("/etc/ec2_version").exists match {
-      case true => getEC2Address
-      case _ =>
-        val name = sys.env.get("EC2_HOME") match {
-          case Some(_:String) => {
-              val name = getEC2HostName
-              if (name.isEmpty) getEC2Address else name
-          }
-          case None => getHostname
+    _hostName match {
+      case Some(name) => name
+      case None => {
+        if (isEC2Instance) {
+          //reduce nesting by iterating over a list
+          _hostName = ListOps.iterateUntilSome(
+            List(
+              "public-hostname",
+              "public-ipv4",
+              "instance-id",
+              "hostname",
+              "local-hostname",
+              "local-ipv4"
+            ),
+            getEC2MetaData _
+          )
         }
-        if (name.isEmpty) "noname" else name
+        //still a bunch of nesting
+        _hostName match {
+          case Some(name) => name
+          case None => {
+            _hostName = getLocalHostname
+            _hostName match {
+              case Some(name) => name
+              case None => {
+                _hostName = Some("noname")
+                _hostName.get
+              }
+            }
+          }
+        }
+      }
     }
   }
 
-  def getEC2Address:String = {
-    getEC2MetaData("public-ipv4")
+  def isEC2Instance:Boolean = {
+    sys.env.contains("EC2_HOME") || new java.io.File("/etc/ec2_version").exists
   }
 
-  def getEC2HostName:String = {
-    getEC2MetaData("public-hostname")
-  }
-
-  def getEC2MetaData(id:String): String = {
+  def getEC2MetaData(id:String): Option[String] = {
     val url = s"http://169.254.169.254/latest/meta-data/$id"
     val aws_ec2_identify = s"curl -s $url --max-time 2 --retry 3"
-    aws_ec2_identify.!!
+    val res = aws_ec2_identify.!!
+    if (res.isEmpty) None else Some(res)
   }
 
-  def getHostname:String = {
+  def getLocalHostname:Option[String] = {
+    var res:String = ""
     try {
       // This might throw an exception if the local DNS doesn't know about the system hostname.
       // At this point we're looking for some kind of identifier. It doesn't have to actually
       // be reachable.
-      java.net.InetAddress.getLocalHost.getHostName
+      res = java.net.InetAddress.getLocalHost.getHostName
     } catch {
       case e:Exception =>
         // If all else fails..
-        "hostname".!!
+        res = "hostname".!!
     }
-
+    if (res.isEmpty) None else Some(res)
   }
 }
