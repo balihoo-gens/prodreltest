@@ -53,7 +53,9 @@ trait BudgetCalculatorComponent {
         new DateTimeActivityParameter("today", "Expected to be within startDate and endDate"),
         new DateTimeActivityParameter("endDate", "The last date of the budget period"),
         new EnumsActivityParameter("adschedule", "Days of the week for spend", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun"))
-      ), new StringActivityResult("Amount that must be spent per-remaining schedule day to spend the entire budget."))
+      ), new StringActivityResult("Amount that must be spent per-remaining schedule day to spend the entire budget."),
+        "https://docs.google.com/a/balihoo.com/presentation/d/13ZZaIxekgcpFY5G4gTeSCu49V2liMyP8-0NwEyFr1q8/edit?usp=sharing"
+      )
     }
 
     def computeDailyBudget(params:ActivityParameters):Float = {
