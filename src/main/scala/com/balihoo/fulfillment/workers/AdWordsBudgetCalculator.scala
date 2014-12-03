@@ -77,12 +77,12 @@ trait BudgetCalculatorComponent {
         ,today.toString("YYYYMMdd")
         ,"Fetching Daily Spend")
 
-      var spent = 0f
+      var spent = 0f // Total up how much we spent between startDate and today
       for((date, cost) <- rep) {
         spent += adWordsAdapter.microsToDollars(cost)
       }
 
-      var futureDays = 0
+      var futureDays = 0 // We count up all the days between today and endDate that are in the schedule
       for(day <- 0 to Days.daysBetween(today, endDate).getDays) {
         if(adschedule.contains(today.plusDays(day).dayOfWeek().getAsShortText)) {
           futureDays += 1
@@ -116,7 +116,7 @@ trait BudgetCalculatorComponent {
         selector.setDateRange(dateRange)
 
         val reportDefinition = new ReportDefinition()
-        reportDefinition.setReportName("BudgetReport "+System.currentTimeMillis())
+        reportDefinition.setReportName(s"BudgetReport $campaignId "+System.currentTimeMillis())
         reportDefinition.setDateRangeType(ReportDefinitionDateRangeType.CUSTOM_DATE)
         reportDefinition.setReportType(ReportDefinitionReportType.CAMPAIGN_PERFORMANCE_REPORT)
         reportDefinition.setDownloadFormat(DownloadFormat.TSV)
@@ -124,13 +124,21 @@ trait BudgetCalculatorComponent {
 
         val report = adWordsAdapter.reportDownloader.downloadReport(reportDefinition)
 
+        // The report is a TSV formatted like this:
+        // Campaign Day Cost
+        // 34563456 2014-12-01 440000
+        // 34563456 2014-12-02 240000
+        // 67897856 2014-12-03 560000
+        // 34563456 2014-12-03 780000
+        // 34563456 2014-12-04 518000
+
         val results = collection.mutable.Map[DateTime, Long]()
 
         val rows = streamToString(report.getInputStream).split("""\n""")
-        for(row <- rows.slice(2, rows.length - 1)) {
+        for(row <- rows.slice(2, rows.length - 1)) { // Slice to skip the header and the totals
           val parts = row.split("""\t""")
-          if(parts(0) == campaignId) {
-            results(new DateTime(parts(1))) = parts(2).toLong
+          if(parts(0) == campaignId) { // Not all rows in the report are for the campaign we're interested in.
+            results(new DateTime(parts(1))) = parts(2).toLong // Mapping when to how much
           }
         }
 
