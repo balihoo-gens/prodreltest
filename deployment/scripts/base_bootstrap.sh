@@ -30,7 +30,7 @@ if [ "${DISTRO}" = "Ubuntu" ]; then
   logdo "rm -rf /var/lib/apt/lists/*"
   logdo "export DEBIAN_FRONTEND=noninteractive"
   #update the repo, but don't let it stop you; we're probably up to date enough anyway
-  logdo "apt-get update -q || true"
+  logdo "apt-get update -q" || true
   logdo "${INSTALLER} install -y unzip default-jre"
 else
   log "nothing to install for amazon linux"
