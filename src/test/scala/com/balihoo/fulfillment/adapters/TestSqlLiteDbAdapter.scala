@@ -33,7 +33,7 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
 
   "SqlLiteDatabaseAdapter" should {
     "return a lightweight database" in new TestContext with TempFileContext {
-      val db = liteDbAdapter.create(tempFile)
+      val db = liteDbAdapter.create(tempFile.getAbsolutePath)
       db must beAnInstanceOf[component.LightweightDatabase]
       db.close()
     }
@@ -111,7 +111,7 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
   }
 
   trait SqlLiteDbContext extends TestContext with TempFileContext {
-    val db = liteDbAdapter.create(tempFile)
+    val db = liteDbAdapter.create(tempFile.getAbsolutePath)
     override def after = {
       db.close()
       super.after

@@ -1,5 +1,6 @@
 package com.balihoo.fulfillment.workers
 
+import java.io.OutputStream
 import java.net.URI
 
 import com.balihoo.fulfillment.adapters._
@@ -28,6 +29,9 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   val s3filenameSepCharPattern = "[\\.]".r
   val s3BucketConfig = "s3bucket"
   val s3DirConfig = "s3dir"
+
+  def destinationS3Bucket = swfAdapter.config.getString(s3BucketConfig)
+  def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -67,20 +71,30 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     val pageSize = maybePageSize.get
     if (pageSize < 1) throw new IllegalArgumentException("pageSize param is invalid")
 
-    (queryDefinition, source.getHost, source.getPath.substring(1), pageSize)
+    (queryDefinition, source.getHost, source.getPath.tail, pageSize)
+  }
+
+  private def writeResultSetToCsv(pagedResultSet: DbPagedResultSet, csvOutputStream: OutputStream, queryDefinition: QueryDefinition) = {
+    /* use same sql pages as csv pages for now */
+
+    if (!pagedResultSet.hasNext) throw new IllegalStateException("csv file count is different than sql pages received")
+    val resultSetPage = pagedResultSet.next
+
+    splog.info("Writing records to CSV...")
+
+    val csvWriter = csvAdapter.newWriter(csvOutputStream)
+    csvWriter.writeRow(queryDefinition.fields)
+    while (resultSetPage.hasNext) {
+      csvWriter.writeRow(resultSetPage.next)
+    }
   }
 
   override def handleTask(params: ActivityParameters) = {
 
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
-    val destinationS3Bucket = this.swfAdapter.config.getString(s3BucketConfig)
-    val destinationS3Key = this.swfAdapter.config.getString(s3DirConfig)
 
-    splog.info(s"Downloading db file sourceBucket=$sourceBucket sourceKey=$sourceKey")
-    val s3TempFile = s3Adapter.getAsTempFile(sourceBucket, sourceKey, None)
-
-    splog.info(s"Opening db file path=${s3TempFile.getAbsolutePath}")
-    val db = liteDbAdapter.create(s3TempFile)
+    val dbDownload = s3Adapter.get(sourceBucket, sourceKey).map(s3Adapter.download).get
+    val db = liteDbAdapter.create(dbDownload.absolutePath)
 
     try {
 
@@ -92,48 +106,34 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
       val pagedResultSet = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
 
       /* Process all csv files one after the other */
-      val urls = for (i <- 1 to pagesCount) yield {
+      val uris = for (i <- 1 to pagesCount) yield {
 
         splog.info(s"Processing csv file #$i...")
 
-        val csvName = s3keySepCharPattern.split(sourceKey).filter(!_.trim.isEmpty).last + s".$i"
-        val csvS3Key = s"$destinationS3Key/$csvName.csv"
-
-        splog.info("Creating temp csv file...")
-        val (csvFile, csvOutputStream) = filesystemAdapter.newTempFileOutputStream(csvName, ".csv")
-        splog.info("Using temp csv file path=" + csvFile.getAbsolutePath)
+        val csvS3Key = s"$destinationS3Key/$sourceKey.$i.csv"
+        val csvTempFile = filesystemAdapter.newTempFile()
+        val csvOutputStream = csvTempFile.asOutputStream
 
         try {
 
-          /* use same sql pages as csv pages for now */
+          writeResultSetToCsv(pagedResultSet, csvOutputStream, queryDefinition)
 
-          if (!pagedResultSet.hasNext) throw new IllegalStateException("csv file count is different than sql pages received")
-          val resultSetPage = pagedResultSet.next
-
-          splog.info("Writing records to CSV...")
-          val csvWriter = csvAdapter.newWriter(csvOutputStream)
-          csvWriter.writeRow(queryDefinition.fields)
-          while (resultSetPage.hasNext) {
-            csvWriter.writeRow(resultSetPage.next)
-          }
-          csvOutputStream.close()
-
-          splog.info(s"Uploading csv file to s3... s3bucket=$destinationS3Bucket s3key=$csvS3Key")
-          s3Adapter.putPublic(destinationS3Bucket, csvS3Key, csvFile)
+          s3Adapter
+            .upload(csvS3Key, csvTempFile.file)
+            .map(_.toString)
+            .get
 
         } finally {
           csvOutputStream.close()
-          csvFile.delete()
+          csvTempFile.delete()
         }
-
-        s"s3://$destinationS3Bucket/$csvS3Key"
       }
 
-      completeTask(JsArray(urls.map(JsString)).toString())
+      completeTask(JsArray(uris.map(JsString)).toString())
 
     } finally {
       db.close()
-      s3TempFile.delete()
+      dbDownload.close()
     }
   }
 
@@ -231,7 +231,7 @@ class EmailFilterListWorker(override val _cfg: PropertiesLoader, override val _s
     with S3AdapterComponent
     with ScalaCsvAdapterComponent
     with LocalFilesystemAdapterComponent {
-  override val s3Adapter = new S3Adapter(_cfg)
+  override val s3Adapter = new S3Adapter(_cfg, _splog)
 }
 
 /**

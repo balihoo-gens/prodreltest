@@ -1,6 +1,9 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{FileOutputStream, File}
+import java.io._
+
+import com.balihoo.fulfillment.util.SploggerComponent
+import org.apache.commons.io.IOUtils
 
 /**
  * Component to help accessing the local filesystem.
@@ -12,35 +15,61 @@ trait FilesystemAdapterComponent {
 
   trait FilesystemAdapter {
 
-    def newTempFileOutputStream(name: String, extension: String = ".tmp"): (File, FileOutputStream)
+    def newTempFile(in: InputStream): TempFile
 
-    def newTempFile(name: String, extension: String = ".tmp"): File
-
-    def newFileOutputStream(file: File): FileOutputStream
+    def newTempFile(): TempFile
 
   }
   
 }
 
+case class TempFile(file: File) {
+
+  def delete() = file.delete()
+
+  lazy val absolutePath = file.getAbsolutePath
+  lazy val uri = file.toURI
+  def asInputStream: InputStream = new FileInputStream(file)
+  def asInputStreamReader: InputStreamReader = new InputStreamReader(asInputStream)
+  def asOutputStream: OutputStream = new FileOutputStream(file)
+}
+
 trait LocalFilesystemAdapterComponent extends FilesystemAdapterComponent {
+
+  this: SploggerComponent =>
 
   val filesystemAdapter = new LocalFilesystemAdapter()
 
   class LocalFilesystemAdapter extends FilesystemAdapter {
 
-    override def newTempFile(name: String, extension: String = ".tmp"): File = {
-      require(!name.trim.isEmpty)
-      require(!extension.trim.isEmpty)
-      val file = File.createTempFile(name, extension)
-      file.deleteOnExit()
-      file
+    def newTempFile() = TempFile(newFile())
+
+    /**
+     * Create a new temporary file that contains specified input stream content.
+     * @param in a stream to copy data from.
+     * @return a new temp file handle.
+     */
+    override def newTempFile(in: InputStream) = {
+      val file = newFile()
+      val out = new FileOutputStream(file)
+      try {
+        val copied = IOUtils.copy(in, out)
+        if (copied == 0) throw new IllegalArgumentException("No data copied")
+        splog.debug(s"Temporary file data copied bytesCount=$copied")
+      } finally {
+        out.close()
+      }
+      TempFile(file)
     }
 
-    override def newFileOutputStream(file: File): FileOutputStream = new FileOutputStream(file)
-
-    override def newTempFileOutputStream(name: String, extension: String = ".tmp"): (File, FileOutputStream) = {
-      val file = newTempFile(name, extension)
-      (file, newFileOutputStream(file))
+    /**
+     * @return a new temp file handle.
+     */
+    private def newFile() = {
+      val file = File.createTempFile(getClass.getSimpleName, ".tmp")
+      splog.debug("New temporary file path=" + file.getAbsolutePath)
+      file.deleteOnExit()
+      file
     }
 
   }

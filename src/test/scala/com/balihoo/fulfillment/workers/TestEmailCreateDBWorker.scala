@@ -1,25 +1,26 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{InputStreamReader, File}
-import java.net.{URI, URISyntaxException}
+import java.io.{File, InputStreamReader}
+import java.net.URI
 import java.text.SimpleDateFormat
+import java.util.Date
 
 import com.balihoo.fulfillment.adapters._
+import org.junit.runner._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.specs2.runner._
-import org.junit.runner._
 import org.specs2.specification.Scope
 import play.api.libs.json.Json
 
-import scala.util.Try
+import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
 class TestEmailCreateDBWorker extends Specification with Mockito {
 
   "EmailCreateDBWorker.getSpecification" should {
-    "return a valid specification" in new TestContext {
-      val spec = worker.getSpecification
+    "return a valid specification" in new WithWorker {
+      val spec = getSpecification
       spec must beAnInstanceOf[ActivitySpecification]
       spec.params.size must beEqualTo(3)
       spec.params.count(_.name == "source") must beEqualTo(1)
@@ -31,76 +32,68 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
   }
 
   "EmailCreateDBWorker.handleTask" should {
-    "fail task if source param missing" in new TestContext {
-      val activityParameter = new ActivityParameters(Map())
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
+    "fail task if source param missing" in new WithWorker {
+      handleTask(data.activityParameterWithMissingSource) must throwA[IllegalArgumentException]
     }
-    "fail task if dbname param missing" in new TestContext {
-      val activityParameter = new ActivityParameters(Map("source" -> data.source, "dtd" -> data.dtd))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
+    "fail task if dbname param missing" in new WithWorker {
+      handleTask(data.activityParameterWithMissingDbname) must throwA[IllegalArgumentException]
     }
-    "fail task if dtd param missing" in new TestContext {
-      val activityParameter = new ActivityParameters(Map("source" -> data.source, "dbname" -> data.dbname))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
+    "fail task if dtd param missing" in new WithWorker {
+      handleTask(data.activityParameterWithMissingDtd) must throwA[IllegalArgumentException]
     }
-    "fail task if dtd param is invalid" in new TestContext {
-      val activityParameter = new ActivityParameters(Map("source" -> data.source, "dtd" -> data.invalidDtd, "dbname" -> data.dbname))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
+    "fail task if dtd param is invalid" in new WithWorker {
+      handleTask(data.activityParameterWithInvalidDtd) must throwA[IllegalArgumentException]
     }
-    "fail task if protocol is unsupported" in new TestContext {
-      val activityParameter = new ActivityParameters(Map(
-        "source" -> data.sourceWithInvalidScheme,
-        "dbname" -> data.dbname,
-        "dtd" -> data.dtd))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
+    "fail task if protocol is unsupported" in new WithWorker {
+      handleTask(data.activityParameterWithUnsupportedProtocol) must throwA[IllegalArgumentException]
     }
-    "fail task if csv stream empty" in new TestContext {
-      givenReader()
-      givenCsvStream(Stream.empty)
-      givenTempDbFile()
-      givenLiteDb()
-      val activityParameter = new ActivityParameters(Map(
-        "source" -> data.source,
-        "dbname" -> data.dbname,
-        "dtd" -> data.dtd))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
-    }
-    "fail task if csv stream has no records" in new TestContext {
-      givenReader()
-      givenCsvStream(data.header #:: Stream.empty)
-      givenTempDbFile()
-      givenLiteDb()
-      val activityParameter = new ActivityParameters(Map(
-        "source" -> data.source,
-        "dbname" -> data.dbname,
-        "dtd" -> data.dtd))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
-    }
-    "fail task if csv stream has bad records and failOnBadRecord is true" in new TestContext {
-      givenFailOnBadRecord()
-      givenReader()
-      givenCsvStream(data.header #:: Stream.empty)
-      givenTempDbFile()
-      givenLiteDb()
-      val activityParameter = new ActivityParameters(Map(
-        "source" -> data.source,
-        "dbname" -> data.dbname,
-        "dtd" -> data.dtd))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[RuntimeException]
-    }
-    "complete task if db file could be created from csv and uploaded to s3" in new TestContext {
-      givenReader()
-      givenCsvStream()
-      givenTempDbFile()
-      givenLiteDb()
-      val activityParameter = new ActivityParameters(Map(
-        "source" -> data.source,
-        "dbname" -> data.dbname,
-        "dtd" -> data.dtd))
+    "fail task if csv stream has no records" in new WithWorker {
+      csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
+      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
+      db_tempFile_mock.absolutePath returns data.db_temp_file_path
+      filesystemAdapter.newTempFile() returns db_tempFile_mock
+      liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
+      csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
+      s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
+      csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream_no_records)
 
-      worker.handleTask(activityParameter)
+      handleTask(data.activityParameter) must throwA[RuntimeException]
+    }
+    "fail task if csv stream has bad records and failOnBadRecord is true" in new WithWorker {
+      swfAdapter.config.getOrElse(===("failOnBadRecord"), any[Boolean]) returns true
+      csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
+      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
+      db_tempFile_mock.absolutePath returns data.db_temp_file_path
+      filesystemAdapter.newTempFile() returns db_tempFile_mock
+      liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
+      csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
+      s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
+      csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream_no_records)
 
-      there was one(worker.dbMock).execute("create table \"recipients\" (" +
+      handleTask(data.activityParameter) must throwA[RuntimeException]
+    }
+    "complete task by uploading generated db to s3" in new WithWorker {
+      csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
+      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
+      db_tempFile_mock.absolutePath returns data.db_temp_file_path
+      db_tempFile_mock.file returns db_file_mock
+      filesystemAdapter.newTempFile() returns db_tempFile_mock
+      liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
+      csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
+      s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
+      csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream)
+      db_mock.batch(anyString) returns db_batch_mock
+      s3Adapter.upload(===(data.db_s3_key), ===(db_file_mock), anyString, any[Map[String, String]], any[S3Visibility]) returns Success(data.db_s3_uri)
+
+      handleTask(data.activityParameter)
+
+      /* make sure output is complete s3 url */
+      test_complete_result must ===(data.db_s3_uri.toString)
+
+      there was one(db_mock).execute("create table \"recipients\" (" +
         "\"locationid\" integer, " +
         "\"recipientid\" varchar(100), " +
         "\"email\" varchar(100), " +
@@ -108,151 +101,158 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         "\"lastname\" varchar(50), " +
         "\"birthday\" date, " +
         "primary key (\"locationid\", \"recipientid\"))")
-      there was one(worker.dbMock).batch("insert into \"recipients\" " +
+      there was one(db_mock).batch("insert into \"recipients\" " +
         "(\"recipientid\", \"locationid\", \"email\", \"firstname\", \"lastname\", \"birthday\") " +
         "values (?, ?, ?, ?, ?, ?)")
 
-      there was one(worker.dbBatchMock).param(1, "b")
-      there was one(worker.dbBatchMock).param(2, 2.toLong)
-      there was one(worker.dbBatchMock).param(3, "rafael@nike.com")
-      there was one(worker.dbBatchMock).param(4, "rafael")
-      there was one(worker.dbBatchMock).param(5, "nadal")
-      there was one(worker.dbBatchMock).param(6, new java.sql.Date(sqlDateParser.parse("1986-06-03").getTime))
+      there was one(db_batch_mock).param(1, "b")
+      there was one(db_batch_mock).param(2, 2.toLong)
+      there was one(db_batch_mock).param(3, "rafael@nike.com")
+      there was one(db_batch_mock).param(4, "rafael")
+      there was one(db_batch_mock).param(5, "nadal")
+      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1986-06-03").getTime))
 
-      there was one(worker.dbBatchMock).param(1, "a")
-      there was one(worker.dbBatchMock).param(2, 1.toLong)
-      there was one(worker.dbBatchMock).param(3, "roger@nike.com")
-      there was one(worker.dbBatchMock).param(4, "roger")
-      there was one(worker.dbBatchMock).param(5, "federer")
-      there was one(worker.dbBatchMock).param(6, new java.sql.Date(sqlDateParser.parse("1981-08-08").getTime))
+      there was one(db_batch_mock).param(1, "a")
+      there was one(db_batch_mock).param(2, 1.toLong)
+      there was one(db_batch_mock).param(3, "roger@nike.com")
+      there was one(db_batch_mock).param(4, "roger")
+      there was one(db_batch_mock).param(5, "federer")
+      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1981-08-08").getTime))
 
-      there was one(worker.dbBatchMock).param(1, "c")
-      there was one(worker.dbBatchMock).param(2, 3.toLong)
-      there was one(worker.dbBatchMock).param(3, "novak@uniqlo.com")
-      there was one(worker.dbBatchMock).param(4, "novak")
-      there was one(worker.dbBatchMock).param(5, "djokovic")
-      there was one(worker.dbBatchMock).param(6, new java.sql.Date(sqlDateParser.parse("1987-05-22").getTime))
+      there was one(db_batch_mock).param(1, "c")
+      there was one(db_batch_mock).param(2, 3.toLong)
+      there was one(db_batch_mock).param(3, "novak@uniqlo.com")
+      there was one(db_batch_mock).param(4, "novak")
+      there was one(db_batch_mock).param(5, "djokovic")
+      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1987-05-22").getTime))
 
-      there was three(worker.dbBatchMock).add()
-      there was two(worker.dbBatchMock).execute()
+      there was three(db_batch_mock).add()
+      there was two(db_batch_mock).execute()
 
-      there was one(worker.dbMock).commit()
-      there was one(worker.dbMock).execute("create unique index \"email_unique_idx\" on \"recipients\" (\"email\")")
-      there was one(worker.dbMock).execute("create index \"fullname\" on \"recipients\" (\"firstname\", \"lastname\")")
-      there was one(worker.dbMock).execute("create index \"bday\" on \"recipients\" (\"birthday\")")
+      there was one(db_mock).commit()
+      there was one(db_mock).execute("create unique index \"email_unique_idx\" on \"recipients\" (\"email\")")
+      there was one(db_mock).execute("create index \"fullname\" on \"recipients\" (\"firstname\", \"lastname\")")
+      there was one(db_mock).execute("create index \"bday\" on \"recipients\" (\"birthday\")")
 
-      there was one(worker.dbMock).close()
-      there was one(worker.readerMock).close()
-      there was one(worker.s3Adapter).putPublic(===("mock"), ===(s"${data.dbname}"), ===(worker.dbFileMock))
-      there was one(worker.dbFileMock).delete()
+      there was one(db_mock).close()
+      there was one(csv_reader_mock).close()
+      there was one(db_tempFile_mock).delete()
+    }
+    "complete task by returning cached db uri if lastModified" in new WithWorker {
+      csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
+      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      db_s3_meta_mock.userMetaData returns data.db_s3_userMetaDataOutdated
+      db_s3_meta_mock.s3Uri returns data.db_s3_uri
+      s3Adapter.get(===(data.db_s3_key)) returns Success(db_s3_meta_mock)
+
+      handleTask(data.activityParameter)
 
       /* make sure output is complete s3 url */
-      worker.test_complete_result must ===(s"s3://mock/${data.dbname}")
+      test_complete_result must ===(data.db_s3_uri.toString)
+
+      there was no(s3Adapter).download(any[S3Meta])
+      there was one(db_s3_meta_mock).close()
+      there was one(csv_s3_meta_mock).close()
     }
   }
 
-  class TestContext extends Scope {
+  object data {
+    val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")
+    val s3_bucket = "balihoo.fulfillment.stuff"
+    val csv_s3_key = "my/key/file.csv"
+    val param_source = new URI(s"s3://$s3_bucket/$csv_s3_key")
+    val param_source_invalid_protocol = new URI(s"http://$s3_bucket/$csv_s3_key")
+    val param_dbname = "test.db"
+    val param_dtd = Json.obj("columns" -> Json.arr(
+      Json.obj(
+        "name" -> "locationId",
+        "type" -> "integer",
+        "source" -> "STORENUM",
+        "index" -> "primary"
+      ),
+      Json.obj(
+        "name" -> "recipientId",
+        "type" -> "varchar(100)",
+        "source" -> "RECIPIENT",
+        "index" -> "primary"
+      ),
+      Json.obj(
+        "name" -> "email",
+        "type" -> "varchar(100)",
+        "source" -> "EMAILADDR",
+        "index" -> "unique"
+      ),
+      Json.obj(
+        "name" -> "firstName",
+        "type" -> "varchar(50)",
+        "source" -> "FNAME",
+        "index" -> "fullname"
+      ),
+      Json.obj(
+        "name" -> "lastName",
+        "type" -> "varchar(50)",
+        "source" -> "LNAME",
+        "index" -> "fullname"
+      ),
+      Json.obj(
+        "name" -> "birthday",
+        "type" -> "date",
+        "source" -> "BDAY",
+        "index" -> "bday"
+      )
+    ))
+    val param_dtd_invalid = Json.obj()
+    val activityParameter = new ActivityParameters(Map("source" -> param_source, "dbname" -> param_dbname, "dtd" -> param_dtd))
+    val activityParameterWithInvalidDtd = new ActivityParameters(Map("source" -> param_source, "dtd" -> param_dtd_invalid, "dbname" -> param_dbname))
+    val activityParameterWithMissingSource = new ActivityParameters(Map("dbname" -> param_dbname, "dtd" -> param_dtd))
+    val activityParameterWithUnsupportedProtocol = new ActivityParameters(Map("source" -> param_source_invalid_protocol, "dbname" -> param_dbname, "dtd" -> param_dtd))
+    val activityParameterWithMissingDbname = new ActivityParameters(Map("source" -> param_source, "dtd" -> param_dtd))
+    val activityParameterWithMissingDtd = new ActivityParameters(Map("source" -> param_source, "dbname" -> param_dbname))
+    val headers = List("RECIPIENT", "STORENUM", "emailaddr", "UNUSED", "FNAME", "LNAME", "TYPE", "BDAY")
+    val roger = List("a", "1", "roger@nike.com", "some", "roger", "federer", "a", "1981-08-08")
+    val rafael = List("b", "2", "rafael@nike.com", "some", "rafael", "nadal", "a", "1986-06-03")
+    val novak = List("c", "3", "novak@uniqlo.com", "some", "novak", "djokovic", "a", "1987-05-22")
+    val novak_bad = novak.tail
+    val csv_stream = headers #:: rafael #:: roger #:: novak #:: Stream.empty
+    val csv_stream_no_records = headers #:: Stream.empty
+    val csv_stream_bad_record = headers #:: roger #:: novak_bad #:: Stream.empty
+    val db_temp_file_path = "/any/path"
+    val csv_s3_LastModified = new Date()
+    val db_s3_LastModified = new Date(csv_s3_LastModified.getTime - 1)
+    val db_s3_userMetaDataOutdated = Map("csvLastModified" -> dateFormat.format(db_s3_LastModified))
+    val db_temp_file_uri = new URI("s3://some/valid")
+    val s3_dir = "test_dubdir"
+    val db_s3_key = s"$s3_dir/$param_dbname"
+    val db_s3_uri = new URI(s"s3://$s3_bucket/$db_s3_key")
+  }
 
-    val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
+  class WithWorker extends AbstractEmailCreateDBWorker with Scope
+    with LoggingWorkflowAdapterTestImpl
+    with S3AdapterComponent
+    with CsvAdapterComponent
+    with FilesystemAdapterComponent
+    with LightweightDatabaseAdapterComponent {
 
-    object data {
-      val s3bucket = "balihoo.fulfillment.stuff"
-      val s3key = "my/key/file.csv"
-      val source = new URI(s"s3://$s3bucket/$s3key")
-      val sourceWithInvalidScheme = new URI(s"http://$s3bucket/$s3key")
-      val dbname = "test.db"
-      val dtd = Json.obj("columns" -> Json.arr(
-        Json.obj(
-          "name" -> "locationId",
-          "type" -> "integer",
-          "source" -> "STORENUM",
-          "index" -> "primary"
-        ),
-        Json.obj(
-          "name" -> "recipientId",
-          "type" -> "varchar(100)",
-          "source" -> "RECIPIENT",
-          "index" -> "primary"
-        ),
-        Json.obj(
-          "name" -> "email",
-          "type" -> "varchar(100)",
-          "source" -> "EMAILADDR",
-          "index" -> "unique"
-        ),
-        Json.obj(
-          "name" -> "firstName",
-          "type" -> "varchar(50)",
-          "source" -> "FNAME",
-          "index" -> "fullname"
-        ),
-        Json.obj(
-          "name" -> "lastName",
-          "type" -> "varchar(50)",
-          "source" -> "LNAME",
-          "index" -> "fullname"
-        ),
-        Json.obj(
-          "name" -> "birthday",
-          "type" -> "date",
-          "source" -> "BDAY",
-          "index" -> "bday"
-        )
-      ))
-      val invalidDtd = Json.obj()
-      val header = List("RECIPIENT", "STORENUM", "emailaddr", "UNUSED", "FNAME", "LNAME", "TYPE", "BDAY")
-      val roger = List("a", "1", "roger@nike.com", "some", "roger", "federer", "a", "1981-08-08")
-      val rafael = List("b", "2", "rafael@nike.com", "some", "rafael", "nadal", "a", "1986-06-03")
-      val novak = List("c", "3", "novak@uniqlo.com", "some", "novak", "djokovic", "a", "1987-05-22")
-      val badRecordNovak = List("c", "3", "some", "novak", "djokovic", "a", "1987-05-22")
-      val csvStream = header #:: rafael #:: roger #:: novak #:: Stream.empty
-      val targetBucket= "test.bucket"
-      val targetDir = "somedir"
+    override val s3Adapter = mock[AbstractS3Adapter]
+    override val csvAdapter = mock[CsvAdapter]
+    override val liteDbAdapter = mock[LightweightDatabaseAdapter]
+    override val filesystemAdapter = mock[FilesystemAdapter]
+    override val insertBatchSize = 2
+    override val s3dir = data.s3_dir
+    override def completeTask(result: String) = {
+      test_complete_result = result
     }
 
-    val worker = new AbstractEmailCreateDBWorker
-      with LoggingWorkflowAdapterTestImpl
-      with S3AdapterComponent
-      with CsvAdapterComponent
-      with FilesystemAdapterComponent
-      with LightweightDatabaseAdapterComponent {
+    var test_complete_result = ""
 
-      override val s3Adapter = mock[AbstractS3Adapter]
-      override val csvAdapter = mock[CsvAdapter]
-      override val liteDbAdapter = mock[LightweightDatabaseAdapter]
-      override val filesystemAdapter = mock[FilesystemAdapter]
-      val readerMock = mock[InputStreamReader]
-      val dbFileMock = mock[File]
-      val dbMock = mock[LightweightDatabase with LightweightFileDatabase]
-      val dbBatchMock = mock[DbBatch]
-      override val insertBatchSize = 2
-      var test_complete_result = ""
-      override def completeTask(result: String) = {
-        test_complete_result = result
-      }
-    }
-
-    def givenFailOnBadRecord(value: Boolean = true) = {
-      worker.swfAdapter.config.getOrElse("failOnBadRecord", default = true) returns value
-    }
-
-    def givenReader() = {
-      worker.s3Adapter.getObjectContentAsReader(data.s3bucket, data.s3key) returns worker.readerMock
-    }
-
-    def givenCsvStream(stream: Stream[List[String]] = data.csvStream) = {
-      worker.csvAdapter.parseReaderAsStream(worker.readerMock) returns stream
-    }
-
-    def givenLiteDb() = {
-      worker.dbMock.batch(anyString) returns worker.dbBatchMock
-      worker.liteDbAdapter.create(any[File]) returns worker.dbMock
-    }
-
-    def givenTempDbFile() = {
-      worker.filesystemAdapter.newTempFile(===("email-createdb-" + data.dbname), ===(".sqlite")) returns worker.dbFileMock
-    }
-
+    val csv_s3_meta_mock = mock[S3Meta]
+    val csv_s3_download_mock = mock[S3Download]
+    val csv_reader_mock = mock[InputStreamReader]
+    val db_s3_meta_mock = mock[S3Meta]
+    val db_file_mock = mock[File]
+    val db_tempFile_mock = mock[TempFile]
+    val db_mock = mock[LightweightDatabase]
+    val db_batch_mock = mock[DbBatch]
   }
 
   "ColumnDefinition" should {

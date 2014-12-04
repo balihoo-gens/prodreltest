@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.adapters
 
-import com.balihoo.fulfillment.{TempFileReaderContext, TempFileOutputStreamContext}
+import com.balihoo.fulfillment.{TempFileOutputStreamContext, TempFileReaderContext}
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
@@ -12,17 +12,20 @@ import org.specs2.specification.Scope
 class TestScalaCsvAdapter extends Specification with Mockito {
 
   "csvAdapter" should {
-    "return a CSV writer/reader that can be used to write and read from a CSV file" in new TestContext with TempFileOutputStreamContext with TempFileReaderContext {
+    "allow to write and read from a csv given a valid output stream and reader" in new TestContext with TempFileOutputStreamContext with TempFileReaderContext {
       val writer = csvAdapter.newWriter(tempFileOutputStream)
       writer must beAnInstanceOf[component.CsvWriter]
       writer.writeRow(data.headers)
       writer.writeRows(Seq(data.row1, data.row2))
-      val stream = csvAdapter.parseReaderAsStream(tempReader)
+      val stream = csvAdapter.parseReaderAsStream(tempReader).get
       stream must beAnInstanceOf[Stream[List[String]]]
       stream.size must beEqualTo(3)
       stream.head must beEqualTo(data.headers)
       stream.drop(1).head must beEqualTo(data.row1)
       stream.drop(2).head must beEqualTo(data.row2)
+    }
+    "return a failure to get a stream from an empty reader" in new TestContext with TempFileOutputStreamContext with TempFileReaderContext {
+      csvAdapter.parseReaderAsStream(tempReader) must beAFailedTry
     }
   }
 

@@ -1,8 +1,9 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.File
+import java.io.Reader
 import java.net.URI
 import java.text.SimpleDateFormat
+import java.util.Date
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
@@ -29,8 +30,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
   val skippedColumnName = "__skipped_column__"
   val insertBatchSize = 100000
+  val csvLastModifiedAttribute = "csvLastModified"
+  val csvLastModifiedDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")
   val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
-  val s3dir = this.swfAdapter.config.getString("s3dir")
+  def s3dir = swfAdapter.config.getString("s3dir")
+  def s3bucket = swfAdapter.config.getString("s3bucket")
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -73,22 +77,6 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   }
 
   /**
-   * Uploads local db to S3.
-   * @return url to the resulting db s3 object.
-   */
-  private def s3upload(file: File, targetKey: String) = {
-    splog.info("Uploading DB file to S3")
-    val targetBucket = swfAdapter.config.getString("s3bucket")
-
-    val start = System.currentTimeMillis
-
-    s3Adapter.putPublic(targetBucket, targetKey, file)
-    splog.info(s"Uploaded to S3 time=${System.currentTimeMillis - start}")
-
-    s"s3://$targetBucket/$targetKey"
-  }
-
-  /**
    * Event handler for a row that contains wrong columns count.
    */
   private def handleBadRow(rowNum: Integer) = {
@@ -104,6 +92,8 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
    * A table definition is required for mapping types and column names between csv and db.
    */
   private def writeCsvStreamToDb(csvStream: Stream[List[String]], tableDefinition: TableDefinition, db: LightweightDatabase) = {
+
+    val time = System.currentTimeMillis()
 
     /*
       Map CSV headers to column names, using dtd.
@@ -184,58 +174,77 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     splog.info(s"Testing DB...")
     val recipientsCount = db.selectCount(s"""select count(*) from "${tableDefinition.getName}"""")
     splog.info(s"Done with SQL inserts, recipientsDbCount=$recipientsCount")
+
+    splog.debug("csv to sql time=" + (System.currentTimeMillis() - time))
   }
 
-  /**
-   * @return an input stream reader (for clean up) and a scala stream based on it for
-   *         processing the CSV records as they come.
-   */
-  private def csvStreamFromS3Content(bucket: String, key: String) = {
-    splog.info(s"Streaming CSV content from S3 bucket=$bucket key=$key")
-    val reader = s3Adapter.getObjectContentAsReader(bucket, key)
-    val csvStream = csvAdapter.parseReaderAsStream(reader)
-    if (csvStream.isEmpty) throw new RuntimeException("csv stream is empty")
-    (reader, csvStream)
+  def createDb(db: LightweightDatabase, tableDefinition: TableDefinition, csvReader: Reader) = {
+    splog.debug("Creating DB schema")
+    db.execute(tableDefinition.tableCreateSql)
+
+    splog.debug("Writing CSV records to DB")
+    val csvStream = csvAdapter.parseReaderAsStream(csvReader).get
+    writeCsvStreamToDb(csvStream, tableDefinition, db)
+
+    db.commit()
   }
 
   override def handleTask(params: ActivityParameters) = {
 
-    splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
+    val (bucket, key, dbName, tableDefinition) = getParams(params)
+    val dbS3Key = s"$s3dir/$dbName"
 
-    /* extract and validate params */
-    val (bucket, key, dbname, tableDefinition) = getParams(params)
+    val csvMeta = s3Adapter.get(bucket, key).get
+    val dbMetaTry = s3Adapter.get(dbS3Key)
 
-    val (csvReader, csvStream) = csvStreamFromS3Content(bucket, key)
+    val useCache = dbMetaTry
+      .map(_.userMetaData(csvLastModifiedAttribute))
+      .map(csvLastModifiedDateFormat.parse)
+      .map(_.getTime < csvMeta.lastModified.getTime)
+      .getOrElse(false)
 
-    splog.info("Creating DB")
-    val dbFile = filesystemAdapter.newTempFile("email-createdb-" + dbname.take(50), ".sqlite")
+    if (dbMetaTry.isSuccess) dbMetaTry.get.close()
 
-    splog.info("Using temp db file path=" + dbFile.getAbsolutePath)
-    val db = liteDbAdapter.create(dbFile)
+    if (useCache) {
 
-    try {
+      csvMeta.close()
+      val s3uri = dbMetaTry.get.s3Uri.toString
+      splog.info(s"Re-using existing database (cached) uri=$s3uri")
+      completeTask(s3uri)
 
-      splog.info("Creating DB schema")
-      db.execute(tableDefinition.tableCreateSql)
+    } else {
 
-      splog.info("Writing CSV records to DB")
-      val time = System.currentTimeMillis()
-      writeCsvStreamToDb(csvStream, tableDefinition, db)
-      splog.info("csv to sql time=" + (System.currentTimeMillis() - time))
-      db.commit()
+      splog.info("Generating database from csv...")
 
-      val s3url = s3upload(dbFile, dbname)
+      val dbTempFile = filesystemAdapter.newTempFile()
+      val db = liteDbAdapter.create(dbTempFile.absolutePath)
 
-      /* return s3 url to target db file */
-      splog.info(s"Task completed, target=[$s3url]")
-      completeTask(s3url)
+      val csvDownload = s3Adapter.download(csvMeta)
+      val csvReader =  csvDownload.asInputStreamReader
 
-    } finally {
-      db.close()
-      csvReader.close()
-      dbFile.delete()
+      try {
+
+        createDb(db, tableDefinition, csvReader)
+
+        val lastModifiedValue = csvLastModifiedDateFormat.format(new Date())
+        val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
+        val dbUri =
+          s3Adapter
+            .upload(dbS3Key, dbTempFile.file, userMetaData = metaData)
+            .map(_.toString)
+            .get
+
+        completeTask(dbUri.toString)
+
+      } finally {
+        db.close()
+        csvDownload.close()
+        csvReader.close()
+        csvMeta.close()
+        dbTempFile.delete()
+      }
+
     }
-
   }
 }
 
@@ -362,7 +371,7 @@ class EmailCreateDBWorker(override val _cfg: PropertiesLoader, override val _spl
   with S3AdapterComponent
   with LocalFilesystemAdapterComponent
   with SQLiteLightweightDatabaseAdapterComponent {
-    override val s3Adapter = new S3Adapter(_cfg)
+    override val s3Adapter = new S3Adapter(_cfg, _splog)
 }
 
 object email_createdb extends FulfillmentWorkerApp {

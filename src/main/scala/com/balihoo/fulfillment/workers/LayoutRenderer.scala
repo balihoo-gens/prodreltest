@@ -40,7 +40,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
     val s3Url = s"https://s3.amazonaws.com/$s3bucket/$key"
     if (file.canRead) {
       splog.info(s"storing $htmlFileName into $s3Url")
-      s3Adapter.putPublic(s3bucket, key, file)
+      s3Adapter.upload(key, file, visibility = PublicS3Visibility).get
       file.delete
     } else {
       throw new Exception(s"Unable to store rendered image to S3: $htmlFileName does not exist")
@@ -108,7 +108,7 @@ class LayoutRenderer(override val _cfg: PropertiesLoader, override val _splog: S
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
   with CommandComponent {
-    lazy val _s3Adapter = new S3Adapter(_cfg)
+    lazy val _s3Adapter = new S3Adapter(_cfg, _splog)
     def s3Adapter = _s3Adapter
     lazy val _command = new Command(commandLine)
     def command = _command

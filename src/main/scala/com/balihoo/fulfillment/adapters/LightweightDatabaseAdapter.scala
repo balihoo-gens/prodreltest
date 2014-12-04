@@ -1,6 +1,5 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.File
 import java.sql._
 
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
@@ -22,9 +21,9 @@ trait LightweightDatabaseAdapterComponent {
   trait LightweightDatabaseAdapter {
 
     /**
-     * @return a new temporary file db from specified file.
+     * @return a new db from specified file path.
      */
-    def create(file: File): LightweightDatabase
+    def create(path: String): LightweightDatabase
 
     /**
      * Calculate how many pages a sql query yields.
@@ -82,18 +81,6 @@ trait LightweightDatabaseAdapterComponent {
      * @return `true` if db is closed, otherwise false.
      */
     def isClosed: Boolean
-
-  }
-
-  /**
-   * Lightweight database that supports file storage.
-   */
-  trait LightweightFileDatabase {
-
-    /**
-     * File used for database storage.
-     */
-    def file: File
 
   }
 
@@ -188,7 +175,7 @@ trait LightweightDatabaseAdapterComponent {
       if (pageSize < 1) throw new IllegalArgumentException("invalid page size")
       if (orderByChecker.findFirstIn(stmt).isEmpty) throw new IllegalArgumentException("statement should have an order by clause")
       val pageCount = if (totalCount < pageSize) 1 else (totalCount / pageSize) + (if (totalCount % pageSize > 0) 1 else 0)
-      splog.info(s"statement=$statement, totalCount=$totalCount, pageSize=$pageSize, pageCount=$pageCount, pageSize=$pageSize")
+      splog.debug(s"statement=$statement, totalCount=$totalCount, pageSize=$pageSize, pageCount=$pageCount, pageSize=$pageSize")
       new JdbcDbPagedResultSet(statement, pageCount, pageSize, connection.createStatement())
     }
 
@@ -233,9 +220,9 @@ trait LightweightDatabaseAdapterComponent {
   }
 
   private[this] class JdbcDbPagedResultSet(private val sql: String,
-                           private val pageCount: Int,
-                           private val pageSize: Int,
-                           private val statement: Statement) extends DbPagedResultSet {
+                                           private val pageCount: Int,
+                                           private val pageSize: Int,
+                                           private val statement: Statement) extends DbPagedResultSet {
 
     private var currentPage = 0
 
@@ -291,19 +278,18 @@ trait SQLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdapt
     /* Load driver, make sure it exists */
     Class.forName("org.sqlite.JDBC")
 
-    override def create(file: File): LightweightDatabase = {
-      val path = file.getAbsolutePath
+    override def create(path: String): LightweightDatabase = {
+      splog.debug(s"Connecting to db path=$path")
       val connection = DriverManager.getConnection(s"jdbc:sqlite:$path")
-      val db = new SQLiteLightweightDatabase(file, connection)
+      val db = new SQLiteLightweightDatabase(connection)
       db.optimize()
       db
     }
 
   }
 
-  private[this] class SQLiteLightweightDatabase(override val file: File, connection: Connection)
-    extends JdbcLightweightDatabase(connection, splog)
-      with LightweightFileDatabase {
+  private[this] class SQLiteLightweightDatabase(connection: Connection)
+    extends JdbcLightweightDatabase(connection, splog) {
 
     def optimize() = {
       execute("PRAGMA synchronous = OFF")
