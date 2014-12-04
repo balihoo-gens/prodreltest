@@ -60,6 +60,7 @@ trait BudgetCalculatorComponent {
 
     def computeDailyBudget(params:ActivityParameters):Float = {
 
+      val campaignId = params[String]("campaignId")
       val startDate = params[DateTime]("startDate")
       val today = params[DateTime]("today")
       val endDate = params[DateTime]("endDate")
@@ -74,26 +75,14 @@ trait BudgetCalculatorComponent {
         throw new Exception(s"today (${UTCFormatter.format(today)}) is after endDate(${UTCFormatter.format(endDate)})")
       }
 
-      val rep = _getDailyCost(params[String]("campaignId")
-        ,startDate.toString("YYYYMMdd")
-        ,today.toString("YYYYMMdd")
-        ,"Fetching Daily Spend")
+      // We count up all the days between today and endDate that are in the schedule
+      val futureScheduleDays = getScheduleDatesForPeriod(adschedule, today, endDate)
+      val futureDateCount = futureScheduleDays.size
 
-      var spent = 0f // Total up how much we spent between startDate and today
-      for((date, cost) <- rep) {
-        spent += adWordsAdapter.microsToDollars(cost)
-      }
-
-      var futureDays = 0 // We count up all the days between today and endDate that are in the schedule
-      for(day <- 0 to Days.daysBetween(today, endDate).getDays) {
-        if(adschedule.contains(today.plusDays(day).dayOfWeek().getAsShortText)) {
-          futureDays += 1
-        }
-      }
-
+      val spent = adWordsAdapter.microsToDollars(getCampaignSpendForPeriod(campaignId, startDate, today))
       val budgetRemaining = budget - spent
       if(budgetRemaining > 0) {
-        return budgetRemaining / (if(futureDays > 0) futureDays else 1)
+        return budgetRemaining / (if(futureDateCount > 0) futureDateCount else 1)
       }
 
       0.0f
@@ -103,49 +92,84 @@ trait BudgetCalculatorComponent {
       Source.fromInputStream(stream).mkString("")
     }
 
-    protected def _getDailyCost(campaignId:String, startDate:String, endDate:String, context:String):Map[DateTime, Long] = {
+    /**
+     *
+     * @param weekdays List[String] Days are expected to be Joda weekday short names.. "Mon","Tue","Wed","Thu","Fri","Sat","Sun"
+     * @param startDate DateTime
+     * @param endDate Datetime
+     * @return
+     */
+    def getScheduleDatesForPeriod(weekdays:List[String], startDate:DateTime, endDate:DateTime):Seq[DateTime] = {
+      val days = for(day <- 0 to Days.daysBetween(startDate, endDate).getDays) yield startDate.plusDays(day)
+      days.filter(d => weekdays.contains(d.dayOfWeek().getAsShortText))
+    }
 
-      adWordsAdapter.withErrorsHandled[Map[DateTime, Long]](s"$context $campaignId $startDate $endDate", {
-        // https://developers.google.com/adwords/api/docs/appendix/reports#campaign
-        val selector = new Selector()
-        selector.getFields.addAll(seqAsJavaList(List(
-           "CampaignId", "Date", "Cost"
-        )))
+    /**
+     *
+     * @param campaignId String AdWords Campaign ID
+     * @param startDate DateTime
+     * @param endDate DateTime
+     * @return the amount of microdollars spent during the time period
+     */
+    def getCampaignSpendForPeriod(campaignId:String, startDate:DateTime, endDate:DateTime):Long = {
+      val spendReport = _getDailyCostSafe(campaignId, startDate, endDate)
+      spendReport.foldLeft[Long](0){ (z, l) => z + l._2 }
+    }
 
-        val dateRange = new DateRange()
-        dateRange.setMin(startDate)
-        dateRange.setMax(endDate)
-        selector.setDateRange(dateRange)
 
-        val reportDefinition = new ReportDefinition()
-        reportDefinition.setReportName(s"BudgetReport $campaignId "+System.currentTimeMillis())
-        reportDefinition.setDateRangeType(ReportDefinitionDateRangeType.CUSTOM_DATE)
-        reportDefinition.setReportType(ReportDefinitionReportType.CAMPAIGN_PERFORMANCE_REPORT)
-        reportDefinition.setDownloadFormat(DownloadFormat.TSV)
-        reportDefinition.setSelector(selector)
+    def getDailyCost(campaignId:String, startDate:DateTime, endDate:DateTime) :Map[DateTime, Long] = {
+      // https://developers.google.com/adwords/api/docs/appendix/reports#campaign
+      val selector = new Selector()
+      selector.getFields.addAll(seqAsJavaList(List(
+        "CampaignId", "Date", "Cost"
+      )))
 
-        val report = adWordsAdapter.reportDownloader.downloadReport(reportDefinition)
+      val dateRange = new DateRange()
+      dateRange.setMin(startDate.toString("YYYYMMdd")) // AdWords wants this date format.
+      dateRange.setMax(endDate.toString("YYYYMMdd"))
+      selector.setDateRange(dateRange)
 
-        // The report is a TSV formatted like this:
-        // Campaign Day Cost
-        // 34563456 2014-12-01 440000
-        // 34563456 2014-12-02 240000
-        // 67897856 2014-12-03 560000
-        // 34563456 2014-12-03 780000
-        // 34563456 2014-12-04 518000
+      val reportDefinition = new ReportDefinition()
+      reportDefinition.setReportName(s"BudgetReport $campaignId "+System.currentTimeMillis())
+      reportDefinition.setDateRangeType(ReportDefinitionDateRangeType.CUSTOM_DATE)
+      reportDefinition.setReportType(ReportDefinitionReportType.CAMPAIGN_PERFORMANCE_REPORT)
+      reportDefinition.setDownloadFormat(DownloadFormat.TSV)
+      reportDefinition.setSelector(selector)
 
-        val results = collection.mutable.Map[DateTime, Long]()
+      val report = adWordsAdapter.reportDownloader.downloadReport(reportDefinition)
 
-        val rows = streamToString(report.getInputStream).split("""\n""")
-        for(row <- rows.slice(2, rows.length - 1)) { // Slice to skip the header and the totals
-          val parts = row.split("""\t""")
-          if(parts(0) == campaignId) { // Not all rows in the report are for the campaign we're interested in.
-            results(new DateTime(parts(1))) = parts(2).toLong // Mapping when to how much
-          }
+      // The report is a TSV formatted like this:
+      // Campaign Day Cost
+      // 34563456 2014-12-01 440000
+      // 34563456 2014-12-02 240000
+      // 67897856 2014-12-03 560000
+      // 34563456 2014-12-03 780000
+      // 34563456 2014-12-04 518000
+
+      val results = collection.mutable.Map[DateTime, Long]()
+
+      val rows = streamToString(report.getInputStream).split("""\n""")
+      for(row <- rows.slice(2, rows.length - 1)) { // Slice to skip the header and the totals
+      val parts = row.split("""\t""")
+        if(parts(0) == campaignId) { // Not all rows in the report are for the campaign we're interested in.
+          results(new DateTime(parts(1))) = parts(2).toLong // Mapping when to how much
         }
+      }
 
-        results.toMap
-      })
+      results.toMap
+
+    }
+
+    /**
+     *
+     * @param campaignId String AdWords Campaign ID
+     * @param startDate DateTime
+     * @param endDate DateTime
+     * @return
+     */
+    protected def _getDailyCostSafe(campaignId:String, startDate:DateTime, endDate:DateTime):Map[DateTime, Long] = {
+
+      adWordsAdapter.withErrorsHandled[Map[DateTime, Long]](s"Fetching Campaign Performance Report $campaignId $startDate $endDate", getDailyCost(campaignId, startDate, endDate))
     }
   }
 

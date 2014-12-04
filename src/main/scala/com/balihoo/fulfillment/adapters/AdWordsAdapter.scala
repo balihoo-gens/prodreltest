@@ -203,8 +203,8 @@ object AdWordsPolicy {
 
   /**
    * AdWords has lots of rules related to string length
-   * @param text
-   * @param maxLength
+   * @param text String
+   * @param maxLength Int
    * @return
    */
   def limitString(text:String, maxLength:Int):String = {
