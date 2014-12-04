@@ -3,7 +3,7 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.v201406.cm.AdGroup
+import com.google.api.ads.adwords.axis.v201409.cm.AdGroup
 import play.api.libs.json._
 
 abstract class TextAdTest(cfg: PropertiesLoader)

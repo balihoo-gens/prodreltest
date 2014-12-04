@@ -2,6 +2,8 @@ package com.balihoo.fulfillment.adapters
 
 import java.net.URL
 
+import com.google.api.ads.adwords.lib.utils.v201409.ReportDownloader
+
 import scala.language.implicitConversions
 
 import com.balihoo.fulfillment.config._
@@ -11,8 +13,8 @@ import com.google.api.ads.common.lib.auth.OfflineCredentials.Api
 import com.google.api.ads.common.lib.auth.OfflineCredentials
 import org.apache.commons.configuration.{BaseConfiguration, Configuration}
 import com.google.api.ads.adwords.axis.factory.AdWordsServices
-import com.google.api.ads.adwords.axis.v201406.cm._
-import com.google.api.ads.adwords.axis.v201406.mcm._
+import com.google.api.ads.adwords.axis.v201409.cm._
+import com.google.api.ads.adwords.axis.v201409.mcm._
 import scala.collection.mutable
 import scala.sys.process._
 import scala.util.matching.Regex
@@ -47,7 +49,6 @@ abstract class AbstractAdWordsAdapter {
     .withOAuth2Credential(oAuth2Credential)
     .withDeveloperToken(config.getString("developerToken"))
     .withUserAgent("Balihoo_Fulfillment")
-    .enableReportMoneyInMicros()
     .build()
 
   session.setValidateOnly(false)
@@ -62,14 +63,20 @@ abstract class AbstractAdWordsAdapter {
   val adGroupBidModifierService:AdGroupBidModifierServiceInterface = services.get(session, classOf[AdGroupBidModifierServiceInterface])
   val adGroupAdService:AdGroupAdServiceInterface = services.get(session, classOf[AdGroupAdServiceInterface])
   val managedCustomerService:ManagedCustomerServiceInterface = services.get(session, classOf[ManagedCustomerServiceInterface])
-  val budgedService:BudgetServiceInterface = services.get(session, classOf[BudgetServiceInterface])
+  val budgetService:BudgetServiceInterface = services.get(session, classOf[BudgetServiceInterface])
   val locationService:LocationCriterionServiceInterface = services.get(session, classOf[LocationCriterionServiceInterface])
   val mediaService:MediaServiceInterface = services.get(session, classOf[MediaServiceInterface])
   val constantDataService:ConstantDataServiceInterface = services.get(session, classOf[ConstantDataServiceInterface])
   val geoLocationService:GeoLocationServiceInterface = services.get(session, classOf[GeoLocationServiceInterface])
+  val reportDefinitionService:ReportDefinitionServiceInterface = services.get(session, classOf[ReportDefinitionServiceInterface])
+  val reportDownloader:ReportDownloader = new ReportDownloader(session)
 
   def dollarsToMicros(dollars:Float):Long = {
     (dollars * 1000000).toLong
+  }
+
+  def microsToDollars(micros:Long):Float = {
+    micros / 1000000.0f
   }
 
   def setClientId(id:String) = {
@@ -196,8 +203,8 @@ object AdWordsPolicy {
 
   /**
    * AdWords has lots of rules related to string length
-   * @param text
-   * @param maxLength
+   * @param text String
+   * @param maxLength Int
    * @return
    */
   def limitString(text:String, maxLength:Int):String = {
@@ -210,7 +217,7 @@ object AdWordsPolicy {
 
   /**
    *
-   * https://developers.google.com/adwords/api/docs/reference/v201406/AdGroupCriterionService.Keyword
+   * https://developers.google.com/adwords/api/docs/reference/v201409/AdGroupCriterionService.Keyword
    * @param text String
    */
   def validateKeyword(text:String):String = {
