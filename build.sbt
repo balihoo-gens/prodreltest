@@ -51,7 +51,8 @@ libraryDependencies ++= Seq(
   "com.github.tototoshi" %% "scala-csv" % "1.1.0",
   "org.xerial" % "sqlite-jdbc" % "3.8.7",
   "com.github.fge" % "json-schema-validator" % "2.2.6",
-  "com.netaporter" %% "scala-uri" % "0.4.3"
+  "com.netaporter" %% "scala-uri" % "0.4.3",
+  "com.jsuereth" %% "scala-arm" % "1.3"
 )
 
 

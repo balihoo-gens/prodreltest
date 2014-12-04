@@ -21,7 +21,7 @@ abstract class AbstractFTPUploadValidator extends FulfillmentWorker {
       val conf = new FTPUploadConfig(params, config)
 
       // Verify that the source file exists.
-      if (new URL(conf.sourceUrl).openConnection().getContentLength() < 0)
+      if (conf.sourceUrl.openConnection().getContentLength() < 0)
         throw new IOException("Unable to get size of " + conf.sourceUrl)
 
       // No exceptions, so call it good.

@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.workers
 
+import java.net.URI
+
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
@@ -55,7 +57,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("source", "The URL of of the page to render"),
+        new UriActivityParameter("source", "The URL of of the page to render"),
         new StringActivityParameter("clipselector", "The selector used to clip the page", required=false),
         new StringActivityParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", required=false),
         new ObjectActivityParameter("headers", "Optional headers", required=false),
@@ -69,11 +71,11 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
     try {
 
       val target = params[String]("target")
-      val source = params[String]("source")
+      val source = params[URI]("source")
 
       val input = MutableMap(
         "action" -> "render",
-        "source" -> source,
+        "source" -> source.toString,
         "target" -> target
       )
 
