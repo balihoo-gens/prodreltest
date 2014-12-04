@@ -1,4 +1,5 @@
 package com.balihoo.fulfillment.util
+import scala.annotation.tailrec
 
 object ListOps {
   /**
@@ -9,6 +10,7 @@ object ListOps {
     * @return Some(result) if calling f on the element returns in Some
     *         None if no element in the iterable results in Some after applying f to it
     */
+  @tailrec
   def iterateUntilSome[T,U](l: Iterable[U], f: U => Option[T]): Option[T] = {
     if (l.isEmpty) {
       None

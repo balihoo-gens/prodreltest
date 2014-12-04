@@ -6,7 +6,7 @@ import org.specs2.runner._
 import org.junit.runner._
 
 @RunWith(classOf[JUnitRunner])
-class TestHostIdentify extends Specification with Mockito
+class TestHostIdentity extends Specification with Mockito
 {
   "Test Host Identity" should {
     "  get a host name " in {
@@ -20,6 +20,23 @@ class TestHostIdentify extends Specification with Mockito
       )
       result.get must beEqualTo("third")
     }
+
+    "  ensure no superfluous work is done " in {
+      object counter {
+        private var _count:Int = 0
+        def findTruth(b:Boolean) = {
+          if (b) Some(_count)
+          else { _count += 1; None }
+        }
+      }
+
+      val result = ListOps.iterateUntilSome(
+        List(false, false, true, true),
+        counter.findTruth _
+      )
+      result.get must beEqualTo(2)
+    }
+
   }
 }
 
