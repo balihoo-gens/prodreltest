@@ -34,7 +34,7 @@ class DecisionGenerator(fulfillment: Fulfillment) {
 
   def _checkComplete(): Option[Decision] = {
 
-    if(fulfillment.categorized.workComplete()) {
+    if(fulfillment.workComplete()) {
       // If we're done then let's just bail here
       fulfillment.timeline.success("Workflow Complete!!!", None)
 
@@ -50,8 +50,8 @@ class DecisionGenerator(fulfillment: Fulfillment) {
 
     val failReasons = mutable.MutableList[String]()
 
-    for(section <- fulfillment.categorized.impossible) {
-      if(section.essential || fulfillment.categorized.essentialTotal == 0) {
+    for(section <- fulfillment.categorized(SectionStatus.IMPOSSIBLE)) {
+      if(section.essential || fulfillment.essentialTotal == 0) {
         val message = s"Section ${section.name} is IMPOSSIBLE!"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
@@ -59,8 +59,8 @@ class DecisionGenerator(fulfillment: Fulfillment) {
     }
 
     // Loop through the problem sections
-    for(section <- fulfillment.categorized.terminal) {
-      if(section.essential || fulfillment.categorized.essentialTotal == 0) {
+    for(section <- fulfillment.categorized(SectionStatus.TERMINAL)) {
+      if(section.essential || fulfillment.essentialTotal == 0) {
         val message = s"Section ${section.name} is TERMINAL!"
         section.timeline.error(message, Some(DateTime.now))
         failReasons += message
@@ -118,7 +118,7 @@ class DecisionGenerator(fulfillment: Fulfillment) {
 
     do {
 
-      fulfillment.categorized.categorize()
+      fulfillment.categorize()
       decisions.clear()
 
       _checkCancelRequested() match {
@@ -136,7 +136,7 @@ class DecisionGenerator(fulfillment: Fulfillment) {
         case _ =>
       }
 
-      for(section <- fulfillment.categorized.ready) {
+      for(section <- fulfillment.categorized(SectionStatus.READY)) {
         val delaySeconds = section.calculateWaitSeconds()
         // Does this task need to be delayed until the waitUntil time?
         if (delaySeconds > 0) {
@@ -146,12 +146,12 @@ class DecisionGenerator(fulfillment: Fulfillment) {
         }
       }
 
-    } while(fulfillment.categorized.checkPromoted)
+    } while(fulfillment.checkPromoted)
 
-    fulfillment.categorized.categorize()
+    fulfillment.categorize()
 
     // Loop through the problem sections
-    for(section <- fulfillment.categorized.failed) {
+    for(section <- fulfillment.categorized(SectionStatus.FAILED)) {
       val message = s"Section failed and is allowed to retry (${section.failedCount} of ${section.failureParams.maxRetries})"
       section.timeline.warning(message, None)
       if(!section.fixable) {
@@ -162,14 +162,14 @@ class DecisionGenerator(fulfillment: Fulfillment) {
       }
     }
 
-    for(section <- fulfillment.categorized.timedout) {
+    for(section <- fulfillment.categorized(SectionStatus.TIMED_OUT)) {
       val message = s"Section timed out and is allowed to retry (${section.timedoutCount} of ${section.timeoutParams.maxRetries})"
       section.timeline.warning(message, None)
       decisions += _createTimerDecision(section.name, section.timeoutParams.delaySeconds, SectionStatus.READY.toString,
         message)
     }
 
-    for(section <- fulfillment.categorized.canceled) {
+    for(section <- fulfillment.categorized(SectionStatus.CANCELED)) {
       val message = s"Section was canceled and is allowed to retry (${section.canceledCount} of ${section.cancelationParams.maxRetries})"
       section.timeline.warning(message, None)
       decisions += _createTimerDecision(section.name, section.cancelationParams.delaySeconds, SectionStatus.READY.toString,
@@ -177,20 +177,20 @@ class DecisionGenerator(fulfillment: Fulfillment) {
     }
 
 
-    if(decisions.length == 0 && !fulfillment.categorized.hasPendingSections) {
+    if(decisions.length == 0 && !fulfillment.hasPendingSections) {
 
       // We aren't making any progress...
       fulfillment.status = FulfillmentStatus.BLOCKED
 
-      if(fulfillment.categorized.terminal.length > 0) {
+      if(fulfillment.categorized(SectionStatus.TERMINAL).length > 0) {
         fulfillment.timeline.error(
-          (for(section <- fulfillment.categorized.terminal) yield section.name)
+          (for(section <- fulfillment.categorized(SectionStatus.TERMINAL)) yield section.name)
             .mkString("Terminal Sections:\n\t", "\n\t", ""), None)
       }
 
-      if(fulfillment.categorized.blocked.length > 0) {
+      if(fulfillment.categorized(SectionStatus.BLOCKED).length > 0) {
         fulfillment.timeline.error(
-          (for(section <- fulfillment.categorized.blocked) yield section.name)
+          (for(section <- fulfillment.categorized(SectionStatus.BLOCKED)) yield section.name)
             .mkString("Blocked Sections:\n\t", "\n\t", ""), None)
       }
 

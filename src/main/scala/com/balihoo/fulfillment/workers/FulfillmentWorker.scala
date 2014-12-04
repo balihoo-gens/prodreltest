@@ -175,8 +175,11 @@ abstract class FulfillmentWorker {
       val result:String = code
       completeTask(result)
     } catch {
+      case cancel:CancelTaskException =>
+        splog("INFO", cancel.details + " " + cancel.getMessage)
+        cancelTask(cancel.details)
       case e:Exception =>
-        failTask(e.getMessage, e.getStackTraceString take 150)
+        failTask("Task Failed", e.getMessage + " " + e.getStackTraceString take 150)
     }
   }
 
@@ -240,8 +243,9 @@ abstract class FulfillmentWorker {
       if (_lastTaskToken != null && _lastTaskToken.nonEmpty) {
         val response:RespondActivityTaskFailedRequest = new RespondActivityTaskFailedRequest
         response.setTaskToken(_lastTaskToken)
-        response.setReason(reason)
-        response.setDetails(details)
+        // http://docs.aws.amazon.com/amazonswf/latest/apireference/API_ActivityTaskFailedEventAttributes.html
+        response.setReason(reason take 256)
+        response.setDetails(details take 32768)
         swfAdapter.client.respondActivityTaskFailed(response)
       } else {
         throw new Exception("empty task token")
@@ -257,7 +261,8 @@ abstract class FulfillmentWorker {
     canceledTasks += 1
     val response:RespondActivityTaskCanceledRequest = new RespondActivityTaskCanceledRequest
     response.setTaskToken(_lastTaskToken)
-    response.setDetails(details)
+    // http://docs.aws.amazon.com/amazonswf/latest/apireference/API_ActivityTaskCanceledEventAttributes.html
+    response.setDetails(details take 32768)
     swfAdapter.client.respondActivityTaskCanceled(response)
     _resolveTask(new TaskResolution("Canceled", details))
   }
@@ -292,6 +297,8 @@ abstract class FulfillmentWorker {
   }
 
 }
+
+class CancelTaskException(val exception:String, val details:String) extends Exception(exception)
 
 class TaskResolution(val resolution:String, val details:String) {
   val when = UTCFormatter.format(DateTime.now)

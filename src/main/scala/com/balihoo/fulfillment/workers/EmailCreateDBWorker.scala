@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.workers
 
 import java.io.File
+import java.net.URI
 import java.text.SimpleDateFormat
 
 import com.balihoo.fulfillment.adapters._
@@ -19,6 +20,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
     with S3AdapterComponent
     with CsvAdapterComponent
+    with FilesystemAdapterComponent
     with LightweightDatabaseAdapterComponent =>
 
   /** Table definition JSON format. */
@@ -28,11 +30,12 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   val skippedColumnName = "__skipped_column__"
   val insertBatchSize = 100000
   val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
+  val s3dir = this.swfAdapter.config.getString("s3dir")
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new StringActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
+        new UriActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
         new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated"),
         new ObjectActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)")
       ),
@@ -47,13 +50,13 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     splog.info("Parsing parameters source, dbname and dtd")
 
-    val maybeSource = parameters.get[String]("source")
+    val maybeSource = parameters.get[URI]("source")
     val maybeDbName = parameters.get[String]("dbname")
     val maybeDtd = parameters.get[JsObject]("dtd")
 
-    if (!maybeSource.isDefined || maybeSource.get.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
-    val sourceUri = new java.net.URI(maybeSource.get)
-    if (!maybeSource.get.trim.startsWith("s3")) throw new IllegalArgumentException("source protocol is unsupported for now")
+    if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
+    val sourceUri = maybeSource.get
+    if (sourceUri.getScheme.toLowerCase != "s3") throw new IllegalArgumentException("source protocol is unsupported for now")
     if (!maybeDbName.isDefined || maybeDbName.get.trim.isEmpty) throw new IllegalArgumentException("dbname parameter is empty")
     if (!maybeDtd.isDefined) throw new IllegalArgumentException("dtd parameter is empty")
 
@@ -73,17 +76,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
    * Uploads local db to S3.
    * @return url to the resulting db s3 object.
    */
-  private def s3upload(file: File, name: String) = {
+  private def s3upload(file: File, targetKey: String) = {
     splog.info("Uploading DB file to S3")
     val targetBucket = swfAdapter.config.getString("s3bucket")
-    /* left pad sub dir with slash if not present */
-    val targetDir = {
-      val dir = swfAdapter.config.getString("s3dir")
-      if (dir.startsWith("/")) dir.substring(1) else dir
-    }
 
     val start = System.currentTimeMillis
-    val targetKey = s"$targetDir/$start/$name"
 
     s3Adapter.putPublic(targetBucket, targetKey, file)
     splog.info(s"Uploaded to S3 time=${System.currentTimeMillis - start}")
@@ -106,7 +103,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
    * Writes the stream of CSV records (list of strings) into the given db.
    * A table definition is required for mapping types and column names between csv and db.
    */
-  private def writeCsvStreamToDb(csvStream: Stream[List[String]], tableDefinition: TableDefinition, db: DbType) = {
+  private def writeCsvStreamToDb(csvStream: Stream[List[String]], tableDefinition: TableDefinition, db: LightweightDatabase) = {
 
     /*
       Map CSV headers to column names, using dtd.
@@ -206,12 +203,15 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     /* extract and validate params */
-    val (bucket, key, filename, tableDefinition) = getParams(params)
+    val (bucket, key, dbname, tableDefinition) = getParams(params)
 
     val (csvReader, csvStream) = csvStreamFromS3Content(bucket, key)
 
-    splog.info("Creating DB file")
-    val db = liteDbAdapter.create(filename)
+    splog.info("Creating DB")
+    val dbFile = filesystemAdapter.newTempFile("email-createdb-" + dbname.take(50), ".sqlite")
+
+    splog.info("Using temp db file path=" + dbFile.getAbsolutePath)
+    val db = liteDbAdapter.create(dbFile)
 
     try {
 
@@ -224,18 +224,17 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       splog.info("csv to sql time=" + (System.currentTimeMillis() - time))
       db.commit()
 
+      val s3url = s3upload(dbFile, dbname)
+
+      /* return s3 url to target db file */
+      splog.info(s"Task completed, target=[$s3url]")
+      completeTask(s3url)
+
     } finally {
       db.close()
       csvReader.close()
+      dbFile.delete()
     }
-
-    val s3url = s3upload(db.file, filename)
-
-    db.destroy()
-
-    /* return s3 url to target db file */
-    splog.info(s"Task completed, target=[$s3url]")
-    completeTask(s3url)
 
   }
 }
@@ -361,7 +360,8 @@ class EmailCreateDBWorker(override val _cfg: PropertiesLoader, override val _spl
   with ScalaCsvAdapterComponent
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
-  with SqlLiteLightweightDatabaseAdapterComponent {
+  with LocalFilesystemAdapterComponent
+  with SQLiteLightweightDatabaseAdapterComponent {
     override val s3Adapter = new S3Adapter(_cfg)
 }
 

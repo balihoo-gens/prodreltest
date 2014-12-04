@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.workers
 
 import java.io.{InputStreamReader, File}
-import java.net.URISyntaxException
+import java.net.{URI, URISyntaxException}
 import java.text.SimpleDateFormat
 
 import com.balihoo.fulfillment.adapters._
@@ -35,10 +35,6 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       val activityParameter = new ActivityParameters(Map())
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
-    "fail task if source param is invalid uri" in new TestContext {
-      val activityParameter = new ActivityParameters(Map("source" -> "invalid uri"))
-      Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[URISyntaxException]
-    }
     "fail task if dbname param missing" in new TestContext {
       val activityParameter = new ActivityParameters(Map("source" -> data.source, "dtd" -> data.dtd))
       Try(worker.handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
@@ -61,6 +57,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "fail task if csv stream empty" in new TestContext {
       givenReader()
       givenCsvStream(Stream.empty)
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -71,6 +68,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "fail task if csv stream has no records" in new TestContext {
       givenReader()
       givenCsvStream(data.header #:: Stream.empty)
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -82,6 +80,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       givenFailOnBadRecord()
       givenReader()
       givenCsvStream(data.header #:: Stream.empty)
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -92,6 +91,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "complete task if db file could be created from csv and uploaded to s3" in new TestContext {
       givenReader()
       givenCsvStream()
+      givenTempDbFile()
       givenLiteDb()
       val activityParameter = new ActivityParameters(Map(
         "source" -> data.source,
@@ -143,11 +143,11 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
       there was one(worker.dbMock).close()
       there was one(worker.readerMock).close()
-      there was one(worker.s3Adapter).putPublic(===("mock"), beMatching(s"mock/\\d+/${data.dbname}"), ===(worker.dbFileMock))
-      there was one(worker.dbMock).destroy()
+      there was one(worker.s3Adapter).putPublic(===("mock"), ===(s"${data.dbname}"), ===(worker.dbFileMock))
+      there was one(worker.dbFileMock).delete()
 
       /* make sure output is complete s3 url */
-      worker.test_complete_result must beMatching(s"s3://mock/mock/\\d+/" + data.dbname)
+      worker.test_complete_result must ===(s"s3://mock/${data.dbname}")
     }
   }
 
@@ -158,8 +158,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     object data {
       val s3bucket = "balihoo.fulfillment.stuff"
       val s3key = "my/key/file.csv"
-      val source = s"s3://$s3bucket/$s3key"
-      val sourceWithInvalidScheme = s"http://$s3bucket/$s3key"
+      val source = new URI(s"s3://$s3bucket/$s3key")
+      val sourceWithInvalidScheme = new URI(s"http://$s3bucket/$s3key")
       val dbname = "test.db"
       val dtd = Json.obj("columns" -> Json.arr(
         Json.obj(
@@ -214,16 +214,16 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       with LoggingWorkflowAdapterTestImpl
       with S3AdapterComponent
       with CsvAdapterComponent
+      with FilesystemAdapterComponent
       with LightweightDatabaseAdapterComponent {
 
-      trait TestDbType extends LightweightDatabase with LightweightFileDatabase
-      override type DbType = TestDbType
       override val s3Adapter = mock[AbstractS3Adapter]
       override val csvAdapter = mock[CsvAdapter]
       override val liteDbAdapter = mock[LightweightDatabaseAdapter]
+      override val filesystemAdapter = mock[FilesystemAdapter]
       val readerMock = mock[InputStreamReader]
-      val dbMock = mock[DbType]
       val dbFileMock = mock[File]
+      val dbMock = mock[LightweightDatabase with LightweightFileDatabase]
       val dbBatchMock = mock[DbBatch]
       override val insertBatchSize = 2
       var test_complete_result = ""
@@ -245,9 +245,12 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
 
     def givenLiteDb() = {
-      worker.dbMock.file returns worker.dbFileMock
       worker.dbMock.batch(anyString) returns worker.dbBatchMock
-      worker.liteDbAdapter.create(===(data.dbname)) returns worker.dbMock
+      worker.liteDbAdapter.create(any[File]) returns worker.dbMock
+    }
+
+    def givenTempDbFile() = {
+      worker.filesystemAdapter.newTempFile(===("email-createdb-" + data.dbname), ===(".sqlite")) returns worker.dbFileMock
     }
 
   }

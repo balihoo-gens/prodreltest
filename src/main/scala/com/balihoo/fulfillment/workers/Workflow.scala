@@ -2,7 +2,7 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.util._
 import play.api.libs.json._
 import org.joda.time._
 import scala.util.Try
@@ -40,28 +40,25 @@ class SubTableActivityParameter(
 
   def jsonType = "object"
 
+  override def additionalSchemaValues = Map(
+    "minProperties" -> Json.toJson(1),
+    "patternProperties" -> Json.obj(
+      "[\r\n.]+" -> Json.obj(
+        "type" -> "array",
+        "minItems" -> 1,
+        "items" -> Json.obj(
+          "type" -> "string"
+        )
+      )
+    )
+    //"additionalProperties" -> Json.toJson(false)
+  )
+
   def parseValue(js:JsValue):SubTable = {
     js.validate[SubTable] match {
       case JsSuccess(submap, _) => submap
       case JsError(e) => throw new Exception("unable to parse substitutions map: ${e.toString}")
     }
-  }
-
-  override def toSchema:JsValue = {
-    Json.obj(
-      "type" -> jsonType,
-      "description" -> description,
-      //"minProperties" -> 1,
-      "patternProperties" -> Json.obj(
-        "[\r\n.]+" -> Json.obj(
-          "type" -> "array",
-          //"minItems" -> 1,
-          "items" -> Json.obj(
-            "type" -> "string"
-          )
-        )
-      )
-    )
   }
 }
 
@@ -114,56 +111,80 @@ abstract class AbstractWorkflowGenerator
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new StringActivityParameter("template", "the template for the workflows", true),
-        new SubTableActivityParameter("substitutions", "substitution data for workflows", false),
-        new StringsActivityParameter("tags", "tags to put on the resulting workflows", false)
+        new ObjectActivityParameter("template", "the template for the workflows"),
+        new SubTableActivityParameter("substitutions", "substitution data for workflows", required=false),
+        new StringsActivityParameter("tags", "tags to put on the resulting workflows", required=false)
     ), new WorkflowIdsActivityResult("list of workflow ids"))
   }
+
+  trait SubProcessor {
+    def process(subs:Map[String,String])
+  }
+
+  class WorkFlowCreator(template: String, tags: List[String]) extends SubProcessor {
+    val results = ArrayBuffer[WorkflowExecutionIds]()
+
+    /** craft a log message that shows what was replaced, but avoid putting
+      * in strings longer that 10 characters
+      */
+    def abbreviateSubs(subs: Map[String,String]):String = {
+      val abbr = Abbreviator.ellipsis _
+      subs.foldLeft("substituted:") {
+        (s,kv) => s"$s (${abbr(kv._1,10)} -> ${abbr(kv._2,10)})"
+      }
+    }
+
+    /** substitutes the values and submits the workflow */
+    override def process(subs: Map[String,String]) = {
+      var ffdoc: String = template
+      var fftags: List[String] = tags
+
+      //perform the replacements
+      for ((key,value) <- subs) {
+        ffdoc = ffdoc.replaceAllLiterally(key,value)
+        fftags = for (tag <- fftags) yield tag.replaceAllLiterally(key,value)
+      }
+      splog.info(abbreviateSubs(subs))
+
+      val result = submitTask(ffdoc, fftags)
+      results += result
+      splog.info(s"completed result ${results.size}: $result")
+    }
+
+    override def toString(): String = results.mkString("[", ",", "]")
+  }
+
 
   override def handleTask(params: ActivityParameters) = {
 
     withTaskHandling {
-      val template = params[String]("template")
-      val results = ArrayBuffer[WorkflowExecutionIds]()
+      val template = Json.stringify(params[JsObject]("template"))
       val tags = Try(params[List[String]]("tags")) getOrElse List[String]()
-
-      def submitAndRecord(ffdoc:String) = {
-        val result = submitTask(ffdoc, tags)
-        results += result
-        splog.info(s"completed result ${results.size}: $result")
-      }
+      val workflowCreator = new WorkFlowCreator(template, tags)
 
       if (params.has("substitutions")) {
         val subTable = params[SubTable]("substitutions")
-        multipleSubstitute(template, subTable, submitAndRecord _)
+        multipleSubstitute(subTable, workflowCreator)
       } else {
-        submitAndRecord(template)
+        submitTask(template, tags)
       }
 
-      results.mkString("[", ",", "]")
-      //Json.toJson(results).stringify
+      workflowCreator.toString
     }
   }
 
 
   /**
-   * recursively and in parallelly generates strings from the template by replacing
-   *   the keys with each of the values in the substitution table, and call function
-   *   f on each result. Deliberately does not store all intermediate results.
-   * @param template the source to replace values in
+   * recursively and in parallel generate the set of substitutions from
+   * the table, and call the 'process' function on the passed in object
    * @param subtable a table containing all the desired substitutions
-   * @param f the function to be called with each completed substitution result
+   * @param processor object on which 'process' with each set of substitutions
    */
-  def multipleSubstitute(template:String, subTable:SubTable, f:(String => Unit)) = {
+  def multipleSubstitute(subTable:SubTable, processor:SubProcessor) = {
     //limit parallel processing to 10 threads
     val parallellism = new ForkJoinTaskSupport(new ForkJoinPool(10))
     //create an object specifically for use by this function
     object mutex
-
-    /**strings can get long, abbreviate with dots */
-    def abbr(s:String, n:Int) = {
-      if (s.size > n) s"${s.take(n)}..." else s
-    }
 
     /**
       * recursive function to iterate over n nested loops, where n is
@@ -177,24 +198,10 @@ abstract class AbstractWorkflowGenerator
       subs:Map[String,String] = Map[String,String]()
     ): Unit = {
       if (subTable.isEmpty) {
-        var ffdoc:String = template
-
-        //perform the replacements
-        for ((key,value) <- subs) {
-          ffdoc = ffdoc.replaceAllLiterally(s"${key}",value)
-        }
-
-        //craft a log message that shows what was replaced, but avoid putting
-        //  in strings longer that 10 characters
-        val logmsg = subs.foldLeft("substituted: ") {
-          (s,kv) => s"""$s ("${abbr(kv._1,10)}" -> "${abbr(kv._2,10)}")"""
-        }
-
         //synchronize the call to user-supplied function f. The caller
         //cannot be expected to provide a thread safe function
         mutex.synchronized {
-          splog.info(logmsg)
-          f(ffdoc)
+          processor.process(subs)
         }
       } else {
         //parallelly iterate over each value in the head of the sub table

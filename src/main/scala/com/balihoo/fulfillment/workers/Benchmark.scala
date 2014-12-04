@@ -19,12 +19,12 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new StringActivityParameter("token", "some identifier to tie the chain together", false),
-        new IntegerActivityParameter("maxcount", "How many workflows to iterate", false),
-        new IntegerActivityParameter("multiply", "Exponential multiplication factor at each iteration", false),
-        new IntegerActivityParameter("count", "system: How manieth workflow this is", false),
-        new IntegerActivityParameter("submit_time", "system: the time this workflow was submitted", false),
-        new IntegerActivityParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", false)
+        new StringActivityParameter("token", "some identifier to tie the chain together", required=false),
+        new IntegerActivityParameter("maxcount", "How many workflows to iterate", required=false),
+        new IntegerActivityParameter("multiply", "Exponential multiplication factor at each iteration", required=false),
+        new IntegerActivityParameter("count", "system: How manieth workflow this is", required=false),
+        new IntegerActivityParameter("submit_time", "system: the time this workflow was submitted", required=false),
+        new IntegerActivityParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", required=false)
     ), new ObjectActivityResult("completed time and token"))
   }
 

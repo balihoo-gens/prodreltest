@@ -71,30 +71,43 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
         )
       )
 
-      val results = MutableList[String]()
-      wfgen.multipleSubstitute(input, subTable, (s:String) => results += s)
-      results must contain("Rusty Towel of Mutual Understanding")
-      results must contain("Jagged Pants of Anger")
-      results must contain("Hallowed Fish of the Occult")
+      object proc extends wfgen.SubProcessor {
+        val results = MutableList[String]()
+        override def process(subs: Map[String,String]) = {
+          var s = input
+          for ((key,value) <- subs) {
+            s = s.replaceAllLiterally(key, value)
+          }
+          results += s
+        }
+      }
+      wfgen.multipleSubstitute(subTable, proc)
+      proc.results must contain("Rusty Towel of Mutual Understanding")
+      proc.results must contain("Jagged Pants of Anger")
+      proc.results must contain("Hallowed Fish of the Occult")
       val total = subTable.keys.foldLeft(1) { (t,key) => t*subTable(key).size }
-      results must have size(total)
+      proc.results must have size(total)
     }
 
     "produce valid json" in {
       val wfgen = new TestableWorkflowGenerator()
+      val replaceableObject = Json.obj("replace" -> "me")
+      val replacingObject1 = Json.obj("replaced" -> "it")
+      val replacingObject2 = Json.obj("this" -> Json.arr("is", "not", "even", "the", "same", "structure", true, 1, JsNull))
 
       val jsonInput = Json.obj(
-        //this template is NOT valid json
-        "template" -> """{ "missingquote: { "value" : missing end curly bracket }""",
-        //sub in partial json to complete the results
+        "template" -> Json.obj(
+          "somekey" -> "#LOC#",
+          "anotherkey" -> replaceableObject
+        ),
         "substitutions" -> Json.obj(
-          "missingquote" -> Json.arr(
-            """ section one" """,
-            """ section two" """
+          "\"#LOC#\"" -> Json.arr(
+            """ { "this": ["is", "json"], "and": ["so", "is", "this"] } """,
+            """ "this is just a string" """
           ),
-          "missing end curly bracket" -> Json.arr(
-            """ "value one" }""",
-            """ "value two" }"""
+          Json.stringify(replaceableObject) -> Json.arr(
+            Json.stringify(replacingObject1),
+            Json.stringify(replacingObject2)
           )
         )
       )
@@ -104,16 +117,55 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
       wfgen.result match {
         case Some(s) =>
           val results = Json.parse(s).as[List[JsObject]]
-          for (result <- results) {
-            //this just contains the input for test so we can
-            //validate it; would contain the wfid in reality
-            val orgInput = (result \ "workflowId").as[String]
-            orgInput must */("value (one|two)".r)
-          }
           results must have size(4)
+          for (result <- results) {
+            //this just contains the workflow doc so we can
+            //validate it; would contain the wfid in reality
+            val wfinput = (result \ "workflowId").as[String]
+            wfinput must not */("#LOC#")
+            Json.parse(wfinput) must not throwA(new Exception)
+          }
+          success
         case _ => failure
       }
       success
+    }
+
+    "replace values in tags" in {
+      val wfgen = new TestableWorkflowGenerator()
+      val jsonInput = Json.obj(
+        "template" -> Json.obj(
+          "somekey" -> "#LOC#"
+        ),
+        "substitutions" -> Json.obj(
+          "\"#LOC#\"" -> Json.arr("1234")
+        ),
+        "tags" -> Json.arr("#LOC#", "NOLOC", "\"#LOC#\"")
+      )
+      val input = Json.stringify(jsonInput)
+      wfgen.handleTask(wfgen.getSpecification.getParameters(input))
+      wfgen.result match {
+        case Some(s) =>
+          val results = Json.parse(s).as[List[JsObject]]
+          results must have size(1)
+          for (result <- results) {
+            val wfinput = (result \ "runId").as[String]
+            wfinput must beEqualTo("#LOC#,NOLOC,1234")
+          }
+        case _ => failure
+      }
+      success
+    }
+
+    "abbreviate a sublist" in {
+      val wfgen = new TestableWorkflowGenerator()
+      val wfc = new wfgen.WorkFlowCreator("", List[String]())
+
+      val subList = Map[String,String](
+        "123456789ABCDEF" -> "short",
+        "short" -> "123456789ABCDEF"
+      )
+      wfc.abbreviateSubs(subList) must beEqualTo("substituted: (1234567... -> short) (short -> 1234567...)")
     }
   }
 }

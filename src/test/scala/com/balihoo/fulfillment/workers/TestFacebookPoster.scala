@@ -1,8 +1,7 @@
 package com.balihoo.fulfillment.workers
 
-import java.net.URL
+import java.net.{URL, URI}
 import javax.ws.rs._
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.workers.TestFacebookPoster.MockWebServer
@@ -92,8 +91,8 @@ class TestFacebookPoster extends Specification with Mockito {
     "message" -> message)
 
   // Optional parameter values
-  val linkUrl = "http://balihoo.com/test"
-  def photoUrl = new URL(server.getBaseUrl, "photos/something.jpg").toString
+  val linkUrl = new URI("http://balihoo.com/test")
+  def photoUrl = new URL(server.getBaseUrl, "photos/something.jpg").toURI
   val photoName = "something.jpg"
 
   // Available actions
@@ -115,7 +114,7 @@ class TestFacebookPoster extends Specification with Mockito {
       val params = new ActivityParameters(baseParams +("postType" -> "link", "linkUrl" -> linkUrl, "action" -> validateAction))
       poster.handleTask(params)
 
-      there was one(poster.facebookAdapter).validateLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl), ===(message))
+      there was one(poster.facebookAdapter).validateLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl.toString), ===(message))
       
       poster.result must beSome("OK")
     }
@@ -125,7 +124,7 @@ class TestFacebookPoster extends Specification with Mockito {
       val params = new ActivityParameters(baseParams +("postType" -> "link", "linkUrl" -> linkUrl, "action" -> publishAction))
       poster.handleTask(params)
 
-      there was one(poster.facebookAdapter).publishLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl), ===(message))
+      there was one(poster.facebookAdapter).publishLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl.toString), ===(message))
 
       poster.result must beSome(linkPostId)
     }

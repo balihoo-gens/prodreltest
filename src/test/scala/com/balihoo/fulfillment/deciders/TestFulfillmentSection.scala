@@ -183,13 +183,13 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val reference = new SectionReference("none/first/second[3]/fourth")
       reference.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
-      reference.section.get.value = Json.parse(result)
+      reference.section.get.setCompleted(result, DateTime.now())
 
       reference.getValue mustEqual JsString("donkey tooth")
 
       val reference2 = new SectionReference("none/first/second/[1]")
       reference2.section = Some(new FulfillmentSection("some section", sectionJson.as[JsObject], DateTime.now))
-      reference2.section.get.value = Json.parse(result)
+      reference2.section.get.setCompleted(result, DateTime.now())
 
       reference2.getValue mustEqual JsString("o'brien")
     }
@@ -205,7 +205,7 @@ class TestFulfillmentSection extends Specification with Mockito
         "two" -> "anti-two"
       ))
 
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual input
 
     }
@@ -223,7 +223,7 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val param = new SectionParameter(Json.parse(input))
 
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
     }
 
@@ -237,15 +237,10 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val param = new SectionParameter(Json.parse(input))
 
-      try {
-        param.evaluate(null)
-        assert(assertion=false, "There should have been an exception!")
-      } catch {
-        case e:Exception =>
-          e.getMessage mustEqual "ERROR During <(md5)> java.lang.IndexOutOfBoundsException: Index 0 not found! : input '{\"what do I do with an object\":\"tuna\"}..."
-      }
+      param.evaluate(null, Map[String, JsValue]())
 
-      true
+      param.isResolvable mustEqual false
+
     }
 
     "  evaluate compound operator" in {
@@ -262,7 +257,7 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val param = new SectionParameter(Json.parse(input))
 
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
     }
 
@@ -276,7 +271,7 @@ class TestFulfillmentSection extends Specification with Mockito
 
       val param = new SectionParameter(Json.parse(input))
 
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
     }
 
@@ -289,7 +284,7 @@ class TestFulfillmentSection extends Specification with Mockito
         """["ankles","door"]"""
 
       val param = new SectionParameter(Json.parse(input))
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
     }
 
@@ -307,7 +302,7 @@ class TestFulfillmentSection extends Specification with Mockito
         """"The GIANT eats tuna flesh when whenever the hail he wants..!!""""
 
       val param = new SectionParameter(Json.parse(input))
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
 
     }
@@ -326,7 +321,7 @@ class TestFulfillmentSection extends Specification with Mockito
         """"The GIANT eats tuna flesh when whenever the hail he wants..!!""""
 
       val param = new SectionParameter(Json.parse(input))
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
 
     }
@@ -343,7 +338,7 @@ class TestFulfillmentSection extends Specification with Mockito
         """"if+%28%28%21flip+%26%26+flap-%3Eflop%28%29%29+%7C%7C+%28*deref%3A%3Aptr%29%5B7%5D%29+%7B+return+%7E%28%26address%29%3B+%7D""""
 
       val param = new SectionParameter(Json.parse(input))
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
     }
 
@@ -367,8 +362,147 @@ class TestFulfillmentSection extends Specification with Mockito
         """"HAYOO""""
 
       val param = new SectionParameter(Json.parse(input))
-      param.evaluate(null)
+      param.evaluate(null, Map[String, JsValue]())
       Json.stringify(param.getResult.get) mustEqual expected
+    }
+
+    "  fetch context information" in {
+      val input =
+        s"""{
+            "<(context)>" : "sloth foot"
+        }"""
+
+      val expected =
+        """"with gravy""""
+
+      val param = new SectionParameter(Json.parse(input))
+      param.evaluate(null, Map("sloth foot" -> JsString("with gravy")))
+      Json.stringify(param.getResult.get) mustEqual expected
+    }
+
+    "  be upset about fetch context information" in {
+      val input =
+        s"""{
+            "<(context)>" : "sloth feets"
+        }"""
+
+      val expected =
+        """"with gravy""""
+
+      val param = new SectionParameter(Json.parse(input))
+      param.evaluate(null, Map("sloth foot" -> JsString("with gravy")))
+
+      !param.isResolved
+
+    }
+
+    "  handle specification of multi param list" in {
+
+      val json = Json.parse( """{
+         "action" : { "name" : "awesome",
+                      "version" : "a zillion",
+                      "failure" : {
+                          "max" : "1",
+                          "delay" : "100"
+                      },
+                      "cancelation" : {
+                          "max" : "2",
+                          "delay" : "4535"
+                      },
+                      "timeout" : {
+                          "max" : "3",
+                          "delay" : "0"
+                      },
+                      "startToCloseTimeout" : "tuna sandwich"
+                    },
+         "params" : {
+                      "multiparam" : [ "carrot", "banana", "faucet" ],
+                      "param1" : {
+            "<(StringFormat)>" :
+                      { "format" : "The {subject} eats {food} when {time}",
+                         "subject" : "GIANT",
+                         "food" : { "<(context)>" : "multi-value" },
+                         "time" : "whenever the hail he wants..!!",
+                         "pointless" : "this won't get used" } },
+
+				              "param2" : "2"
+
+                  },
+         "multiParam" : "multiparam",
+         "prereqs" : [],
+         "status" : "READY"
+	      }""").as[JsObject]
+
+      val section = new FulfillmentSection("sectionname", json, DateTime.now())
+
+      val fulfillment = new Fulfillment(List())
+      fulfillment.nameToSection("sectionname") = section
+      section.evaluateParameters(fulfillment)
+
+      fulfillment.categorize()
+
+      fulfillment.getSectionByName("sectionname[0]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[0]").params("multiparam").getResult.get mustEqual JsString("carrot")
+
+      fulfillment.getSectionByName("sectionname[1]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[1]").params("multiparam").getResult.get mustEqual JsString("banana")
+
+      fulfillment.getSectionByName("sectionname[2]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[2]").params("multiparam").getResult.get mustEqual JsString("faucet")
+
+    }
+
+    "  handle specification of multi param object" in {
+
+      val json = Json.parse( """{
+         "action" : { "name" : "awesome",
+                      "version" : "a zillion",
+                      "failure" : {
+                          "max" : "1",
+                          "delay" : "100"
+                      },
+                      "cancelation" : {
+                          "max" : "2",
+                          "delay" : "4535"
+                      },
+                      "timeout" : {
+                          "max" : "3",
+                          "delay" : "0"
+                      },
+                      "startToCloseTimeout" : "tuna sandwich"
+                    },
+         "params" : {
+                      "multiparam" : { "carrot" : "cww___", "banana" : "bn___" },
+                      "param1" : {
+            "<(StringFormat)>" :
+                      { "format" : "The {subject} eats {food} when {time}",
+                         "subject" : "GIANT",
+                         "food" : { "<(context)>" : "multi-key" },
+                         "time" : "whenever the hail he wants..!!",
+                         "pointless" : "this won't get used" } },
+
+				              "param2" : "2"
+
+                  },
+         "multiParam" : "multiparam",
+         "prereqs" : [],
+         "status" : "READY"
+	      }""").as[JsObject]
+
+      val section = new FulfillmentSection("sectionname", json, DateTime.now())
+
+      val fulfillment = new Fulfillment(List())
+      fulfillment.nameToSection("sectionname") = section
+      section.evaluateParameters(fulfillment)
+
+      fulfillment.categorize()
+
+      fulfillment.getSectionByName("sectionname[carrot]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[carrot]").params("multiparam").getResult.get mustEqual JsString("cww___")
+
+      fulfillment.getSectionByName("sectionname[banana]").parent.get mustEqual fulfillment.getSectionByName("sectionname")
+      fulfillment.getSectionByName("sectionname[banana]").params("multiparam").getResult.get mustEqual JsString("bn___")
+
     }
   }
 }
