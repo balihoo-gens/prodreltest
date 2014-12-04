@@ -30,7 +30,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
   val skippedColumnName = "__skipped_column__"
   val insertBatchSize = 100000
-  val csvLastModifiedAttribute = "csvLastModified"
+  val csvLastModifiedAttribute = "csvlastmodified"
   val csvLastModifiedDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")
   val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
   def s3dir = swfAdapter.config.getString("s3dir")
@@ -196,11 +196,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     val csvMeta = s3Adapter.get(bucket, key).get
     val dbMetaTry = s3Adapter.get(dbS3Key)
-
     val useCache = dbMetaTry
       .map(_.userMetaData(csvLastModifiedAttribute))
       .map(csvLastModifiedDateFormat.parse)
-      .map(_.getTime < csvMeta.lastModified.getTime)
+      .map(_.getTime / 1000)
+      .map(_ >= csvMeta.lastModified.getTime / 1000) /* don't look at the millis (we don't store it) */
       .getOrElse(false)
 
     if (dbMetaTry.isSuccess) dbMetaTry.get.close()
@@ -216,7 +216,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
       splog.info("Generating database from csv...")
 
-      val dbTempFile = filesystemAdapter.newTempFile()
+      val dbTempFile = filesystemAdapter.newTempFile(dbName + ".sqlite")
       val db = liteDbAdapter.create(dbTempFile.absolutePath)
 
       val csvDownload = s3Adapter.download(csvMeta)
@@ -226,7 +226,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
         createDb(db, tableDefinition, csvReader)
 
-        val lastModifiedValue = csvLastModifiedDateFormat.format(new Date())
+        val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
         val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
         val dbUri =
           s3Adapter

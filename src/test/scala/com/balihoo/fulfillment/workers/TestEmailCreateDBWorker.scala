@@ -52,7 +52,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
       s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_tempFile_mock.absolutePath returns data.db_temp_file_path
-      filesystemAdapter.newTempFile() returns db_tempFile_mock
+      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_tempFile_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
       csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
       s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
@@ -66,7 +66,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
       s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_tempFile_mock.absolutePath returns data.db_temp_file_path
-      filesystemAdapter.newTempFile() returns db_tempFile_mock
+      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_tempFile_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
       csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
       s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
@@ -80,7 +80,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_tempFile_mock.absolutePath returns data.db_temp_file_path
       db_tempFile_mock.file returns db_file_mock
-      filesystemAdapter.newTempFile() returns db_tempFile_mock
+      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_tempFile_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
       csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
       s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
@@ -138,10 +138,10 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       there was one(csv_reader_mock).close()
       there was one(db_tempFile_mock).delete()
     }
-    "complete task by returning cached db uri if lastModified" in new WithWorker {
+    "complete task by returning cached db uri if db lastModified is equal or greater to csv lastModified" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
       s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
-      db_s3_meta_mock.userMetaData returns data.db_s3_userMetaDataOutdated
+      db_s3_meta_mock.userMetaData returns data.db_s3_userMetaDataUseCache
       db_s3_meta_mock.s3Uri returns data.db_s3_uri
       s3Adapter.get(===(data.db_s3_key)) returns Success(db_s3_meta_mock)
 
@@ -217,9 +217,10 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val csv_stream_no_records = headers #:: Stream.empty
     val csv_stream_bad_record = headers #:: roger #:: novak_bad #:: Stream.empty
     val db_temp_file_path = "/any/path"
+    val db_temp_file_hint = param_dbname + ".sqlite"
     val csv_s3_LastModified = new Date()
-    val db_s3_LastModified = new Date(csv_s3_LastModified.getTime - 1)
-    val db_s3_userMetaDataOutdated = Map("csvLastModified" -> dateFormat.format(db_s3_LastModified))
+    val db_s3_LastModified = csv_s3_LastModified // same date means use cache
+    val db_s3_userMetaDataUseCache = Map("csvlastmodified" -> dateFormat.format(db_s3_LastModified))
     val db_temp_file_uri = new URI("s3://some/valid")
     val s3_dir = "test_dubdir"
     val db_s3_key = s"$s3_dir/$param_dbname"

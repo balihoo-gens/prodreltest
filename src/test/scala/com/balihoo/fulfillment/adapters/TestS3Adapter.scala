@@ -42,7 +42,7 @@ class TestS3Adapter extends Specification with Mockito {
       awsObjectMock.getObjectContent returns objectInputStreamMock
       val objectMeta = S3Meta(awsObjectMock, data.key, data.bucket)
       val tempFileMock = mock[TempFile]
-      filesystemAdapter.newTempFile(objectInputStreamMock) returns tempFileMock
+      filesystemAdapter.newTempFile(objectInputStreamMock, data.key) returns tempFileMock
 
       client.getObject(data.bucket, data.key) returns awsObjectMock
 

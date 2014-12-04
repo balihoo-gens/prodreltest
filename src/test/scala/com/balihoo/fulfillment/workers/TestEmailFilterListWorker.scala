@@ -46,7 +46,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
 
       // setup
       s3Adapter.get(===(data.s3_bucket), ===(data.db_s3_key)) returns Success(db_s3_meta_mock)
+      db_s3_meta_mock.filename returns data.db_s3_meta_filename
       db_s3_download_mock.absolutePath returns data.db_temp_file_path
+      db_s3_download_mock.meta returns db_s3_meta_mock
       s3Adapter.download(db_s3_meta_mock) returns db_s3_download_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
       liteDbAdapter.calculatePageCount(===(data.recordsCount), ===(data.param_pageSize)) returns data.expectedPageCount
@@ -62,7 +64,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       csv_tempFile1_mock.file returns csv_file1_mock
       csv_tempFile2_mock.file returns csv_file2_mock
       csv_tempFile3_mock.file returns csv_file3_mock
-      filesystemAdapter.newTempFile returns csv_tempFile1_mock thenReturns csv_tempFile2_mock thenReturns csv_tempFile3_mock
+      filesystemAdapter.newTempFile(data.csv_s3_key1) returns csv_tempFile1_mock
+      filesystemAdapter.newTempFile(data.csv_s3_key2) returns csv_tempFile2_mock
+      filesystemAdapter.newTempFile(data.csv_s3_key3) returns csv_tempFile3_mock
       csvAdapter.newWriter(csv_outputStream1_mock) returns csv_writer1_mock
       csvAdapter.newWriter(csv_outputStream2_mock) returns csv_writer2_mock
       csvAdapter.newWriter(csv_outputStream3_mock) returns csv_writer3_mock
@@ -70,15 +74,11 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       s3Adapter.upload(data.csv_s3_key2, csv_file2_mock) returns Success(data.csv_s3_uri2)
       s3Adapter.upload(data.csv_s3_key3, csv_file3_mock) returns Success(data.csv_s3_uri3)
 
-      page1.hasNext returns true thenReturns true thenReturns true thenReturns true thenReturns false
-      page2.hasNext returns true thenReturns true thenReturns true thenReturns true thenReturns false
-      page3.hasNext returns true thenReturns true thenReturns false
-      page1.next returns mock[Seq[Any]].smart
-      page2.next returns mock[Seq[Any]].smart
-      page3.next returns mock[Seq[Any]].smart
-      db_paged_resultSet_mock.hasNext returns true thenReturns true thenReturns true thenReturns false
-      db_paged_resultSet_mock.next returns page1 thenReturns page2 thenReturns page3
-      db_mock.pagedSelect(===(data.selectSql), ===(data.recordsCount), ===(data.param_pageSize)) returns db_paged_resultSet_mock
+      val page1 = Seq(mock[Seq[Any]].smart, mock[Seq[Any]].smart, mock[Seq[Any]].smart, mock[Seq[Any]].smart)
+      val page2 = Seq(mock[Seq[Any]].smart, mock[Seq[Any]].smart, mock[Seq[Any]].smart, mock[Seq[Any]].smart)
+      val page3 = Seq(mock[Seq[Any]].smart, mock[Seq[Any]].smart)
+      val pages = Seq(page1, page2, page3)
+      db_mock.pagedSelect(===(data.selectSql), ===(data.recordsCount), ===(data.param_pageSize)) returns pages
 
       // invocation
       handleTask(data.activityParameter)
@@ -164,10 +164,11 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val activityParameterSourceMissing = ActivityParameters("query" -> param_query, "pageSize" -> param_pageSize)
     val activityParameterSourceInvalidProtocol = ActivityParameters("source" -> param_source_invalid_protocol, "query" -> param_query, "pageSize" -> param_pageSize)
     val activityParameterSourceInvalid = ActivityParameters("source" -> param_source_invalid, "query" -> param_query, "pageSize" -> param_pageSize)
+    val db_s3_meta_filename = db_s3_key.split("/").last
     val db_temp_file_path = "some/file"
-    val csv_s3_key1 = s"mock/$db_s3_key.1.csv"
-    val csv_s3_key2 = s"mock/$db_s3_key.2.csv"
-    val csv_s3_key3 = s"mock/$db_s3_key.3.csv"
+    val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv"
+    val csv_s3_key2 = s"mock/$db_s3_meta_filename.2.csv"
+    val csv_s3_key3 = s"mock/$db_s3_meta_filename.3.csv"
     val csv_s3_uri1 = new URI("s3://host1/path1")
     val csv_s3_uri2 = new URI("s3://host2/path2")
     val csv_s3_uri3 = new URI("s3://host3/path3")
@@ -205,9 +206,6 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val db_mock = mock[LightweightDatabase]
     val db_paged_resultSet_mock = mock[DbPagedResultSet]
     val db_resultset_page_mock = mock[DbResultSetPage]
-    val page1 = mock[DbResultSetPage]
-    val page2 = mock[DbResultSetPage]
-    val page3 = mock[DbResultSetPage]
 
   }
 }

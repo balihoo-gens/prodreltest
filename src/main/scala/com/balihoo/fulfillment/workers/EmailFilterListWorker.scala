@@ -74,21 +74,6 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     (queryDefinition, source.getHost, source.getPath.tail, pageSize)
   }
 
-  private def writeResultSetToCsv(pagedResultSet: DbPagedResultSet, csvOutputStream: OutputStream, queryDefinition: QueryDefinition) = {
-    /* use same sql pages as csv pages for now */
-
-    if (!pagedResultSet.hasNext) throw new IllegalStateException("csv file count is different than sql pages received")
-    val resultSetPage = pagedResultSet.next
-
-    splog.info("Writing records to CSV...")
-
-    val csvWriter = csvAdapter.newWriter(csvOutputStream)
-    csvWriter.writeRow(queryDefinition.fields)
-    while (resultSetPage.hasNext) {
-      csvWriter.writeRow(resultSetPage.next)
-    }
-  }
-
   override def handleTask(params: ActivityParameters) = {
 
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
@@ -103,20 +88,28 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
       val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
 
       splog.info(s"Executing paged query... totalRecordsCount=$totalRecordsCount queryRecordsCount=$queryRecordsCount recordsPerPage=$recordsPerPage pagesCount=$pagesCount")
-      val pagedResultSet = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
+      val pages = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
 
       /* Process all csv files one after the other */
-      val uris = for (i <- 1 to pagesCount) yield {
+      var pageNum = 0
+      val uris = for (page <- pages) yield {
+        pageNum += 1
+        splog.info(s"Processing csv file #$pageNum...")
 
-        splog.info(s"Processing csv file #$i...")
-
-        val csvS3Key = s"$destinationS3Key/$sourceKey.$i.csv"
-        val csvTempFile = filesystemAdapter.newTempFile()
+        val csvS3Key = s"$destinationS3Key/${dbDownload.meta.filename}.$pageNum.csv"
+        val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
         val csvOutputStream = csvTempFile.asOutputStream
+        val csvWriter = csvAdapter.newWriter(csvOutputStream)
 
         try {
 
-          writeResultSetToCsv(pagedResultSet, csvOutputStream, queryDefinition)
+          /* use same sql pages as csv pages for now */
+          splog.info("Writing records to CSV...")
+          csvWriter.writeRow(queryDefinition.fields)
+          for (row <- page) {
+            println(row)
+            csvWriter.writeRow(row)
+          }
 
           s3Adapter
             .upload(csvS3Key, csvTempFile.file)
@@ -129,7 +122,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
         }
       }
 
-      completeTask(JsArray(uris.map(JsString)).toString())
+      completeTask(JsArray(uris.toSeq.map(JsString)).toString())
 
     } finally {
       db.close()

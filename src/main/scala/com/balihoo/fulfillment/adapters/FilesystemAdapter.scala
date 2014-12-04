@@ -15,9 +15,9 @@ trait FilesystemAdapterComponent {
 
   trait FilesystemAdapter {
 
-    def newTempFile(in: InputStream): TempFile
+    def newTempFile(in: InputStream, hint: String): TempFile
 
-    def newTempFile(): TempFile
+    def newTempFile(hint: String): TempFile
 
   }
   
@@ -42,20 +42,20 @@ trait LocalFilesystemAdapterComponent extends FilesystemAdapterComponent {
 
   class LocalFilesystemAdapter extends FilesystemAdapter {
 
-    def newTempFile() = TempFile(newFile())
+    override def newTempFile(hint: String) = TempFile(newFile(hint))
 
     /**
      * Create a new temporary file that contains specified input stream content.
      * @param in a stream to copy data from.
      * @return a new temp file handle.
      */
-    override def newTempFile(in: InputStream) = {
-      val file = newFile()
+    override def newTempFile(in: InputStream, hint: String) = {
+      val file = newFile(hint)
       val out = new FileOutputStream(file)
       try {
         val copied = IOUtils.copy(in, out)
         if (copied == 0) throw new IllegalArgumentException("No data copied")
-        splog.debug(s"Temporary file data copied bytesCount=$copied")
+        splog.debug(s"Temporary file data copied. bytesCount=$copied")
       } finally {
         out.close()
       }
@@ -65,9 +65,9 @@ trait LocalFilesystemAdapterComponent extends FilesystemAdapterComponent {
     /**
      * @return a new temp file handle.
      */
-    private def newFile() = {
-      val file = File.createTempFile(getClass.getSimpleName, ".tmp")
-      splog.debug("New temporary file path=" + file.getAbsolutePath)
+    private def newFile(hint: String) = {
+      val file = File.createTempFile(hint.replaceAll("/", "_"), ".tmp")
+      splog.debug("New temporary file. path=" + file.getAbsolutePath)
       file.deleteOnExit()
       file
     }

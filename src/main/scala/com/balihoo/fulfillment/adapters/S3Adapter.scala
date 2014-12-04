@@ -44,6 +44,7 @@ case class S3Meta(awsObject: S3Object, key: String, bucket: String) {
   lazy val s3Url = new URL("s3", bucket, key)
   lazy val s3Uri = new URI(s"s3://$bucket/$key")
   lazy val userMetaData = awsObject.getObjectMetadata.getUserMetadata.asScala.toMap
+  lazy val filename = awsObject.getKey.split("/").last
   def close() = awsObject.close()
 }
 
@@ -61,7 +62,7 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
   def download(meta: S3Meta): S3Download = {
     splog.debug(s"Downloading... bucket=${meta.bucket} key=${meta.key}")
     val s3Stream = meta.awsObject.getObjectContent
-    val tempFile = filesystemAdapter.newTempFile(s3Stream)
+    val tempFile = filesystemAdapter.newTempFile(s3Stream, meta.key)
     splog.debug(s"Downloaded! bucket=${meta.bucket} key=${meta.key}")
     S3Download(tempFile, meta)
   }
@@ -100,19 +101,23 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
 
     val request = new PutObjectRequest(bucket, key, file)
 
-    visibility match {
-      case PublicS3Visibility => request.withCannedAcl(CannedAccessControlList.PublicRead)
-      case PrivateS3Visibility => request.withCannedAcl(CannedAccessControlList.Private)
+    val acl = visibility match {
+      case PublicS3Visibility => CannedAccessControlList.PublicRead
+      case PrivateS3Visibility => CannedAccessControlList.Private
     }
 
     val metaData = new ObjectMetadata()
-    metaData.getUserMetadata.putAll(userMetaData.asJava)
-    request.withMetadata(metaData)
+    metaData.setContentLength(file.length()) /* required in order to enable streaming */
+    metaData.setUserMetadata(userMetaData.asJava)
+
+    request
+      .withCannedAcl(acl)
+      .withMetadata(metaData)
 
     val start = System.currentTimeMillis
-    splog.debug(s"Uploading... file=${file.getName}")
+    splog.debug(s"Uploading... key=$key bucket=$bucket file=${file.getName} acl=$acl")
     Try(client.putObject(request)).map { putObjectResult =>
-      splog.debug(s"Uploaded! file=${file.getName} time=${System.currentTimeMillis - start}")
+      splog.debug(s"Uploaded! key=$key bucket=$bucket file=${file.getName} time=${System.currentTimeMillis - start}")
       new URI(s"s3://$bucket/$key")
     }
   }

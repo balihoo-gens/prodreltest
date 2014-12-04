@@ -76,34 +76,34 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
       val result = Try(db.pagedSelect("select id, name, bday from recipients order by id", data.insertsSql.size, 2))
       result must beSuccessfulTry
 
-      val pages = result.get
+      val pages = result.get.iterator
 
       pages.hasNext must beTrue
-      val page1 = pages.next
+      val page1 = pages.next().iterator
       page1.hasNext must beTrue
-      val row1 = page1.next
+      val row1 = page1.next()
       row1 must contain(exactly(1, "Rick", "1986-08-19"))
       page1.hasNext must beTrue
-      val row2 = page1.next
+      val row2 = page1.next()
       row2 must contain(exactly(2, "Sam", "1980-04-01"))
       page1.hasNext must beFalse
 
       pages.hasNext must beTrue
-      val page2 = pages.next
+      val page2 = pages.next().iterator
       page2.hasNext must beTrue
-      val row3 = page2.next
+      val row3 = page2.next()
       row3.size must beEqualTo(3)
       row3 must contain(allOf(3, "Lucy"))
       page2.hasNext must beTrue
-      val row4 = page2.next
+      val row4 = page2.next()
       row4.size must beEqualTo(3)
       row4 must contain(allOf(4, "Lacy"))
       page2.hasNext must beFalse
 
       pages.hasNext must beTrue
-      val page3 = pages.next
+      val page3 = pages.next().iterator
       page3.hasNext must beTrue
-      val row5 = page3.next
+      val row5 = page3.next()
       row5.size must beEqualTo(3)
       row5 must contain(allOf(5, "Sarah"))
       page3.hasNext must beFalse

@@ -107,43 +107,13 @@ trait LightweightDatabaseAdapterComponent {
 
   /**
    * A trait to allow browsing a large result set with paging.
-   *
-   * @note Stateful implementation (like jdbc) might require a `hasNext`
-   * invocation before a `next` invocation, it's safer to do that.
    */
-  trait DbPagedResultSet {
-
-    /**
-     * @return `true` if another page is available, `false` otherwise.
-     */
-    def hasNext: Boolean
-
-    /**
-     * @return the next page of this result set.
-     */
-    def next: DbResultSetPage
-
-  }
+  type DbPagedResultSet = Iterable[DbResultSetPage]
 
   /**
    * A trait to allow browsing records of a result set with paging.
-   *
-   * @note Stateful implementation (like jdbc) might require a `hasNext`
-   * invocation before a `next` invocation, it's safer to do that.
    */
-  trait DbResultSetPage {
-
-    /**
-     * @return `true` if another record is available, `false` otherwise.
-     */
-    def hasNext: Boolean
-
-    /**
-     * @return the next record of this result set.
-     */
-    def next: Seq[Any]
-
-  }
+  type DbResultSetPage = Iterable[Seq[Any]]
 
   /**
    * A jdbc-based lite db.
@@ -223,42 +193,45 @@ trait LightweightDatabaseAdapterComponent {
                                            private val pageCount: Int,
                                            private val pageSize: Int,
                                            private val statement: Statement) extends DbPagedResultSet {
-
     private var currentPage = 0
 
-    override def hasNext: Boolean = currentPage < pageCount
+    override val iterator = new Iterator[DbResultSetPage] {
 
-    override def next: DbResultSetPage = {
-      val offset = currentPage * pageSize
-      statement.execute(sql + s" limit $pageSize offset $offset")
-      currentPage += 1
-      new JdbcDbResultSetPage(statement.getResultSet)
+      override def hasNext: Boolean = currentPage < pageCount
+
+      override def next() = {
+        val offset = currentPage * pageSize
+        statement.execute(sql + s" limit $pageSize offset $offset")
+        currentPage += 1
+        new JdbcDbResultSetPage(statement.getResultSet)
+      }
     }
-
   }
 
   private[this] class JdbcDbResultSetPage(private val resultSet: ResultSet) extends DbResultSetPage {
 
     private val metaData = resultSet.getMetaData
 
-    override def hasNext = resultSet.next()
+    override val iterator = new Iterator[Seq[Any]] {
 
-    override def next = {
-      for {
-        i <- 1 to metaData.getColumnCount
-      } yield {
-        metaData.getColumnType(i) match {
-          case Types.TINYINT | Types.SMALLINT | Types.INTEGER | Types.BIGINT => resultSet.getInt(i)
-          case Types.CLOB | Types.CHAR | Types.VARCHAR | Types.NCHAR | Types.NVARCHAR => resultSet.getString(i)
-          case Types.REAL | Types.DOUBLE | Types.FLOAT | Types.NUMERIC | Types.DECIMAL => resultSet.getDouble(i)
-          case Types.BOOLEAN => resultSet.getBoolean(i)
-          case Types.DATE => resultSet.getString(i)
-          case Types.TIME | Types.TIMESTAMP => resultSet.getLong(i)
-          case _ => resultSet.getObject(i)
+      override def hasNext: Boolean = resultSet.next()
+
+      override def next(): Seq[Any] = {
+        for {
+          i <- 1 to metaData.getColumnCount
+        } yield {
+          metaData.getColumnType(i) match {
+            case Types.TINYINT | Types.SMALLINT | Types.INTEGER | Types.BIGINT => resultSet.getInt(i)
+            case Types.CLOB | Types.CHAR | Types.VARCHAR | Types.NCHAR | Types.NVARCHAR => resultSet.getString(i)
+            case Types.REAL | Types.DOUBLE | Types.FLOAT | Types.NUMERIC | Types.DECIMAL => resultSet.getDouble(i)
+            case Types.BOOLEAN => resultSet.getBoolean(i)
+            case Types.DATE => resultSet.getString(i)
+            case Types.TIME | Types.TIMESTAMP => resultSet.getLong(i)
+            case _ => resultSet.getObject(i)
+          }
         }
       }
     }
-
   }
 
 }
