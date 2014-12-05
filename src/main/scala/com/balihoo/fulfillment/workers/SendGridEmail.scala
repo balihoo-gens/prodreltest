@@ -1,15 +1,13 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.InputStreamReader
 import java.net.URI
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
 import org.joda.time.DateTime
 import play.api.libs.json.JsObject
-import scala.io.Source
-import scala.util.{Try, Success, Failure}
 import resource._
+import scala.util.{Failure, Success, Try}
 
 abstract class AbstractSendGridEmail extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
@@ -21,12 +19,12 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
     new ActivitySpecification(List(
       new ObjectActivityParameter("uniqueArgs", "An associative array of values that will appear in the event data"),
       new StringActivityParameter("subaccount", "The SendGrid subaccount username"),
-      new UriActivityParameter("listUri", "The S3 URI of the recipient list"),
+      new UriActivityParameter("listUrl", "The S3 URL of the recipient list"),
       new StringActivityParameter("subject", "The email subject"),
       new EmailActivityParameter("fromAddress", "The from address"),
       new StringActivityParameter("fromName", "The from name"),
       new EmailActivityParameter("replyToAddress", "The reply-to address"),
-      new UriActivityParameter("bodyUri", "The S3 URI of the file containing the email body"),
+      new UriActivityParameter("bodyUrl", "The S3 URL of the file containing the email body"),
       new DateTimeActivityParameter("sendTime", "The desired send time (< 24 hours in the future)"),
       new StringActivityParameter("recipientIdHeading", "The heading of the recipientId column"),
       new StringActivityParameter("emailHeading", "The heading of the email column")
@@ -42,18 +40,18 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
       val fromAddress = params[String]("fromAddress")
       val fromName = params[String]("fromName")
       val replyToAddress = params[String]("replyToAddress")
-      val bodyUri = params[URI]("bodyUri")
-      val (bodyBucket, bodyKey) = dissectS3Uri(bodyUri, "bodyUri")
+      val bodyUrl = params[URI]("bodyUrl")
+      val (bodyBucket, bodyKey) = dissectS3Url(bodyUrl, "bodyUrl")
       val sendTime = params[DateTime]("sendTime")
       val recipientIdHeading = params[String]("recipientIdHeading")
       val emailHeading = params[String]("emailHeading")
-      val listUri = params[URI]("listUri")
-      val (listBucket, listKey) = dissectS3Uri(listUri, "listUri")
+      val listUrl = params[URI]("listUrl")
+      val (listBucket, listKey) = dissectS3Url(listUrl, "listUrl")
 
       // Retrieve the email body
       val body = Try(s3Adapter.getObjectContentAsString(bodyBucket, bodyKey)) match {
         case Success(s) => s
-        case Failure(e) => throw new SendGridException(s"Unable to get email body from $bodyUri", e)
+        case Failure(e) => throw new SendGridException(s"Unable to get email body from $bodyUrl", e)
       }
 
       // Define the email contents
@@ -72,25 +70,25 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
         }
       } catch {
         case e: SendGridException => throw e
-        case e: Exception => throw new SendGridException(s"Unable to get recipient list from $listUri", e)
+        case e: Exception => throw new SendGridException(s"Unable to get recipient list from $listUrl", e)
       }
 
       "OK"
     }
 
     /**
-     * Breaks up an S3 URI into useful parts
-     * @param uri
+     * Breaks up an S3 URL into useful parts
+     * @param url
      * @param label a label to include in error messages
      * @return the bucket and key
      */
-    def dissectS3Uri(uri: URI, label: String): (String, String) = {
-      if (uri.getScheme == null || !uri.getScheme.equalsIgnoreCase("s3")) throw new IllegalArgumentException(s"Invalid URI scheme in $label")
+    def dissectS3Url(url: URI, label: String): (String, String) = {
+      if (url.getScheme == null || !url.getScheme.equalsIgnoreCase("s3")) throw new IllegalArgumentException(s"Invalid URL scheme in $label")
 
-      val bucket = uri.getHost
+      val bucket = url.getHost
       if (bucket == null || bucket.isEmpty) throw new IllegalArgumentException(s"Missing hostname in $label")
 
-      val path = uri.getPath
+      val path = url.getPath
       if (path == null || path.isEmpty) throw new IllegalArgumentException(s"Missing path in $label")
 
       // Strip leading slash from path to get the key

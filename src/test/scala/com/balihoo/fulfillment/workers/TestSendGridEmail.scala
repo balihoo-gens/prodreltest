@@ -22,13 +22,13 @@ class TestSendGridEmail extends Specification with Mockito {
       there was one(_sendGridAdapter).sendEmail(credentials, uniqueArgs, sendTime, email, recipientsStream, recipientIdHeading, emailHeading)
     }
 
-    "reject a bad list URI" in new Adapter {
-      val params2 = new ActivityParameters(params.params + ("listUri" -> bogusUri))
+    "reject a bad list URL" in new Adapter {
+      val params2 = new ActivityParameters(params.params + ("listUrl" -> bogusUrl))
       worker.handleTask(params2) must throwA[SendGridException]
     }
 
-    "reject a bad email body URI" in new Adapter {
-      val params2 = new ActivityParameters(params.params + ("bodyUri" -> bogusUri))
+    "reject a bad email body URL" in new Adapter {
+      val params2 = new ActivityParameters(params.params + ("bodyUrl" -> bogusUrl))
       worker.handleTask(params2) must throwA[SendGridException]
     }
   }
@@ -44,7 +44,7 @@ class TestSendGridEmail extends Specification with Mockito {
     val bodyKey = "body983983"
     val listKey = "list9398844"
     val bogusKey = "bogus"
-    val bogusUri = new URI(s"S3://$bucket/$bogusKey")
+    val bogusUrl = new URI(s"S3://$bucket/$bogusKey")
     val recipientsStream = Stream(
       List("personId", "name", "email", "likes"),
       List("17", "User1", "user1@balihoo.com", "fish"),
@@ -60,12 +60,12 @@ class TestSendGridEmail extends Specification with Mockito {
     val params = new ActivityParameters(Map(
       "uniqueArgs" -> uniqueArgs,
       "subaccount" -> subaccount,
-      "listUri" -> new URI(s"S3://$bucket/$listKey"),
+      "listUrl" -> new URI(s"S3://$bucket/$listKey"),
       "subject" -> email.subject,
       "fromAddress" -> email.fromAddress,
       "fromName" -> email.fromName,
       "replyToAddress" -> email.replyToAddress,
-      "bodyUri" -> new URI(s"S3://$bucket/$bodyKey"),
+      "bodyUrl" -> new URI(s"S3://$bucket/$bodyKey"),
       "sendTime" -> sendTime,
       "recipientIdHeading" -> recipientIdHeading,
       "emailHeading" -> emailHeading))
