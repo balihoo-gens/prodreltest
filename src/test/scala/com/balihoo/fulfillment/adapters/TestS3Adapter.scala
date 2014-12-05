@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{File, InputStreamReader, InputStream, Reader}
+import java.io._
 import java.nio.charset.Charset
 import java.nio.file.{StandardCopyOption, Files, Path}
 
@@ -9,6 +9,7 @@ import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.{S3ObjectInputStream, S3Object}
 import com.balihoo.fulfillment.config.{PropertiesLoaderComponent, PropertiesLoader}
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
+import org.apache.http.client.methods.HttpRequestBase
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -48,6 +49,17 @@ class TestS3Adapter extends Specification with Mockito {
       val reader = s3Adapter.getObjectContentAsReader(data.bucket, data.key, "Latin1")
       reader must beAnInstanceOf[InputStreamReader]
       Charset.forName("Latin1").aliases().contains(reader.getEncoding) must beTrue
+    }
+  }
+  "getObjectContentAsString" should {
+    "return a string" in new TestContext {
+      val expected = "I expect perfection!"
+      val inputStream = spy(new S3ObjectInputStream(new ByteArrayInputStream(expected.getBytes), mock[HttpRequestBase]))
+      givenS3Object()
+      givenS3ObjectContent(inputStream)
+      val result = s3Adapter.getObjectContentAsString(data.bucket, data.key)
+      result === expected
+      there was one(inputStream).close
     }
   }
   "getAsTempFile" should {
