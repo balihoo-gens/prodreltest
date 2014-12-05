@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{ByteArrayInputStream, InputStreamReader, StringReader}
+import java.io.{ByteArrayInputStream, InputStreamReader}
 import java.net.URI
 import com.amazonaws.AmazonServiceException
 import com.balihoo.fulfillment.adapters._
@@ -11,7 +11,6 @@ import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import org.specs2.specification.Scope
 import play.api.libs.json.Json
-
 import scala.io.Codec
 
 @RunWith(classOf[JUnitRunner])
