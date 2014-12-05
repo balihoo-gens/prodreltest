@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
 import java.io._
+import java.net.URI
 import java.nio.charset.Charset
 import java.nio.file._
 import com.amazonaws.services.s3.AmazonS3Client
@@ -76,5 +77,27 @@ class S3Adapter(cfg: PropertiesLoader) extends AbstractS3Adapter with Properties
     val secretKey = config.getString("aws.secretKey")
     val credentials = new BasicAWSCredentials(accessKey, secretKey)
     new AmazonS3Client(credentials)
+  }
+}
+
+object S3Adapter {
+  /**
+   * Breaks up an S3 URL into useful parts
+   * @param url
+   * @return the bucket and key
+   */
+  def dissectS3Url(url: URI): (String, String) = {
+    require(url.getScheme != null && url.getScheme.equalsIgnoreCase("s3"), s"Invalid URL scheme in $url")
+
+    val bucket = url.getHost
+    require(bucket != null && !bucket.isEmpty, s"Missing hostname in $url")
+
+    val path = url.getPath
+    require(path != null && !path.isEmpty, s"Missing path in $url")
+
+    // Strip leading slash from path to get the key
+    val key = path.substring(1)
+
+    (bucket, key)
   }
 }

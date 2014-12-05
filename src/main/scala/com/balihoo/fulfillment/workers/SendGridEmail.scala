@@ -41,12 +41,12 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
       val fromName = params[String]("fromName")
       val replyToAddress = params[String]("replyToAddress")
       val bodyUrl = params[URI]("bodyUrl")
-      val (bodyBucket, bodyKey) = dissectS3Url(bodyUrl, "bodyUrl")
+      val (bodyBucket, bodyKey) = S3Adapter.dissectS3Url(bodyUrl)
       val sendTime = params[DateTime]("sendTime")
       val recipientIdHeading = params[String]("recipientIdHeading")
       val emailHeading = params[String]("emailHeading")
       val listUrl = params[URI]("listUrl")
-      val (listBucket, listKey) = dissectS3Url(listUrl, "listUrl")
+      val (listBucket, listKey) = S3Adapter.dissectS3Url(listUrl)
 
       // Retrieve the email body
       val body = Try(s3Adapter.getObjectContentAsString(bodyBucket, bodyKey)) match {
@@ -74,27 +74,6 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
       }
 
       "OK"
-    }
-
-    /**
-     * Breaks up an S3 URL into useful parts
-     * @param url
-     * @param label a label to include in error messages
-     * @return the bucket and key
-     */
-    def dissectS3Url(url: URI, label: String): (String, String) = {
-      if (url.getScheme == null || !url.getScheme.equalsIgnoreCase("s3")) throw new IllegalArgumentException(s"Invalid URL scheme in $label")
-
-      val bucket = url.getHost
-      if (bucket == null || bucket.isEmpty) throw new IllegalArgumentException(s"Missing hostname in $label")
-
-      val path = url.getPath
-      if (path == null || path.isEmpty) throw new IllegalArgumentException(s"Missing path in $label")
-
-      // Strip leading slash from path to get the key
-      val key = path.substring(1)
-
-      (bucket, key)
     }
   }
 
