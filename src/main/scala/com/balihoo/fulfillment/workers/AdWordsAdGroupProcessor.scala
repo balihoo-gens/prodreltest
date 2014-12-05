@@ -5,8 +5,8 @@ import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
 import com.balihoo.fulfillment.util.Splogger
 
-import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201406.cm._
+import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201409.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}
 
 import scala.collection.mutable

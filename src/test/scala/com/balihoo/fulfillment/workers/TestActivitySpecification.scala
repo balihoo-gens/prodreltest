@@ -441,10 +441,12 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
         "description for the whole activity. Notes and stuff")
 
       val input = """{"param1" : 1}"""
+      val badInput = """{"param1" : [5]}"""
 
       val params = spec.getParameters(input)
       params[Int]("param1") must beEqualTo(1)
 
+      spec.getParameters(badInput) must throwA[Exception].like { case e => e.getMessage must contain("""/param1 instance type (array) does not match any allowed primitive type (allowed: ["integer"])""") }
     }
 
     "parse long type" in {
@@ -454,10 +456,28 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
         "description for the whole activity. Notes and stuff")
 
       val input = """{"param1" : 1}"""
+      val badInput = """{"param1" : "stork hip"}"""
 
       val params = spec.getParameters(input)
       params[Long]("param1") must beEqualTo(1.toLong)
 
+      spec.getParameters(badInput) must throwA[Exception].like { case e => e.getMessage must contain("""param1 instance type (string) does not match any allowed primitive type (allowed: ["integer"])""") }
+    }
+
+    "parse enums type" in {
+
+      val spec = new ActivitySpecification(List(
+        new EnumsActivityParameter("param1", "Param 1 is an enumses", options=List("BEETLE", "JUICE", "IS", "WEIRD"))
+      ), new StringActivityResult("really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val input = """{"param1" : ["IS", "BEETLE"]}"""
+      val badinput = """{"param1" : ["IS", "BEATLE"]}"""
+
+      val params = spec.getParameters(input)
+      params[List[String]]("param1") mustEqual List("IS", "BEETLE")
+
+      spec.getParameters(badinput) must throwA[Exception].like { case e => e.getMessage must contain("""instance value ("BEATLE") not found in enum (possible values: ["BEETLE","JUICE","IS","WEIRD"])""")}
     }
 
   }

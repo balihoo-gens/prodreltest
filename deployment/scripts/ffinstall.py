@@ -127,12 +127,18 @@ class Installer(object):
         instance_id = instance_data["instanceId"]
         region = os.environ["AWS_REGION"]
         ec2conn = ec2.connect_to_region(region_name=region)
-        if ec2conn.disassociate_address(public_ip=eip):
-            self._log.info("successfully disassociated eip " + eip)
-        if ec2conn.associate_address(instance_id=instance_id, public_ip=eip):
-            self._log.info("successfully associated with eip " + eip)
+        if eip.startswith('eipalloc'):
+            if ec2conn.associate_address(instance_id=instance_id, allocation_id=eip, allow_reassociation=True):
+                self._log.info("successfully associated with eip " + eip)
+            else:
+                self._log.error("failed to associate with eip " + eip)
         else:
-            self._log.error("failed to associate with eip " + eip)
+            if ec2conn.disassociate_address(public_ip=eip):
+                self._log.info("successfully disassociated eip " + eip)
+            if ec2conn.associate_address(instance_id=instance_id, public_ip=eip):
+                self._log.info("successfully associated with eip " + eip)
+            else:
+                self._log.error("failed to associate with eip " + eip)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Install the Fulfillment application")

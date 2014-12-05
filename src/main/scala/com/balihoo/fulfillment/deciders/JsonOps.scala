@@ -17,7 +17,11 @@ object JsonOpName extends Enumeration {
   val JSON_PATH = Value("jsonpath")
   val OBJECT_KEYS = Value("objectkeys")
   val OBJECT_VALUES = Value("objectvalues")
-  val STRING_CONCAT = Value("stringconcat")
+  val JSON_PARSE = Value("jsonparse")
+  val JSON_STRINGIFY = Value("jsonstringify")
+  val SUBSTRING = Value("substring")
+  val REPLACE = Value("replace")
+  val SWITCH = Value("switch")
 //  val ARRAY_UNION = Value("arrayunion")
 //  val ARRAY_DIFF = Value("arraydiff")
 //  val ARRAY_INTERSECT = Value("arrayintersect")
@@ -264,13 +268,84 @@ object JsonOps {
         Json.toJson(for((k, v) <- args.kwargs) yield v)
       })
 
+  protected val jsonParseOperator =
+    new JsonOp(
+      JsonOpName.JSON_PARSE,
+      new JsonOpSpec("Parses a string and returns the JSON value",
+        List(),
+        new JsonOpResult("JSON", "the JSON value encoded in the input")
+      ),
+      (args) => {
+        Json.parse(args[String](0))
+      })
+
+  protected val jsonStringifyOperator =
+    new JsonOp(
+      JsonOpName.JSON_STRINGIFY,
+      new JsonOpSpec("string encodes a JSON value",
+        List(),
+        new JsonOpResult("string", "a stringified version of the input")
+      ),
+      (args) => {
+        Json.toJson(args.input)
+      })
+
+  protected val subStringOperator =
+    new JsonOp(
+      JsonOpName.SUBSTRING,
+      new JsonOpSpec("extracts a substring of the input",
+        List(),
+        new JsonOpResult("string", "the substring from beginIndex to endIndex")
+      ),
+      (args) => {
+        val input = args[String]("input")
+        val beginIndex = args[Int]("beginIndex")
+        val endIndex = args[Int]("endIndex")
+        Json.toJson(input.substring(beginIndex, endIndex))
+      })
+
+  protected val replaceOperator =
+    new JsonOp(
+      JsonOpName.REPLACE,
+      new JsonOpSpec("Replaces all regular expression matches with the given replacement",
+        List(),
+        new JsonOpResult("string", "the original string with all replacements")
+      ),
+      (args) => {
+        val input = args[String]("input")
+        val regex = args[String]("regex")
+        val replacement = args[String]("replacement")
+        Json.toJson(input.replaceAll(regex, replacement))
+      })
+
+  protected val switchOperator =
+    new JsonOp(
+      JsonOpName.SWITCH,
+      new JsonOpSpec("selects a value based on the value of an expression",
+        List(),
+        new JsonOpResult("string", "the value associated with the result matching the expression")
+      ),
+      (args) => {
+        val expression = args[String]("expression")
+        val clauses = args.kwargs.filter(kv => {
+          val key:String = kv._1
+          ! List("expression", "default").contains(key)
+        })
+        Json.toJson(clauses.getOrElse(expression, clauses("default")))
+      })
+
   protected val operators = Map[JsonOpName.Value, JsonOp](
     md5Operator.name -> md5Operator,
     stringFormatOperator.name -> stringFormatOperator,
     urlEncodeOperator.name -> urlEncodeOperator,
     objectKeysOperator.name -> objectKeysOperator,
     objectValuesOperator.name -> objectValuesOperator,
-    jsonPathOperator.name -> jsonPathOperator
+    jsonPathOperator.name -> jsonPathOperator,
+    jsonParseOperator.name -> jsonParseOperator,
+    jsonStringifyOperator.name -> jsonStringifyOperator,
+    subStringOperator.name -> subStringOperator,
+    replaceOperator.name -> replaceOperator,
+    switchOperator.name -> switchOperator
   )
 
   protected def _escapeDollar(s:String):String = {

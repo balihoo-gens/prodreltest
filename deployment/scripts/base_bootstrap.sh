@@ -25,8 +25,12 @@ fi
 
 log "installing dependencies"
 if [ "${DISTRO}" = "Ubuntu" ]; then
+  #remove existing lists, as update may fail with conflicting hash values
+  # http://askubuntu.com/questions/553765/failed-to-fetch-update-on-ubuntu-14-04-lts-trusty-tahr
+  logdo "rm -rf /var/lib/apt/lists/*"
   logdo "export DEBIAN_FRONTEND=noninteractive"
-  logdo "apt-get update -q"
+  #update the repo, but don't let it stop you; we're probably up to date enough anyway
+  logdo "apt-get update -q" || true
   logdo "${INSTALLER} install -y unzip default-jre"
 else
   log "nothing to install for amazon linux"
@@ -50,7 +54,8 @@ VEARCHIVENAME="ve.tar.gz"
 S3VEURL="s3://${S3BUCKET}/VirtualEnv/${OSID}/ve-${VEVERSION}/py-${PYVERSION}/${VEARCHIVENAME}"
 #check for the presence of the VE check file on S3
 log "checking ${S3VEURL}"
-VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})"
+#force a true return value even if nothing is found, so that set -e doesn't bomb out
+VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})" || true
 if [ -z "${VEFILE}" ]; then
     log "no installation found: installing virtual env"
     if [ "${DISTRO}" = "Ubuntu" ]; then
@@ -66,7 +71,7 @@ if [ -z "${VEFILE}" ]; then
     logdo "pip install boto"
 
     # recheck for the check file, in case someone was building simultaneously
-    VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})"
+    VEFILE="$(/usr/local/bin/aws s3 ls ${S3VEURL})" || true
     if [ -z "${VEFILE}" ]; then
         log "uploading virtual env install to S3"
         logdo "$(cd ${VEDIR} && tar -czf ${VEARCHIVENAME} *)"

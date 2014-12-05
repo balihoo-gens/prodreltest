@@ -101,16 +101,16 @@ class FulfillmentWorkerTable {
 
 @DynamoDBTable(tableName="_CONFIGURED_IN_WORKER_PROPERTIES_")
 class FulfillmentWorkerEntry() {
-  var instance:String = ""
-  var hostAddress:String = ""
-  var domain:String = ""
-  var activityName:String = ""
-  var activityVersion:String = ""
-  var specification:String = ""
-  var status:String = ""
-  var resolutionHistory:String = ""
-  var start:String = ""
-  var last:String = ""
+  var instance:String = "empty"
+  var hostAddress:String = "empty"
+  var domain:String = "empty"
+  var activityName:String = "empty"
+  var activityVersion:String = "empty"
+  var specification:String = "empty"
+  var status:String = "empty"
+  var resolutionHistory:String = "empty"
+  var start:String = "empty"
+  var last:String = "empty"
 
   var minutesSinceLast:Long = 0
 
