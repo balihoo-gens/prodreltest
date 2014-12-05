@@ -95,9 +95,9 @@
     },
 
     "AWSRegion2AMIvHVM" : {
-      "us-east-1"      : { "Amazon" : "ami-", "Ubuntu" : "ami-4ceaed4d" },
-      "us-west-1"      : { "Amazon" : "ami-", "Ubuntu" : "ami-d5180890" },
-      "us-west-2"      : { "Amazon" : "ami-", "Ubuntu" : "ami-838dd9b3" }
+      "us-east-1"      : { "Amazon" : "ami-b66ed3de", "Ubuntu" : "ami-76e27e1e" },
+      "us-west-1"      : { "Amazon" : "ami-4b6f650e", "Ubuntu" : "ami-d5180890" },
+      "us-west-2"      : { "Amazon" : "ami-b5a7ea85", "Ubuntu" : "ami-838dd9b3" }
     }
 
   },
