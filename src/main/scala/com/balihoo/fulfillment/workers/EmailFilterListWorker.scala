@@ -1,6 +1,5 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.OutputStream
 import java.net.URI
 
 import com.balihoo.fulfillment.adapters._
@@ -78,8 +77,9 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
 
-    val dbDownload = s3Adapter.get(sourceBucket, sourceKey).map(s3Adapter.download).get
-    val db = liteDbAdapter.create(dbDownload.absolutePath)
+    val dbMeta = s3Adapter.get(sourceBucket, sourceKey).get
+    val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
+    val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 
     try {
 
@@ -96,9 +96,9 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
         pageNum += 1
         splog.info(s"Processing csv file #$pageNum...")
 
-        val csvS3Key = s"$destinationS3Key/${dbDownload.meta.filename}.$pageNum.csv"
+        val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv"
         val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
-        val csvOutputStream = csvTempFile.asOutputStream
+        val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
         val csvWriter = csvAdapter.newWriter(csvOutputStream)
 
         try {
@@ -107,12 +107,11 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
           splog.info("Writing records to CSV...")
           csvWriter.writeRow(queryDefinition.fields)
           for (row <- page) {
-            println(row)
             csvWriter.writeRow(row)
           }
 
           s3Adapter
-            .upload(csvS3Key, csvTempFile.file)
+            .upload(csvS3Key, csvTempFile)
             .map(_.toString)
             .get
 
@@ -126,7 +125,8 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     } finally {
       db.close()
-      dbDownload.close()
+      dbMeta.close()
+      dbFile.delete()
     }
   }
 
@@ -223,7 +223,7 @@ class EmailFilterListWorker(override val _cfg: PropertiesLoader, override val _s
     with SQLiteLightweightDatabaseAdapterComponent
     with S3AdapterComponent
     with ScalaCsvAdapterComponent
-    with LocalFilesystemAdapterComponent {
+    with FilesystemAdapterComponent {
   override val s3Adapter = new S3Adapter(_cfg, _splog)
 }
 

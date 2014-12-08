@@ -2,76 +2,74 @@ package com.balihoo.fulfillment.adapters
 
 import java.io._
 
-import com.balihoo.fulfillment.util.SploggerComponent
 import org.apache.commons.io.IOUtils
 
 /**
- * Component to help accessing the local filesystem.
- * Useful mostly in tests, where you can mock it to avoid any direct FS access.
+ * The idea of this component is to allow simpler unit testing for
+ * workers that uses the filesystem. It makes all operations faster
+ * and mockable.
+ */
+
+/**
+ * Component that offer a filesystem adapter.
  */
 trait FilesystemAdapterComponent {
-  
-  def filesystemAdapter: FilesystemAdapter
 
-  trait FilesystemAdapter {
+  /**
+   * @return a file system adapter.
+   */
+  val filesystemAdapter = new JavaIOFilesystemAdapter
 
-    def newTempFile(in: InputStream, hint: String): TempFile
-
-    def newTempFile(hint: String): TempFile
-
-  }
-  
 }
 
-case class TempFile(file: File) {
+/**
+ * A filesystem adapter implementation based on simple Java IO classes.
+ */
+class JavaIOFilesystemAdapter {
 
-  def delete() = file.delete()
-
-  lazy val absolutePath = file.getAbsolutePath
-  lazy val uri = file.toURI
-  def asInputStream: InputStream = new FileInputStream(file)
-  def asInputStreamReader: InputStreamReader = new InputStreamReader(asInputStream)
-  def asOutputStream: OutputStream = new FileOutputStream(file)
-}
-
-trait LocalFilesystemAdapterComponent extends FilesystemAdapterComponent {
-
-  this: SploggerComponent =>
-
-  val filesystemAdapter = new LocalFilesystemAdapter()
-
-  class LocalFilesystemAdapter extends FilesystemAdapter {
-
-    override def newTempFile(hint: String) = TempFile(newFile(hint))
-
-    /**
-     * Create a new temporary file that contains specified input stream content.
-     * @param in a stream to copy data from.
-     * @return a new temp file handle.
-     */
-    override def newTempFile(in: InputStream, hint: String) = {
-      val file = newFile(hint)
-      val out = new FileOutputStream(file)
-      try {
-        val copied = IOUtils.copy(in, out)
-        if (copied == 0) throw new IllegalArgumentException("No data copied")
-        splog.debug(s"Temporary file data copied. bytesCount=$copied")
-      } finally {
-        out.close()
-      }
-      TempFile(file)
+  /**
+   * @return a new temporary file with the content of the specified input
+   *         stream with a name based on the specified hint.
+   */
+  def newTempFileFromStream(in: InputStream, hint: String): File = {
+    val file = newTempFile(hint)
+    val out = newOutputStream(file)
+    try {
+      if (IOUtils.copy(in, out) == 0)
+        throw new IllegalArgumentException("No data copied")
+      else
+        file
+    } finally {
+      out.close()
     }
-
-    /**
-     * @return a new temp file handle.
-     */
-    private def newFile(hint: String) = {
-      val file = File.createTempFile(hint.replaceAll("/", "_"), ".tmp")
-      splog.debug("New temporary file. path=" + file.getAbsolutePath)
-      file.deleteOnExit()
-      file
-    }
-
   }
 
+  /**
+   * @return a new temporary file with a name based on the specified hint.
+   */
+  def newTempFile(hint: String): File = {
+    val safeHint = hint.replaceAll("/", "_")
+    val file = File.createTempFile(safeHint, ".tmp")
+    file.deleteOnExit()
+    file
+  }
+
+  /**
+   * @return a new output stream from the specified file.
+   *         Caller need to close that stream.
+   */
+  def newOutputStream(file: File): OutputStream = new FileOutputStream(file)
+
+  /**
+   * @return a new input stream from the specified file.
+   *         Caller need to close that stream.
+   */
+  def newInputStream(file: File): InputStream = new  FileInputStream(file)
+
+  /**
+   * @return a new reader for the specified input stream.
+   */
+  def newReader(in: InputStream): Reader = new InputStreamReader(in)
+
 }
+

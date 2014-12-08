@@ -1,10 +1,11 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{File, InputStreamReader}
+import java.io.{InputStream, File, InputStreamReader}
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
 
+import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
 import org.junit.runner._
 import org.specs2.mock.Mockito
@@ -49,13 +50,13 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
     "fail task if csv stream has no records" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
+      csv_s3_meta_mock.getContentStream returns csv_s3_content_stream
       s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
       s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
-      db_tempFile_mock.absolutePath returns data.db_temp_file_path
-      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_tempFile_mock
+      db_file_mock.getAbsolutePath returns data.db_temp_file_path
+      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
+      filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
-      csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
-      s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
       csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream_no_records)
 
       handleTask(data.activityParameter) must throwA[RuntimeException]
@@ -63,27 +64,26 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "fail task if csv stream has bad records and failOnBadRecord is true" in new WithWorker {
       swfAdapter.config.getOrElse(===("failOnBadRecord"), any[Boolean]) returns true
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
+      csv_s3_meta_mock.getContentStream returns csv_s3_content_stream
       s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
       s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
-      db_tempFile_mock.absolutePath returns data.db_temp_file_path
-      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_tempFile_mock
+      db_file_mock.getAbsolutePath returns data.db_temp_file_path
+      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
+      filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
-      csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
-      s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
       csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream_no_records)
 
       handleTask(data.activityParameter) must throwA[RuntimeException]
     }
     "complete task by uploading generated db to s3" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
+      csv_s3_meta_mock.getContentStream returns csv_s3_content_stream
       s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
       s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
-      db_tempFile_mock.absolutePath returns data.db_temp_file_path
-      db_tempFile_mock.file returns db_file_mock
-      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_tempFile_mock
+      db_file_mock.getAbsolutePath returns data.db_temp_file_path
+      filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
+      filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
-      csv_s3_download_mock.asInputStreamReader returns csv_reader_mock
-      s3Adapter.download(csv_s3_meta_mock) returns csv_s3_download_mock
       csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream)
       db_mock.batch(anyString) returns db_batch_mock
       s3Adapter.upload(===(data.db_s3_key), ===(db_file_mock), anyString, any[Map[String, String]], any[S3Visibility]) returns Success(data.db_s3_uri)
@@ -136,7 +136,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
 
       there was one(db_mock).close()
       there was one(csv_reader_mock).close()
-      there was one(db_tempFile_mock).delete()
+      there was one(db_file_mock).delete()
     }
     "complete task by returning cached db uri if db lastModified is equal or greater to csv lastModified" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
@@ -150,7 +150,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       /* make sure output is complete s3 url */
       test_complete_result must ===(data.db_s3_uri.toString)
 
-      there was no(s3Adapter).download(any[S3Meta])
+      there was no(filesystemAdapter).newTempFileFromStream(any[InputStream], anyString)
       there was one(db_s3_meta_mock).close()
       there was one(csv_s3_meta_mock).close()
     }
@@ -227,7 +227,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val db_s3_uri = new URI(s"s3://$s3_bucket/$db_s3_key")
   }
 
-  class WithWorker extends AbstractEmailCreateDBWorker with Scope
+  trait WithWorker extends AbstractEmailCreateDBWorker with Scope
     with LoggingWorkflowAdapterTestImpl
     with S3AdapterComponent
     with CsvAdapterComponent
@@ -237,7 +237,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     override val s3Adapter = mock[AbstractS3Adapter]
     override val csvAdapter = mock[CsvAdapter]
     override val liteDbAdapter = mock[LightweightDatabaseAdapter]
-    override val filesystemAdapter = mock[FilesystemAdapter]
+    override val filesystemAdapter = mock[JavaIOFilesystemAdapter]
     override val insertBatchSize = 2
     override val s3dir = data.s3_dir
     override def completeTask(result: String) = {
@@ -247,11 +247,10 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     var test_complete_result = ""
 
     val csv_s3_meta_mock = mock[S3Meta]
-    val csv_s3_download_mock = mock[S3Download]
+    val csv_s3_content_stream = mock[S3ObjectInputStream]
     val csv_reader_mock = mock[InputStreamReader]
     val db_s3_meta_mock = mock[S3Meta]
     val db_file_mock = mock[File]
-    val db_tempFile_mock = mock[TempFile]
     val db_mock = mock[LightweightDatabase]
     val db_batch_mock = mock[DbBatch]
   }

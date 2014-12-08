@@ -3,7 +3,6 @@ package com.balihoo.fulfillment.workers
 import java.io.Reader
 import java.net.URI
 import java.text.SimpleDateFormat
-import java.util.Date
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
@@ -217,20 +216,18 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
       splog.info("Generating database from csv...")
 
       val dbTempFile = filesystemAdapter.newTempFile(dbName + ".sqlite")
-      val db = liteDbAdapter.create(dbTempFile.absolutePath)
-
-      val csvDownload = s3Adapter.download(csvMeta)
-      val csvReader =  csvDownload.asInputStreamReader
+      val db = liteDbAdapter.create(dbTempFile.getAbsolutePath)
+      val csvInputStreamReader = filesystemAdapter.newReader(csvMeta.getContentStream)
 
       try {
 
-        createDb(db, tableDefinition, csvReader)
+        createDb(db, tableDefinition, csvInputStreamReader)
 
         val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
         val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
         val dbUri =
           s3Adapter
-            .upload(dbS3Key, dbTempFile.file, userMetaData = metaData)
+            .upload(dbS3Key, dbTempFile, userMetaData = metaData)
             .map(_.toString)
             .get
 
@@ -238,8 +235,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
       } finally {
         db.close()
-        csvDownload.close()
-        csvReader.close()
+        csvInputStreamReader.close()
         csvMeta.close()
         dbTempFile.delete()
       }
@@ -369,7 +365,7 @@ class EmailCreateDBWorker(override val _cfg: PropertiesLoader, override val _spl
   with ScalaCsvAdapterComponent
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
-  with LocalFilesystemAdapterComponent
+  with FilesystemAdapterComponent
   with SQLiteLightweightDatabaseAdapterComponent {
     override val s3Adapter = new S3Adapter(_cfg, _splog)
 }

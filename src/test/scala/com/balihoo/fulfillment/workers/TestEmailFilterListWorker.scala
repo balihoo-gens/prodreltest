@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.workers
 import java.io.{File, OutputStream}
 import java.net.URI
 
+import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
@@ -47,26 +48,22 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       // setup
       s3Adapter.get(===(data.s3_bucket), ===(data.db_s3_key)) returns Success(db_s3_meta_mock)
       db_s3_meta_mock.filename returns data.db_s3_meta_filename
-      db_s3_download_mock.absolutePath returns data.db_temp_file_path
-      db_s3_download_mock.meta returns db_s3_meta_mock
-      s3Adapter.download(db_s3_meta_mock) returns db_s3_download_mock
-      liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
+      db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
+      db_file_mock.getAbsolutePath returns data.db_file_path
+      filesystemAdapter.newTempFileFromStream(db_s3_contentStream_mock, data.db_s3_key) returns db_file_mock
+      liteDbAdapter.create(===(data.db_file_path)) returns db_mock
       liteDbAdapter.calculatePageCount(===(data.recordsCount), ===(data.param_pageSize)) returns data.expectedPageCount
       db_mock.selectCount(===(data.queryDefinition.selectCountSql)) returns data.recordsCount
 
       val (csv_file1_mock, csv_file2_mock, csv_file3_mock) = (mock[File], mock[File], mock[File])
       val (csv_outputStream1_mock, csv_outputStream2_mock, csv_outputStream3_mock) = (mock[OutputStream], mock[OutputStream], mock[OutputStream])
       val (csv_writer1_mock, csv_writer2_mock, csv_writer3_mock) = (mock[CsvWriter], mock[CsvWriter], mock[CsvWriter])
-      val (csv_tempFile1_mock, csv_tempFile2_mock, csv_tempFile3_mock) = (mock[TempFile], mock[TempFile], mock[TempFile])
-      csv_tempFile1_mock.asOutputStream returns csv_outputStream1_mock
-      csv_tempFile2_mock.asOutputStream returns csv_outputStream2_mock
-      csv_tempFile3_mock.asOutputStream returns csv_outputStream3_mock
-      csv_tempFile1_mock.file returns csv_file1_mock
-      csv_tempFile2_mock.file returns csv_file2_mock
-      csv_tempFile3_mock.file returns csv_file3_mock
-      filesystemAdapter.newTempFile(data.csv_s3_key1) returns csv_tempFile1_mock
-      filesystemAdapter.newTempFile(data.csv_s3_key2) returns csv_tempFile2_mock
-      filesystemAdapter.newTempFile(data.csv_s3_key3) returns csv_tempFile3_mock
+      filesystemAdapter.newOutputStream(csv_file1_mock) returns csv_outputStream1_mock
+      filesystemAdapter.newOutputStream(csv_file2_mock) returns csv_outputStream2_mock
+      filesystemAdapter.newOutputStream(csv_file3_mock) returns csv_outputStream3_mock
+      filesystemAdapter.newTempFile(data.csv_s3_key1) returns csv_file1_mock
+      filesystemAdapter.newTempFile(data.csv_s3_key2) returns csv_file2_mock
+      filesystemAdapter.newTempFile(data.csv_s3_key3) returns csv_file3_mock
       csvAdapter.newWriter(csv_outputStream1_mock) returns csv_writer1_mock
       csvAdapter.newWriter(csv_outputStream2_mock) returns csv_writer2_mock
       csvAdapter.newWriter(csv_outputStream3_mock) returns csv_writer3_mock
@@ -94,9 +91,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
         one(csv_outputStream1_mock).close()
         one(csv_outputStream2_mock).close()
         one(csv_outputStream3_mock).close()
-        one(csv_tempFile1_mock).delete()
-        one(csv_tempFile2_mock).delete()
-        one(csv_tempFile3_mock).delete()
+        one(csv_file1_mock).delete()
+        one(csv_file2_mock).delete()
+        one(csv_file3_mock).delete()
 
         /* verify writes */
         one(csv_writer1_mock).writeRow(data.expectedCsvHeaders)
@@ -165,7 +162,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val activityParameterSourceInvalidProtocol = ActivityParameters("source" -> param_source_invalid_protocol, "query" -> param_query, "pageSize" -> param_pageSize)
     val activityParameterSourceInvalid = ActivityParameters("source" -> param_source_invalid, "query" -> param_query, "pageSize" -> param_pageSize)
     val db_s3_meta_filename = db_s3_key.split("/").last
-    val db_temp_file_path = "some/file"
+    val db_file_path = "some/file"
     val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv"
     val csv_s3_key2 = s"mock/$db_s3_meta_filename.2.csv"
     val csv_s3_key3 = s"mock/$db_s3_meta_filename.3.csv"
@@ -180,18 +177,18 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val expectedPageCount = recordsCount / param_pageSize + 1
   }
 
-  class WithWorker extends AbstractEmailFilterListWorker with Scope
+  trait WithWorker extends AbstractEmailFilterListWorker with Scope
     with LoggingWorkflowAdapterTestImpl
     with S3AdapterComponent
     with LightweightDatabaseAdapterComponent
-    with CsvAdapterComponent
-    with FilesystemAdapterComponent {    
+    with FilesystemAdapterComponent
+    with CsvAdapterComponent {
 
     /* overrides */
     override val s3Adapter = mock[AbstractS3Adapter]
     override val liteDbAdapter = mock[LightweightDatabaseAdapter]
     override val csvAdapter = mock[CsvAdapter]
-    override val filesystemAdapter = mock[FilesystemAdapter]
+    override val filesystemAdapter = mock[JavaIOFilesystemAdapter]
 
     /* hack into completeTask base worker to get result */
     var test_complete_result = ""
@@ -201,7 +198,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
 
     /* mocks */
     val db_s3_meta_mock = mock[S3Meta]
-    val db_s3_download_mock = mock[S3Download]
+    val db_s3_contentStream_mock = mock[S3ObjectInputStream]
     val db_file_mock = mock[File]
     val db_mock = mock[LightweightDatabase]
     val db_paged_resultSet_mock = mock[DbPagedResultSet]
