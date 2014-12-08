@@ -187,6 +187,7 @@ object AdWordsPolicy {
     if(dispHost != destHost) {
       throw new Exception(s"Domains for destination and display URLs must match! ($destHost =/= $dispHost)")
     }
+    true
   }
 
   def fixUpperCaseViolations(text:String):String = {
