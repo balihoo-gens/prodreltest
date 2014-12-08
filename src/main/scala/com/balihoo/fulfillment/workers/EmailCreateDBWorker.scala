@@ -193,8 +193,8 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     val (bucket, key, dbName, tableDefinition) = getParams(params)
     val dbS3Key = s"$s3dir/$dbName"
 
-    val csvMeta = s3Adapter.get(bucket, key).get
-    val dbMetaTry = s3Adapter.get(dbS3Key)
+    val csvMeta = s3Adapter.getMeta(bucket, key).get
+    val dbMetaTry = s3Adapter.getMeta(dbS3Key)
     val useCache = dbMetaTry
       .map(_.userMetaData(csvLastModifiedAttribute))
       .map(csvLastModifiedDateFormat.parse)

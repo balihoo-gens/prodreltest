@@ -51,8 +51,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "fail task if csv stream has no records" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
       csv_s3_meta_mock.getContentStream returns csv_s3_content_stream
-      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
-      s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
+      s3Adapter.getMeta(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      s3Adapter.getMeta(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_file_mock.getAbsolutePath returns data.db_temp_file_path
       filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
       filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
@@ -65,8 +65,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       swfAdapter.config.getOrElse(===("failOnBadRecord"), any[Boolean]) returns true
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
       csv_s3_meta_mock.getContentStream returns csv_s3_content_stream
-      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
-      s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
+      s3Adapter.getMeta(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      s3Adapter.getMeta(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_file_mock.getAbsolutePath returns data.db_temp_file_path
       filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
       filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
@@ -78,8 +78,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "complete task by uploading generated db to s3" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
       csv_s3_meta_mock.getContentStream returns csv_s3_content_stream
-      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
-      s3Adapter.get(===(data.db_s3_key)) returns Failure(mock[Exception])
+      s3Adapter.getMeta(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      s3Adapter.getMeta(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_file_mock.getAbsolutePath returns data.db_temp_file_path
       filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
       filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
@@ -140,10 +140,10 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     }
     "complete task by returning cached db uri if db lastModified is equal or greater to csv lastModified" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
-      s3Adapter.get(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
+      s3Adapter.getMeta(===(data.s3_bucket), ===(data.csv_s3_key)) returns Success(csv_s3_meta_mock)
       db_s3_meta_mock.userMetaData returns data.db_s3_userMetaDataUseCache
       db_s3_meta_mock.s3Uri returns data.db_s3_uri
-      s3Adapter.get(===(data.db_s3_key)) returns Success(db_s3_meta_mock)
+      s3Adapter.getMeta(===(data.db_s3_key)) returns Success(db_s3_meta_mock)
 
       handleTask(data.activityParameter)
 

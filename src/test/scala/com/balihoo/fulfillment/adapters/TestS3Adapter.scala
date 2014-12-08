@@ -22,14 +22,14 @@ class TestS3Adapter extends Specification with Mockito {
       val awsObjectMock = mock[S3Object]
       client.getObject(data.bucket, data.key) returns awsObjectMock
 
-      val result = get(data.bucket, data.key)
+      val result = getMeta(data.bucket, data.key)
 
       result must beSuccessfulTry[S3Meta].withValue(S3Meta(awsObjectMock, data.key, data.bucket))
     }
     "return a failure if aws client request failed" in new WithAdapter {
       client.getObject(data.bucket, data.key) throws new AmazonServiceException("aws is screwed")
 
-      val result = get(data.bucket, data.key)
+      val result = getMeta(data.bucket, data.key)
 
       result must beFailedTry.withThrowable[AmazonServiceException]
     }

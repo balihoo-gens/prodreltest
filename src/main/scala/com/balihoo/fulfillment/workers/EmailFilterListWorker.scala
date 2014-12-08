@@ -77,7 +77,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
 
-    val dbMeta = s3Adapter.get(sourceBucket, sourceKey).get
+    val dbMeta = s3Adapter.getMeta(sourceBucket, sourceKey).get
     val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
     val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 

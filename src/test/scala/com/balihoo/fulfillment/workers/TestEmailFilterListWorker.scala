@@ -46,7 +46,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     "complete task if db file downloaded from s3, query performed, csv files created and uploaded to s3" in new WithWorker {
 
       // setup
-      s3Adapter.get(===(data.s3_bucket), ===(data.db_s3_key)) returns Success(db_s3_meta_mock)
+      s3Adapter.getMeta(===(data.s3_bucket), ===(data.db_s3_key)) returns Success(db_s3_meta_mock)
       db_s3_meta_mock.filename returns data.db_s3_meta_filename
       db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
       db_file_mock.getAbsolutePath returns data.db_file_path

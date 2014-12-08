@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.File
+import java.io.{Closeable, File}
 import java.net.{URI, URL}
 
 import com.amazonaws.auth.BasicAWSCredentials
@@ -25,15 +25,16 @@ case object PrivateS3Visibility extends S3Visibility
 
 /**
  * Wrapper for an s3 object.
+ * This object must be released as fast as possible per the amazon API.
  */
-case class S3Meta(awsObject: S3Object, key: String, bucket: String) {
+case class S3Meta(awsObject: S3Object, key: String, bucket: String) extends Closeable {
   lazy val lastModified = awsObject.getObjectMetadata.getLastModified
   lazy val httpsUrl = new URL("https", "s3.amazonaws.com", s"$bucket/$key")
   lazy val s3Url = new URL("s3", bucket, key)
   lazy val s3Uri = new URI(s"s3://$bucket/$key")
   lazy val userMetaData = awsObject.getObjectMetadata.getUserMetadata.asScala.toMap
   lazy val filename = awsObject.getKey.split("/").last
-  def close() = awsObject.close()
+  override def close() = awsObject.close()
   def getContentStream = awsObject.getObjectContent
 }
 
@@ -56,14 +57,14 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
    * @param key s3 key i.e.: `some/long/key.file`
    * @return a `Try` to get a s3 object
    */
-  def get(key: String): Try[S3Meta] = get(defaultBucket, key)
+  def getMeta(key: String): Try[S3Meta] = getMeta(defaultBucket, key)
 
   /**
    * @param bucket s3 bucket
    * @param key s3 key i.e.: `some/long/key.file`
    * @return a `Try` to get a s3 object
    */
-  def get(bucket: String, key: String): Try[S3Meta] = Try({
+  def getMeta(bucket: String, key: String): Try[S3Meta] = Try({
     splog.debug(s"Getting... bucket=$bucket key=$key")
     val awsObject = client.getObject(bucket, key)
     splog.debug(s"Got it! bucket=$bucket key=$key")
