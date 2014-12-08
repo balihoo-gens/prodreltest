@@ -114,12 +114,14 @@ trait CampaignCreatorComponent {
         new DateTimeActivityParameter("endDate", "Last day the campaign will run"),
         new StringsActivityParameter("targetzips", "An array of zip codes"),
         new EnumsActivityParameter("adschedule", "Days of the week to run ads", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun")),
-        new StringActivityParameter("street address", "LocationExtension: Street address line 1", required=false),
-        new StringActivityParameter("city", "LocationExtension: Name of the city", required=false),
-        new StringActivityParameter("postal code", "LocationExtension: Postal code", required=false),
-        new StringActivityParameter("country code", "LocationExtension: Country code", required=false),
-        new StringActivityParameter("company name", "LocationExtension(Optional): The name of the company located at the given address.", required=false, maxLength = Some(80), minLength = Some(1)),
-        new StringActivityParameter("phone number", "LocationExtension(Optional): The phone number for the location", required=false)
+        new ObjectActivityParameter("location", "Location Extension information", properties=List(
+          new StringActivityParameter("street address", "Street address line 1"),
+          new StringActivityParameter("city", "Name of the city"),
+          new StringActivityParameter("postal code", "Postal code"),
+          new StringActivityParameter("country code", "Country code"),
+          new StringActivityParameter("company name", "The name of the company located at the given address.", required=false, maxLength = Some(80), minLength = Some(1)),
+          new StringActivityParameter("phone number", "The phone number for the location", required=false)
+        ), required = false)
       ), new StringActivityResult("AdWords Campaign ID"))
     }
 
@@ -233,6 +235,10 @@ trait CampaignCreatorComponent {
 
       setTargetZips(madeCampaign, params("targetzips"))
       setAdSchedule(madeCampaign, params("adschedule"))
+
+      if(params.has("location")) {
+        setLocationExtension(campaign, params[ActivityParameters]("location"))
+      }
       madeCampaign
     }
 
@@ -252,8 +258,8 @@ trait CampaignCreatorComponent {
       if(params.has("adschedule")) {
         setAdSchedule(campaign, params("adschedule"))
       }
-      if(params.has("street address")) {
-        setLocationExtension(campaign, params)
+      if(params.has("location")) {
+        setLocationExtension(campaign, params[ActivityParameters]("location"))
       }
 
       val operation = new CampaignOperation()

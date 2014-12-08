@@ -68,14 +68,14 @@ trait AdGroupCreatorComponent {
         new StringActivityParameter("name", "Name of this AdGroup"),
         new StringActivityParameter("campaignId", "AdWords Campaign ID"),
         new NumberActivityParameter("bidDollars", "Bid amount in dollars"),
-        new NumberActivityParameter("mobile bid modifier", "Proportion of bidDollars to be bid for mobile", false),
+        new NumberActivityParameter("mobile bid modifier", "Proportion of bidDollars to be bid for mobile", required=false),
         new EnumActivityParameter("status", "", List("ENABLED","PAUSED","DELETED")),
-        new ObjectActivityParameter("target", /*"JSON",*/ "Mysterious and magical Form Builder output!", false),
-        new StringsActivityParameter("interests", "List of Interests\nhttps://developers.google.com/adwords/api/docs/appendix/verticals", false),
-        new StringsActivityParameter("exact keywords", "List of EXACT Match Keywords", false),
-        new StringsActivityParameter("broad keywords", "List of BROAD Match Keywords", false),
-        new StringsActivityParameter("phrase keywords", "List of PHRASE Match Keywords", false),
-        new StringsActivityParameter("negative keywords", "List of NEGATIVE Match Keywords", false)
+        new ObjectActivityParameter("target", /*"JSON",*/ "Mysterious and magical Form Builder output!", required=false),
+        new StringsActivityParameter("interests", "List of Interests\nhttps://developers.google.com/adwords/api/docs/appendix/verticals", required=false),
+        new StringsActivityParameter("exact keywords", "List of EXACT Match Keywords", required=false),
+        new StringsActivityParameter("broad keywords", "List of BROAD Match Keywords", required=false),
+        new StringsActivityParameter("phrase keywords", "List of PHRASE Match Keywords", required=false),
+        new StringsActivityParameter("negative keywords", "List of NEGATIVE Match Keywords", required=false)
       ), new StringActivityResult("AdGroup ID"))
     }
 
