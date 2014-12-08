@@ -18,6 +18,8 @@ import play.api.libs.json._
 import scala.language.implicitConversions
 import collection.JavaConversions._
 
+case class ActivitySpecificationException(msg: String) extends Exception(msg)
+
 class ActivitySpecification(val params:List[ActivityParameter]
                            ,val result:ActivityResult
                            ,val description:String = "") {
@@ -65,7 +67,7 @@ class ActivitySpecification(val params:List[ActivityParameter]
           val message = report.value("message").as[String]
           gripes += s"$domain $level: $pointer $message"
         }
-        throw new Exception(gripes.mkString("\n"))
+        throw ActivitySpecificationException(gripes.mkString("\n"))
       case _ =>
     }
   }
@@ -301,7 +303,7 @@ class ObjectActivityParameter(override val name:String
 
   def jsonType = "object"
 
-  override def additionalSchemaValues = Map("properties" -> Json.obj())
+  override def additionalSchemaValues: Map[String, JsValue] = Map("properties" -> Json.obj())
 
   def parseValue(js:JsValue):Any = js.as[JsObject]
 }
@@ -338,7 +340,7 @@ class UriActivityParameter(override val name:String
 
   def jsonType = "string"
 
-  override def additionalSchemaValues = Map("format" -> Json.toJson("uri"))
+  override def additionalSchemaValues = Map("format" -> Json.toJson("uri"), "minLength" -> Json.toJson(1))
 
   def parseValue(js: JsValue): Any = new URI(_parseBasic[String](js).toString)
 }

@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsString, JsValue, JsObject, Json}
 
 import scala.util.{Failure, Success, Try}
 
@@ -32,12 +32,49 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   val sqlDateParser = new SimpleDateFormat("yyyy-MM-dd")
   val s3dir = this.swfAdapter.config.getString("s3dir")
 
+  object EmailDatabaseSchemaDefinitionActivityParameter
+    extends ObjectActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)", true) {
+    override def additionalSchemaValues: Map[String, JsValue] = {
+      Map(
+        "required" -> Json.arr("columns"),
+        "properties" -> Json.obj(
+          "name" -> Json.obj("type" -> "string"),
+          "columns" -> Json.obj(
+            "description" -> "",
+            "type" -> "array",
+            "minItems" -> 1,
+            "uniqueItems" -> true,
+            "items" -> Json.obj(
+              "type" -> "object",
+              "required" -> Json.arr("name", "type", "source"),
+              "properties" -> Json.obj(
+                "name" -> Json.obj(
+                  "type" -> "string",
+                  "minLength" -> 1
+                ),
+                "type" -> Json.obj(
+                  "type" -> "string",
+                  "enum" -> DataTypes.AllSupportedAliases
+                ),
+                "source" -> Json.obj(
+                  "type" -> "string",
+                  "minLength" -> 1
+                ),
+                "index" -> Json.obj("type" -> "string")
+              )
+            )
+          )
+        )
+      )
+    }
+  }
+
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
         new UriActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
-        new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated"),
-        new ObjectActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)")
+        new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated", minLength = Some(1)),
+        EmailDatabaseSchemaDefinitionActivityParameter
       ),
       new StringActivityResult("URL to the lightweight database file"),
       "Insert all records from a CSV file to a lightweight database file, according to a DTD")
@@ -244,7 +281,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
  * Supported database types enumeration.
  */
 object DataTypes {
-  sealed abstract class DataType(aliases: String*) {
+  sealed abstract class DataType(val aliases: String*) {
     val regex = aliases
       .map(_.replaceAll("\\s", "\\\\s"))
       .mkString("(", "|", ")\\s*([(](\\d+)[)]){0,1}")
@@ -256,6 +293,8 @@ object DataTypes {
   case object Date extends DataType("date")
   case object Boolean extends DataType("boolean")
   case object Timestamp extends DataType("datetime", "timestamp")
+
+  val AllSupportedAliases = Boolean.aliases ++ Date.aliases ++ Integer.aliases ++ Real.aliases ++ Text.aliases ++ Timestamp.aliases
 }
 
 /**

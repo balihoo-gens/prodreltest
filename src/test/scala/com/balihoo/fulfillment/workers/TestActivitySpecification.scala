@@ -97,7 +97,7 @@ class TestActivitySpecification extends Specification with Mockito
         """{
           | "param2" : "all kinds of angry"
           |}
-        """.stripMargin) must throwA(new Exception("""validation error:  object has missing required properties (["param1"])"""))
+        """.stripMargin) must throwA(ActivitySpecificationException("""validation error:  object has missing required properties (["param1"])"""))
     }
 
     "produce a valid jsonSchema for parameters" in {
@@ -138,7 +138,7 @@ class TestActivitySpecification extends Specification with Mockito
               "param2" : "wrong type"
           }"""
 
-      spec.getParameters(input) must throwA(new Exception("""validation error: /param2 instance type (string) does not match any allowed primitive type (allowed: ["integer","number"])"""))
+      spec.getParameters(input) must throwA(ActivitySpecificationException("""validation error: /param2 instance type (string) does not match any allowed primitive type (allowed: ["integer","number"])"""))
 
     }
 
@@ -174,7 +174,7 @@ class TestActivitySpecification extends Specification with Mockito
               "param2" : "HOUDINI"
           }"""
 
-      spec.getParameters(input) must throwA(new Exception("""validation error: /param2 instance value ("HOUDINI") not found in enum (possible values: ["FERRET","CHICKEN"])"""))
+      spec.getParameters(input) must throwA(ActivitySpecificationException("""validation error: /param2 instance value ("HOUDINI") not found in enum (possible values: ["FERRET","CHICKEN"])"""))
 
 
     }
@@ -192,7 +192,7 @@ class TestActivitySpecification extends Specification with Mockito
               "param2" : "HOUDINI"
           }"""
 
-      spec.getParameters(input) must throwA(new Exception("""validation error: /param1 instance type (integer) does not match any allowed primitive type (allowed: ["string"])
+      spec.getParameters(input) must throwA(ActivitySpecificationException("""validation error: /param1 instance type (integer) does not match any allowed primitive type (allowed: ["string"])
 validation error: /param2 instance value ("HOUDINI") not found in enum (possible values: ["FERRET","CHICKEN"])"""))
 
 
@@ -208,7 +208,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
               "param1" : "this string is much longer than 15 characters"
           }"""
 
-      spec.getParameters(input) must throwA(new Exception("""validation error: /param1 string "this string is much longer than 15 characters" is too long (length: 45, maximum allowed: 15)"""))
+      spec.getParameters(input) must throwA(ActivitySpecificationException("""validation error: /param1 string "this string is much longer than 15 characters" is too long (length: 45, maximum allowed: 15)"""))
 
     }
 
@@ -222,7 +222,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
               "param1" : "too short!"
           }"""
 
-      spec.getParameters(input) must throwA(new Exception("""validation error: /param1 string "too short!" is too short (length: 10, required minimum: 15)"""))
+      spec.getParameters(input) must throwA(ActivitySpecificationException("""validation error: /param1 string "too short!" is too short (length: 10, required minimum: 15)"""))
 
     }
 
@@ -236,7 +236,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
               "param1" : "feesh"
           }"""
 
-      spec.getParameters(input) must throwA(new Exception( """validation error: /param1 ECMA 262 regex "[0-9]{3}[a-z]{4}" does not match input string "feesh""""))
+      spec.getParameters(input) must throwA(ActivitySpecificationException( """validation error: /param1 ECMA 262 regex "[0-9]{3}[a-z]{4}" does not match input string "feesh""""))
     }
 
       "accept string pattern" in {
@@ -281,7 +281,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
           |}
         """.stripMargin
 
-      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is invalid against requested date format(s)""") }
+      spec.getParameters(input) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""string "banana peel" is invalid against requested date format(s)""") }
     }
 
     "handle a good URI" in {
@@ -311,7 +311,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
           |}
         """.stripMargin
 
-      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid URI""") }
+      spec.getParameters(input) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""string "banana peel" is not a valid URI""") }
     }
 
     "handle a good email address" in {
@@ -341,7 +341,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
           |}
         """.stripMargin
 
-      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid email address""") }
+      spec.getParameters(input) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""string "banana peel" is not a valid email address""") }
     }
 
     "handle a good IPv4 address" in {
@@ -371,7 +371,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
           |}
         """.stripMargin
 
-      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid IPv4 address""") }
+      spec.getParameters(input) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""string "banana peel" is not a valid IPv4 address""") }
     }
 
     "handle a good IPv6 address" in {
@@ -401,7 +401,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
           |}
         """.stripMargin
 
-      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid IPv6 address""") }
+      spec.getParameters(input) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""string "banana peel" is not a valid IPv6 address""") }
     }
 
     "handle a good hostname" in {
@@ -431,7 +431,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
           |}
         """.stripMargin
 
-      spec.getParameters(input) must throwA[Exception].like { case e => e.getMessage must contain("""string "banana peel" is not a valid hostname""") }
+      spec.getParameters(input) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""string "banana peel" is not a valid hostname""") }
     }
 
     "parse integer type" in {
@@ -446,7 +446,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
       val params = spec.getParameters(input)
       params[Int]("param1") must beEqualTo(1)
 
-      spec.getParameters(badInput) must throwA[Exception].like { case e => e.getMessage must contain("""/param1 instance type (array) does not match any allowed primitive type (allowed: ["integer"])""") }
+      spec.getParameters(badInput) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""/param1 instance type (array) does not match any allowed primitive type (allowed: ["integer"])""") }
     }
 
     "parse long type" in {
@@ -461,7 +461,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
       val params = spec.getParameters(input)
       params[Long]("param1") must beEqualTo(1.toLong)
 
-      spec.getParameters(badInput) must throwA[Exception].like { case e => e.getMessage must contain("""param1 instance type (string) does not match any allowed primitive type (allowed: ["integer"])""") }
+      spec.getParameters(badInput) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""param1 instance type (string) does not match any allowed primitive type (allowed: ["integer"])""") }
     }
 
     "parse enums type" in {
@@ -477,7 +477,7 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
       val params = spec.getParameters(input)
       params[List[String]]("param1") mustEqual List("IS", "BEETLE")
 
-      spec.getParameters(badinput) must throwA[Exception].like { case e => e.getMessage must contain("""instance value ("BEATLE") not found in enum (possible values: ["BEETLE","JUICE","IS","WEIRD"])""")}
+      spec.getParameters(badinput) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""instance value ("BEATLE") not found in enum (possible values: ["BEETLE","JUICE","IS","WEIRD"])""")}
     }
 
   }

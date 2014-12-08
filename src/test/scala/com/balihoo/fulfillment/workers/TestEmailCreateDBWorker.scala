@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.workers
 
 import java.io.{InputStreamReader, File}
-import java.net.{URI, URISyntaxException}
+import java.net.URI
 import java.text.SimpleDateFormat
 
 import com.balihoo.fulfillment.adapters._
@@ -10,7 +10,7 @@ import org.specs2.mutable._
 import org.specs2.runner._
 import org.junit.runner._
 import org.specs2.specification.Scope
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
@@ -27,6 +27,196 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       spec.params.count(_.name == "dtd") must beEqualTo(1)
       spec.result must beAnInstanceOf[StringActivityResult]
       spec.description must not(beEmpty)
+    }
+    "fail param validation when dbname property is missing" in new TestContext {
+      val dtdJsonObj = Json.obj(
+        "columns" -> Json.arr(
+          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+          Json.obj("name" -> "foz", "type" -> "char", "source" -> "baz")
+        )
+      )
+      val input = Json.obj(
+        "source" -> "aSource",
+        "dtd" -> dtdJsonObj
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"dbname\"\\]\\)")
+    }
+    "fail param validation when dbname property is empty" in new TestContext {
+      val dtdJsonObj = Json.obj(
+        "columns" -> Json.arr(
+          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+          Json.obj("name" -> "foz", "type" -> "char", "source" -> "baz")
+        )
+      )
+      val input = Json.obj(
+        "dbname" -> "",
+        "source" -> "aSource",
+        "dtd" -> dtdJsonObj
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dbname string \"\" is too short")
+    }
+    "fail param validation when source property is missing" in new TestContext {
+      val dtdJsonObj = Json.obj(
+        "columns" -> Json.arr(
+          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+          Json.obj("name" -> "foz", "type" -> "char", "source" -> "baz")
+        )
+      )
+      val input = Json.obj(
+        "dbname" -> "aName",
+        "dtd" -> dtdJsonObj
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"source\"\\]\\)")
+    }
+    "fail param validation when source property is empty" in new TestContext {
+      val dtdJsonObj = Json.obj(
+        "columns" -> Json.arr(
+          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+          Json.obj("name" -> "foz", "type" -> "char", "source" -> "baz")
+        )
+      )
+      val input = Json.obj(
+        "dbname" -> "aName",
+        "source" -> "",
+        "dtd" -> dtdJsonObj
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/source string \"\" is too short")
+    }
+    "fail param validation when source property is invalid uri" in new TestContext {
+      val dtdJsonObj = Json.obj(
+        "columns" -> Json.arr(
+          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+          Json.obj("name" -> "foz", "type" -> "char", "source" -> "baz")
+        )
+      )
+      val input = Json.obj(
+        "dbname" -> "aName",
+        "source" -> "some uri",
+        "dtd" -> dtdJsonObj
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/source string \"some uri\" is not a valid URI")
+    }
+    "fail param validation when /dtd/columns property undefined" in new TestContext {
+      val input = Json.obj("source" -> "some", "dbname" -> "some", "dtd" -> Json.obj())
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd object has missing required properties")
+    }
+    "fail param validation when /dtd/columns property is empty array" in new TestContext {
+      val input = Json.obj("source" -> "some", "dbname" -> "some", "dtd" -> Json.obj("columns" -> Json.arr()))
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns array is too short")
+    }
+    "fail param validation when /dtd/columns property has non unique objects" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+            Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns array must not contain duplicate elements")
+    }
+    "fail param validation when a /dtd/columns/source property is missing" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("name" -> "foo", "type" -> "int")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns/0 object has missing required properties \\(\\[\"source\"\\]\\)")
+    }
+    "fail param validation when a /dtd/columns/type property is missing" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("name" -> "foo", "source" -> "bar")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns/0 object has missing required properties \\(\\[\"type\"\\]\\)")
+    }
+    "fail param validation when a /dtd/columns/name property is missing" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("type" -> "int", "source" -> "bar")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns/0 object has missing required properties \\(\\[\"name\"\\]\\)")
+    }
+    "fail param validation when a /dtd/columns/name property is empty" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("name" -> "", "type" -> "int", "source" -> "bar")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns/0/name string \"\" is too short")
+    }
+    "fail param validation when a /dtd/columns/type property is empty" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("name" -> "foo", "type" -> "", "source" -> "bar")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns/0/type instance value \\(\"\"\\) not found in enum")
+    }
+    "fail param validation when a /dtd/columns/type property is undefined enum value" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("name" -> "foo", "type" -> "weird", "source" -> "bar")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns/0/type instance value \\(\"weird\"\\) not found in enum")
+    }
+    "fail param validation when a /dtd/columns/source property is empty" in new TestContext {
+      val input = Json.obj(
+        "source" -> "some",
+        "dbname" -> "some",
+        "dtd" -> Json.obj(
+          "columns" -> Json.arr(
+            Json.obj("name" -> "foo", "type" -> "int", "source" -> "")
+          )
+        )
+      )
+      worker.getSpecification.getParameters(input) must throwA[ActivitySpecificationException]("/dtd/columns/0/source string \"\" is too short")
+    }
+    "return activity parameters given valid input" in new TestContext {
+      val dtdJonObj = Json.obj(
+        "columns" -> Json.arr(
+          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+          Json.obj("name" -> "foz", "type" -> "char", "source" -> "baz")
+        )
+      )
+      val input = Json.obj(
+        "source" -> "aSource",
+        "dbname" -> "aName",
+        "dtd" -> dtdJonObj
+      )
+      val result = worker.getSpecification.getParameters(input)
+      result.get[URI]("source") must beSome(new URI("aSource"))
+      result.get[String]("dbname") must beSome("aName")
+      result.get[JsObject]("dtd") must beSome(dtdJonObj)
     }
   }
 
