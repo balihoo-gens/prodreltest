@@ -1,48 +1,75 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{FileOutputStream, File}
+import java.io._
+
+import org.apache.commons.io.IOUtils
 
 /**
- * Component to help accessing the local filesystem.
- * Useful mostly in tests, where you can mock it to avoid any direct FS access.
+ * The idea of this component is to allow simpler unit testing for
+ * workers that uses the filesystem. It makes all operations faster
+ * and mockable.
+ */
+
+/**
+ * Component that offer a filesystem adapter.
  */
 trait FilesystemAdapterComponent {
-  
-  def filesystemAdapter: FilesystemAdapter
 
-  trait FilesystemAdapter {
-
-    def newTempFileOutputStream(name: String, extension: String = ".tmp"): (File, FileOutputStream)
-
-    def newTempFile(name: String, extension: String = ".tmp"): File
-
-    def newFileOutputStream(file: File): FileOutputStream
-
-  }
-  
-}
-
-trait LocalFilesystemAdapterComponent extends FilesystemAdapterComponent {
-
-  val filesystemAdapter = new LocalFilesystemAdapter()
-
-  class LocalFilesystemAdapter extends FilesystemAdapter {
-
-    override def newTempFile(name: String, extension: String = ".tmp"): File = {
-      require(!name.trim.isEmpty)
-      require(!extension.trim.isEmpty)
-      val file = File.createTempFile(name, extension)
-      file.deleteOnExit()
-      file
-    }
-
-    override def newFileOutputStream(file: File): FileOutputStream = new FileOutputStream(file)
-
-    override def newTempFileOutputStream(name: String, extension: String = ".tmp"): (File, FileOutputStream) = {
-      val file = newTempFile(name, extension)
-      (file, newFileOutputStream(file))
-    }
-
-  }
+  /**
+   * @return a file system adapter.
+   */
+  val filesystemAdapter = new JavaIOFilesystemAdapter
 
 }
+
+/**
+ * A filesystem adapter implementation based on simple Java IO classes.
+ */
+class JavaIOFilesystemAdapter {
+
+  /**
+   * @return a new temporary file with the content of the specified input
+   *         stream with a name based on the specified hint.
+   */
+  def newTempFileFromStream(in: InputStream, hint: String): File = {
+    val file = newTempFile(hint)
+    val out = newOutputStream(file)
+    try {
+      if (IOUtils.copy(in, out) == 0)
+        throw new IllegalArgumentException("No data copied")
+      else
+        file
+    } finally {
+      out.close()
+    }
+  }
+
+  /**
+   * @return a new temporary file with a name based on the specified hint.
+   */
+  def newTempFile(hint: String): File = {
+    val safeHint = hint.replaceAll("/", "_")
+    val file = File.createTempFile(safeHint, ".tmp")
+    file.deleteOnExit()
+    file
+  }
+
+  /**
+   * @return a new output stream from the specified file.
+   *         Caller need to close that stream.
+   */
+  def newOutputStream(file: File): OutputStream = new FileOutputStream(file)
+
+  /**
+   * @return a new input stream from the specified file.
+   *         Caller need to close that stream.
+   */
+  def newInputStream(file: File): InputStream = new  FileInputStream(file)
+
+  /**
+   * @return a new reader for the specified input stream.
+   */
+  def newReader(in: InputStream): Reader = new InputStreamReader(in)
+
+}
+

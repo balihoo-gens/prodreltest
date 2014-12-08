@@ -39,6 +39,7 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.adwords_campaignprocessor": True,
         "com.balihoo.fulfillment.workers.adwords_imageadprocessor": True,
         "com.balihoo.fulfillment.workers.adwords_textadprocessor": True,
+        "com.balihoo.fulfillment.workers.adwords_budgetcalculator": True,
         "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
         "com.balihoo.fulfillment.workers.htmlrenderer": True,
         "com.balihoo.fulfillment.workers.email_createdb": True,

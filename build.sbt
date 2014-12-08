@@ -39,8 +39,8 @@ libraryDependencies ++= Seq(
   ("com.balihoo.commons" % "commons-client" % "14.19-SNAPSHOT")
     .exclude("com.google.guava", "guava")
     .exclude("com.sun.jersey", "jersey-core"),
-  ("com.google.api-ads" % "ads-lib" % "1.32.0").exclude("com.google.guava", "guava-jdk5"), // exclude old guava
-  ("com.google.api-ads" % "adwords-axis" % "1.32.0").exclude("com.google.guava", "guava-jdk5"), // exclude old guava
+  ("com.google.api-ads" % "ads-lib" % "1.35.1").exclude("com.google.guava", "guava-jdk5"), // exclude old guava
+  ("com.google.api-ads" % "adwords-axis" % "1.35.1").exclude("com.google.guava", "guava-jdk5"), // exclude old guava
   "javax.activation" % "activation" % "1.1",
   "com.github.scopt" %% "scopt" % "3.2.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.1.8.v20121106",
@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
   "com.stackmob" %% "newman" % "1.3.5",
   ("com.balihoo.socialmedia" % "facebook-client" % "14.19-SNAPSHOT").exclude("ch.qos.logback", "logback-classic"),
   "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test,
-  "com.github.tototoshi" %% "scala-csv" % "1.1.0",
+  "com.github.tototoshi" %% "scala-csv" % "1.1.2",
   "org.xerial" % "sqlite-jdbc" % "3.8.7",
   "com.github.fge" % "json-schema-validator" % "2.2.6",
   "com.netaporter" %% "scala-uri" % "0.4.3",
