@@ -2,7 +2,7 @@ package com.balihoo.fulfillment.workers
 
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters._
-import com.google.api.ads.adwords.axis.v201406.mcm.ManagedCustomer
+import com.google.api.ads.adwords.axis.v201409.mcm.ManagedCustomer
 
 import com.balihoo.fulfillment.util.Splogger
 

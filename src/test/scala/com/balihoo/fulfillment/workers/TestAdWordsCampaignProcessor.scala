@@ -59,10 +59,10 @@ class TestAdWordsCampaignProcessor extends Specification with Mockito
           "account" : "flesh of the tuna",
           "channel" : "DISPLAY",
           "budget" : 34545.0,
-"adschedule" : ["34545yay"],
-"endDate" : "34546767",
+"adschedule" : ["Thu", "Sat"],
+"endDate" : "2025-12-15T12:12:12Z",
 "name" : "some name",
-"startDate" : "34543465",
+"startDate" : "2025-11-15T12:12:12Z",
 "targetzips" : ["34545yay"]
           }
 

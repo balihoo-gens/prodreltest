@@ -4,9 +4,9 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
 
-import com.google.api.ads.adwords.axis.utils.v201406.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201406.cm._
-import play.api.libs.json._
+import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201409.cm._
+import org.joda.time.DateTime
 
 import scala.collection.mutable
 
@@ -58,7 +58,7 @@ trait BudgetCreatorComponent {
         .build()
 
       adWordsAdapter.withErrorsHandled[Budget](context, {
-        val page = adWordsAdapter.budgedService.get(selector)
+        val page = adWordsAdapter.budgetService.get(selector)
         page.getTotalNumEntries.intValue() match {
           case 0 => null
           case 1 => page.getEntries(0)
@@ -84,7 +84,7 @@ trait BudgetCreatorComponent {
       operation.setOperator(Operator.ADD)
 
       adWordsAdapter.withErrorsHandled[Budget](context, {
-        adWordsAdapter.budgedService.mutate(Array(operation)).getValue(0)
+        adWordsAdapter.budgetService.mutate(Array(operation)).getValue(0)
       })
     }
   }
@@ -110,10 +110,10 @@ trait CampaignCreatorComponent {
         new EnumActivityParameter("channel", "The advertising channel", List("SEARCH", "DISPLAY", "SHOPPING")),
         new NumberActivityParameter("budget", "The monthly budget"),
         new EnumActivityParameter("status", "Always ACTIVE on Campaign creation", List("ACTIVE", "PAUSED", "DELETED"), required=false),
-        new StringActivityParameter("startDate", "YYYYMMDD Ignored on update.", pattern=Some("[0-9]{8}")),
-        new StringActivityParameter("endDate", "YYYYMMDD", pattern=Some("[0-9]{8}")),
+        new DateTimeActivityParameter("startDate", "First day the campaign will run. Ignored on update."),
+        new DateTimeActivityParameter("endDate", "Last day the campaign will run"),
         new StringsActivityParameter("targetzips", "An array of zip codes"),
-        new StringsActivityParameter("adschedule", "An array of one or more of M,T,W,Th,F,S,Su"),
+        new EnumsActivityParameter("adschedule", "Days of the week to run ads", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun")),
         new StringActivityParameter("street address", "LocationExtension: Street address line 1", required=false),
         new StringActivityParameter("city", "LocationExtension: Name of the city", required=false),
         new StringActivityParameter("postal code", "LocationExtension: Postal code", required=false),
@@ -188,11 +188,11 @@ trait CampaignCreatorComponent {
       campaign.setBudget(campaignBudget)
 
       if(params.has("startDate")) {
-        campaign.setStartDate(params[String]("startDate"))
+        campaign.setStartDate(params[DateTime]("startDate").toString("YYYYMMdd"))
       }
 
       if(params.has("endDate")) {
-        campaign.setEndDate(params[String]("endDate"))
+        campaign.setEndDate(params[DateTime]("endDate").toString("YYYYMMdd"))
       }
 
       val cpcBiddingScheme = new ManualCpcBiddingScheme()
@@ -221,10 +221,7 @@ trait CampaignCreatorComponent {
       val geoTarget = new GeoTargetTypeSetting()
       geoTarget.setPositiveGeoTargetType(GeoTargetTypeSettingPositiveGeoTargetType.DONT_CARE)
 
-      val keywordMatch = new KeywordMatchSetting()
-      keywordMatch.setOptIn(false)
-
-      campaign.setSettings(Array(geoTarget, keywordMatch))
+      campaign.setSettings(Array(geoTarget))
 
       val operation = new CampaignOperation()
       operation.setOperand(campaign)
@@ -247,7 +244,7 @@ trait CampaignCreatorComponent {
         campaign.setStatus(CampaignStatus.fromString(params("status")))
       }
       if(params.has("endDate")) {
-        campaign.setEndDate(params("endDate"))
+        campaign.setEndDate(params[DateTime]("endDate").toString("YYYYMMdd"))
       }
       if(params.has("targetzips")) {
         setTargetZips(campaign, params[List[String]]("targetzips"))
@@ -301,7 +298,7 @@ trait CampaignCreatorComponent {
     /**
      * This function is the result of the unfortunate fact that you can't (or at least I couldn't figure out)
      * filter by CountryCode = 'US' as you'd expect.
-     * Details here: https://developers.google.com/adWordsAdapter/api/docs/appendix/selectorfields#v201406-LocationCriterionService
+     * Details here: https://developers.google.com/adWordsAdapter/api/docs/appendix/selectorfields#v201409-LocationCriterionService
      * @param locations Array[LocationCriterion]
      * @return
      */
@@ -407,19 +404,19 @@ trait CampaignCreatorComponent {
         dayOfWeek.setEndHour(24)
         dayOfWeek.setEndMinute(MinuteOfHour.ZERO)
         day match {
-          case "M" =>
+          case "Mon" =>
             dayOfWeek.setDayOfWeek(DayOfWeek.MONDAY)
-          case "T" =>
+          case "Tue" =>
             dayOfWeek.setDayOfWeek(DayOfWeek.TUESDAY)
-          case "W" =>
+          case "Wed" =>
             dayOfWeek.setDayOfWeek(DayOfWeek.WEDNESDAY)
-          case "Th" =>
+          case "Thu" =>
             dayOfWeek.setDayOfWeek(DayOfWeek.THURSDAY)
-          case "F" =>
+          case "Fri" =>
             dayOfWeek.setDayOfWeek(DayOfWeek.FRIDAY)
-          case "S" =>
+          case "Sat" =>
             dayOfWeek.setDayOfWeek(DayOfWeek.SATURDAY)
-          case "Su" =>
+          case "Sun" =>
             dayOfWeek.setDayOfWeek(DayOfWeek.SUNDAY)
           case _ =>
             // TODO Should we throw an exception!?

@@ -7,7 +7,7 @@ import org.joda.time.DateTime
 
 import scala.collection.mutable
 
-import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
 
 import org.keyczar.Crypter
@@ -273,7 +273,25 @@ class StringsActivityParameter(override val name:String
 
   override def additionalSchemaValues = Map("items" -> Json.obj("type" -> "string"))
 
+  def parseValue(js: JsValue): Any = _parseBasic[List[String]](js)
+}
+
+class EnumsActivityParameter(override val name:String
+                               ,override val description:String
+                               ,val options:Seq[String]
+                               ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "array"
+
   def parseValue(js:JsValue):Any = _parseBasic[List[String]](js)
+
+  override def additionalSchemaValues =
+    Map("items" -> Json.obj(
+          "type" -> "string",
+          "enum" -> Json.toJson(options)
+        )
+      )
 }
 
 class ObjectActivityParameter(override val name:String
