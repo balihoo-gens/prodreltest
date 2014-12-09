@@ -8,6 +8,7 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.util.{UTCFormatter, Splogger}
 import com.google.api.ads.adwords.lib.jaxb.v201409._
 import org.joda.time.{Days, DateTime}
+import play.api.libs.json.{Json, JsObject}
 
 import scala.collection.JavaConversions._
 import scala.io.Source
@@ -22,7 +23,7 @@ abstract class AbstractAdWordsBudgetCalculator extends FulfillmentWorker {
     adWordsAdapter.withErrorsHandled[Any]("Budget Calculation", {
       adWordsAdapter.setClientId(params[String]("account"))
 
-      completeTask(s"${budgetCalculator.computeDailyBudget(params)}")
+      completeTask(Json.stringify(budgetCalculator.computeDailyBudget(params)))
     })
   }
 }
@@ -53,12 +54,12 @@ trait BudgetCalculatorComponent {
         new DateTimeActivityParameter("today", "Expected to be within startDate and endDate"),
         new DateTimeActivityParameter("endDate", "The last date of the budget period"),
         new EnumsActivityParameter("adschedule", "Days of the week for spend", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun"))
-      ), new StringActivityResult("Amount that must be spent per-remaining schedule day to spend the entire budget."),
+      ), new ObjectActivityResult("Results of budget calcuations. Including the amount that must be spent per-remaining schedule day to spend the entire budget."),
         "https://docs.google.com/a/balihoo.com/presentation/d/13ZZaIxekgcpFY5G4gTeSCu49V2liMyP8-0NwEyFr1q8/edit?usp=sharing"
       )
     }
 
-    def computeDailyBudget(params:ActivityParameters):Float = {
+    def computeDailyBudget(params:ActivityParameters):JsObject = {
 
       val campaignId = params[String]("campaignId")
       val startDate = params[DateTime]("startDate")
@@ -81,11 +82,21 @@ trait BudgetCalculatorComponent {
 
       val spent = adWordsAdapter.microsToDollars(getCampaignSpendForPeriod(campaignId, startDate, today))
       val budgetRemaining = budget - spent
-      if(budgetRemaining > 0) {
-        return budgetRemaining / (if(futureDateCount > 0) futureDateCount else 1)
+      val dailyBudget = budgetRemaining > 0 match {
+        case true =>
+          budgetRemaining / (if(futureDateCount > 0) futureDateCount else 1)
+        case false =>
+          0.0f
       }
 
-      0.0f
+      Json.obj(
+        "futureScheduleDays" -> (for(date <- futureScheduleDays) yield UTCFormatter.format(date)),
+        "futureScheduleDaysCount" -> futureDateCount,
+        "budgetSpent" -> spent,
+        "budgetRemaining" -> budgetRemaining,
+        "dailyBudget" -> dailyBudget
+      )
+
     }
 
     def streamToString(stream:InputStream):String = {

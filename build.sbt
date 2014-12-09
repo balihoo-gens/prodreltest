@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
   "com.stackmob" %% "newman" % "1.3.5",
   ("com.balihoo.socialmedia" % "facebook-client" % "14.19-SNAPSHOT").exclude("ch.qos.logback", "logback-classic"),
   "org.glassfish.jersey.test-framework.providers" % "jersey-test-framework-provider-grizzly2" % "2.12" % Test,
-  "com.github.tototoshi" %% "scala-csv" % "1.1.0",
+  "com.github.tototoshi" %% "scala-csv" % "1.1.2",
   "org.xerial" % "sqlite-jdbc" % "3.8.7",
   "com.github.fge" % "json-schema-validator" % "2.2.6",
   "com.netaporter" %% "scala-uri" % "0.4.3",
