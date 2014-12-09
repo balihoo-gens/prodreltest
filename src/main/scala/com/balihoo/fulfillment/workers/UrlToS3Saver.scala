@@ -32,7 +32,8 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
       val url = params[URI]("url").toString
       val method = params[String]("method")
       def processStream(is:InputStream) = {
-        scala.io.Source.fromInputStream(is).foreach(c => println("stuff" + c))
+        scala.io.Source.fromInputStream(is).foreach(c => {
+          println("stuff" + c))
       }
       Http(url).method(method).execute(parser = processStream)
       "yo"
