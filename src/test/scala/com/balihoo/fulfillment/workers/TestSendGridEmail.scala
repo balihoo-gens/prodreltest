@@ -1,9 +1,12 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{ByteArrayInputStream, InputStreamReader}
+import java.io.ByteArrayInputStream
 import java.net.URI
+
 import com.amazonaws.AmazonServiceException
+import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
+import org.apache.http.client.methods.HttpRequestBase
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
@@ -11,7 +14,9 @@ import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import org.specs2.specification.Scope
 import play.api.libs.json.Json
+
 import scala.io.Codec
+import scala.util.Success
 
 @RunWith(classOf[JUnitRunner])
 class TestSendGridEmail extends Specification with Mockito {
@@ -19,7 +24,8 @@ class TestSendGridEmail extends Specification with Mockito {
     "handle a normal request" in new Adapter {
       worker.handleTask(params)
       worker.result.get === "OK"
-      there was one(_sendGridAdapter).sendEmail(credentials, uniqueArgs, sendTime, email, recipientsStream, recipientIdHeading, emailHeading)
+      there was one(_sendGridAdapter).sendEmail(credentials, metadata, sendTime, email, recipientsStream, recipientIdHeading, emailHeading)
+      there was one(listStream).close
     }
 
     "reject a bad list URL" in new Adapter {
@@ -49,7 +55,7 @@ class TestSendGridEmail extends Specification with Mockito {
       List("personId", "name", "email", "likes"),
       List("17", "User1", "user1@balihoo.com", "fish"),
       List("22", "user2", "user2@balihoo.com", "tacos, with \"cheese\" "))
-    val uniqueArgs = Json.obj("ocean" -> "Pacific", "fish" -> "salmon")
+    val metadata = Json.obj("ocean" -> "Pacific", "fish" -> "salmon")
     val subaccount = "TestAccount17"
     val email = Email(fromAddress = "spammer@spam.them.all", fromName = "Not a spammer", replyToAddress = "noreply@go.fish",
       subject = "Best email ever!!!", body = emailBody)
@@ -58,7 +64,7 @@ class TestSendGridEmail extends Specification with Mockito {
     val recipientIdHeading = "personId"
     val emailHeading = "email"
     val params = new ActivityParameters(Map(
-      "uniqueArgs" -> uniqueArgs,
+      "metadata" -> metadata,
       "subaccount" -> subaccount,
       "listUrl" -> new URI(s"S3://$bucket/$listKey"),
       "subject" -> email.subject,
@@ -73,9 +79,13 @@ class TestSendGridEmail extends Specification with Mockito {
     val _sendGridAdapter = mock[SendGridAdapter]
     _sendGridAdapter.getCredentials(subaccount) returns credentials
 
+    val listMeta = mock[S3Meta]
+    val listStream = spy(new S3ObjectInputStream(new ByteArrayInputStream(recipients.getBytes), mock[HttpRequestBase]))
+    listMeta.getContentStream returns listStream
+
     val _s3Adapter = mock[S3Adapter]
     _s3Adapter.getObjectContentAsString(===(bucket), ===(bodyKey))(any[Codec]) returns emailBody
-    _s3Adapter.getObjectContentAsReader(===(bucket), ===(listKey), anyString) returns new InputStreamReader(new ByteArrayInputStream(recipients.getBytes))
+    _s3Adapter.getMeta(===(bucket), ===(listKey)) returns Success(listMeta)
     _s3Adapter.getObjectContentAsString(===(bucket), ===(bogusKey))(any[Codec]) throws new AmazonServiceException("Bogus!")
 
     val worker = new AbstractSendGridEmail

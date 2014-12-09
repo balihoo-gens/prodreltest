@@ -1,5 +1,6 @@
 package com.balihoo.fulfillment.workers
 
+import java.io.InputStreamReader
 import java.net.URI
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
@@ -17,7 +18,7 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ObjectActivityParameter("uniqueArgs", "An associative array of values that will appear in the event data"),
+      new ObjectActivityParameter("metadata", "An associative array of values that will appear in the event data"),
       new StringActivityParameter("subaccount", "The SendGrid subaccount username"),
       new UriActivityParameter("listUrl", "The S3 URL of the recipient list"),
       new StringActivityParameter("subject", "The email subject"),
@@ -35,7 +36,7 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
     withTaskHandling {
       val credentials = sendGridAdapter.getCredentials(params("subaccount"))
-      val uniqueArgs = params[JsObject]("uniqueArgs")
+      val metadata = params[JsObject]("metadata")
       val subject = params[String]("subject")
       val fromAddress = params[String]("fromAddress")
       val fromName = params[String]("fromName")
@@ -59,11 +60,12 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
 
       // Create a stream of recipient records and send the emails
       try {
-        for (recipientReader <- managed(s3Adapter.getObjectContentAsReader(listBucket, listKey))) {
-          val recipientCsv = csvAdapter.parseReaderAsStream(recipientReader)
+        for (s3Meta <- managed(s3Adapter.getMeta(listBucket, listKey).get);
+             reader <- managed(new InputStreamReader(s3Meta.getContentStream))) {
+          val recipientCsv = csvAdapter.parseReaderAsStream(reader).get
           processStream(recipientCsv)
           try {
-            sendGridAdapter.sendEmail(credentials, uniqueArgs, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
+            sendGridAdapter.sendEmail(credentials, metadata, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
           } catch {
             case e: Exception => throw new SendGridException("Error while sending email", e)
           }
@@ -93,7 +95,7 @@ class SendGridEmail(override val _cfg: PropertiesLoader, override val _splog: Sp
 
   private lazy val _sendGridAdapter = new SendGridAdapter(_cfg, _splog)
   def sendGridAdapter = _sendGridAdapter
-  override val s3Adapter = new S3Adapter(_cfg)
+  override val s3Adapter = new S3Adapter(_cfg, _splog)
 }
 
 object sendgrid_email extends FulfillmentWorkerApp {

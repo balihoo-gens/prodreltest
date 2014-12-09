@@ -7,11 +7,11 @@ import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.{CannedAccessControlList, ObjectMetadata, PutObjectRequest, S3Object}
 import com.balihoo.fulfillment.config._
-import resource._
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
+import resource._
 
-import scala.io.{Codec, Source}
 import scala.collection.JavaConverters._
+import scala.io.{Codec, Source}
 import scala.util.Try
 
 trait S3AdapterComponent {
@@ -104,8 +104,17 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
       new URI(s"s3://$bucket/$key")
     }
   }
+
+  /**
+   * Gets the contents of an S3 object as a string.
+   * @param bucket
+   * @param key
+   * @param codec the character set
+   * @return
+   */
   def getObjectContentAsString(bucket: String, key: String)(implicit codec: Codec): String = {
-    managed(withS3Object(bucket, key) { s3obj => s3obj.getObjectContent })
+    splog.debug(s"Getting object content as a string. bucket=$bucket key=$key")
+    managed(client.getObject(bucket, key).getObjectContent)
       .map(inputStream => Source.fromInputStream(inputStream).mkString).opt.get
   }
 
