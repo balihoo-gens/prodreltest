@@ -480,5 +480,71 @@ validation error: /param2 instance value ("HOUDINI") not found in enum (possible
       spec.getParameters(badinput) must throwA[ActivitySpecificationException].like { case e => e.getMessage must contain("""instance value ("BEATLE") not found in enum (possible values: ["BEETLE","JUICE","IS","WEIRD"])""")}
     }
 
+    "validate complex objects" in {
+
+      val spec = new ActivitySpecification(List(
+        new ObjectActivityParameter("address", "An address.", properties=List(
+          new StringActivityParameter("street", "Street and Number"),
+          new StringActivityParameter("city", "The local municipality"),
+          new StringActivityParameter("postalCode", "the zip or whatever, dang", pattern=Some("[0-9]{5}"))
+        )),
+
+        new StringActivityParameter("favoriteFruit", "Tell me your favorite fruit")
+        ), new StringActivityResult("really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val input =
+        """{"favoriteFruit" : "Milk bone",
+          | "address" : {
+          |   "street" : "car named desire",
+          |   "city" : "that never sleeps",
+          |   "postalCode" : "66677"
+          | }
+          |}""".stripMargin
+
+      val badinput =
+        """{"favoriteFruit" : "Milk bone",
+          | "address" : {
+          |   "street" : "car named desire",
+          |   "city" : "that never sleeps",
+          |   "postalCode" : "m6677illegal"
+          | }
+          |}""".stripMargin
+
+
+      val params = spec.getParameters(input)
+      val addr = params[ActivityParameters]("address")
+      addr[String]("city") mustEqual "that never sleeps"
+
+      spec.getParameters(badinput) must throwA[Exception].like { case e => e.getMessage must contain("""/address/postalCode ECMA 262 regex "[0-9]{5}"""")}
+
+    }
+
+    "validate array" in {
+
+      val spec = new ActivitySpecification(List(
+        new ArrayActivityParameter("zips", "An bunch of zips",
+          element=new StringActivityParameter("postalCode", "the zip or whatever, dang", pattern=Some("[0-9]{5}"))),
+        new StringActivityParameter("favoriteFruit", "Tell me your favorite fruit")
+      ), new StringActivityResult("really interesting description"),
+        "description for the whole activity. Notes and stuff")
+
+      val input =
+        """{"favoriteFruit" : "Milk bone",
+          | "zips" : [ "90210", "83702", "55566" ]
+          |}""".stripMargin
+
+      val badinput =
+        """{"favoriteFruit" : "Milk bone",
+          | "zips" : [ "90210", "83702", "555dfgh66" ]
+          |}""".stripMargin
+
+
+      val params = spec.getParameters(input)
+      params[List[Any]]("zips") contains "90210" mustEqual true
+
+      spec.getParameters(badinput) must throwA[Exception].like { case e => e.getMessage must contain("""/zips/2 ECMA 262 regex "[0-9]{5}"""")}
+
+    }
   }
 }

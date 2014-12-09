@@ -33,41 +33,24 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   val s3dir = this.swfAdapter.config.getString("s3dir")
 
   object EmailDatabaseSchemaDefinitionActivityParameter
-    extends ObjectActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)", true) {
-    override def additionalSchemaValues: Map[String, JsValue] = {
-      Map(
-        "required" -> Json.arr("columns"),
-        "properties" -> Json.obj(
-          "name" -> Json.obj("type" -> "string"),
-          "columns" -> Json.obj(
-            "description" -> "",
-            "type" -> "array",
-            "minItems" -> 1,
-            "uniqueItems" -> true,
-            "items" -> Json.obj(
-              "type" -> "object",
-              "required" -> Json.arr("name", "type", "source"),
-              "properties" -> Json.obj(
-                "name" -> Json.obj(
-                  "type" -> "string",
-                  "minLength" -> 1
-                ),
-                "type" -> Json.obj(
-                  "type" -> "string",
-                  "enum" -> DataTypes.AllSupportedAliases
-                ),
-                "source" -> Json.obj(
-                  "type" -> "string",
-                  "minLength" -> 1
-                ),
-                "index" -> Json.obj("type" -> "string")
-              )
-            )
-          )
+    extends ObjectActivityParameter(
+      "dtd",
+      "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)",
+      required = true,
+      properties = List(
+        new StringActivityParameter("name", "database table name", required = false),
+        new ArrayActivityParameter("columns", "database columns definitions",
+          new ObjectActivityParameter("", "", List(
+            new StringActivityParameter("name", "table column's name", minLength = Some(1)),
+            new EnumActivityParameter("type", "table column's type", DataTypes.AllSupportedAliases),
+            new StringActivityParameter("source", "source csv header name", minLength = Some(1)),
+            new StringActivityParameter("index", "table column's index name or type", required = false, minLength = Some(1))
+          )),
+          minItems = 1,
+          uniqueItems = true
         )
       )
-    }
-  }
+    )
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
@@ -89,7 +72,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     val maybeSource = parameters.get[URI]("source")
     val maybeDbName = parameters.get[String]("dbname")
-    val maybeDtd = parameters.get[JsObject]("dtd")
+    val maybeDtd = parameters.get[ActivityParameters]("dtd")
 
     if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
     val sourceUri = maybeSource.get
@@ -97,14 +80,14 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     if (!maybeDbName.isDefined || maybeDbName.get.trim.isEmpty) throw new IllegalArgumentException("dbname parameter is empty")
     if (!maybeDtd.isDefined) throw new IllegalArgumentException("dtd parameter is empty")
 
-    val tableDefinition = Try(maybeDtd.get.as[TableDefinition]) match {
+    val tableDefinition = Try(Json.parse(maybeDtd.get.input).as[TableDefinition]) match {
       case Success(td) => td
       case Failure(t) => throw new IllegalArgumentException("invalid DTD")
     }
 
-    splog.debug("namesBySource=" + tableDefinition.source2name)
-    splog.debug("typesByName=" + tableDefinition.name2type)
-    splog.debug("table definition sql=" + tableDefinition.tableCreateSql)
+    splog.debug(s"csv header name -> column name : ${tableDefinition.source2name}")
+    splog.debug(s"column name -> column sql type : ${tableDefinition.name2type}")
+    splog.debug(s"table ddl sql : ${tableDefinition.tableCreateSql}")
 
     (sourceUri.getHost, sourceUri.getPath.substring(1), maybeDbName.get, tableDefinition)
   }

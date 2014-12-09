@@ -204,7 +204,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     "return activity parameters given valid input" in new TestContext {
       val dtdJonObj = Json.obj(
         "columns" -> Json.arr(
-          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar"),
+          Json.obj("name" -> "foo", "type" -> "int", "source" -> "bar", "index" -> "pk"),
           Json.obj("name" -> "foz", "type" -> "char", "source" -> "baz")
         )
       )
@@ -216,7 +216,12 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       val result = worker.getSpecification.getParameters(input)
       result.get[URI]("source") must beSome(new URI("aSource"))
       result.get[String]("dbname") must beSome("aName")
-      result.get[JsObject]("dtd") must beSome(dtdJonObj)
+      val maybeDtdActivityParameters = result.get[ActivityParameters]("dtd")
+
+      maybeDtdActivityParameters must beSome[ActivityParameters]
+      val dtdActivityParameters = maybeDtdActivityParameters.get
+      dtdActivityParameters.params must haveSize(1)
+
     }
   }
 
@@ -351,7 +356,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       val source = new URI(s"s3://$s3bucket/$s3key")
       val sourceWithInvalidScheme = new URI(s"http://$s3bucket/$s3key")
       val dbname = "test.db"
-      val dtd = Json.obj("columns" -> Json.arr(
+      val dtd = new ActivityParameters(Map.empty, Json.obj("columns" -> Json.arr(
         Json.obj(
           "name" -> "locationId",
           "type" -> "integer",
@@ -388,7 +393,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
           "source" -> "BDAY",
           "index" -> "bday"
         )
-      ))
+      )).toString())
       val invalidDtd = Json.obj()
       val header = List("RECIPIENT", "STORENUM", "emailaddr", "UNUSED", "FNAME", "LNAME", "TYPE", "BDAY")
       val roger = List("a", "1", "roger@nike.com", "some", "roger", "federer", "a", "1981-08-08")

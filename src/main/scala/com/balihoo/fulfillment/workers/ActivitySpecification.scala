@@ -298,14 +298,52 @@ class EnumsActivityParameter(override val name:String
 
 class ObjectActivityParameter(override val name:String
                               ,override val description:String
+                              ,val properties:List[ActivityParameter] = List()
                               ,override val required:Boolean = true)
   extends ActivityParameter(name, description, required) {
 
+  val propsMap:Map[String,ActivityParameter] = (for(prop <- properties) yield prop.name -> prop).toMap
+  val requiredProperties = for(prop <- properties if prop.required) yield prop.name
   def jsonType = "object"
 
-  override def additionalSchemaValues: Map[String, JsValue] = Map("properties" -> Json.obj())
+  override def additionalSchemaValues = {
+    val schema = collection.mutable.Map[String, JsValue]()
+    if(requiredProperties.size > 0) {
+      // Schema gets upset if you have "required" with an empty list. so we omit it completely if there are
+      // no required properties
+      schema("required") = Json.toJson(requiredProperties)
+    }
 
-  def parseValue(js:JsValue):Any = js.as[JsObject]
+    schema("properties") = Json.toJson((for(property <- properties) yield property.name -> property.toSchema).toMap)
+
+    schema.toMap
+  }
+
+  def parseValue(js:JsValue):Any = {
+    new ActivityParameters(
+      (for((name, property) <- js.as[JsObject].fields)
+        yield name -> (if(propsMap contains name) propsMap(name).parseValue(property) else js)).toMap
+      , Json.stringify(js))
+  }
+}
+
+class ArrayActivityParameter(override val name:String
+                              ,override val description:String
+                              ,val element:ActivityParameter
+                              ,override val required:Boolean = true
+                              ,val minItems: Int = 0
+                              , val uniqueItems: Boolean = false)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "array"
+
+  override def additionalSchemaValues = {
+    val base = Map("items" -> element.toSchema)
+    val withMinItems = if (minItems > 0) base + ("minItems" -> Json.toJson(minItems)) else base
+    if (uniqueItems) withMinItems + ("uniqueItems" -> Json.toJson(uniqueItems)) else withMinItems
+  }
+
+  def parseValue(js:JsValue):Any = (for(item <- js.as[JsArray].value) yield element.parseValue(item)).toList
 }
 
 class EnumActivityParameter(override val name:String
