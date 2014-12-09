@@ -55,7 +55,7 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
       try {
         for (recipientReader <- managed(new InputStreamReader(recipientListUri.toURL.openStream()))) {
           val recipientCsv = csvAdapter.parseReaderAsStream(recipientReader)
-          sendGridAdapter.sendEmail(credentials, uniqueArgs, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
+          sendGridAdapter.sendEmail(credentials, uniqueArgs, sendTime, email, recipientCsv.get, recipientIdHeading, emailHeading)
         }
       } catch {
         case e: Exception => throw new SendGridException(s"Unable to get recipient list from $recipientListUri", e)

@@ -416,3 +416,7 @@ class ActivityParameters(val params:Map[String,Any], val input:String = "{}") {
     params.toString()
   }
 }
+
+object ActivityParameters {
+  def apply(params: (String, Any)*) = new ActivityParameters(params.toMap)
+}
