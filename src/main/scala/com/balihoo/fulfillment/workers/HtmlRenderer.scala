@@ -9,7 +9,6 @@ import play.api.libs.json.{Json, JsObject}
 import scala.io.Source
 import java.io._
 import scala.collection.mutable.{Map => MutableMap}
-import scala.math
 
 /*
  * this is the dependency-injectable class containing all functionality
@@ -44,7 +43,7 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
     val s3Url = s"https://s3.amazonaws.com/$s3bucket/$key"
     if (file.canRead) {
       splog.info(s"storing $imageFileName into $s3Url")
-      s3Adapter.putPublic(s3bucket, key, file)
+      s3Adapter.upload(key, file, visibility = PublicS3Visibility).get
       file.delete
     } else {
       throw new Exception(s"Unable to store rendered image to S3: $imageFileName does not exist")
@@ -147,7 +146,7 @@ class HtmlRenderer(override val _cfg: PropertiesLoader, override val _splog: Spl
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
   with CommandComponent {
-    lazy val _s3Adapter = new S3Adapter(_cfg)
+    lazy val _s3Adapter = new S3Adapter(_cfg, _splog)
     def s3Adapter = _s3Adapter
     lazy val _command = new Command(commandLine)
     def command = _command

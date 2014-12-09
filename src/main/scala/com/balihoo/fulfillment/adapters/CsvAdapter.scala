@@ -4,6 +4,8 @@ import java.io.{OutputStream, Reader}
 
 import com.github.tototoshi.csv._
 
+import scala.util.{Success, Failure, Try}
+
 /**
  * Component with a CSV adapter.
  */
@@ -22,7 +24,7 @@ trait CsvAdapterComponent {
     /**
      * @return a stream of rows from a `Reader`.
      */
-    def parseReaderAsStream(reader: Reader): Stream[List[String]]
+    def parseReaderAsStream(reader: Reader): Try[Stream[List[String]]]
 
     /**
      * @return a CSV writer.
@@ -61,7 +63,9 @@ trait ScalaCsvAdapterComponent extends CsvAdapterComponent {
       override val quoting: Quoting = QUOTE_ALL
     }
 
-    override def parseReaderAsStream(reader: Reader): Stream[List[String]] = CSVReader.open(reader)(csvFormat).toStream()
+    override def parseReaderAsStream(reader: Reader): Try[Stream[List[String]]] =
+      for (stream <- Try(CSVReader.open(reader)(csvFormat).toStream()))
+      yield if (stream.nonEmpty) stream else throw new RuntimeException("csv stream is empty")
 
     override def newWriter(os: OutputStream): CsvWriter = new ScalaCsvWriter(CSVWriter.open(os)(csvFormat))
 
