@@ -40,11 +40,12 @@ class TestS3Adapter extends Specification with Mockito {
       val expected = "I expect perfection!"
       val inputStream = spy(new S3ObjectInputStream(new ByteArrayInputStream(expected.getBytes), mock[HttpRequestBase]))
       val awsObjectMock = mock[S3Object]
+      implicit val order = inOrder(inputStream, awsObjectMock)
       awsObjectMock.getObjectContent returns inputStream
       client.getObject(data.bucket, data.key) returns awsObjectMock
       val result = getObjectContentAsString(data.bucket, data.key)
       result === expected
-      there was one(inputStream).close
+      there was one(inputStream).close andThen one(awsObjectMock).close
     }
   }
 

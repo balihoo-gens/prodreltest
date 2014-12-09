@@ -22,10 +22,11 @@ import scala.util.Success
 class TestSendGridEmail extends Specification with Mockito {
   "SendGridEmail" should {
     "handle a normal request" in new Adapter {
+      val order = inOrder(listStream, listMeta) // For some reason, this test fails if order is implicit.
       worker.handleTask(params)
       worker.result.get === "OK"
       there was one(_sendGridAdapter).sendEmail(credentials, metadata, sendTime, email, recipientsStream, recipientIdHeading, emailHeading)
-      there was one(listStream).close
+      there was one(listStream)(order).close andThen one(listMeta)(order).close
     }
 
     "reject a bad list URL" in new Adapter {

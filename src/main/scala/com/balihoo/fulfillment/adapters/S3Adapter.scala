@@ -114,8 +114,11 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
    */
   def getObjectContentAsString(bucket: String, key: String)(implicit codec: Codec): String = {
     splog.debug(s"Getting object content as a string. bucket=$bucket key=$key")
-    managed(client.getObject(bucket, key).getObjectContent)
-      .map(inputStream => Source.fromInputStream(inputStream).mkString).opt.get
+    val resource = for (s3Object <- managed(getMeta(bucket, key).get);
+                        inputStream <- managed(s3Object.getContentStream)) yield {
+      Source.fromInputStream(inputStream).mkString
+    }
+    resource.acquireAndGet(s => s)
   }
 
 }
