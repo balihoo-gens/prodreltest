@@ -26,8 +26,8 @@ class TestSendGridEmail extends Specification with Mockito {
       worker.handleTask(params)
       worker.result.get === "OK"
       (there was one(_sendGridAdapter).sendEmail(credentials, metadata, sendTime, email, recipientsStream, recipientIdHeading, emailHeading)
-        andThen one(listStream)(order).close
-        andThen one(listMeta)(order).close)
+        andThen one(listStream).close
+        andThen one(listMeta).close)
     }
 
     "reject a bad list URL" in new Adapter {
