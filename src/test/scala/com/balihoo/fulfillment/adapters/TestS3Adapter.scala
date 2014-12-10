@@ -1,13 +1,14 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.File
+import java.io.{ByteArrayInputStream, File}
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.{PutObjectRequest, PutObjectResult, S3Object}
+import com.amazonaws.services.s3.model.{PutObjectRequest, PutObjectResult, S3Object, S3ObjectInputStream}
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
 import com.balihoo.fulfillment.config.{PropertiesLoader, PropertiesLoaderComponent}
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
+import org.apache.http.client.methods.HttpRequestBase
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -32,6 +33,19 @@ class TestS3Adapter extends Specification with Mockito {
       val result = getMeta(data.bucket, data.key)
 
       result must beFailedTry.withThrowable[AmazonServiceException]
+    }
+  }
+  "getObjectContentAsString" should {
+    "return a string" in new WithAdapter {
+      val expected = "I expect perfection!"
+      val inputStream = spy(new S3ObjectInputStream(new ByteArrayInputStream(expected.getBytes), mock[HttpRequestBase]))
+      val awsObjectMock = mock[S3Object]
+      implicit val order = inOrder(inputStream, awsObjectMock)
+      awsObjectMock.getObjectContent returns inputStream
+      client.getObject(data.bucket, data.key) returns awsObjectMock
+      val result = getObjectContentAsString(data.bucket, data.key)
+      result === expected
+      there was one(inputStream).close andThen one(awsObjectMock).close
     }
   }
 
