@@ -9,6 +9,9 @@ import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
+case class InvalidColumnException(columns: Set[String])
+  extends RuntimeException("Invalid columns names: " + columns.mkString(","))
+
 /**
  * Worker that execute a SQL query over a database file ot yield a set of CSV files
  * (put in s3) that contains recipients email address for bulk email delivery.
@@ -83,6 +86,12 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     try {
 
+      val dbColumns = db.getTableColumnNames(queryDefinition.getTableName)
+      val invalidColumns = queryDefinition.fields.diff(dbColumns)
+      if (invalidColumns.nonEmpty) {
+        throw InvalidColumnException(invalidColumns)
+      }
+
       val totalRecordsCount = db.selectCount(s"""select count(*) from "${queryDefinition.getTableName}"""")
       val queryRecordsCount = db.selectCount(queryDefinition.selectCountSql)
       val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
@@ -105,7 +114,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
           /* use same sql pages as csv pages for now */
           splog.info("Writing records to CSV...")
-          csvWriter.writeRow(queryDefinition.fields)
+          csvWriter.writeRow(queryDefinition.fields.toSeq)
           for (row <- page) {
             csvWriter.writeRow(row)
           }
@@ -160,7 +169,7 @@ case class QueryDefinition(select: JsObject, tableName: Option[String] = Some("r
   /**
    * List of field names to be returned by select statement.
    */
-  val fields = select.fields.map(_._1)
+  val fields = select.fields.map(_._1).toSet
 
   /**
    * Map field name to a sequence of sql criterions.

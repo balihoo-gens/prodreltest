@@ -11,7 +11,7 @@ import org.specs2.specification.Scope
 import scala.util.Try
 
 @RunWith(classOf[JUnitRunner])
-class TestSqlLiteDbAdapter extends Specification with Mockito {
+class TestSQLiteLightweightDatabaseAdapter extends Specification with Mockito {
 
   "LightweightDatabaseAdapter" should {
     "return 0 when count is 0" in new TestContext {
@@ -39,13 +39,13 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
     }
   }
   "SqlLiteDatabase" should {
-    "execute and selectCount" in new SqlLiteDbContext {
+    "execute and selectCount" in new WithLightweigthDatabase {
       db.execute(data.createTableSql)
       db.execute(data.insertsSql.head)
       val selectCount = db.selectCount("select count(id) from recipients where name like 'r%'")
       selectCount must beEqualTo(1)
     }
-    "batch" in new SqlLiteDbContext {
+    "batch" in new WithLightweigthDatabase {
       db.execute("create table recipients (id integer, name string)")
       val dbBatch = db.batch("insert into recipients (id, name) values (?, ?)")
       dbBatch.param(1, 1.toLong)
@@ -61,15 +61,19 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
       val selectCount = db.selectCount("select count(id) from recipients where name like 'r%'")
       selectCount must beEqualTo(2)
     }
-    "fail pagedSelect if statement is missing an order by clause" in new SqlLiteDbContext {
+    "fail pagedSelect if statement is missing an order by clause" in new WithLightweigthDatabase {
       val result = Try(db.pagedSelect("select * from recipients", data.insertsSql.size))
       result must beAFailedTry.withThrowable[IllegalArgumentException]
     }
-    "fail pagedSelect pageSize is invalid" in new SqlLiteDbContext {
+    "fail pagedSelect pageSize is invalid" in new WithLightweigthDatabase {
       val result = Try(db.pagedSelect("select * from recipients order by id", data.insertsSql.size, 0))
       result must beAFailedTry.withThrowable[IllegalArgumentException]
     }
-    "pagedSelect should give paged access to table rows" in new SqlLiteDbContext {
+    "getTableColumnNames should return a set of column names" in new WithLightweigthDatabase {
+      db.execute(data.createTableSql)
+      db.getTableColumnNames(data.tableName) must beEqualTo(Set("id", "bday", "name"))
+    }
+    "pagedSelect should give paged access to table rows" in new WithLightweigthDatabase {
       db.execute(data.createTableSql)
       data.insertsSql.foreach(db.execute)
 
@@ -110,7 +114,7 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
     }
   }
 
-  trait SqlLiteDbContext extends TestContext with TempFileContext {
+  trait WithLightweigthDatabase extends TestContext with TempFileContext {
     val db = liteDbAdapter.create(tempFile.getAbsolutePath)
     override def after = {
       db.close()
@@ -121,7 +125,8 @@ class TestSqlLiteDbAdapter extends Specification with Mockito {
   class TestContext extends Scope {
 
     object data {
-      val createTableSql = "create table recipients (id integer, name varchar, bday date null)"
+      val tableName = "recipients"
+      val createTableSql = s"create table $tableName (id integer, name varchar, bday date null)"
       val insertsSql = Seq(
         "insert into recipients (id, name, bday) values (1, 'Rick', '1986-08-19')",
         "insert into recipients (id, name, bday) values (2, 'Sam', '1980-04-01')",

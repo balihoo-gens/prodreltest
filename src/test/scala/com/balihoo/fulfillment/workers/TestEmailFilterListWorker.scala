@@ -43,6 +43,19 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       val activityParameter = new ActivityParameters(params)
       Try(handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
+    "fail task if non existing column in query" in new WithWorker {
+      s3Adapter.getMeta(===(data.s3_bucket), ===(data.db_s3_key)) returns Success(db_s3_meta_mock)
+      db_s3_meta_mock.filename returns data.db_s3_meta_filename
+      db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
+      db_file_mock.getAbsolutePath returns data.db_file_path
+      filesystemAdapter.newTempFileFromStream(db_s3_contentStream_mock, data.db_s3_key) returns db_file_mock
+      liteDbAdapter.create(===(data.db_file_path)) returns db_mock
+      db_mock.getTableColumnNames(===(data.queryDefinition.getTableName)) returns data.param_select.fieldSet.map(_._1).toSet
+
+      val params = Map("query" -> data.param_query_nonExisting_column, "source" -> data.param_source, "pageSize" -> data.param_pageSize)
+      val activityParameter = new ActivityParameters(params)
+      handleTask(activityParameter) must throwA[InvalidColumnException]
+    }
     "complete task if db file downloaded from s3, query performed, csv files created and uploaded to s3" in new WithWorker {
 
       // setup
@@ -54,6 +67,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       liteDbAdapter.create(===(data.db_file_path)) returns db_mock
       liteDbAdapter.calculatePageCount(===(data.recordsCount), ===(data.param_pageSize)) returns data.expectedPageCount
       db_mock.selectCount(===(data.queryDefinition.selectCountSql)) returns data.recordsCount
+      db_mock.getTableColumnNames(===(data.queryDefinition.getTableName)) returns data.param_select.fieldSet.map(_._1).toSet
 
       val (csv_file1_mock, csv_file2_mock, csv_file3_mock) = (mock[File], mock[File], mock[File])
       val (csv_outputStream1_mock, csv_outputStream2_mock, csv_outputStream3_mock) = (mock[OutputStream], mock[OutputStream], mock[OutputStream])
@@ -96,9 +110,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
         one(csv_file3_mock).delete()
 
         /* verify writes */
-        one(csv_writer1_mock).writeRow(data.expectedCsvHeaders)
-        one(csv_writer2_mock).writeRow(data.expectedCsvHeaders)
-        one(csv_writer3_mock).writeRow(data.expectedCsvHeaders)
+        one(csv_writer1_mock).writeRow(data.expectedCsvHeaders.toSeq)
+        one(csv_writer2_mock).writeRow(data.expectedCsvHeaders.toSeq)
+        one(csv_writer3_mock).writeRow(data.expectedCsvHeaders.toSeq)
         5.times(csv_writer1_mock).writeRow(any[Seq[Any]])
         5.times(csv_writer2_mock).writeRow(any[Seq[Any]])
         three(csv_writer3_mock).writeRow(any[Seq[Any]])
@@ -149,6 +163,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val queryDefinitionWithEmptySql = QueryDefinition(selectWithEmptySql)
     val param_query = Json.obj("select" -> param_select)
     val param_queryInvalid = Json.obj()
+    val param_query_nonExisting_column = Json.obj("select" -> Json.obj("nonExisting" -> Json.arr(), "id" -> "$v=5", "name" -> "$v like 'a%'"))
     val s3_bucket = "some.bucket"
     val db_s3_key = "long/key/some.db"
     val param_source = s"s3://$s3_bucket/$db_s3_key"
@@ -172,8 +187,8 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val selectSql = queryDefinition.selectSql
     val recordsCount = 10
     val pageSizeInvalid = 0
-    val expectedCsvHeaders = Seq("email", "firstname", "blength", "ctype", "fuel", "cstat", "ccexpiredate")
-    val expectedSelectSql = """select "email", "firstname", "blength", "ctype", "fuel", "cstat", "ccexpiredate" from "recipients" where (("blength"<12) or ("blength">=14 and "blength"<18)) and ("ctype"='COM') and ("fuel"='DIESEL') and (("cstat"='HOLD') or ("cstat"='CUR')) and ("ccexpiredate"='2020-01-01') order by "email""""
+    val expectedCsvHeaders = Set("email", "firstname", "blength", "ctype", "fuel", "cstat", "ccexpiredate")
+    val expectedSelectSql = """select "ccexpiredate", "fuel", "ctype", "blength", "email", "firstname", "cstat" from "recipients" where (("blength"<12) or ("blength">=14 and "blength"<18)) and ("ctype"='COM') and ("fuel"='DIESEL') and (("cstat"='HOLD') or ("cstat"='CUR')) and ("ccexpiredate"='2020-01-01') order by "email""""
     val expectedPageCount = recordsCount / param_pageSize + 1
   }
 
