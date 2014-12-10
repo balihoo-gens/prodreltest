@@ -90,7 +90,7 @@ class JavaIOFilesystemAdapter {
    */
   def gzip(file: File, extension: String = ".gz"): File = {
     import resource._
-    val gzFile = newTempFile(file.getName + extension)
+    val gzFile = new File(file.getParentFile, file.getName + extension)
     (for {
       in <- managed(newInputStream(file))
       out <- managed(new GZIPOutputStream(new FileOutputStream(gzFile)))
