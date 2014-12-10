@@ -5,7 +5,6 @@ import java.net.URI
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import com.balihoo.fulfillment.workers.ObjectActivityParameter
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
@@ -87,62 +86,66 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
 
     val dbMeta = s3Adapter.getMeta(sourceBucket, sourceKey).get
-    val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
-    val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 
     try {
 
-      val dbColumns = db.getTableColumnNames(queryDefinition.getTableName)
-      val invalidColumns = queryDefinition.fields.diff(dbColumns)
-      if (invalidColumns.nonEmpty) {
-        throw InvalidColumnException(invalidColumns)
-      }
+      val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
+      val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 
-      val totalRecordsCount = db.selectCount(s"""select count(*) from "${queryDefinition.getTableName}"""")
-      val queryRecordsCount = db.selectCount(queryDefinition.selectCountSql)
-      val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
-
-      splog.info(s"Executing paged query... totalRecordsCount=$totalRecordsCount queryRecordsCount=$queryRecordsCount recordsPerPage=$recordsPerPage pagesCount=$pagesCount")
-      val pages = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
-
-      /* Process all csv files one after the other */
-      var pageNum = 0
-      val uris = for (page <- pages) yield {
-        pageNum += 1
-        splog.info(s"Processing csv file #$pageNum...")
-
-        val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv"
-        val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
-        val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
-        val csvWriter = csvAdapter.newWriter(csvOutputStream)
-
-        try {
-
-          /* use same sql pages as csv pages for now */
-          splog.info("Writing records to CSV...")
-          csvWriter.writeRow(queryDefinition.fields.toSeq)
-          for (row <- page) {
-            csvWriter.writeRow(row)
-          }
-
-          s3Adapter
-            .upload(csvS3Key, csvTempFile)
-            .map(_.toString)
-            .get
-
-        } finally {
-          csvOutputStream.close()
-          csvTempFile.delete()
+      try {
+        val dbColumns = db.getTableColumnNames(queryDefinition.getTableName)
+        val invalidColumns = queryDefinition.fields.diff(dbColumns)
+        if (invalidColumns.nonEmpty) {
+          throw InvalidColumnException(invalidColumns)
         }
+
+        val totalRecordsCount = db.selectCount( s"""select count(*) from "${queryDefinition.getTableName}"""")
+        val queryRecordsCount = db.selectCount(queryDefinition.selectCountSql)
+        val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
+
+        splog.info(s"Executing paged query... totalRecordsCount=$totalRecordsCount queryRecordsCount=$queryRecordsCount recordsPerPage=$recordsPerPage pagesCount=$pagesCount")
+        val pages = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
+
+        /* Process all csv files one after the other */
+        var pageNum = 0
+        val uris = for (page <- pages) yield {
+          pageNum += 1
+          splog.info(s"Processing csv file #$pageNum...")
+
+          val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv"
+          val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
+          val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
+          val csvWriter = csvAdapter.newWriter(csvOutputStream)
+
+          try {
+
+            /* use same sql pages as csv pages for now */
+            splog.info("Writing records to CSV...")
+            csvWriter.writeRow(queryDefinition.fields.toSeq)
+            for (row <- page) {
+              csvWriter.writeRow(row)
+            }
+
+            s3Adapter
+              .upload(csvS3Key, csvTempFile)
+              .map(_.toString)
+              .get
+
+          } finally {
+            csvOutputStream.close()
+            csvTempFile.delete()
+          }
+        }
+
+        completeTask(JsArray(uris.toSeq.map(JsString)).toString())
+      } finally {
+        db.close()
+        dbFile.delete()
       }
-
-      completeTask(JsArray(uris.toSeq.map(JsString)).toString())
-
     } finally {
-      db.close()
       dbMeta.close()
-      dbFile.delete()
     }
+
   }
 
 }

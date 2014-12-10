@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
 import com.balihoo.fulfillment.TempFileContext
-import com.balihoo.fulfillment.util.{SploggerComponent, Splogger}
+import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -48,7 +48,7 @@ class TestSQLiteLightweightDatabaseAdapter extends Specification with Mockito {
     "batch" in new WithLightweigthDatabase {
       db.execute("create table recipients (id integer, name string)")
       val dbBatch = db.batch("insert into recipients (id, name) values (?, ?)")
-      dbBatch.param(1, 1.toLong)
+      dbBatch.param(1, 1)
       dbBatch.param(2, "roger")
       dbBatch.add()
       dbBatch.param(1, 2)
