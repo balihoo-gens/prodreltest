@@ -8,8 +8,10 @@ import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.{CannedAccessControlList, ObjectMetadata, PutObjectRequest, S3Object}
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
+import resource._
 
 import scala.collection.JavaConverters._
+import scala.io.{Codec, Source}
 import scala.util.Try
 
 trait S3AdapterComponent {
@@ -102,6 +104,23 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
       new URI(s"s3://$bucket/$key")
     }
   }
+
+  /**
+   * Gets the contents of an S3 object as a string.
+   * @param bucket
+   * @param key
+   * @param codec the character set
+   * @return
+   */
+  def getObjectContentAsString(bucket: String, key: String)(implicit codec: Codec): String = {
+    splog.debug(s"Getting object content as a string. bucket=$bucket key=$key")
+    val resource = for (s3Object <- managed(getMeta(bucket, key).get);
+                        inputStream <- managed(s3Object.getContentStream)) yield {
+      Source.fromInputStream(inputStream).mkString
+    }
+    resource.acquireAndGet(s => s)
+  }
+
 }
 
 class S3Adapter(cfg: PropertiesLoader, override val splog: Splogger)
@@ -120,5 +139,27 @@ class S3Adapter(cfg: PropertiesLoader, override val splog: Splogger)
     val secretKey = config.getString("aws.secretKey")
     val credentials = new BasicAWSCredentials(accessKey, secretKey)
     new AmazonS3Client(credentials)
+  }
+}
+
+object S3Adapter {
+  /**
+   * Breaks up an S3 URL into useful parts
+   * @param url
+   * @return the bucket and key
+   */
+  def dissectS3Url(url: URI): (String, String) = {
+    require(url.getScheme != null && url.getScheme.equalsIgnoreCase("s3"), s"Invalid URL scheme in $url")
+
+    val bucket = url.getHost
+    require(bucket != null && !bucket.isEmpty, s"Missing hostname in $url")
+
+    val path = url.getPath
+    require(path != null && !path.isEmpty, s"Missing path in $url")
+
+    // Strip leading slash from path to get the key
+    val key = path.substring(1)
+
+    (bucket, key)
   }
 }
