@@ -5,6 +5,7 @@ import java.net.URI
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.workers.ObjectActivityParameter
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
@@ -35,10 +36,15 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   def destinationS3Bucket = swfAdapter.config.getString(s3BucketConfig)
   def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
 
+  object FilterListQueryActivityParameter
+    extends ObjectActivityParameter("query", "JSON representation of a SQL query", List(
+      new ObjectActivityParameter("select", "select columns definition", required = true)
+    ), required = true)
+
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new ObjectActivityParameter("query", "JSON representation of a SQL query"),
+        FilterListQueryActivityParameter,
         new StringActivityParameter("source", "URL to a database file to use"),
         new IntegerActivityParameter("pageSize", "Maximum records the produced csv files can contain")
       ),
@@ -50,10 +56,10 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
    * Extract, validate and return parameters for this task.
    */
   private def getParams(params: ActivityParameters) = {
-    val maybeQuery =  params.get[JsValue]("query")
+    val maybeQuery =  params.get[ActivityParameters]("query")
     if (maybeQuery.isEmpty) throw new IllegalArgumentException("query param is required")
 
-    val queryDefinition = Try(maybeQuery.get.as[QueryDefinition]) match {
+    val queryDefinition = Try(Json.parse(maybeQuery.get.input).as[QueryDefinition]) match {
       case Success(td) => td
       case Failure(t) => throw new IllegalArgumentException("invalid select query object", t)
     }

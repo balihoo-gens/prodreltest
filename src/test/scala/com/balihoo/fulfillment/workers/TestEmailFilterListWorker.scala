@@ -17,7 +17,7 @@ import scala.util.{Success, Try}
 @RunWith(classOf[JUnitRunner])
 class TestEmailFilterListWorker extends Specification with Mockito {
 
-  "AbstractEmailFilterListWorker.handleTask" should {
+  "email filter list worker" should {
     "fail task if query param is missing" in new WithWorker {
       handleTask(data.activityParameterQueryMissing) must throwA[IllegalArgumentException]
     }
@@ -161,9 +161,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val queryDefinition = QueryDefinition(param_select)
     val queryDefinitionWithSqlInjection = QueryDefinition(selectWithSqlInjection)
     val queryDefinitionWithEmptySql = QueryDefinition(selectWithEmptySql)
-    val param_query = Json.obj("select" -> param_select)
-    val param_queryInvalid = Json.obj()
-    val param_query_nonExisting_column = Json.obj("select" -> Json.obj("nonExisting" -> Json.arr(), "id" -> "$v=5", "name" -> "$v like 'a%'"))
+    val param_query = new ActivityParameters(Map.empty, Json.obj("select" -> param_select).toString())
+    val param_queryInvalid = new ActivityParameters(Map.empty, Json.obj().toString())
+    val param_query_nonExisting_column = new ActivityParameters(Map.empty, Json.obj("select" -> Json.obj("nonExisting" -> Json.arr(), "id" -> "$v=5", "name" -> "$v like 'a%'")).toString())
     val s3_bucket = "some.bucket"
     val db_s3_key = "long/key/some.db"
     val param_source = s"s3://$s3_bucket/$db_s3_key"
