@@ -1,6 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
 import java.io._
+import java.util.zip.{GZIPOutputStream, GZIPInputStream}
 
 import org.apache.commons.io.IOUtils
 
@@ -22,6 +23,8 @@ trait FilesystemAdapterComponent {
 
 }
 
+case object NoDataCopiedException extends IllegalArgumentException("No data copied")
+
 /**
  * A filesystem adapter implementation based on simple Java IO classes.
  */
@@ -36,7 +39,7 @@ class JavaIOFilesystemAdapter {
     val out = newOutputStream(file)
     try {
       if (IOUtils.copy(in, out) == 0)
-        throw new IllegalArgumentException("No data copied")
+        throw NoDataCopiedException
       else
         file
     } finally {
@@ -70,6 +73,34 @@ class JavaIOFilesystemAdapter {
    * @return a new reader for the specified input stream.
    */
   def newReader(in: InputStream): Reader = new InputStreamReader(in)
+
+  /**
+   * @return a new GZIP input stream, to decode incoming compressed data.
+   */
+  def newGZIPInputStream(in: InputStream) = new GZIPInputStream(in)
+
+  /**
+   * @return a new GZIP output stream, to encode outcoming compressed data.
+   */
+  def newGZIPOutputStream(out: OutputStream) = new GZIPOutputStream(out)
+
+  /**
+   * Compress a file in the same directory as the original file.
+   * @return the compressed file handle.
+   */
+  def gzip(file: File, extension: String = ".gz"): File = {
+    import resource._
+    val gzFile = newTempFile(file.getName + extension)
+    (for {
+      in <- managed(newInputStream(file))
+      out <- managed(new GZIPOutputStream(new FileOutputStream(gzFile)))
+    } yield {
+      if (IOUtils.copy(in, out) > 0)
+        gzFile
+      else
+        throw NoDataCopiedException
+    }).acquireAndGet(f => f)
+  }
 
 }
 

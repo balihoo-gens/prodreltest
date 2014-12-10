@@ -1,9 +1,10 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{InputStream, File, InputStreamReader}
+import java.io.{File, InputStream, InputStreamReader}
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.zip.GZIPInputStream
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
@@ -12,7 +13,7 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.specs2.runner._
 import org.specs2.specification.Scope
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 
 import scala.util.{Failure, Success}
 
@@ -257,11 +258,13 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       s3Adapter.getMeta(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_file_mock.getAbsolutePath returns data.db_temp_file_path
       filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
-      filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
+      filesystemAdapter.newGZIPInputStream(csv_s3_content_stream) returns csv_gzip_content_stream
+      filesystemAdapter.newReader(csv_gzip_content_stream) returns csv_reader_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
       csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream)
       db_mock.batch(anyString) returns db_batch_mock
-      s3Adapter.upload(===(data.db_s3_key), ===(db_file_mock), anyString, any[Map[String, String]], any[S3Visibility]) returns Success(data.db_s3_uri)
+      filesystemAdapter.gzip(db_file_mock) returns db_gzip_file_mock
+      s3Adapter.upload(===(data.db_s3_key), ===(db_gzip_file_mock), anyString, any[Map[String, String]], any[S3Visibility]) returns Success(data.db_s3_uri)
 
       handleTask(data.activityParameter)
 
@@ -398,7 +401,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val db_s3_userMetaDataUseCache = Map("csvlastmodified" -> dateFormat.format(db_s3_LastModified))
     val db_temp_file_uri = new URI("s3://some/valid")
     val s3_dir = "test_dubdir"
-    val db_s3_key = s"$s3_dir/$param_dbname"
+    val db_s3_key = s"$s3_dir/$param_dbname.gz"
     val db_s3_uri = new URI(s"s3://$s3_bucket/$db_s3_key")
   }
 
@@ -426,6 +429,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val csv_reader_mock = mock[InputStreamReader]
     val db_s3_meta_mock = mock[S3Meta]
     val db_file_mock = mock[File]
+    val db_gzip_file_mock = mock[File]
+    val csv_gzip_content_stream = mock[GZIPInputStream]
     val db_mock = mock[LightweightDatabase]
     val db_batch_mock = mock[DbBatch]
   }

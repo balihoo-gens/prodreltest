@@ -27,7 +27,7 @@
       "version": "1"
     },
     "params": {
-      "source": "s3://balihoo.dev.fulfillment/lists/snap/member_current.csv",
+      "source": "s3://balihoo.dev.fulfillment/lists/snap/member_current.csv.gz",
       "dbname": "test.db",
       "dtd": {
         "columns": [

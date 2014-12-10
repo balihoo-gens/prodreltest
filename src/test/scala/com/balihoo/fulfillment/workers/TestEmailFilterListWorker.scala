@@ -2,6 +2,7 @@ package com.balihoo.fulfillment.workers
 
 import java.io.{File, OutputStream}
 import java.net.URI
+import java.util.zip.GZIPInputStream
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
@@ -48,7 +49,8 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       db_s3_meta_mock.filename returns data.db_s3_meta_filename
       db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
       db_file_mock.getAbsolutePath returns data.db_file_path
-      filesystemAdapter.newTempFileFromStream(db_s3_contentStream_mock, data.db_s3_key) returns db_file_mock
+      filesystemAdapter.newGZIPInputStream(db_s3_contentStream_mock) returns db_gzip_stream_mock
+      filesystemAdapter.newTempFileFromStream(db_gzip_stream_mock, data.db_s3_key) returns db_file_mock
       liteDbAdapter.create(===(data.db_file_path)) returns db_mock
       db_mock.getTableColumnNames(===(data.queryDefinition.getTableName)) returns data.param_select.fieldSet.map(_._1).toSet
 
@@ -63,7 +65,8 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       db_s3_meta_mock.filename returns data.db_s3_meta_filename
       db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
       db_file_mock.getAbsolutePath returns data.db_file_path
-      filesystemAdapter.newTempFileFromStream(db_s3_contentStream_mock, data.db_s3_key) returns db_file_mock
+      filesystemAdapter.newGZIPInputStream(db_s3_contentStream_mock) returns db_gzip_stream_mock
+      filesystemAdapter.newTempFileFromStream(db_gzip_stream_mock, data.db_s3_key) returns db_file_mock
       liteDbAdapter.create(===(data.db_file_path)) returns db_mock
       liteDbAdapter.calculatePageCount(===(data.recordsCount), ===(data.param_pageSize)) returns data.expectedPageCount
       db_mock.selectCount(===(data.queryDefinition.selectCountSql)) returns data.recordsCount
@@ -81,6 +84,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       csvAdapter.newWriter(csv_outputStream1_mock) returns csv_writer1_mock
       csvAdapter.newWriter(csv_outputStream2_mock) returns csv_writer2_mock
       csvAdapter.newWriter(csv_outputStream3_mock) returns csv_writer3_mock
+      filesystemAdapter.gzip(csv_file1_mock) returns csv_file1_mock
+      filesystemAdapter.gzip(csv_file2_mock) returns csv_file2_mock
+      filesystemAdapter.gzip(csv_file3_mock) returns csv_file3_mock
       s3Adapter.upload(data.csv_s3_key1, csv_file1_mock) returns Success(data.csv_s3_uri1)
       s3Adapter.upload(data.csv_s3_key2, csv_file2_mock) returns Success(data.csv_s3_uri2)
       s3Adapter.upload(data.csv_s3_key3, csv_file3_mock) returns Success(data.csv_s3_uri3)
@@ -165,7 +171,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val param_queryInvalid = new ActivityParameters(Map.empty, Json.obj().toString())
     val param_query_nonExisting_column = new ActivityParameters(Map.empty, Json.obj("select" -> Json.obj("nonExisting" -> Json.arr(), "id" -> "$v=5", "name" -> "$v like 'a%'")).toString())
     val s3_bucket = "some.bucket"
-    val db_s3_key = "long/key/some.db"
+    val db_s3_key = "long/key/some.db.gz"
     val param_source = s"s3://$s3_bucket/$db_s3_key"
     val param_source_invalid = "://"
     val param_source_invalid_protocol = "http://some/uri"
@@ -178,9 +184,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val activityParameterSourceInvalid = ActivityParameters("source" -> param_source_invalid, "query" -> param_query, "pageSize" -> param_pageSize)
     val db_s3_meta_filename = db_s3_key.split("/").last
     val db_file_path = "some/file"
-    val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv"
-    val csv_s3_key2 = s"mock/$db_s3_meta_filename.2.csv"
-    val csv_s3_key3 = s"mock/$db_s3_meta_filename.3.csv"
+    val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv.gz"
+    val csv_s3_key2 = s"mock/$db_s3_meta_filename.2.csv.gz"
+    val csv_s3_key3 = s"mock/$db_s3_meta_filename.3.csv.gz"
     val csv_s3_uri1 = new URI("s3://host1/path1")
     val csv_s3_uri2 = new URI("s3://host2/path2")
     val csv_s3_uri3 = new URI("s3://host3/path3")
@@ -214,6 +220,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     /* mocks */
     val db_s3_meta_mock = mock[S3Meta]
     val db_s3_contentStream_mock = mock[S3ObjectInputStream]
+    val db_gzip_stream_mock = mock[GZIPInputStream]
     val db_file_mock = mock[File]
     val db_mock = mock[LightweightDatabase]
     val db_paged_resultSet_mock = mock[DbPagedResultSet]

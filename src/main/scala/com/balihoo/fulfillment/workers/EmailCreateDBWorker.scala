@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import play.api.libs.json.{JsString, JsValue, JsObject, Json}
+import play.api.libs.json.Json
 
 import scala.util.{Failure, Success, Try}
 
@@ -211,7 +211,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
 
     val (bucket, key, dbName, tableDefinition) = getParams(params)
-    val dbS3Key = s"$s3dir/$dbName"
+
+    val dbS3Key = {
+      val gzDbName = if (dbName.endsWith(".gz")) dbName else s"$dbName.gz"
+      s"$s3dir/$gzDbName"
+    }
 
     val csvMeta = s3Adapter.getMeta(bucket, key).get
     val dbMetaTry = s3Adapter.getMeta(dbS3Key)
@@ -237,17 +241,20 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
       val dbTempFile = filesystemAdapter.newTempFile(dbName + ".sqlite")
       val db = liteDbAdapter.create(dbTempFile.getAbsolutePath)
-      val csvInputStreamReader = filesystemAdapter.newReader(csvMeta.getContentStream)
+      val csvInputStream = filesystemAdapter.newGZIPInputStream(csvMeta.getContentStream)
+      val csvInputStreamReader = filesystemAdapter.newReader(csvInputStream)
 
       try {
 
         createDb(db, tableDefinition, csvInputStreamReader)
 
+        val gzDbFile = filesystemAdapter.gzip(dbTempFile)
+
         val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
         val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
         val dbUri =
           s3Adapter
-            .upload(dbS3Key, dbTempFile, userMetaData = metaData)
+            .upload(dbS3Key, gzDbFile, userMetaData = metaData)
             .map(_.toString)
             .get
 
