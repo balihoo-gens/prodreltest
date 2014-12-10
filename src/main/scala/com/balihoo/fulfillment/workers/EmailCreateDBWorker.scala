@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsString, JsValue, JsObject, Json}
 
 import scala.util.{Failure, Success, Try}
 
@@ -35,12 +35,32 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   def s3dir = swfAdapter.config.getString("s3dir")
   def s3bucket = swfAdapter.config.getString("s3bucket")
 
+  object EmailDatabaseSchemaDefinitionActivityParameter
+    extends ObjectActivityParameter(
+      "dtd",
+      "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)",
+      required = true,
+      properties = List(
+        new StringActivityParameter("name", "database table name", required = false),
+        new ArrayActivityParameter("columns", "database columns definitions",
+          new ObjectActivityParameter("", "", List(
+            new StringActivityParameter("name", "table column's name", minLength = Some(1)),
+            new StringActivityParameter("type", "table column's type", minLength = Some(1)),
+            new StringActivityParameter("source", "source csv header name", minLength = Some(1)),
+            new StringActivityParameter("index", "table column's index name or type", required = false, minLength = Some(1))
+          )),
+          minItems = 1,
+          uniqueItems = true
+        )
+      )
+    )
+
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
         new UriActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
-        new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated"),
-        new ObjectActivityParameter("dtd", "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)")
+        new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated", minLength = Some(1)),
+        EmailDatabaseSchemaDefinitionActivityParameter
       ),
       new StringActivityResult("URL to the lightweight database file"),
       "Insert all records from a CSV file to a lightweight database file, according to a DTD")
@@ -55,7 +75,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     val maybeSource = parameters.get[URI]("source")
     val maybeDbName = parameters.get[String]("dbname")
-    val maybeDtd = parameters.get[JsObject]("dtd")
+    val maybeDtd = parameters.get[ActivityParameters]("dtd")
 
     if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
     val sourceUri = maybeSource.get
@@ -63,14 +83,14 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     if (!maybeDbName.isDefined || maybeDbName.get.trim.isEmpty) throw new IllegalArgumentException("dbname parameter is empty")
     if (!maybeDtd.isDefined) throw new IllegalArgumentException("dtd parameter is empty")
 
-    val tableDefinition = Try(maybeDtd.get.as[TableDefinition]) match {
+    val tableDefinition = Try(Json.parse(maybeDtd.get.input).as[TableDefinition]) match {
       case Success(td) => td
       case Failure(t) => throw new IllegalArgumentException("invalid DTD")
     }
 
-    splog.debug("namesBySource=" + tableDefinition.source2name)
-    splog.debug("typesByName=" + tableDefinition.name2type)
-    splog.debug("table definition sql=" + tableDefinition.tableCreateSql)
+    splog.debug(s"csv header name -> column name : ${tableDefinition.source2name}")
+    splog.debug(s"column name -> column sql type : ${tableDefinition.name2type}")
+    splog.debug(s"table ddl sql : ${tableDefinition.tableCreateSql}")
 
     (sourceUri.getHost, sourceUri.getPath.substring(1), maybeDbName.get, tableDefinition)
   }
@@ -249,7 +269,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
  * Supported database types enumeration.
  */
 object DataTypes {
-  sealed abstract class DataType(aliases: String*) {
+  sealed abstract class DataType(val aliases: String*) {
     val regex = aliases
       .map(_.replaceAll("\\s", "\\\\s"))
       .mkString("(", "|", ")\\s*([(](\\d+)[)]){0,1}")
@@ -261,6 +281,8 @@ object DataTypes {
   case object Date extends DataType("date")
   case object Boolean extends DataType("boolean")
   case object Timestamp extends DataType("datetime", "timestamp")
+
+  val AllSupportedAliases = Boolean.aliases ++ Date.aliases ++ Integer.aliases ++ Real.aliases ++ Text.aliases ++ Timestamp.aliases
 }
 
 /**

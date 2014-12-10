@@ -9,6 +9,9 @@ import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
+case class InvalidColumnException(columns: Set[String])
+  extends RuntimeException("Invalid columns names: " + columns.mkString(","))
+
 /**
  * Worker that execute a SQL query over a database file ot yield a set of CSV files
  * (put in s3) that contains recipients email address for bulk email delivery.
@@ -32,10 +35,15 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   def destinationS3Bucket = swfAdapter.config.getString(s3BucketConfig)
   def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
 
+  object FilterListQueryActivityParameter
+    extends ObjectActivityParameter("query", "JSON representation of a SQL query", List(
+      new ObjectActivityParameter("select", "select columns definition", required = true)
+    ), required = true)
+
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new ObjectActivityParameter("query", "JSON representation of a SQL query"),
+        FilterListQueryActivityParameter,
         new StringActivityParameter("source", "URL to a database file to use"),
         new IntegerActivityParameter("pageSize", "Maximum records the produced csv files can contain")
       ),
@@ -47,10 +55,10 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
    * Extract, validate and return parameters for this task.
    */
   private def getParams(params: ActivityParameters) = {
-    val maybeQuery =  params.get[JsValue]("query")
+    val maybeQuery =  params.get[ActivityParameters]("query")
     if (maybeQuery.isEmpty) throw new IllegalArgumentException("query param is required")
 
-    val queryDefinition = Try(maybeQuery.get.as[QueryDefinition]) match {
+    val queryDefinition = Try(Json.parse(maybeQuery.get.input).as[QueryDefinition]) match {
       case Success(td) => td
       case Failure(t) => throw new IllegalArgumentException("invalid select query object", t)
     }
@@ -78,56 +86,66 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
 
     val dbMeta = s3Adapter.getMeta(sourceBucket, sourceKey).get
-    val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
-    val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 
     try {
 
-      val totalRecordsCount = db.selectCount(s"""select count(*) from "${queryDefinition.getTableName}"""")
-      val queryRecordsCount = db.selectCount(queryDefinition.selectCountSql)
-      val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
+      val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
+      val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 
-      splog.info(s"Executing paged query... totalRecordsCount=$totalRecordsCount queryRecordsCount=$queryRecordsCount recordsPerPage=$recordsPerPage pagesCount=$pagesCount")
-      val pages = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
-
-      /* Process all csv files one after the other */
-      var pageNum = 0
-      val uris = for (page <- pages) yield {
-        pageNum += 1
-        splog.info(s"Processing csv file #$pageNum...")
-
-        val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv"
-        val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
-        val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
-        val csvWriter = csvAdapter.newWriter(csvOutputStream)
-
-        try {
-
-          /* use same sql pages as csv pages for now */
-          splog.info("Writing records to CSV...")
-          csvWriter.writeRow(queryDefinition.fields)
-          for (row <- page) {
-            csvWriter.writeRow(row)
-          }
-
-          s3Adapter
-            .upload(csvS3Key, csvTempFile)
-            .map(_.toString)
-            .get
-
-        } finally {
-          csvOutputStream.close()
-          csvTempFile.delete()
+      try {
+        val dbColumns = db.getTableColumnNames(queryDefinition.getTableName)
+        val invalidColumns = queryDefinition.fields.diff(dbColumns)
+        if (invalidColumns.nonEmpty) {
+          throw InvalidColumnException(invalidColumns)
         }
+
+        val totalRecordsCount = db.selectCount( s"""select count(*) from "${queryDefinition.getTableName}"""")
+        val queryRecordsCount = db.selectCount(queryDefinition.selectCountSql)
+        val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
+
+        splog.info(s"Executing paged query... totalRecordsCount=$totalRecordsCount queryRecordsCount=$queryRecordsCount recordsPerPage=$recordsPerPage pagesCount=$pagesCount")
+        val pages = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
+
+        /* Process all csv files one after the other */
+        var pageNum = 0
+        val uris = for (page <- pages) yield {
+          pageNum += 1
+          splog.info(s"Processing csv file #$pageNum...")
+
+          val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv"
+          val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
+          val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
+          val csvWriter = csvAdapter.newWriter(csvOutputStream)
+
+          try {
+
+            /* use same sql pages as csv pages for now */
+            splog.info("Writing records to CSV...")
+            csvWriter.writeRow(queryDefinition.fields.toSeq)
+            for (row <- page) {
+              csvWriter.writeRow(row)
+            }
+
+            s3Adapter
+              .upload(csvS3Key, csvTempFile)
+              .map(_.toString)
+              .get
+
+          } finally {
+            csvOutputStream.close()
+            csvTempFile.delete()
+          }
+        }
+
+        completeTask(JsArray(uris.toSeq.map(JsString)).toString())
+      } finally {
+        db.close()
+        dbFile.delete()
       }
-
-      completeTask(JsArray(uris.toSeq.map(JsString)).toString())
-
     } finally {
-      db.close()
       dbMeta.close()
-      dbFile.delete()
     }
+
   }
 
 }
@@ -160,7 +178,7 @@ case class QueryDefinition(select: JsObject, tableName: Option[String] = Some("r
   /**
    * List of field names to be returned by select statement.
    */
-  val fields = select.fields.map(_._1)
+  val fields = select.fields.map(_._1).toSet
 
   /**
    * Map field name to a sequence of sql criterions.

@@ -151,14 +151,14 @@ abstract class AbstractWorkflowGenerator
       splog.info(s"completed result ${results.size}: $result")
     }
 
-    override def toString(): String = results.mkString("[", ",", "]")
+    override def toString: String = results.mkString("[", ",", "]")
   }
 
 
   override def handleTask(params: ActivityParameters) = {
 
     withTaskHandling {
-      val template = Json.stringify(params[JsObject]("template"))
+      val template = params[ActivityParameters]("template").input
       val tags = Try(params[List[String]]("tags")) getOrElse List[String]()
       val workflowCreator = new WorkFlowCreator(template, tags)
 
