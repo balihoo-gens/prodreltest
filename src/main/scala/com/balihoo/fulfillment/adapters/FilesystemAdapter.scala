@@ -1,7 +1,7 @@
 package com.balihoo.fulfillment.adapters
 
 import java.io._
-import java.util.zip.{GZIPOutputStream, GZIPInputStream}
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 
 import org.apache.commons.io.IOUtils
 
@@ -23,7 +23,10 @@ trait FilesystemAdapterComponent {
 
 }
 
-case object NoDataCopiedException extends IllegalArgumentException("No data copied")
+/**
+ * Exception thrown when a copy operation fails.
+ */
+case object NoDataCopiedException extends IOException("No data copied")
 
 /**
  * A filesystem adapter implementation based on simple Java IO classes.

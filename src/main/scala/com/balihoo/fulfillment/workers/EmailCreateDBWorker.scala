@@ -149,15 +149,21 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     /**
      * Add a parameter to the prepared statement based on db type and index.
      */
-    def addSqlParam(sqlParamIndex: Int, dbType: DataTypes.DataType, value: String) = dbType match {
-      case DataTypes.Text => dbBatch.param(sqlParamIndex, value)
-      case DataTypes.Integer => dbBatch.param(sqlParamIndex, value.toLong)
-      case DataTypes.Date => dbBatch.param(sqlParamIndex, new java.sql.Date(sqlDateParser.parse(value).getTime))
-      /** TODO (jmelanson) support timestamp (need requirements) */
-      case DataTypes.Timestamp => dbBatch.param(sqlParamIndex, value)
-      case DataTypes.Boolean => dbBatch.param(sqlParamIndex, value.toBoolean)
-      case DataTypes.Real => dbBatch.param(sqlParamIndex, value.toDouble)
-      case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
+    def addSqlParam(sqlParamIndex: Int, dbType: DataTypes.DataType, value: String) = {
+      if (Option(value).isEmpty || value.trim.isEmpty)
+        dbBatch.param(sqlParamIndex, None)
+      else dbType match {
+        case DataTypes.Text => dbBatch.param(sqlParamIndex, Some(value))
+        case DataTypes.Integer => dbBatch.param(sqlParamIndex, Some(value.toLong))
+        case DataTypes.Date =>
+          val aDate = new java.sql.Date(sqlDateParser.parse(value).getTime)
+          dbBatch.param(sqlParamIndex, Some(aDate))
+        /** TODO (jmelanson) support timestamp (need requirements) */
+        case DataTypes.Timestamp => dbBatch.param(sqlParamIndex, Some(value))
+        case DataTypes.Boolean => dbBatch.param(sqlParamIndex, Some(value.toBoolean))
+        case DataTypes.Real => dbBatch.param(sqlParamIndex, Some(value.toDouble))
+        case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
+      }
     }
 
     /* main loop, insert all rows in db */
@@ -241,8 +247,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
       val dbTempFile = filesystemAdapter.newTempFile(dbName + ".sqlite")
       val db = liteDbAdapter.create(dbTempFile.getAbsolutePath)
-      val csvInputStream = filesystemAdapter.newGZIPInputStream(csvMeta.getContentStream)
-      val csvInputStreamReader = filesystemAdapter.newReader(csvInputStream)
+      val csvInputStreamReader = filesystemAdapter.newReader(csvMeta.getContentStream)
 
       try {
 
@@ -262,8 +267,8 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
       } finally {
         db.close()
-        csvInputStreamReader.close()
         csvMeta.close()
+        csvInputStreamReader.close()
         dbTempFile.delete()
       }
 

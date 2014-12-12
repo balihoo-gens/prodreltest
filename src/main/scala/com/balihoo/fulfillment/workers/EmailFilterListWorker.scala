@@ -88,11 +88,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     try {
 
-      val dbInputStream = if (sourceKey.endsWith(".gz"))
-        filesystemAdapter.newGZIPInputStream(dbMeta.getContentStream)
-      else
-        dbMeta.getContentStream
-      val dbFile = filesystemAdapter.newTempFileFromStream(dbInputStream, sourceKey)
+      val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
       val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 
       try {
@@ -115,7 +111,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
           pageNum += 1
           splog.info(s"Processing csv file #$pageNum...")
 
-          val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv.gz"
+          val csvS3Key = s"$destinationS3Key/${dbMeta.filenameNoExtension}.$pageNum.csv.gz"
           val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
           val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
           val csvWriter = csvAdapter.newWriter(csvOutputStream)

@@ -138,6 +138,7 @@ abstract class FulfillmentWorker {
               splog.info(s"Task processed time=$time")
             } catch {
               case e:Exception =>
+                e.printStackTrace()
                 splog.warning(s"activity failed: exception=${e.toString}")
                 failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
             }

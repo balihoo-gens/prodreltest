@@ -1,7 +1,8 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{Closeable, File}
+import java.io.{Closeable, File, InputStream}
 import java.net.{URI, URL}
+import java.util.zip.GZIPInputStream
 
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
@@ -27,17 +28,35 @@ case object PrivateS3Visibility extends S3Visibility
 
 /**
  * Wrapper for an s3 object.
- * This object must be released as fast as possible per the amazon API.
+ * This object must be released as fast as possible per the amazon's API.
  */
 case class S3Meta(awsObject: S3Object, key: String, bucket: String) extends Closeable {
   lazy val lastModified = awsObject.getObjectMetadata.getLastModified
+  lazy val contentType = awsObject.getObjectMetadata.getContentType
   lazy val httpsUrl = new URL("https", "s3.amazonaws.com", s"$bucket/$key")
   lazy val s3Url = new URL("s3", bucket, key)
   lazy val s3Uri = new URI(s"s3://$bucket/$key")
   lazy val userMetaData = awsObject.getObjectMetadata.getUserMetadata.asScala.toMap
   lazy val filename = awsObject.getKey.split("/").last
+  lazy val filenameNoExtension = filename.split('.').init.mkString(".")
+  lazy val isGzip = "application/x-gzip" == contentType || filename.endsWith(".gz")
+
+  /**
+   * Release the S3 object.
+   */
   override def close() = awsObject.close()
-  def getContentStream = awsObject.getObjectContent
+
+  /**
+   * @return an `InputStream` the content's input stream. An appropriate `InputStream` decoder will
+   *         be provided based on the file extension.
+   */
+  def getContentStream: InputStream = {
+    if (isGzip)
+      new GZIPInputStream(awsObject.getObjectContent)
+    else
+      awsObject.getObjectContent
+  }
+
 }
 
 /**

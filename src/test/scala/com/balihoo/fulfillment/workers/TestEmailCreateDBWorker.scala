@@ -258,8 +258,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       s3Adapter.getMeta(===(data.db_s3_key)) returns Failure(mock[Exception])
       db_file_mock.getAbsolutePath returns data.db_temp_file_path
       filesystemAdapter.newTempFile(===(data.db_temp_file_hint)) returns db_file_mock
-      filesystemAdapter.newGZIPInputStream(csv_s3_content_stream) returns csv_gzip_content_stream
-      filesystemAdapter.newReader(csv_gzip_content_stream) returns csv_reader_mock
+      filesystemAdapter.newReader(csv_s3_content_stream) returns csv_reader_mock
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
       csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream)
       db_mock.batch(anyString) returns db_batch_mock
@@ -283,26 +282,26 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         "(\"recipientid\", \"locationid\", \"email\", \"firstname\", \"lastname\", \"birthday\") " +
         "values (?, ?, ?, ?, ?, ?)")
 
-      there was one(db_batch_mock).param(1, "b")
-      there was one(db_batch_mock).param(2, 2.toLong)
-      there was one(db_batch_mock).param(3, "rafael@nike.com")
-      there was one(db_batch_mock).param(4, "rafael")
-      there was one(db_batch_mock).param(5, "nadal")
-      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1986-06-03").getTime))
+      there was one(db_batch_mock).param(1, Some("b"))
+      there was one(db_batch_mock).param(2, Some(2.toLong))
+      there was one(db_batch_mock).param(3, Some("rafael@nike.com"))
+      there was one(db_batch_mock).param(4, Some("rafael"))
+      there was one(db_batch_mock).param(5, Some("nadal"))
+      there was one(db_batch_mock).param(6, Some(new java.sql.Date(sqlDateParser.parse("1986-06-03").getTime)))
 
-      there was one(db_batch_mock).param(1, "a")
-      there was one(db_batch_mock).param(2, 1.toLong)
-      there was one(db_batch_mock).param(3, "roger@nike.com")
-      there was one(db_batch_mock).param(4, "roger")
-      there was one(db_batch_mock).param(5, "federer")
-      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1981-08-08").getTime))
+      there was one(db_batch_mock).param(1, Some("a"))
+      there was one(db_batch_mock).param(2, Some(1.toLong))
+      there was one(db_batch_mock).param(3, Some("roger@nike.com"))
+      there was one(db_batch_mock).param(4, Some("roger"))
+      there was one(db_batch_mock).param(5, Some("federer"))
+      there was one(db_batch_mock).param(6, Some(new java.sql.Date(sqlDateParser.parse("1981-08-08").getTime)))
 
-      there was one(db_batch_mock).param(1, "c")
-      there was one(db_batch_mock).param(2, 3.toLong)
-      there was one(db_batch_mock).param(3, "novak@uniqlo.com")
-      there was one(db_batch_mock).param(4, "novak")
-      there was one(db_batch_mock).param(5, "djokovic")
-      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1987-05-22").getTime))
+      there was one(db_batch_mock).param(1, Some("c"))
+      there was one(db_batch_mock).param(2, Some(3.toLong))
+      there was one(db_batch_mock).param(3, Some("novak@uniqlo.com"))
+      there was one(db_batch_mock).param(4, Some("novak"))
+      there was one(db_batch_mock).param(5, Some("djokovic"))
+      there was one(db_batch_mock).param(6, Some(new java.sql.Date(sqlDateParser.parse("1987-05-22").getTime)))
 
       there was three(db_batch_mock).add()
       there was two(db_batch_mock).execute()
@@ -430,7 +429,6 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val db_s3_meta_mock = mock[S3Meta]
     val db_file_mock = mock[File]
     val db_gzip_file_mock = mock[File]
-    val csv_gzip_content_stream = mock[GZIPInputStream]
     val db_mock = mock[LightweightDatabase]
     val db_batch_mock = mock[DbBatch]
   }

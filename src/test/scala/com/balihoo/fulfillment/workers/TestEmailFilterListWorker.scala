@@ -2,7 +2,6 @@ package com.balihoo.fulfillment.workers
 
 import java.io.{File, OutputStream}
 import java.net.URI
-import java.util.zip.GZIPInputStream
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
@@ -49,8 +48,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       db_s3_meta_mock.filename returns data.db_s3_meta_filename
       db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
       db_file_mock.getAbsolutePath returns data.db_file_path
-      filesystemAdapter.newGZIPInputStream(db_s3_contentStream_mock) returns db_gzip_stream_mock
-      filesystemAdapter.newTempFileFromStream(db_gzip_stream_mock, data.db_s3_key) returns db_file_mock
+      filesystemAdapter.newTempFileFromStream(db_s3_contentStream_mock, data.db_s3_key) returns db_file_mock
       liteDbAdapter.create(===(data.db_file_path)) returns db_mock
       db_mock.getTableColumnNames(===(data.queryDefinition.getTableName)) returns data.param_select.fieldSet.map(_._1).toSet
 
@@ -63,10 +61,10 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       // setup
       s3Adapter.getMeta(===(data.s3_bucket), ===(data.db_s3_key)) returns Success(db_s3_meta_mock)
       db_s3_meta_mock.filename returns data.db_s3_meta_filename
+      db_s3_meta_mock.filenameNoExtension returns data.db_s3_meta_filename
       db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
       db_file_mock.getAbsolutePath returns data.db_file_path
-      filesystemAdapter.newGZIPInputStream(db_s3_contentStream_mock) returns db_gzip_stream_mock
-      filesystemAdapter.newTempFileFromStream(db_gzip_stream_mock, data.db_s3_key) returns db_file_mock
+      filesystemAdapter.newTempFileFromStream(db_s3_contentStream_mock, data.db_s3_key) returns db_file_mock
       liteDbAdapter.create(===(data.db_file_path)) returns db_mock
       liteDbAdapter.calculatePageCount(===(data.recordsCount), ===(data.param_pageSize)) returns data.expectedPageCount
       db_mock.selectCount(===(data.queryDefinition.selectCountSql)) returns data.recordsCount
@@ -183,6 +181,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val activityParameterSourceInvalidProtocol = ActivityParameters("source" -> param_source_invalid_protocol, "query" -> param_query, "pageSize" -> param_pageSize)
     val activityParameterSourceInvalid = ActivityParameters("source" -> param_source_invalid, "query" -> param_query, "pageSize" -> param_pageSize)
     val db_s3_meta_filename = db_s3_key.split("/").last
+    val db_s3_meta_filename_noext = db_s3_key.split("/").last.split('.').init.mkString(".")
     val db_file_path = "some/file"
     val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv.gz"
     val csv_s3_key2 = s"mock/$db_s3_meta_filename.2.csv.gz"
@@ -220,7 +219,6 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     /* mocks */
     val db_s3_meta_mock = mock[S3Meta]
     val db_s3_contentStream_mock = mock[S3ObjectInputStream]
-    val db_gzip_stream_mock = mock[GZIPInputStream]
     val db_file_mock = mock[File]
     val db_mock = mock[LightweightDatabase]
     val db_paged_resultSet_mock = mock[DbPagedResultSet]
