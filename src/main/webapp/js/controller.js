@@ -192,7 +192,7 @@ app.factory('formatUtil', function() {
 
     function _formatURLs(param) {
         if(param === null) { return ""; }
-
+        if(param === undefined) { return ""; }
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
 
         return param.replace(urlRegex, function (url) {
@@ -255,22 +255,20 @@ app.factory('formatUtil', function() {
 
 });
 
-app.directive('jsonSchema', function(RecursionHelper, formatUtil) {//['$formatUtil', function($formatUtil) {
+app.directive('jsonSchema', function(RecursionHelper, formatUtil) {
     return {
         templateUrl: 'partials/jsonSchema.html',
         scope: {
-            schema: '=schema',
-            required: '=required'
+            schema: '=schema'
         },
         restrict: 'E',
         replace: true,
-        link: function(scope) {
-            scope.formatUtil = formatUtil;
-        },
         compile: function(element) {
             // Use the compile function from the RecursionHelper,
             // And return the linking function(s) which it returns
-            return RecursionHelper.compile(element);
+            return RecursionHelper.compile(element, function(scope, element, attr) {
+                scope.formatUtil = formatUtil;
+            });
         }
     };
 });
@@ -843,15 +841,6 @@ app.controller('processController', function($scope, $route, $http, $location, e
             }
 
             domain[worker.activityName].push(worker);
-
-//            if(worker.specification.hasOwnProperty("params")) {
-//                $.each(worker.specification.params.properties,
-//                       function (i, e) {
-//                           e._name = i;
-//                           e._required = $.inArray(i, worker.specification.params.required) > -1;
-//
-//                       });
-//            }
 
         }
     };
