@@ -1,6 +1,5 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.File
 import java.sql._
 
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
@@ -22,9 +21,9 @@ trait LightweightDatabaseAdapterComponent {
   trait LightweightDatabaseAdapter {
 
     /**
-     * @return a new temporary file db from specified file.
+     * @return a new db from specified file path.
      */
-    def create(file: File): LightweightDatabase
+    def create(path: String): LightweightDatabase
 
     /**
      * Calculate how many pages a sql query yields.
@@ -35,6 +34,7 @@ trait LightweightDatabaseAdapterComponent {
       val pages = if (totalCount >= pageSize) totalCount / pageSize else 0
       if (hasRemaining) pages + 1 else pages
     }
+
   }
 
   /**
@@ -83,18 +83,10 @@ trait LightweightDatabaseAdapterComponent {
      */
     def isClosed: Boolean
 
-  }
-
-  /**
-   * Lightweight database that supports file storage.
-   */
-  trait LightweightFileDatabase {
-
     /**
-     * File used for database storage.
+     * @return a set of column names for the specified table.
      */
-    def file: File
-
+    def getTableColumnNames(tableName: String): Set[String]
   }
 
   /**
@@ -120,43 +112,13 @@ trait LightweightDatabaseAdapterComponent {
 
   /**
    * A trait to allow browsing a large result set with paging.
-   *
-   * @note Stateful implementation (like jdbc) might require a `hasNext`
-   * invocation before a `next` invocation, it's safer to do that.
    */
-  trait DbPagedResultSet {
-
-    /**
-     * @return `true` if another page is available, `false` otherwise.
-     */
-    def hasNext: Boolean
-
-    /**
-     * @return the next page of this result set.
-     */
-    def next: DbResultSetPage
-
-  }
+  type DbPagedResultSet = Iterable[DbResultSetPage]
 
   /**
    * A trait to allow browsing records of a result set with paging.
-   *
-   * @note Stateful implementation (like jdbc) might require a `hasNext`
-   * invocation before a `next` invocation, it's safer to do that.
    */
-  trait DbResultSetPage {
-
-    /**
-     * @return `true` if another record is available, `false` otherwise.
-     */
-    def hasNext: Boolean
-
-    /**
-     * @return the next record of this result set.
-     */
-    def next: Seq[Any]
-
-  }
+  type DbResultSetPage = Iterable[Seq[Any]]
 
   /**
    * A jdbc-based lite db.
@@ -168,7 +130,7 @@ trait LightweightDatabaseAdapterComponent {
 
     val orderByChecker = "(order[ ]+by)".r
 
-    private def newStatement() = {
+    protected def newStatement() = {
       val stmt = connection.createStatement()
       stmt.setQueryTimeout(30) // 30 sec. timeout
       stmt.closeOnCompletion()
@@ -188,7 +150,7 @@ trait LightweightDatabaseAdapterComponent {
       if (pageSize < 1) throw new IllegalArgumentException("invalid page size")
       if (orderByChecker.findFirstIn(stmt).isEmpty) throw new IllegalArgumentException("statement should have an order by clause")
       val pageCount = if (totalCount < pageSize) 1 else (totalCount / pageSize) + (if (totalCount % pageSize > 0) 1 else 0)
-      splog.info(s"statement=$statement, totalCount=$totalCount, pageSize=$pageSize, pageCount=$pageCount, pageSize=$pageSize")
+      splog.debug(s"statement=$statement, totalCount=$totalCount, pageSize=$pageSize, pageCount=$pageCount, pageSize=$pageSize")
       new JdbcDbPagedResultSet(statement, pageCount, pageSize, connection.createStatement())
     }
 
@@ -233,45 +195,48 @@ trait LightweightDatabaseAdapterComponent {
   }
 
   private[this] class JdbcDbPagedResultSet(private val sql: String,
-                           private val pageCount: Int,
-                           private val pageSize: Int,
-                           private val statement: Statement) extends DbPagedResultSet {
-
+                                           private val pageCount: Int,
+                                           private val pageSize: Int,
+                                           private val statement: Statement) extends DbPagedResultSet {
     private var currentPage = 0
 
-    override def hasNext: Boolean = currentPage < pageCount
+    override val iterator = new Iterator[DbResultSetPage] {
 
-    override def next: DbResultSetPage = {
-      val offset = currentPage * pageSize
-      statement.execute(sql + s" limit $pageSize offset $offset")
-      currentPage += 1
-      new JdbcDbResultSetPage(statement.getResultSet)
+      override def hasNext: Boolean = currentPage < pageCount
+
+      override def next() = {
+        val offset = currentPage * pageSize
+        statement.execute(sql + s" limit $pageSize offset $offset")
+        currentPage += 1
+        new JdbcDbResultSetPage(statement.getResultSet)
+      }
     }
-
   }
 
   private[this] class JdbcDbResultSetPage(private val resultSet: ResultSet) extends DbResultSetPage {
 
     private val metaData = resultSet.getMetaData
 
-    override def hasNext = resultSet.next()
+    override val iterator = new Iterator[Seq[Any]] {
 
-    override def next = {
-      for {
-        i <- 1 to metaData.getColumnCount
-      } yield {
-        metaData.getColumnType(i) match {
-          case Types.TINYINT | Types.SMALLINT | Types.INTEGER | Types.BIGINT => resultSet.getInt(i)
-          case Types.CLOB | Types.CHAR | Types.VARCHAR | Types.NCHAR | Types.NVARCHAR => resultSet.getString(i)
-          case Types.REAL | Types.DOUBLE | Types.FLOAT | Types.NUMERIC | Types.DECIMAL => resultSet.getDouble(i)
-          case Types.BOOLEAN => resultSet.getBoolean(i)
-          case Types.DATE => resultSet.getString(i)
-          case Types.TIME | Types.TIMESTAMP => resultSet.getLong(i)
-          case _ => resultSet.getObject(i)
+      override def hasNext: Boolean = resultSet.next()
+
+      override def next(): Seq[Any] = {
+        for {
+          i <- 1 to metaData.getColumnCount
+        } yield {
+          metaData.getColumnType(i) match {
+            case Types.TINYINT | Types.SMALLINT | Types.INTEGER | Types.BIGINT => resultSet.getInt(i)
+            case Types.CLOB | Types.CHAR | Types.VARCHAR | Types.NCHAR | Types.NVARCHAR => resultSet.getString(i)
+            case Types.REAL | Types.DOUBLE | Types.FLOAT | Types.NUMERIC | Types.DECIMAL => resultSet.getDouble(i)
+            case Types.BOOLEAN => resultSet.getBoolean(i)
+            case Types.DATE => resultSet.getString(i)
+            case Types.TIME | Types.TIMESTAMP => resultSet.getLong(i)
+            case _ => resultSet.getObject(i)
+          }
         }
       }
     }
-
   }
 
 }
@@ -291,19 +256,32 @@ trait SQLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdapt
     /* Load driver, make sure it exists */
     Class.forName("org.sqlite.JDBC")
 
-    override def create(file: File): LightweightDatabase = {
-      val path = file.getAbsolutePath
+    override def create(path: String): LightweightDatabase = {
+      splog.debug(s"Connecting to db path=$path")
       val connection = DriverManager.getConnection(s"jdbc:sqlite:$path")
-      val db = new SQLiteLightweightDatabase(file, connection)
+      val db = new SQLiteLightweightDatabase(connection)
       db.optimize()
       db
     }
 
   }
 
-  private[this] class SQLiteLightweightDatabase(override val file: File, connection: Connection)
-    extends JdbcLightweightDatabase(connection, splog)
-      with LightweightFileDatabase {
+  private[this] class SQLiteLightweightDatabase(connection: Connection)
+    extends JdbcLightweightDatabase(connection, splog) {
+
+    override def getTableColumnNames(tableName: String): Set[String] = {
+      val statement = newStatement()
+      val columns = collection.mutable.Set[String]()
+      try {
+        val columnsResultSet = statement.executeQuery(s"""PRAGMA table_info("$tableName")""")
+        while (columnsResultSet.next()) {
+          columns += columnsResultSet.getString(2)
+        }
+      } finally {
+        statement.close()
+      }
+      columns.toSet
+    }
 
     def optimize() = {
       execute("PRAGMA synchronous = OFF")

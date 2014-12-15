@@ -28,7 +28,7 @@
     },
     "params": {
       "source": "s3://balihoo.dev.fulfillment/lists/snap/member_current.csv",
-      "dbname": "snapee.db",
+      "dbname": "test.db",
       "dtd": {
         "columns": [
           {

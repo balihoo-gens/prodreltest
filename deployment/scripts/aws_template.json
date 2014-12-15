@@ -292,7 +292,7 @@
       "Properties" : {
         "AssociatePublicIpAddress" : "true",
         "ImageId" : { "Fn::FindInMap" : [
-          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "WorkerInstanceType" }, "AMIMap" ] },
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "DashboardInstanceType" }, "AMIMap" ] },
           { "Ref" : "AWS::Region" },
           { "Ref" : "LinuxDistro" }
         ] },

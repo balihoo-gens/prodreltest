@@ -14,7 +14,7 @@ class AbstractRESTClient extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
       new UriActivityParameter("url", "The service URL"),
-      new ObjectActivityParameter("headers", "This object's attributes will be added to the HTTP request headers.", false),
+      new ObjectActivityParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
       new EnumActivityParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
       new StringActivityParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
     ), new StringActivityResult("Rest response data"))

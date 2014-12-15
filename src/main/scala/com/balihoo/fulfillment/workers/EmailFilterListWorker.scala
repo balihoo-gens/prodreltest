@@ -9,6 +9,9 @@ import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
+case class InvalidColumnException(columns: Set[String])
+  extends RuntimeException("Invalid columns names: " + columns.mkString(","))
+
 /**
  * Worker that execute a SQL query over a database file ot yield a set of CSV files
  * (put in s3) that contains recipients email address for bulk email delivery.
@@ -29,10 +32,18 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   val s3BucketConfig = "s3bucket"
   val s3DirConfig = "s3dir"
 
+  def destinationS3Bucket = swfAdapter.config.getString(s3BucketConfig)
+  def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
+
+  object FilterListQueryActivityParameter
+    extends ObjectActivityParameter("query", "JSON representation of a SQL query", List(
+      new ObjectActivityParameter("select", "select columns definition", required = true)
+    ), required = true)
+
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new ObjectActivityParameter("query", "JSON representation of a SQL query"),
+        FilterListQueryActivityParameter,
         new StringActivityParameter("source", "URL to a database file to use"),
         new IntegerActivityParameter("pageSize", "Maximum records the produced csv files can contain")
       ),
@@ -44,10 +55,10 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
    * Extract, validate and return parameters for this task.
    */
   private def getParams(params: ActivityParameters) = {
-    val maybeQuery =  params.get[JsValue]("query")
+    val maybeQuery =  params.get[ActivityParameters]("query")
     if (maybeQuery.isEmpty) throw new IllegalArgumentException("query param is required")
 
-    val queryDefinition = Try(maybeQuery.get.as[QueryDefinition]) match {
+    val queryDefinition = Try(Json.parse(maybeQuery.get.input).as[QueryDefinition]) match {
       case Success(td) => td
       case Failure(t) => throw new IllegalArgumentException("invalid select query object", t)
     }
@@ -67,74 +78,74 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     val pageSize = maybePageSize.get
     if (pageSize < 1) throw new IllegalArgumentException("pageSize param is invalid")
 
-    (queryDefinition, source.getHost, source.getPath.substring(1), pageSize)
+    (queryDefinition, source.getHost, source.getPath.tail, pageSize)
   }
 
   override def handleTask(params: ActivityParameters) = {
 
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
-    val destinationS3Bucket = this.swfAdapter.config.getString(s3BucketConfig)
-    val destinationS3Key = this.swfAdapter.config.getString(s3DirConfig)
 
-    splog.info(s"Downloading db file sourceBucket=$sourceBucket sourceKey=$sourceKey")
-    val s3TempFile = s3Adapter.getAsTempFile(sourceBucket, sourceKey, None)
-
-    splog.info(s"Opening db file path=${s3TempFile.getAbsolutePath}")
-    val db = liteDbAdapter.create(s3TempFile)
+    val dbMeta = s3Adapter.getMeta(sourceBucket, sourceKey).get
 
     try {
 
-      val totalRecordsCount = db.selectCount(s"""select count(*) from "${queryDefinition.getTableName}"""")
-      val queryRecordsCount = db.selectCount(queryDefinition.selectCountSql)
-      val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
+      val dbFile = filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey)
+      val db = liteDbAdapter.create(dbFile.getAbsolutePath)
 
-      splog.info(s"Executing paged query... totalRecordsCount=$totalRecordsCount queryRecordsCount=$queryRecordsCount recordsPerPage=$recordsPerPage pagesCount=$pagesCount")
-      val pagedResultSet = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
-
-      /* Process all csv files one after the other */
-      val urls = for (i <- 1 to pagesCount) yield {
-
-        splog.info(s"Processing csv file #$i...")
-
-        val csvName = s3keySepCharPattern.split(sourceKey).filter(!_.trim.isEmpty).last + s".$i"
-        val csvS3Key = s"$destinationS3Key/$csvName.csv"
-
-        splog.info("Creating temp csv file...")
-        val (csvFile, csvOutputStream) = filesystemAdapter.newTempFileOutputStream(csvName, ".csv")
-        splog.info("Using temp csv file path=" + csvFile.getAbsolutePath)
-
-        try {
-
-          /* use same sql pages as csv pages for now */
-
-          if (!pagedResultSet.hasNext) throw new IllegalStateException("csv file count is different than sql pages received")
-          val resultSetPage = pagedResultSet.next
-
-          splog.info("Writing records to CSV...")
-          val csvWriter = csvAdapter.newWriter(csvOutputStream)
-          csvWriter.writeRow(queryDefinition.fields)
-          while (resultSetPage.hasNext) {
-            csvWriter.writeRow(resultSetPage.next)
-          }
-          csvOutputStream.close()
-
-          splog.info(s"Uploading csv file to s3... s3bucket=$destinationS3Bucket s3key=$csvS3Key")
-          s3Adapter.putPublic(destinationS3Bucket, csvS3Key, csvFile)
-
-        } finally {
-          csvOutputStream.close()
-          csvFile.delete()
+      try {
+        val dbColumns = db.getTableColumnNames(queryDefinition.getTableName)
+        val invalidColumns = queryDefinition.fields.diff(dbColumns)
+        if (invalidColumns.nonEmpty) {
+          throw InvalidColumnException(invalidColumns)
         }
 
-        s"s3://$destinationS3Bucket/$csvS3Key"
+        val totalRecordsCount = db.selectCount( s"""select count(*) from "${queryDefinition.getTableName}"""")
+        val queryRecordsCount = db.selectCount(queryDefinition.selectCountSql)
+        val pagesCount = liteDbAdapter.calculatePageCount(queryRecordsCount, recordsPerPage)
+
+        splog.info(s"Executing paged query... totalRecordsCount=$totalRecordsCount queryRecordsCount=$queryRecordsCount recordsPerPage=$recordsPerPage pagesCount=$pagesCount")
+        val pages = db.pagedSelect(queryDefinition.selectSql, queryRecordsCount, recordsPerPage)
+
+        /* Process all csv files one after the other */
+        var pageNum = 0
+        val uris = for (page <- pages) yield {
+          pageNum += 1
+          splog.info(s"Processing csv file #$pageNum...")
+
+          val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv"
+          val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
+          val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
+          val csvWriter = csvAdapter.newWriter(csvOutputStream)
+
+          try {
+
+            /* use same sql pages as csv pages for now */
+            splog.info("Writing records to CSV...")
+            csvWriter.writeRow(queryDefinition.fields.toSeq)
+            for (row <- page) {
+              csvWriter.writeRow(row)
+            }
+
+            s3Adapter
+              .upload(csvS3Key, csvTempFile)
+              .map(_.toString)
+              .get
+
+          } finally {
+            csvOutputStream.close()
+            csvTempFile.delete()
+          }
+        }
+
+        completeTask(JsArray(uris.toSeq.map(JsString)).toString())
+      } finally {
+        db.close()
+        dbFile.delete()
       }
-
-      completeTask(JsArray(urls.map(JsString)).toString())
-
     } finally {
-      db.close()
-      s3TempFile.delete()
+      dbMeta.close()
     }
+
   }
 
 }
@@ -167,7 +178,7 @@ case class QueryDefinition(select: JsObject, tableName: Option[String] = Some("r
   /**
    * List of field names to be returned by select statement.
    */
-  val fields = select.fields.map(_._1)
+  val fields = select.fields.map(_._1).toSet
 
   /**
    * Map field name to a sequence of sql criterions.
@@ -230,8 +241,8 @@ class EmailFilterListWorker(override val _cfg: PropertiesLoader, override val _s
     with SQLiteLightweightDatabaseAdapterComponent
     with S3AdapterComponent
     with ScalaCsvAdapterComponent
-    with LocalFilesystemAdapterComponent {
-  override val s3Adapter = new S3Adapter(_cfg)
+    with FilesystemAdapterComponent {
+  override val s3Adapter = new S3Adapter(_cfg, _splog)
 }
 
 /**

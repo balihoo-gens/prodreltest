@@ -12,7 +12,7 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new IntegerActivityParameter("parent", "Brand AdWords account ID"),
+      new StringActivityParameter("parent", "Parent AdWords account name"),
       new StringActivityParameter("name", "Name of the Account")
     ), new StringActivityResult("AdWords Account ID"))
   }

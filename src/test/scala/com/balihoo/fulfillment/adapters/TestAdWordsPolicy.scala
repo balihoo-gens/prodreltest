@@ -36,16 +36,9 @@ class TestAdWordsPolicy extends Specification with Mockito
     }
 
     "  confirm url is good" in {
-      AdWordsPolicy.cleanUrl("balihoo.com") mustEqual "http://balihoo.com"
-      try {
-        AdWordsPolicy.cleanUrl("notbalihoo.com") mustEqual "http://balihoo.com"
-        failure("Expected an exception cause that URL does not exist")
-      } catch {
-        case e: Exception =>
-          e.getMessage mustEqual "URL:notbalihoo.com does NOT resolve!"
-      }
-
-      true
+      AdWordsPolicy.cleanUrl("google.com") mustEqual "http://google.com"
+      AdWordsPolicy.cleanUrl("notbalihoo.com") must throwA[Exception].like {
+        case e => e.getMessage must contain("URL:notbalihoo.com does NOT resolve!")}
     }
 
     "  fix upper case violations" in {
@@ -53,59 +46,26 @@ class TestAdWordsPolicy extends Specification with Mockito
     }
 
     "  match domains" in {
-      try {
-        AdWordsPolicy.matchDomains("randomdomainname.net/stork/angle/possum/spine", "https://randomdomainname.net/")
-      } catch {
-        case e:Exception =>
-          failure("That should have worked! "+e.getMessage)
-      }
-
-      success
+      AdWordsPolicy.matchDomains("randomdomainname.net/stork/angle/possum/spine", "https://randomdomainname.net/")
     }
 
     "  NOT match domains" in {
-      try {
-        AdWordsPolicy.matchDomains("http://superspecificname.net/stork/angle/possum/spine", "https://randomdomainname.net/")
-        failure("That should NOT have worked! ")
-      } catch {
-        case e:Exception =>
-          e.getMessage mustEqual "Domains for destination and display URLs must match! (randomdomainname.net =/= superspecificname.net)"
-      }
-
-      true
-
+      AdWordsPolicy.matchDomains("http://superspecificname.net/stork/angle/possum/spine", "https://randomdomainname.net/") must throwA[Exception].like {
+        case e => e.getMessage must contain("Domains for destination and display URLs must match! (randomdomainname.net =/= superspecificname.net)")}
     }
 
     "  validate keyword" in {
-      try {
-        AdWordsPolicy.validateKeyword("this is a valid keyword")
-        success
-      } catch {
-        case e:Exception =>
-          failure("This should be valid! "+e.getMessage)
-      }
+      AdWordsPolicy.validateKeyword("this is a valid keyword") == "this is a valid keyword"
     }
 
     "  NOT validate too many word keyword" in {
-      try {
-        AdWordsPolicy.validateKeyword("this is NOT a valid keyword because it has more than 10 words")
-        failure("That should have been too long!")
-      } catch {
-        case e:Exception =>
-          e.getMessage mustEqual "Keyword 'this is NOT a valid keyword because it has more than 10 words' has too many words! (max 10)"
-      }
-      true
+      AdWordsPolicy.validateKeyword("this is NOT a valid keyword because it has more than 10 words") must throwA[Exception].like {
+        case e => e.getMessage must contain("Keyword 'this is NOT a valid keyword because it has more than 10 words' has too many words! (max 10)")}
     }
 
     "  NOT validate too long keyword" in {
-      try {
-        AdWordsPolicy.validateKeyword("this isNOTavalidkeywordbecauseithasmorethan80characters whichistoomanyyeahitsureis")
-        failure("That should have been too long!")
-      } catch {
-        case e:Exception =>
-          e.getMessage mustEqual "Keyword 'this isNOTavalidkeywordbecauseithasmorethan80characters whichistoomanyyeahitsureis' is too long! (max 80)"
-      }
-      true
+      AdWordsPolicy.validateKeyword("this isNOTavalidkeywordbecauseithasmorethan80characters whichistoomanyyeahitsureis") must throwA[Exception].like {
+        case e => e.getMessage must contain("Keyword 'this isNOTavalidkeywordbecauseithasmorethan80characters whichistoomanyyeahitsureis' is too long! (max 80)")}
     }
   }
 
