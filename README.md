@@ -16,9 +16,6 @@ Building
 SBT should take care of most of the dependencies for you; check build.sbt to see what is used
 You will also need a number of properties which are set in the config directory.
 Some of the property files include a .private file for settings that do not belong in source control:
-  * awskeys.properties.private: contains two keys
-    * ```aws.accessKey=<your key>```
-    * ```aws.secretKey=<your secret key>```
   * aws.properties.private
     * ```domain=fauxfillment```
     * ```region=us-west-2```
@@ -34,9 +31,10 @@ Deployment
 --------
 Deployment is done by running the deploy script
   * Set the configs (keys, domain, region) to your deployment environment
-  * Set two environment variables aws to be used for deployment (runtime uses the keys from the config):
+  * Set two environment variables aws to be used for deployment:
     * AWS_ACCESS_KEY_ID
     * AWS_SECRET_ACCESS_KEY
+    * The deployment keys are not used runtime, that uses IAM roles. Keys used for deployment must have permissions to S3, create a CF stack etc.
   * If using a brand new region or domain: Set up the domains in the region:
     * DynamoDB table
     * SWF Region
@@ -55,6 +53,10 @@ Deployment is done by running the deploy script
 Running
 --------
   * When using the deployment script, workers, decider and dashboard all run on EC2 instances automatically.
+  * Before being able to run locally, you must have valid credentials in your environment:
+    * AWS_ACCESS_KEY_ID
+    * AWS_SECRET_ACCESS_KEY
+    * These keys need to have the same permissions in AWS as the IAM roles have: access SWF and S3 primarily.
   * To run locally, use ```python launcher.py``` in the project root to run some or all of the classes
     * Usage: ```$python ./launcher [-j <jar name>] [<main name> ...]```
     * class name resolution will try to match the name to the list of defaults. This allows you to abbreviate by leaving a lot of namespace out. Ambiguous names result in the selection of the first match.
