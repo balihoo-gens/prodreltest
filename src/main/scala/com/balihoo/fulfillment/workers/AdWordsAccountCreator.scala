@@ -54,7 +54,7 @@ trait AccountCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new IntegerActivityParameter("parent", "Parent AdWords account ID"),
+        new StringActivityParameter("parent", "Parent AdWords account name"),
         new StringActivityParameter("name", "Name of this Account"),
         new StringActivityParameter("currencyCode", "Usually US. https://developers.google.com/adwords/api/docs/appendix/currencycodes "),
         new StringActivityParameter("timeZone", "https://developers.google.com/adwords/api/docs/appendix/timezones")
