@@ -69,6 +69,7 @@
         <div ng-show="workersLoading">
             <img src="img/loading.gif">
         </div>
+
         <div class="panel panel-default" ng-repeat="(activityName, activities) in workersByDomain[currentDomain]">
             <div class="panel-heading-small">
                 <b>{{activityName}}</b>
@@ -81,6 +82,7 @@
 					</span>
                     <b>{{worker.activityName}} - {{worker.activityVersion}}</b>
                     </span>
+
                     <div ng-show="worker.showContents">
                         <table class="table table-condensed params">
                             <tr>
@@ -95,31 +97,30 @@
                             <tr ng-show="worker.specification.description">
                                 <td>Description</td>
                                 <td>
-                                    {{worker.specifiction.description}}
+                                    <span ng-bind-html="formatUtil.formatURLs(worker.specification.description)"></span>
                                 </td>
                             </tr>
                             <tr ng-show="worker.specification">
+
                                 <td ng-click="worker.showFormatted = !worker.showFormatted">Params</td>
                                 <td>
                                     <div ng-show="worker.showFormatted">
-                                        <div ng-repeat="(name, param) in worker.specification.schema.properties">
-                                            <i class="fa fa-flash muted" ng-show="param._required" title="Parameter is REQUIRED"></i>&nbsp;<i class="fa fa-eye-slash muted" ng-show="param.sensitive" title="Parameter will be ENCRYPTED"></i>&nbsp;<b>{{name}}</b>&nbsp;&nbsp;{{param.type}}
-                                            <span class="label label-default" ng-repeat="e in param.enum">{{e}}</span><br/>
-                                            <div class="block">
-                                                <span ng-bind-html="formatUtil.formatURLs(param.description)"></span>
-                                            </div>
-                                        </div>
+                                        <json-schema schema="worker.specification.params"></json-schema>
                                     </div>
                                     <div ng-hide="worker.showFormatted">
-                                        <pre ng-bind-html="formatUtil.prettyJson(worker.specification)"></pre>
+                                        <pre ng-bind-html="formatUtil.prettyJson(worker.specification.params)"></pre>
                                     </div>
                                 </td>
                             </tr>
                             <tr ng-show="worker.specification">
-                                <td>Result</td>
+                                <td ng-click="worker.showFormatted = !worker.showFormatted">Result</td>
                                 <td>
-                                    Type:&nbsp;&nbsp;{{worker.specification.result.type}}<br/>
-                                    Description:&nbsp;&nbsp;{{worker.specification.result.description}}
+                                    <div ng-show="worker.showFormatted">
+                                        <json-schema schema="worker.specification.result"></json-schema>
+                                    </div>
+                                    <div ng-hide="worker.showFormatted">
+                                        <pre ng-bind-html="formatUtil.prettyJson(worker.specification.result)"></pre>
+                                    </div>
                                 </td>
                             </tr>
                             <tr ng-show="worker.resolutionHistory">

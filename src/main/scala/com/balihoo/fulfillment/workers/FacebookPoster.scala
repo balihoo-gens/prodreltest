@@ -27,17 +27,17 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("appId", "The Facebook app ID"),
-      new EncryptedActivityParameter("appSecret", "The Facebook app secret"),
-      new EncryptedActivityParameter("accessToken", "The Facebook access token"),
-      new EnumActivityParameter("postType", "", List("link", "photo", "status update")),
-      new StringActivityParameter("pageId", "The Facebook page ID"),
-      new ObjectActivityParameter("target", "The targeting data"),
-      new StringActivityParameter("message", "The message to post", required = false),
-      new UriActivityParameter("linkUrl", "A link to include in the post", required = false),
-      new UriActivityParameter("photoUrl", "The URL of the photo to include in the post", required = false),
-      new EnumActivityParameter("action", "", List("validate", "publish"))
-    ), new StringActivityResult("the Facebook post ID if the action is \"publish\", otherwise ignore this value"))
+      new StringParameter("appId", "The Facebook app ID"),
+      new EncryptedParameter("appSecret", "The Facebook app secret"),
+      new EncryptedParameter("accessToken", "The Facebook access token"),
+      new EnumParameter("postType", "", List("link", "photo", "status update")),
+      new StringParameter("pageId", "The Facebook page ID"),
+      new ObjectParameter("target", "The targeting data"),
+      new StringParameter("message", "The message to post", required = false),
+      new UriParameter("linkUrl", "A link to include in the post", required = false),
+      new UriParameter("photoUrl", "The URL of the photo to include in the post", required = false),
+      new EnumParameter("action", "", List("validate", "publish"))
+    ), new StringResultType("the Facebook post ID if the action is \"publish\", otherwise ignore this value"))
   }
 
   /**
@@ -66,25 +66,25 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     }
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    withTaskHandling {
-      val appId = params[String]("appId")
-      val appSecret = params[String]("appSecret")
-      val accessToken = params[String]("accessToken")
-      val connection = new FacebookConnection(appId, appSecret, accessToken)
-      val postType = params[String]("postType")
-      val pageId = params[String]("pageId")
-      val target = createTarget(params[JsObject]("target"))
-      val message = params.getOrElse[String]("message", null)
-      lazy val linkUri = params.getOrElse[URI]("linkUrl", null)
-      lazy val photoUri = params.get[URI]("photoUrl")
-      lazy val photoBytes = getPhotoBytes(photoUri)
-      lazy val photoName = getPhotoName(photoUri)
-      val action = params[String]("action")
-      splog.info(s"Facebook poster was asked to $action a $postType. The page ID is $pageId.")
+    val appId = params[String]("appId")
+    val appSecret = params[String]("appSecret")
+    val accessToken = params[String]("accessToken")
+    val connection = new FacebookConnection(appId, appSecret, accessToken)
+    val postType = params[String]("postType")
+    val pageId = params[String]("pageId")
+    val target = createTarget(params[JsObject]("target"))
+    val message = params.getOrElse[String]("message", null)
+    lazy val linkUri = params.getOrElse[URI]("linkUrl", null)
+    lazy val photoUri = params.get[URI]("photoUrl")
+    lazy val photoBytes = getPhotoBytes(photoUri)
+    lazy val photoName = getPhotoName(photoUri)
+    val action = params[String]("action")
+    splog.info(s"Facebook poster was asked to $action a $postType. The page ID is $pageId.")
 
+    getSpecification.createResult(
       (action, postType) match {
         case ("validate", "link") => facebookAdapter.validateLinkPost(connection, pageId, target, linkUri.toString, message); "OK"
         case ("validate", "photo") => facebookAdapter.validatePhotoPost(connection, pageId, target, photoBytes, photoName, message); "OK"
@@ -94,7 +94,7 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
         case ("publish", "status update") => facebookAdapter.publishStatusUpdate(connection, pageId, target, message)
         case _ => throw new IllegalArgumentException(s"Invalid action or post type: $action $postType")
       }
-    }
+    )
   }
 
   // We'll use this in a couple of places to convert Ints to Integers so the Java libraries can use them.

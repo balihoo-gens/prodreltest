@@ -12,50 +12,49 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("subaccount", "The SendGrid subaccount username"),
-      new StringActivityParameter("firstName", "The first name from the participant's marketing address"),
-      new StringActivityParameter("lastName", "The last name from the participant's marketing address"),
-      new StringActivityParameter("address", "The street address from the participant's marketing address"),
-      new StringActivityParameter("city", "The city from the participant's marketing address"),
-      new StringActivityParameter("state", "The state from the participant's marketing address"),
-      new StringActivityParameter("zip", "The zip from the participant's marketing address"),
-      new StringActivityParameter("country", "The country from the participant's marketing address"),
-      new StringActivityParameter("phone", "The phone number from the participant's marketing address"),
-      new UriActivityParameter("webhookUrl", "The event notification webhook URL"),
-      new StringActivityParameter("webhookUsername", "The event notification webhook username"),
-      new EncryptedActivityParameter("webhookPassword", "The even notification webhook password"),
-      new Ipv4ActivityParameter("ipAddress", "The IP address SendGrid should use for sending email"),
-      new StringActivityParameter("whitelabel", "The SendGrid whitelabel for the subaccount")
-    ), new StringActivityResult("The subaccount name"))
+      new StringParameter("subaccount", "The SendGrid subaccount username"),
+      new StringParameter("firstName", "The first name from the participant's marketing address"),
+      new StringParameter("lastName", "The last name from the participant's marketing address"),
+      new StringParameter("address", "The street address from the participant's marketing address"),
+      new StringParameter("city", "The city from the participant's marketing address"),
+      new StringParameter("state", "The state from the participant's marketing address"),
+      new StringParameter("zip", "The zip from the participant's marketing address"),
+      new StringParameter("country", "The country from the participant's marketing address"),
+      new StringParameter("phone", "The phone number from the participant's marketing address"),
+      new UriParameter("webhookUrl", "The event notification webhook URL"),
+      new StringParameter("webhookUsername", "The event notification webhook username"),
+      new EncryptedParameter("webhookPassword", "The even notification webhook password"),
+      new Ipv4Parameter("ipAddress", "The IP address SendGrid should use for sending email"),
+      new StringParameter("whitelabel", "The SendGrid whitelabel for the subaccount")
+    ), new StringResultType("The subaccount name"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    withTaskHandling {
-      val subaccountUser = params[String]("subaccount")
-      val webhookUrl = params[URI]("webhookUrl").toURL
-      val webhookUsername = params[String]("webhookUsername")
-      val webhookPassword = params[String]("webhookPassword")
-      val ipAddress = params[String]("ipAddress")
-      val whitelabel = params[String]("whitelabel")
-      val credentials = sendGridAdapter.getCredentials(subaccountUser)
-      val subaccount = new SendGridSubaccount(
-        _credentials = credentials,
-        _firstName = params("firstName"),
-        _lastName = params("lastName"),
-        _address = params("address"),
-        _city = params("city"),
-        _state = params("state"),
-        _zip = params("zip"),
-        _country = params("country"),
-        _phone = params("phone"))
-      sendGridAdapter.updateProfile(subaccount)
-      sendGridAdapter.configureEventNotificationApp(subaccountUser, webhookUrl, webhookUsername, webhookPassword)
-      sendGridAdapter.setIpAddress(subaccountUser, ipAddress)
-      sendGridAdapter.setWhitelabel(subaccountUser, whitelabel)
-      subaccountUser
-    }
+    val subaccountUser = params[String]("subaccount")
+    val webhookUrl = params[URI]("webhookUrl").toURL
+    val webhookUsername = params[String]("webhookUsername")
+    val webhookPassword = params[String]("webhookPassword")
+    val ipAddress = params[String]("ipAddress")
+    val whitelabel = params[String]("whitelabel")
+    val credentials = sendGridAdapter.getCredentials(subaccountUser)
+    val subaccount = new SendGridSubaccount(
+      _credentials = credentials,
+      _firstName = params("firstName"),
+      _lastName = params("lastName"),
+      _address = params("address"),
+      _city = params("city"),
+      _state = params("state"),
+      _zip = params("zip"),
+      _country = params("country"),
+      _phone = params("phone"))
+    sendGridAdapter.updateProfile(subaccount)
+    sendGridAdapter.configureEventNotificationApp(subaccountUser, webhookUrl, webhookUsername, webhookPassword)
+    sendGridAdapter.setIpAddress(subaccountUser, ipAddress)
+    sendGridAdapter.setWhitelabel(subaccountUser, whitelabel)
+
+    getSpecification.createResult(subaccountUser)
   }
 }
 

@@ -35,7 +35,7 @@ object adwordsAdGroupCreator {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(Map(
+      val campaign = campaignCreator.getCampaign(new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       )))
@@ -43,7 +43,7 @@ object adwordsAdGroupCreator {
       val target =
         """{\"focus\" : \"interests\",\"interests\" : [\"Beauty & Fitness\",\"Books & Literature\"]}"""
 
-      val groupParams = new ActivityParameters(Map(
+      val groupParams = new ActivityArgs(Map(
         "name" -> "CPM AdGroup",
         "status" -> "ENABLED",
         "campaignId" -> s"${campaign.getId}",
@@ -73,13 +73,13 @@ object adwordsAdGroupSetInterests {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
       "channel" -> "DISPLAY"
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
 
-      val adgroupParams = new ActivityParameters(Map(
+      val adgroupParams = new ActivityArgs(Map(
         "name" -> "GROUP A",
         "campaignId" -> s"${campaign.getId}"
 
@@ -105,13 +105,13 @@ object adwordsAdGroupSetKeywords {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
 
-      val adgroupParams = new ActivityParameters(Map(
+      val adgroupParams = new ActivityArgs(Map(
         "name" -> "GROUP A",
         "campaignId" -> s"${campaign.getId}"
 
@@ -139,13 +139,13 @@ object adwordsAdGroupSetBidModifier {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
 
-      val adgroupParams = new ActivityParameters(Map(
+      val adgroupParams = new ActivityArgs(Map(
         "name" -> "GROUP A",
         "campaignId" -> s"${campaign.getId}"
 

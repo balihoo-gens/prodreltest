@@ -19,16 +19,16 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new StringActivityParameter("token", "some identifier to tie the chain together", required=false),
-        new IntegerActivityParameter("maxcount", "How many workflows to iterate", required=false),
-        new IntegerActivityParameter("multiply", "Exponential multiplication factor at each iteration", required=false),
-        new IntegerActivityParameter("count", "system: How manieth workflow this is", required=false),
-        new IntegerActivityParameter("submit_time", "system: the time this workflow was submitted", required=false),
-        new IntegerActivityParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", required=false)
-    ), new ObjectActivityResult("completed time and token"))
+        new StringParameter("token", "some identifier to tie the chain together", required=false),
+        new IntegerParameter("maxcount", "How many workflows to iterate", required=false),
+        new IntegerParameter("multiply", "Exponential multiplication factor at each iteration", required=false),
+        new IntegerParameter("count", "system: How manieth workflow this is", required=false),
+        new IntegerParameter("submit_time", "system: the time this workflow was submitted", required=false),
+        new IntegerParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", required=false)
+    ), new ObjectResultType("completed time and token"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
     val timeReceived = new DateTime(DateTimeZone.UTC)
     val countMax = params.getOrElse("maxcount", 1)
     val countPrevious = params.getOrElse("count", 0)
@@ -116,7 +116,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
     addDuration("Duration", durationLast)
     addDuration("Average Duration", durationAvg)
 
-    completeTask(Json.stringify(Json.toJson(result.toMap)))
+    getSpecification.createResult(result.toMap)
   }
 
   def uuid = java.util.UUID.randomUUID.toString

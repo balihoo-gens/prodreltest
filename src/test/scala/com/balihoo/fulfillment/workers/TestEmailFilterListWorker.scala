@@ -35,12 +35,12 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     }
     "fail task if pageSize param is missing" in new WithWorker {
       val params = Map("query" -> data.param_query, "source" -> data.param_source)
-      val activityParameter = new ActivityParameters(params)
+      val activityParameter = new ActivityArgs(params)
       Try(handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
     "fail task if pageSize param is invalid" in new WithWorker {
       val params = Map("query" -> data.param_query, "source" -> data.param_source, "pageSize" -> data.pageSizeInvalid)
-      val activityParameter = new ActivityParameters(params)
+      val activityParameter = new ActivityArgs(params)
       Try(handleTask(activityParameter)) must beFailedTry.withThrowable[IllegalArgumentException]
     }
     "fail task if non existing column in query" in new WithWorker {
@@ -53,7 +53,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       db_mock.getTableColumnNames(===(data.queryDefinition.getTableName)) returns data.param_select.fieldSet.map(_._1).toSet
 
       val params = Map("query" -> data.param_query_nonExisting_column, "source" -> data.param_source, "pageSize" -> data.param_pageSize)
-      val activityParameter = new ActivityParameters(params)
+      val activityParameter = new ActivityArgs(params)
       handleTask(activityParameter) must throwA[InvalidColumnException]
     }
     "complete task if db file downloaded from s3, query performed, csv files created and uploaded to s3" in new WithWorker {
@@ -92,11 +92,11 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       db_mock.pagedSelect(===(data.selectSql), ===(data.recordsCount), ===(data.param_pageSize)) returns pages
 
       // invocation
-      handleTask(data.activityParameter)
+      val result = handleTask(data.activityParameter)
 
       // verifications
       val expectedResult = Seq(data.csv_s3_uri1, data.csv_s3_uri2, data.csv_s3_uri3).map(_.toString)
-      test_complete_result must beEqualTo(JsArray(expectedResult.map(JsString)).toString())
+      result.result must beEqualTo(JsArray(expectedResult.map(JsString)))
 
       got {
 
@@ -161,21 +161,21 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val queryDefinition = QueryDefinition(param_select)
     val queryDefinitionWithSqlInjection = QueryDefinition(selectWithSqlInjection)
     val queryDefinitionWithEmptySql = QueryDefinition(selectWithEmptySql)
-    val param_query = new ActivityParameters(Map.empty, Json.obj("select" -> param_select).toString())
-    val param_queryInvalid = new ActivityParameters(Map.empty, Json.obj().toString())
-    val param_query_nonExisting_column = new ActivityParameters(Map.empty, Json.obj("select" -> Json.obj("nonExisting" -> Json.arr(), "id" -> "$v=5", "name" -> "$v like 'a%'")).toString())
+    val param_query = new ActivityArgs(Map.empty, Json.obj("select" -> param_select).toString())
+    val param_queryInvalid = new ActivityArgs(Map.empty, Json.obj().toString())
+    val param_query_nonExisting_column = new ActivityArgs(Map.empty, Json.obj("select" -> Json.obj("nonExisting" -> Json.arr(), "id" -> "$v=5", "name" -> "$v like 'a%'")).toString())
     val s3_bucket = "some.bucket"
     val db_s3_key = "long/key/some.db"
     val param_source = s"s3://$s3_bucket/$db_s3_key"
     val param_source_invalid = "://"
     val param_source_invalid_protocol = "http://some/uri"
     val param_pageSize = 4
-    val activityParameter = ActivityParameters("source" -> param_source, "query" -> param_query, "pageSize" -> param_pageSize)
-    val activityParameterQueryMissing = ActivityParameters("source" -> param_source, "pageSize" -> param_pageSize)
-    val activityParameterQueryInvalid = ActivityParameters("source" -> param_source, "query" -> param_queryInvalid, "pageSize" -> param_pageSize)
-    val activityParameterSourceMissing = ActivityParameters("query" -> param_query, "pageSize" -> param_pageSize)
-    val activityParameterSourceInvalidProtocol = ActivityParameters("source" -> param_source_invalid_protocol, "query" -> param_query, "pageSize" -> param_pageSize)
-    val activityParameterSourceInvalid = ActivityParameters("source" -> param_source_invalid, "query" -> param_query, "pageSize" -> param_pageSize)
+    val activityParameter = ActivityArgs("source" -> param_source, "query" -> param_query, "pageSize" -> param_pageSize)
+    val activityParameterQueryMissing = ActivityArgs("source" -> param_source, "pageSize" -> param_pageSize)
+    val activityParameterQueryInvalid = ActivityArgs("source" -> param_source, "query" -> param_queryInvalid, "pageSize" -> param_pageSize)
+    val activityParameterSourceMissing = ActivityArgs("query" -> param_query, "pageSize" -> param_pageSize)
+    val activityParameterSourceInvalidProtocol = ActivityArgs("source" -> param_source_invalid_protocol, "query" -> param_query, "pageSize" -> param_pageSize)
+    val activityParameterSourceInvalid = ActivityArgs("source" -> param_source_invalid, "query" -> param_query, "pageSize" -> param_pageSize)
     val db_s3_meta_filename = db_s3_key.split("/").last
     val db_file_path = "some/file"
     val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv"
@@ -207,8 +207,8 @@ class TestEmailFilterListWorker extends Specification with Mockito {
 
     /* hack into completeTask base worker to get result */
     var test_complete_result = ""
-    override def completeTask(result: String) = {
-      test_complete_result = result
+    override def completeTask(result: ActivityResult) = {
+      test_complete_result = result.serialize()
     }
 
     /* mocks */

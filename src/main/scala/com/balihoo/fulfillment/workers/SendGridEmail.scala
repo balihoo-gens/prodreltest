@@ -18,65 +18,64 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new ObjectActivityParameter("metadata", "An associative array of values that will appear in the event data"),
-      new StringActivityParameter("subaccount", "The SendGrid subaccount username"),
-      new UriActivityParameter("listUrl", "The S3 URL of the recipient list"),
-      new StringActivityParameter("subject", "The email subject"),
-      new EmailActivityParameter("fromAddress", "The from address"),
-      new StringActivityParameter("fromName", "The from name"),
-      new EmailActivityParameter("replyToAddress", "The reply-to address"),
-      new UriActivityParameter("bodyUrl", "The S3 URL of the file containing the email body"),
-      new DateTimeActivityParameter("sendTime", "The desired send time (< 24 hours in the future)"),
-      new StringActivityParameter("recipientIdHeading", "The heading of the recipientId column"),
-      new StringActivityParameter("emailHeading", "The heading of the email column")
-    ), new StringActivityResult("A success message that makes you feel good, but can be ignored"))
+      new ObjectParameter("metadata", "An associative array of values that will appear in the event data"),
+      new StringParameter("subaccount", "The SendGrid subaccount username"),
+      new UriParameter("listUrl", "The S3 URL of the recipient list"),
+      new StringParameter("subject", "The email subject"),
+      new EmailParameter("fromAddress", "The from address"),
+      new StringParameter("fromName", "The from name"),
+      new EmailParameter("replyToAddress", "The reply-to address"),
+      new UriParameter("bodyUrl", "The S3 URL of the file containing the email body"),
+      new DateTimeParameter("sendTime", "The desired send time (< 24 hours in the future)"),
+      new StringParameter("recipientIdHeading", "The heading of the recipientId column"),
+      new StringParameter("emailHeading", "The heading of the email column")
+    ), new StringResultType("A success message that makes you feel good, but can be ignored"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
-    withTaskHandling {
-      val credentials = sendGridAdapter.getCredentials(params("subaccount"))
-      val metadata = params[JsObject]("metadata")
-      val subject = params[String]("subject")
-      val fromAddress = params[String]("fromAddress")
-      val fromName = params[String]("fromName")
-      val replyToAddress = params[String]("replyToAddress")
-      val bodyUrl = params[URI]("bodyUrl")
-      val (bodyBucket, bodyKey) = S3Adapter.dissectS3Url(bodyUrl)
-      val sendTime = params[DateTime]("sendTime")
-      val recipientIdHeading = params[String]("recipientIdHeading")
-      val emailHeading = params[String]("emailHeading")
-      val listUrl = params[URI]("listUrl")
-      val (listBucket, listKey) = S3Adapter.dissectS3Url(listUrl)
 
-      // Retrieve the email body
-      val body = Try(s3Adapter.getObjectContentAsString(bodyBucket, bodyKey)) match {
-        case Success(s) => s
-        case Failure(e) => throw new SendGridException(s"Unable to get email body from $bodyUrl", e)
-      }
+    val credentials = sendGridAdapter.getCredentials(params("subaccount"))
+    val metadata = params[JsObject]("metadata")
+    val subject = params[String]("subject")
+    val fromAddress = params[String]("fromAddress")
+    val fromName = params[String]("fromName")
+    val replyToAddress = params[String]("replyToAddress")
+    val bodyUrl = params[URI]("bodyUrl")
+    val (bodyBucket, bodyKey) = S3Adapter.dissectS3Url(bodyUrl)
+    val sendTime = params[DateTime]("sendTime")
+    val recipientIdHeading = params[String]("recipientIdHeading")
+    val emailHeading = params[String]("emailHeading")
+    val listUrl = params[URI]("listUrl")
+    val (listBucket, listKey) = S3Adapter.dissectS3Url(listUrl)
 
-      // Define the email contents
-      val email = Email(fromAddress = fromAddress, fromName = fromName, replyToAddress = replyToAddress, subject = subject, body = body)
-
-      // Create a stream of recipient records and send the emails
-      try {
-        for (s3Meta <- managed(s3Adapter.getMeta(listBucket, listKey).get);
-             reader <- managed(new InputStreamReader(s3Meta.getContentStream))) {
-          val recipientCsv = csvAdapter.parseReaderAsStream(reader).get
-          processStream(recipientCsv)
-          try {
-            sendGridAdapter.sendEmail(credentials, metadata, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
-          } catch {
-            case e: Exception => throw new SendGridException("Error while sending email", e)
-          }
-        }
-      } catch {
-        case e: SendGridException => throw e
-        case e: Exception => throw new SendGridException(s"Unable to get recipient list from $listUrl", e)
-      }
-
-      "OK"
+    // Retrieve the email body
+    val body = Try(s3Adapter.getObjectContentAsString(bodyBucket, bodyKey)) match {
+      case Success(s) => s
+      case Failure(e) => throw new SendGridException(s"Unable to get email body from $bodyUrl", e)
     }
+
+    // Define the email contents
+    val email = Email(fromAddress = fromAddress, fromName = fromName, replyToAddress = replyToAddress, subject = subject, body = body)
+
+    // Create a stream of recipient records and send the emails
+    try {
+      for (s3Meta <- managed(s3Adapter.getMeta(listBucket, listKey).get);
+           reader <- managed(new InputStreamReader(s3Meta.getContentStream))) {
+        val recipientCsv = csvAdapter.parseReaderAsStream(reader).get
+        processStream(recipientCsv)
+        try {
+          sendGridAdapter.sendEmail(credentials, metadata, sendTime, email, recipientCsv, recipientIdHeading, emailHeading)
+        } catch {
+          case e: Exception => throw new SendGridException("Error while sending email", e)
+        }
+      }
+    } catch {
+      case e: SendGridException => throw e
+      case e: Exception => throw new SendGridException(s"Unable to get recipient list from $listUrl", e)
+    }
+
+    getSpecification.createResult("OK")
   }
 
   /**

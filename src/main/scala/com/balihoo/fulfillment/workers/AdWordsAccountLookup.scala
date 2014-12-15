@@ -12,21 +12,21 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new IntegerActivityParameter("parent", "Brand AdWords account ID"),
-      new StringActivityParameter("name", "Name of the Account")
-    ), new StringActivityResult("AdWords Account ID"))
+      new IntegerParameter("parent", "Brand AdWords account ID"),
+      new StringParameter("name", "Name of the Account")
+    ), new StringResultType("AdWords Account ID"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("Account Lookup", {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("Account Lookup", {
       adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
       val aname = params[String]("name")
       accountCreator.getAccount(params) match {
         case existing:ManagedCustomer =>
-          completeTask(String.valueOf(existing.getCustomerId))
+          getSpecification.createResult(String.valueOf(existing.getCustomerId))
         case _ =>
-          failTask(s"No account with name '$aname' was found!", "-")
+          throw new FailTaskException(s"No account with name '$aname' was found!", "-")
       }
     })
   }
