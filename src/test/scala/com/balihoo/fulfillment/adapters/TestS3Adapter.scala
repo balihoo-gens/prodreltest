@@ -55,7 +55,7 @@ class TestS3Adapter extends Specification with Mockito {
   "uploadStream" should {
     "return an URI if a aws putObject request succeeded" in new WithAdapter {
       val inputStreamMock = mock[InputStream]
-      val result = s3Adapter.uploadStream(data.key, is, 0, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
+      val result = uploadStream(data.key, inputStreamMock, 0, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
 
       result must beSuccessfulTry.withValue(new URI(s"s3://${data.bucket}/${data.key}"))
       there was one(client).putObject(any[PutObjectRequest])
@@ -64,7 +64,7 @@ class TestS3Adapter extends Specification with Mockito {
       val inputStreamMock = mock[InputStream]
       client.putObject(any[PutObjectRequest]) throws new AmazonClientException("damn")
 
-      val result = s3Adapter.uploadStream(data.key, is, 0, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
+      val result = uploadStream(data.key, inputStreamMock, 0, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
       result must beFailedTry.withThrowable[AmazonClientException]
     }
   }

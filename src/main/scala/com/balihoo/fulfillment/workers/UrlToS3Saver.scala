@@ -14,6 +14,7 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{Success, Failure, Try}
 import scala.collection.mutable.{Map => MutableMap}
+import play.api.libs.json._
 
 abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
@@ -41,26 +42,30 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
     withTaskHandling {
       val uriPromise = Promise[String]()
-
-      def processStream(code:Int, headers:Map[String,String], is:InputStream) = {
-        Try(headers("Content-Length").toInt) match {
-          case Success(len) => s3Adapter.uploadStream(s"$destinationS3Key/$target", is, len) match {
-            case Success(s3Uri) => uriPromise.success(s3Uri.toString)
-            case Failure(t) => uriPromise.failure(t)
-          }
-          case Failure(t) => uriPromise.failure(t)
-        }
-      }
-
       val url = params[URI]("url")
       val method = params[String]("method")
       val target = params[String]("target")
       val req = makeRequest(url, method)
 
+      def processStream(code:Int, headers:Map[String,String], is:InputStream) = {
+        code match {
+          case n if 200 until 300 contains n =>
+            Try(headers("Content-Length").toInt) match {
+              case Success(len) => s3Adapter.uploadStream(s"$destinationS3Key/$target", is, len) match {
+                case Success(s3Uri) => uriPromise.success(s3Uri.toString)
+                case Failure(t) => uriPromise.failure(t)
+              }
+              case Failure(t) => uriPromise.failure(t)
+            }
+          case _ => uriPromise.failure(new Exception("server returned $code"))
+        }
+      }
+
       if (params.has("headers")) {
-        Try(params.getOrElse("headers", Json.obj()).as[Map[String, String]]) match {
-          case Success(headers) => req.headers(headers)
-          case Failure(t) => throw new IllegalArgumentException("invalid header object", t)
+        params[JsObject]("headers").validate[Map[String, String]] match {
+          case headers:JsSuccess[Map[String, String]] =>
+            req.headers(headers.get)
+          case _ => throw new IllegalArgumentException("invalid header object")
         }
       }
 
