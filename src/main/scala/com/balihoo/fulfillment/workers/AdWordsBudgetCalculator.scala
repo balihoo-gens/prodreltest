@@ -19,11 +19,11 @@ abstract class AbstractAdWordsBudgetCalculator extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = budgetCalculator.getSpecification
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("Budget Calculation", {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("Budget Calculation", {
       adWordsAdapter.setClientId(params[String]("account"))
 
-      completeTask(Json.stringify(budgetCalculator.computeDailyBudget(params)))
+      getSpecification.createResult(Json.stringify(budgetCalculator.computeDailyBudget(params)))
     })
   }
 }
@@ -47,19 +47,25 @@ trait BudgetCalculatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("account", "Participant AdWords account ID"),
-        new StringActivityParameter("campaignId", "AdWords Campaign ID"),
-        new NumberActivityParameter("budget", "The target spend for the period from startDate to endDate"),
-        new DateTimeActivityParameter("startDate", "The first date of the budget period"),
-        new DateTimeActivityParameter("today", "Expected to be within startDate and endDate"),
-        new DateTimeActivityParameter("endDate", "The last date of the budget period"),
-        new EnumsActivityParameter("adschedule", "Days of the week for spend", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun"))
-      ), new ObjectActivityResult("Results of budget calcuations. Including the amount that must be spent per-remaining schedule day to spend the entire budget."),
+        new StringParameter("account", "Participant AdWords account ID"),
+        new StringParameter("campaignId", "AdWords Campaign ID"),
+        new NumberParameter("budget", "The target spend for the period from startDate to endDate"),
+        new DateTimeParameter("startDate", "The first date of the budget period"),
+        new DateTimeParameter("today", "Expected to be within startDate and endDate"),
+        new DateTimeParameter("endDate", "The last date of the budget period"),
+        new EnumsParameter("adschedule", "Days of the week for spend", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun"))
+      ), new ObjectResultType("Results of budget calcuations", Map(
+        "futureScheduleDays" -> new ArrayResultType("List of future dates in the schedule", new DateTimeResultType("Schedule date")),
+        "futureScheduleDaysCount" -> new IntegerResultType("Count of futureScheduleDays"),
+        "budgetSpent" -> new NumberResultType("The budget spent between startDate and today"),
+        "budgetRemaining" -> new NumberResultType("The budget - budgetSpent"),
+        "dailyBudget" -> new NumberResultType("budgetRemaining / futureScheduleDaysCount")
+        )),
         "https://docs.google.com/a/balihoo.com/presentation/d/13ZZaIxekgcpFY5G4gTeSCu49V2liMyP8-0NwEyFr1q8/edit?usp=sharing"
       )
     }
 
-    def computeDailyBudget(params:ActivityParameters):JsObject = {
+    def computeDailyBudget(params:ActivityArgs):JsObject = {
 
       val campaignId = params[String]("campaignId")
       val startDate = params[DateTime]("startDate")

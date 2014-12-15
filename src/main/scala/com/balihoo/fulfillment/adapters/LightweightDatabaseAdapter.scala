@@ -34,6 +34,7 @@ trait LightweightDatabaseAdapterComponent {
       val pages = if (totalCount >= pageSize) totalCount / pageSize else 0
       if (hasRemaining) pages + 1 else pages
     }
+
   }
 
   /**
@@ -82,6 +83,10 @@ trait LightweightDatabaseAdapterComponent {
      */
     def isClosed: Boolean
 
+    /**
+     * @return a set of column names for the specified table.
+     */
+    def getTableColumnNames(tableName: String): Set[String]
   }
 
   /**
@@ -125,7 +130,7 @@ trait LightweightDatabaseAdapterComponent {
 
     val orderByChecker = "(order[ ]+by)".r
 
-    private def newStatement() = {
+    protected def newStatement() = {
       val stmt = connection.createStatement()
       stmt.setQueryTimeout(30) // 30 sec. timeout
       stmt.closeOnCompletion()
@@ -263,6 +268,20 @@ trait SQLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdapt
 
   private[this] class SQLiteLightweightDatabase(connection: Connection)
     extends JdbcLightweightDatabase(connection, splog) {
+
+    override def getTableColumnNames(tableName: String): Set[String] = {
+      val statement = newStatement()
+      val columns = collection.mutable.Set[String]()
+      try {
+        val columnsResultSet = statement.executeQuery(s"""PRAGMA table_info("$tableName")""")
+        while (columnsResultSet.next()) {
+          columns += columnsResultSet.getString(2)
+        }
+      } finally {
+        statement.close()
+      }
+      columns.toSet
+    }
 
     def optimize() = {
       execute("PRAGMA synchronous = OFF")

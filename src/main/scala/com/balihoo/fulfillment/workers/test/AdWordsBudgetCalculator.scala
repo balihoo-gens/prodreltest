@@ -39,7 +39,7 @@ object adWordsCalculateBudget {
       "name" -> "CT-13:AFFID-410851",
       "channel" -> "DISPLAY"
       )
-      val campaign = campaignCreator.getCampaign(new ActivityParameters(campaignParams))
+      val campaign = campaignCreator.getCampaign(new ActivityArgs(campaignParams))
 
 
       val budgetCalcParams = Json.obj(
@@ -52,7 +52,7 @@ object adWordsCalculateBudget {
         "adschedule" -> List("Mon", "Tue", "Fri")
       )
 
-      val budget = budgetCalculator.computeDailyBudget(budgetCalculator.getSpecification.getParameters(budgetCalcParams))
+      val budget = budgetCalculator.computeDailyBudget(budgetCalculator.getSpecification.getArgs(budgetCalcParams))
 
       println(budget)
     }

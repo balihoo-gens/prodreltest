@@ -18,8 +18,8 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
     campaignCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("Campaign Processor", {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("Campaign Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val campaign = campaignCreator.getCampaign(params) match {
@@ -29,7 +29,7 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
           campaignCreator.createCampaign(params)
       }
 
-      completeTask(String.valueOf(campaign.getId))
+      getSpecification.createResult(String.valueOf(campaign.getId))
     })
   }
 }
@@ -48,33 +48,39 @@ trait BudgetCreatorComponent {
   abstract class AbstractBudgetCreator {
     this: AdWordsAdapterComponent =>
 
-    def getBudget(name: String): Budget = {
+    def getBudget(campaignName: String, amount: Float): Budget = {
 
-      val context = s"getBudget(name='$name')"
+      val context = s"getBudget(name='$campaignName')"
 
       val selector = new SelectorBuilder()
         .fields("BudgetId")
-        .equals("BudgetName", name)
+        .equals("BudgetName", campaignName)
         .build()
 
       adWordsAdapter.withErrorsHandled[Budget](context, {
         val page = adWordsAdapter.budgetService.get(selector)
         page.getTotalNumEntries.intValue() match {
-          case 0 => null
-          case 1 => page.getEntries(0)
-          case _ => throw new Exception(s"Budget name $name is ambiguous!")
+          case 0 => createBudget(campaignName, amount)
+          case 1 =>
+            val existing = page.getEntries(0)
+            val microDollars = adWordsAdapter.dollarsToMicros(amount)
+            if(existing.getAmount.getMicroAmount != microDollars) {
+              updateBudget(existing, microDollars)
+            } else {
+              existing
+            }
+          case _ => throw new Exception(s"Budget name $campaignName is ambiguous!")
         }
       })
     }
 
-    def createBudget(name:String, amount:Float): Budget = {
-      val context = s"getCampaign(name='$name', amount='$amount'"
+    def createBudget(campaignName:String, amount:Float): Budget = {
 
       val budget = new Budget()
       val money = new Money()
       money.setMicroAmount(adWordsAdapter.dollarsToMicros(amount))
       budget.setAmount(money)
-      budget.setName(name)
+      budget.setName(campaignName)
       budget.setDeliveryMethod(BudgetBudgetDeliveryMethod.STANDARD)
       budget.setPeriod(BudgetBudgetPeriod.DAILY)
       //    budget.setIsExplicitlyShared(true)
@@ -83,7 +89,22 @@ trait BudgetCreatorComponent {
       operation.setOperand(budget)
       operation.setOperator(Operator.ADD)
 
-      adWordsAdapter.withErrorsHandled[Budget](context, {
+      adWordsAdapter.withErrorsHandled[Budget](s"Creating budget ${budget.getName}", {
+        adWordsAdapter.budgetService.mutate(Array(operation)).getValue(0)
+      })
+    }
+
+    def updateBudget(budget:Budget, micros:Long): Budget = {
+
+      val money = new Money()
+      money.setMicroAmount(micros)
+      budget.setAmount(money)
+
+      val operation = new BudgetOperation()
+      operation.setOperand(budget)
+      operation.setOperator(Operator.SET)
+
+      adWordsAdapter.withErrorsHandled[Budget](s"Updating budget ${budget.getName}", {
         adWordsAdapter.budgetService.mutate(Array(operation)).getValue(0)
       })
     }
@@ -105,25 +126,33 @@ trait CampaignCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("account", "Participant AdWords account ID"),
-        new StringActivityParameter("name", "Name of the Campaign"),
-        new EnumActivityParameter("channel", "The advertising channel", List("SEARCH", "DISPLAY", "SHOPPING")),
-        new NumberActivityParameter("budget", "The monthly budget"),
-        new EnumActivityParameter("status", "Always ACTIVE on Campaign creation", List("ACTIVE", "PAUSED", "DELETED"), required=false),
-        new DateTimeActivityParameter("startDate", "First day the campaign will run. Ignored on update."),
-        new DateTimeActivityParameter("endDate", "Last day the campaign will run"),
-        new StringsActivityParameter("targetzips", "An array of zip codes"),
-        new EnumsActivityParameter("adschedule", "Days of the week to run ads", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun")),
-        new StringActivityParameter("street address", "LocationExtension: Street address line 1", required=false),
-        new StringActivityParameter("city", "LocationExtension: Name of the city", required=false),
-        new StringActivityParameter("postal code", "LocationExtension: Postal code", required=false),
-        new StringActivityParameter("country code", "LocationExtension: Country code", required=false),
-        new StringActivityParameter("company name", "LocationExtension(Optional): The name of the company located at the given address.", required=false, maxLength = Some(80), minLength = Some(1)),
-        new StringActivityParameter("phone number", "LocationExtension(Optional): The phone number for the location", required=false)
-      ), new StringActivityResult("AdWords Campaign ID"))
+        new StringParameter("account", "Participant AdWords account ID"),
+        new StringParameter("name", "Name of the Campaign"),
+        new EnumParameter("channel", "The advertising channel", List("SEARCH", "DISPLAY", "SHOPPING")),
+        new NumberParameter("budget", "The monthly budget"),
+        new EnumParameter("status", "Always PAUSED on Campaign creation", List("ACTIVE", "PAUSED", "DELETED"), required=false),
+        new DateTimeParameter("startDate", "First day the campaign will run. Ignored on update."),
+        new DateTimeParameter("endDate", "Last day the campaign will run"),
+        new StringsParameter("targetzips", "An array of zip codes", required=false),
+        new ObjectParameter("proximity", "A proximity is an area within a certain radius of a point with the center point being described by a lat/lon pair", properties=List(
+          new NumberParameter("lat", "Latitude in micro-degrees"),
+          new NumberParameter("lon", "Longitude in micro-degrees"),
+          new NumberParameter("radius", "Distance from lat/lon point"),
+          new EnumParameter("radiusUnits", "", List("MILES", "KILOMETERS"))
+        ), required = false),
+        new EnumsParameter("adschedule", "Days of the week to run ads", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun")),
+        new ObjectParameter("location", "Location Extension information", properties=List(
+          new StringParameter("street address", "Street address line 1"),
+          new StringParameter("city", "Name of the city"),
+          new StringParameter("postal code", "Postal code"),
+          new StringParameter("country code", "Country code"),
+          new StringParameter("company name", "The name of the company located at the given address.", required=false, maxLength = Some(80), minLength = Some(1)),
+          new StringParameter("phone number", "The phone number for the location", required=false)
+        ), required = false)
+      ), new StringResultType("AdWords Campaign ID"))
     }
 
-    def getCampaign(params: ActivityParameters):Campaign = {
+    def getCampaign(params: ActivityArgs):Campaign = {
 
       val name = params[String]("name")
       val channel = params[String]("channel")
@@ -164,28 +193,21 @@ trait CampaignCreatorComponent {
       })
     }
 
-    def createCampaign(params:ActivityParameters):Campaign = {
+    def createCampaign(params:ActivityArgs):Campaign = {
 
       val name = params[String]("name")
       val channel = params[String]("channel")
       val context = s"createCampaign(name='$name', channel='$channel')"
 
       val budgetName = s"$name Budget"
-      val budget:Budget = budgetCreator.getBudget(budgetName) match {
-        case b:Budget => b
-        case _ =>
-          budgetCreator.createBudget(budgetName, params[Float]("budget"))
-      }
-
-      val campaignBudget = new Budget()
-      campaignBudget.setBudgetId(budget.getBudgetId)
+      val budget = budgetCreator.getBudget(budgetName, params[Float]("budget"))
 
       val campaign = new Campaign()
       campaign.setName(name)
       campaign.setAdvertisingChannelType(AdvertisingChannelType.fromString(channel))
 
-      campaign.setStatus(CampaignStatus.ENABLED)
-      campaign.setBudget(campaignBudget)
+      campaign.setStatus(CampaignStatus.PAUSED)
+      campaign.setBudget(budget)
 
       if(params.has("startDate")) {
         campaign.setStartDate(params[DateTime]("startDate").toString("YYYYMMdd"))
@@ -231,14 +253,52 @@ trait CampaignCreatorComponent {
         adWordsAdapter.campaignService.mutate(Array(operation)).getValue(0)
       })
 
-      setTargetZips(madeCampaign, params("targetzips"))
-      setAdSchedule(madeCampaign, params("adschedule"))
+      processCampaignCriterion(campaign, params)
+
+      if(params.has("location")) {
+        setLocationExtension(campaign, params[ActivityArgs]("location"))
+      }
       madeCampaign
     }
 
-    def updateCampaign(campaign: Campaign, params: ActivityParameters) = {
+    def processCampaignCriterion(campaign:Campaign, params:ActivityArgs) = {
 
-      val context = s"updateCampaign(name='${campaign.getName}')"
+      val existingCriterion =
+        if(campaign.getId > 0)
+          _getExistingCampaignCriterion(campaign)
+        else
+          new CampaignCriterionPage()
+
+      val newCampaignCriterionOperations = collection.mutable.ArrayBuffer[CampaignCriterionOperation]()
+
+      if(params.has("targetzips")) {
+        newCampaignCriterionOperations ++= targetZipsOps(campaign, params[List[String]]("targetzips"), existingCriterion)
+      }
+      if(params.has("proximity")) {
+        newCampaignCriterionOperations ++= proximityOps(campaign, params[ActivityArgs]("proximity"), existingCriterion)
+      }
+      if(params.has("adschedule")) {
+        newCampaignCriterionOperations ++= adScheduleOps(campaign, params("adschedule"), existingCriterion)
+      }
+
+      adWordsAdapter.withErrorsHandled[Any]("processing Campaign Criterion", {
+        adWordsAdapter.campaignCriterionService.mutate(newCampaignCriterionOperations.toArray)
+      })
+    }
+
+    def updateCampaign(campaign: Campaign, params: ActivityArgs) = {
+
+      processCampaignCriterion(campaign, params)
+
+      if(params.has("location")) {
+        setLocationExtension(campaign, params[ActivityArgs]("location"))
+      }
+
+      if(params.has("budget")) {
+        val budgetName = s"${campaign.getName} Budget"
+        val budget = budgetCreator.getBudget(budgetName, params[Float]("budget"))
+        campaign.setBudget(budget)
+      }
 
       if(params.has("status")) {
         campaign.setStatus(CampaignStatus.fromString(params("status")))
@@ -246,23 +306,14 @@ trait CampaignCreatorComponent {
       if(params.has("endDate")) {
         campaign.setEndDate(params[DateTime]("endDate").toString("YYYYMMdd"))
       }
-      if(params.has("targetzips")) {
-        setTargetZips(campaign, params[List[String]]("targetzips"))
-      }
-      if(params.has("adschedule")) {
-        setAdSchedule(campaign, params("adschedule"))
-      }
-      if(params.has("street address")) {
-        setLocationExtension(campaign, params)
-      }
-
       val operation = new CampaignOperation()
       operation.setOperand(campaign)
       operation.setOperator(Operator.SET)
 
-      adWordsAdapter.withErrorsHandled[Campaign](context, {
+      adWordsAdapter.withErrorsHandled[Campaign](s"updateCampaign(name='${campaign.getName}')", {
         adWordsAdapter.campaignService.mutate(Array(operation)).getValue(0)
       })
+
     }
 
     def lookupLocationsByZips(zips:Seq[String]):Array[LocationCriterion] = {
@@ -314,9 +365,20 @@ trait CampaignCreatorComponent {
       ret.toArray
     }
 
-    def setTargetZips(campaign:Campaign, zips:Seq[String]) = {
+    protected def _getExistingCampaignCriterion(campaign:Campaign):CampaignCriterionPage = {
 
-      val context = s"Setting target zips for campaign ${campaign.getId}"
+      // First we query the existing criteria
+      val existingSelector = new SelectorBuilder()
+        .fields("Id")
+        .equals("CampaignId", String.valueOf(campaign.getId))
+        .build()
+
+      adWordsAdapter.withErrorsHandled[CampaignCriterionPage]("Fetching existing Campaign criterion", {
+        adWordsAdapter.campaignCriterionService.get(existingSelector)
+      })
+    }
+
+    def targetZipsOps(campaign:Campaign, zips:Seq[String], existingCriterion:CampaignCriterionPage):Array[CampaignCriterionOperation] = {
 
       val newLocationCriteria = lookupLocationsByZips(zips)
       if(newLocationCriteria.length == 0) {
@@ -325,16 +387,7 @@ trait CampaignCreatorComponent {
 
       val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
-      // First we query the existing zips
-      val existingSelector = new SelectorBuilder()
-        .fields("Id")
-        .equals("CampaignId", String.valueOf(campaign.getId))
-        .build()
-
-      val existingZips = adWordsAdapter.withErrorsHandled[CampaignCriterionPage]("Fetching existing Campaign criterion", {
-        adWordsAdapter.campaignCriterionService.get(existingSelector)
-      })
-      for(page <- existingZips.getEntries) {
+      for(page <- existingCriterion.getEntries) {
         page.getCriterion match {
           case location: Location =>
             // Create operations to REMOVE the existing zips
@@ -362,25 +415,56 @@ trait CampaignCreatorComponent {
         operations += operation
       }
 
-      adWordsAdapter.withErrorsHandled[Any](context, {
-        adWordsAdapter.campaignCriterionService.mutate(operations.toArray)
-      })
+      operations.toArray
     }
 
-    def setAdSchedule(campaign:Campaign, schedule:Seq[String]) = {
-
-      val context = s"setAdSchedule(campaignId='${campaign.getId}', schedule='$schedule')"
+    def proximityOps(campaign:Campaign, proximityParams:ActivityArgs, existingCriterion:CampaignCriterionPage):Array[CampaignCriterionOperation] = {
 
       val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
-      // First we query the existing schedule
-      val selector = new SelectorBuilder()
-        .fields("Id")
-        .equals("CampaignId", String.valueOf(campaign.getId))
-        .build()
+      for(page <- existingCriterion.getEntries) {
+        page.getCriterion match {
+          case proximity: Proximity =>
+            // Create operations to REMOVE the existing proximities
+            val campaignCriterion = new CampaignCriterion()
+            campaignCriterion.setCampaignId(campaign.getId)
+            campaignCriterion.setCriterion(proximity)
 
-      val existingSchedule:CampaignCriterionPage = adWordsAdapter.campaignCriterionService.get(selector)
-      for(page <- existingSchedule.getEntries) {
+            val operation = new CampaignCriterionOperation()
+            operation.setOperand(campaignCriterion)
+            operation.setOperator(Operator.REMOVE)
+            operations += operation
+          case _ =>
+        }
+      }
+
+      val proximity = new Proximity()
+      proximity.setGeoPoint(
+        new GeoPoint(
+          (proximityParams[Double]("lat") * 1E6).toInt,
+          (proximityParams[Double]("lon") * 1E6).toInt
+      ))
+      proximity.setRadiusDistanceUnits(ProximityDistanceUnits.fromString(proximityParams[String]("radiusUnits")))
+      proximity.setRadiusInUnits(proximityParams[Double]("radius"))
+
+      val campaignCriterion = new CampaignCriterion()
+      campaignCriterion.setCampaignId(campaign.getId)
+      campaignCriterion.setCriterion(proximity)
+
+      val operation = new CampaignCriterionOperation()
+      operation.setOperand(campaignCriterion)
+      operation.setOperator(Operator.ADD)
+      operations += operation
+
+      operations.toArray
+    }
+
+
+    def adScheduleOps(campaign:Campaign, schedule:Seq[String], existingCriterion:CampaignCriterionPage):Array[CampaignCriterionOperation] = {
+
+      val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
+
+      for(page <- existingCriterion.getEntries) {
         page.getCriterion match {
           case adSchedule: AdSchedule =>
             // Create operations to REMOVE the existing schedule entries
@@ -396,6 +480,15 @@ trait CampaignCreatorComponent {
         }
       }
 
+      val shortToDayOfWeek = Map(
+        "Mon" -> DayOfWeek.MONDAY,
+        "Tue" -> DayOfWeek.TUESDAY,
+        "Wed" -> DayOfWeek.WEDNESDAY,
+        "Thu" -> DayOfWeek.THURSDAY,
+        "Fri" -> DayOfWeek.FRIDAY,
+        "Sat" -> DayOfWeek.SATURDAY,
+        "Sun" -> DayOfWeek.SUNDAY)
+
       // Now create operations to add the new schedule days
       for(day <- schedule) {
         val dayOfWeek = new AdSchedule()
@@ -403,25 +496,7 @@ trait CampaignCreatorComponent {
         dayOfWeek.setStartMinute(MinuteOfHour.ZERO)
         dayOfWeek.setEndHour(24)
         dayOfWeek.setEndMinute(MinuteOfHour.ZERO)
-        day match {
-          case "Mon" =>
-            dayOfWeek.setDayOfWeek(DayOfWeek.MONDAY)
-          case "Tue" =>
-            dayOfWeek.setDayOfWeek(DayOfWeek.TUESDAY)
-          case "Wed" =>
-            dayOfWeek.setDayOfWeek(DayOfWeek.WEDNESDAY)
-          case "Thu" =>
-            dayOfWeek.setDayOfWeek(DayOfWeek.THURSDAY)
-          case "Fri" =>
-            dayOfWeek.setDayOfWeek(DayOfWeek.FRIDAY)
-          case "Sat" =>
-            dayOfWeek.setDayOfWeek(DayOfWeek.SATURDAY)
-          case "Sun" =>
-            dayOfWeek.setDayOfWeek(DayOfWeek.SUNDAY)
-          case _ =>
-            // TODO Should we throw an exception!?
-            dayOfWeek.setDayOfWeek(DayOfWeek.MONDAY)
-        }
+        dayOfWeek.setDayOfWeek(shortToDayOfWeek(day))
 
         val campaignCriterion = new CampaignCriterion()
         campaignCriterion.setCampaignId(campaign.getId)
@@ -433,12 +508,10 @@ trait CampaignCreatorComponent {
         operations += operation
       }
 
-      adWordsAdapter.withErrorsHandled[Any](context, {
-        adWordsAdapter.campaignCriterionService.mutate(operations.toArray)
-      })
+      operations.toArray
     }
 
-    def setLocationExtension(campaign:Campaign, params:ActivityParameters) = {
+    def setLocationExtension(campaign:Campaign, params:ActivityArgs) = {
 
       val address = new Address()
       address.setStreetAddress(params[String]("street address"))
@@ -496,7 +569,7 @@ trait CampaignCreatorComponent {
       })
     }
 
-    def _addLocationExtension(campaign:Campaign, address:Address, params:ActivityParameters) = {
+    def _addLocationExtension(campaign:Campaign, address:Address, params:ActivityArgs) = {
 
       val geoLocationSelector = new GeoLocationSelector()
       geoLocationSelector.setAddresses(Array(address))

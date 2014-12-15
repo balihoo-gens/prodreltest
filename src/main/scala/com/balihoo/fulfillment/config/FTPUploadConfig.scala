@@ -8,7 +8,7 @@ trait FTPUploadConfigComponent {
   def ftpUploadConfig: AbstractFTPUploadConfig with PropertiesLoaderComponent
 }
 
-abstract class AbstractFTPUploadConfig(params: ActivityParameters) {
+abstract class AbstractFTPUploadConfig(params: ActivityArgs) {
   this: PropertiesLoaderComponent =>
 
   val sourceUrl = params[URI]("sourceUrl").toURL
@@ -20,7 +20,7 @@ abstract class AbstractFTPUploadConfig(params: ActivityParameters) {
   val ftpFilename = params[String]("ftpFilename")
 }
 
-class FTPUploadConfig(params: ActivityParameters, cfg: PropertiesLoader)
+class FTPUploadConfig(params: ActivityArgs, cfg: PropertiesLoader)
   extends AbstractFTPUploadConfig(params)
   with PropertiesLoaderComponent {
 
@@ -30,13 +30,13 @@ class FTPUploadConfig(params: ActivityParameters, cfg: PropertiesLoader)
 object FTPUploadConfig {
   def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new UriActivityParameter("sourceUrl", "The URL of the file to be uploaded"),
-      new HostnameActivityParameter("ftpHost", "The destination host name"),
-      new IntegerActivityParameter("ftpPort", "The destination port number (default = 21)", required = false),
-      new StringActivityParameter("ftpUsername", "The username for the destination FTP server"),
-      new EncryptedActivityParameter("ftpPassword", "The password for the destination FTP server"),
-      new StringActivityParameter("ftpDirectory", "The destination directory (default = \"/\")", required = false),
-      new StringActivityParameter("ftpFilename", "The destination filename")
-    ), new StringActivityResult("A status message"))
+      new UriParameter("sourceUrl", "The URL of the file to be uploaded"),
+      new HostnameParameter("ftpHost", "The destination host name"),
+      new IntegerParameter("ftpPort", "The destination port number (default = 21)", required = false),
+      new StringParameter("ftpUsername", "The username for the destination FTP server"),
+      new EncryptedParameter("ftpPassword", "The password for the destination FTP server"),
+      new StringParameter("ftpDirectory", "The destination directory (default = \"/\")", required = false),
+      new StringParameter("ftpFilename", "The destination filename")
+    ), new StringResultType("A status message"))
   }
 }

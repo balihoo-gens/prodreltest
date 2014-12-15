@@ -32,7 +32,7 @@ object adWordsCampaignCreator {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
          "name" -> "test campaign",
           "channel" -> "DISPLAY",
           "budget" -> "11",
@@ -65,12 +65,12 @@ object adWordsLocationCriterion {
 
       val zipString = List("53001", "53002", "90210")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
          "name" -> "fulfillment Campaign",
           "channel" -> "DISPLAY"
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
-      campaignCreator.setTargetZips(campaign, zipString)
+//      val ops = campaignCreator.targetZipsOps(campaign, zipString)
     }
   }
 }
@@ -90,12 +90,12 @@ object adWordsSchedule {
 
       val scheduleString = List("T", "Th")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       ))
       val campaign = campaignCreator.getCampaign(campaignParams)
-      campaignCreator.setAdSchedule(campaign, scheduleString)
+//      campaignCreator.adScheduleOps(campaign, scheduleString)
     }
   }
 }
@@ -170,20 +170,49 @@ object adWordsAddress {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       ))
 
       val campaign = campaignCreator.getCampaign(campaignParams)
 
-      val locationExtension = new ActivityParameters(Map(
+      val locationExtension = new ActivityArgs(Map(
         "city" -> "Boise",
         "street address" -> "6700 W Fairview Ave",
         "postal code" -> "83704",
         "country code" -> "US"
       ))
       campaignCreator.setLocationExtension(campaign, locationExtension)
+    }
+  }
+}
+
+object adWordsProximity {
+  def main(args: Array[String]) {
+    val cfg = PropertiesLoader(args, "adwords_campaignprocessor")
+    val test = new TestProximity(cfg)
+    test.run
+  }
+
+  class TestProximity(cfg: PropertiesLoader) extends CampaignTest(cfg) {
+
+    def run = {
+      adWordsAdapter.setValidateOnly(false)
+      adWordsAdapter.setClientId("100-019-2687")
+
+      val campaignParams = new ActivityArgs(Map(
+        "name" -> "fulfillment Campaign",
+        "channel" -> "DISPLAY",
+        "proximity" -> new ActivityArgs(Map(
+          "lat" -> 33.8090, // Disneyland
+          "lon" -> -117.9190,
+          "radius" -> 15.0,
+          "radiusUnits" -> "MILES"
+        ))
+      ))
+      val campaign = campaignCreator.getCampaign(campaignParams)
+      campaignCreator.updateCampaign(campaign, campaignParams)
     }
   }
 }

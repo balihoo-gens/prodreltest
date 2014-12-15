@@ -127,12 +127,12 @@ abstract class AbstractGeoNamesTimeZoneRetriever extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("lat", ""),
-      new StringActivityParameter("lon", "")
-    ), new StringActivityResult("Timezone like (America/Denver)"))
+      new StringParameter("lat", ""),
+      new StringParameter("lon", "")
+    ), new StringResultType("Timezone like (America/Denver)"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
 
     val lat = params[String]("lat")
     val lon = params[String]("lon")
@@ -145,7 +145,9 @@ abstract class AbstractGeoNamesTimeZoneRetriever extends FulfillmentWorker {
       throw new Exception(results+" does not contain 'timezoneId'")
     }
 
-    completeTask(translateZone(jresults.value("timezoneId").as[String]))
+    getSpecification.createResult(
+      jresults ++ Json.obj("timezoneIdTranslated" -> translateZone(jresults.value("timezoneId").as[String])))
+
   }
 
   def latLonToTimeZone(lat:String, lon:String) = {
@@ -162,7 +164,7 @@ abstract class AbstractGeoNamesTimeZoneRetriever extends FulfillmentWorker {
     IOUtils.toString(response.getEntity.getContent)
   }
 
-  def translateZone(zone:String) = {
+  def translateZone(zone:String):String = {
     translator.getOrElse(zone, zone)
   }
 

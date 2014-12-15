@@ -115,13 +115,13 @@ abstract class AbstractAdWordsAdapter {
           }
         }
         throw new Exception(s"${errors.length} Errors!: " + errors.mkString("\n"))
-      case e:Exception =>
-        e.getMessage match {
-          case null =>
-            throw new Exception(s"Exception during $context :${e.getStackTraceString take 150}", e)
-          case _ =>
-            throw new Exception(s"Exception during $context :${e.getMessage}", e)
-        }
+//      case e:Exception =>
+//        e.getMessage match {
+//          case null =>
+//            throw new Exception(s"Exception during $context :${e.getStackTraceString take 150}", e)
+//          case _ =>
+//            throw new Exception(s"Exception during $context :${e.getMessage}", e)
+//        }
     }
   }
 
@@ -187,6 +187,7 @@ object AdWordsPolicy {
     if(dispHost != destHost) {
       throw new Exception(s"Domains for destination and display URLs must match! ($destHost =/= $dispHost)")
     }
+    true
   }
 
   def fixUpperCaseViolations(text:String):String = {

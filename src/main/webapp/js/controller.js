@@ -50,6 +50,48 @@ app.directive('autofocus', function ($timeout) {
     };
 });
 
+app.factory('RecursionHelper', ['$compile', function($compile){
+    return {
+        /**
+         * Manually compiles the element, fixing the recursion loop.
+         * @param element
+         * @param [link] A post-link function, or an object with function(s) registered via pre and post properties.
+         * @returns An object containing the linking functions.
+         */
+        compile: function(element, link){
+            // Normalize the link parameter
+            if(angular.isFunction(link)){
+                link = { post: link };
+            }
+
+            // Break the recursion loop by removing the contents
+            var contents = element.contents().remove();
+            var compiledContents;
+            return {
+                pre: (link && link.pre) ? link.pre : null,
+                /**
+                 * Compiles and re-adds the contents
+                 */
+                post: function(scope, element){
+                    // Compile the contents
+                    if(!compiledContents){
+                        compiledContents = $compile(contents);
+                    }
+                    // Re-add the compiled contents to the element
+                    compiledContents(scope, function(clone){
+                        element.append(clone);
+                    });
+
+                    // Call the post-linking function, if any
+                    if(link && link.post){
+                        link.post.apply(null, arguments);
+                    }
+                }
+            };
+        }
+    };
+}]);
+
 app.factory('environment', function() {
     return {};
 });
@@ -150,7 +192,7 @@ app.factory('formatUtil', function() {
 
     function _formatURLs(param) {
         if(param === null) { return ""; }
-
+        if(param === undefined) { return ""; }
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
 
         return param.replace(urlRegex, function (url) {
@@ -191,12 +233,8 @@ app.factory('formatUtil', function() {
         return typeof s === "string";
     }
 
-    function _escapeSlash(s) {
-        return s.replace("/", "++++");
-    }
-
-    function _unEscapeSlash(s) {
-        return s.replace("++++", "/");
+    function _inArray(arr, item) {
+        return $.inArray(item, arr) > -1;
     }
 
     return {
@@ -209,13 +247,30 @@ app.factory('formatUtil', function() {
         formatURLs: _formatURLs,
         isJSON: _isJSON,
         isArray: _isArray,
+        inArray: _inArray,
         isObject: _isObject,
         isSimple: _isSimple,
-        isString: _isString,
-        escapeSlash: _escapeSlash,
-        unEscapeSlash: _unEscapeSlash
+        isString: _isString
     }
 
+});
+
+app.directive('jsonSchema', function(RecursionHelper, formatUtil) {
+    return {
+        templateUrl: 'partials/jsonSchema.html',
+        scope: {
+            schema: '=schema'
+        },
+        restrict: 'E',
+        replace: true,
+        compile: function(element) {
+            // Use the compile function from the RecursionHelper,
+            // And return the linking function(s) which it returns
+            return RecursionHelper.compile(element, function(scope, element, attr) {
+                scope.formatUtil = formatUtil;
+            });
+        }
+    };
 });
 
 app.config(
@@ -786,15 +841,6 @@ app.controller('processController', function($scope, $route, $http, $location, e
             }
 
             domain[worker.activityName].push(worker);
-
-            if(worker.specification.hasOwnProperty("schema")) {
-                $.each(worker.specification.schema.properties,
-                       function (i, e) {
-                           e._name = i;
-                           e._required = $.inArray(i, worker.specification.schema.required) > -1;
-
-                       });
-            }
 
         }
     };

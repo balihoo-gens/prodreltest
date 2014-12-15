@@ -10,45 +10,43 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("participantId", "The participant ID used to identify the SendGrid subaccount"),
-      new BooleanActivityParameter("useTestSubaccount", "True if the SendGrid test account should be used"),
-      new StringActivityParameter("firstName", "The first name from the participant's marketing address"),
-      new StringActivityParameter("lastName", "The last name from the participant's marketing address"),
-      new StringActivityParameter("address", "The street address from the participant's marketing address"),
-      new StringActivityParameter("city", "The city from the participant's marketing address"),
-      new StringActivityParameter("state", "The state from the participant's marketing address"),
-      new StringActivityParameter("zip", "The zip from the participant's marketing address"),
-      new StringActivityParameter("country", "The country from the participant's marketing address"),
-      new StringActivityParameter("phone", "The phone number from the participant's marketing address")
-    ), new StringActivityResult("The subaccount username"))
+      new StringParameter("participantId", "The participant ID used to identify the SendGrid subaccount"),
+      new BooleanParameter("useTestSubaccount", "True if the SendGrid test account should be used"),
+      new StringParameter("firstName", "The first name from the participant's marketing address"),
+      new StringParameter("lastName", "The last name from the participant's marketing address"),
+      new StringParameter("address", "The street address from the participant's marketing address"),
+      new StringParameter("city", "The city from the participant's marketing address"),
+      new StringParameter("state", "The state from the participant's marketing address"),
+      new StringParameter("zip", "The zip from the participant's marketing address"),
+      new StringParameter("country", "The country from the participant's marketing address"),
+      new StringParameter("phone", "The phone number from the participant's marketing address")
+    ), new StringResultType("The subaccount username"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    withTaskHandling {
-      val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
-      val credentials = sendGridAdapter.subaccountToCredentials(subaccountId)
-      val subaccount = new SendGridSubaccount(
-        _credentials = credentials,
-        _firstName = params("firstName"),
-        _lastName = params("lastName"),
-        _address = params("address"),
-        _city = params("city"),
-        _state = params("state"),
-        _zip = params("zip"),
-        _country = params("country"),
-        _phone = params("phone"))
-      sendGridAdapter.createSubaccount(subaccount)
+    val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
+    val credentials = sendGridAdapter.subaccountToCredentials(subaccountId)
+    val subaccount = new SendGridSubaccount(
+      _credentials = credentials,
+      _firstName = params("firstName"),
+      _lastName = params("lastName"),
+      _address = params("address"),
+      _city = params("city"),
+      _state = params("state"),
+      _zip = params("zip"),
+      _country = params("country"),
+      _phone = params("phone"))
+    sendGridAdapter.createSubaccount(subaccount)
 
-      // Configuration stuff that can be done at account creation time.  (This stuff won't need to change later.)
-      sendGridAdapter.activateApp(credentials.apiUser, "eventnotify")
-      sendGridAdapter.activateApp(credentials.apiUser, "clicktrack")
-      sendGridAdapter.activateApp(credentials.apiUser, "opentrack")
-      sendGridAdapter.activateApp(credentials.apiUser, "subscriptiontrack")
+    // Configuration stuff that can be done at account creation time.  (This stuff won't need to change later.)
+    sendGridAdapter.activateApp(credentials.apiUser, "eventnotify")
+    sendGridAdapter.activateApp(credentials.apiUser, "clicktrack")
+    sendGridAdapter.activateApp(credentials.apiUser, "opentrack")
+    sendGridAdapter.activateApp(credentials.apiUser, "subscriptiontrack")
 
-      credentials.apiUser
-    }
+    getSpecification.createResult(credentials.apiUser)
   }
 }
 
