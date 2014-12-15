@@ -53,8 +53,7 @@ libraryDependencies ++= Seq(
   "com.github.fge" % "json-schema-validator" % "2.2.6",
   "com.netaporter" %% "scala-uri" % "0.4.3",
   "com.jsuereth" %% "scala-arm" % "1.3",
-  "org.scalaj" %% "scalaj-http" % "1.1.0",
-  "org.scalastuff" %% "json-parser" % "2.0.2"
+  "org.scalaj" %% "scalaj-http" % "1.1.0"
 )
 
 
