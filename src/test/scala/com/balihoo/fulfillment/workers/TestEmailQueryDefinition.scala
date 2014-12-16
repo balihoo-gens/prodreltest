@@ -71,4 +71,18 @@ class TestEmailQueryDefinition extends Specification {
       EmailQueryDefinition(select).selectSql must beEqualTo("""select "col1", "col2" from "recipients" where ("col1">0) and (("col2"=0) or ("col2">5 and "col2"<10)) order by "col1"""")
     }
   }
+  "selectCountOnColumn" should {
+    "return sql query for column and count with restricting values" in {
+      val select = Json.obj("col2" -> Json.arr("$v=0", "$v>5 and $v<10"), "col3" -> Json.arr(), "col1" -> Json.arr("$v>0"))
+      EmailQueryDefinition(select).selectCountOnColumn("col3", Set("a", "b", "c")) must beEqualTo("""select "col3", count(*) from "recipients" where ("col1">0) and (("col2"=0) or ("col2">5 and "col2"<10)) and "col3" in ('a','b','c') group by "col3" order by "col3"""")
+    }
+    "return sql query for column and count without restricting values" in {
+      val select = Json.obj("col2" -> Json.arr("$v=0", "$v>5 and $v<10"), "col3" -> Json.arr(), "col1" -> Json.arr("$v>0"))
+      EmailQueryDefinition(select).selectCountOnColumn("col3") must beEqualTo("""select "col3", count(*) from "recipients" where ("col1">0) and (("col2"=0) or ("col2">5 and "col2"<10)) group by "col3" order by "col3"""")
+    }
+    "throw an exception if column argument is missing" in {
+      val select = Json.obj("col2" -> Json.arr("$v=0", "$v>5 and $v<10"), "col3" -> Json.arr(), "col1" -> Json.arr("$v>0"))
+      EmailQueryDefinition(select).selectCountOnColumn(" ") must throwA[IllegalArgumentException]
+    }
+  }
 }

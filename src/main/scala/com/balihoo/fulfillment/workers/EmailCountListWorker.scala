@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.workers
 
+import java.net.URI
+
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -18,9 +20,6 @@ abstract class AbstractEmailCountListWorker extends FulfillmentWorker {
 
   implicit val queryDefinitionFormat = Json.format[EmailQueryDefinition]
 
-  val s3keySepCharPattern = "[/]".r
-  val s3filenameSepCharPattern = "[\\.]".r
-
   object FilterListQueryActivityParameter
     extends ObjectActivityParameter("query", "JSON representation of a SQL query", List(
       new ObjectActivityParameter("select", "select columns definition", required = true)
@@ -29,16 +28,38 @@ abstract class AbstractEmailCountListWorker extends FulfillmentWorker {
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new StringActivityParameter("source", "URL to a database file to use"),
-        new ArrayActivityParameter("queries", "Queries to use for counting",
-          new ObjectActivityParameter("", "Query definition"))
+        FilterListQueryActivityParameter,
+        new UriActivityParameter("source", "URL to a database file to use"),
+        new StringActivityParameter("column", "location column name"),
+        new StringsActivityParameter("locations", "location ids array", required = false)
       ),
-      new ObjectActivityResult("an object containing a \"results\" property which returns an array of object that contains query columns and value and a count property.")
+      new ObjectActivityResult("query count (total) for each location")
     )
   }
 
   override def handleTask(params: ActivityParameters) = {
     withTaskHandling {
+
+      splog.info(s"Checking parameters...")
+      val source = params[URI]("source")
+      val column = params[String]("column")
+      val query = Json.parse(params[ActivityParameters]("query").input).as[EmailQueryDefinition]
+      val locations = params[Seq[String]]("locations")
+      if (source.getScheme != "s3") throw ActivitySpecificationException("Invalid source protocol")
+      query.validate()
+      val (sourceBucket, sourceKey) = (source.getHost, source.getPath.tail)
+
+      splog.info(s"Downloading database file...")
+      val dbMeta = workerResource(s3Adapter.getMeta(sourceBucket, sourceKey).get)
+      val dbFile = workerFile(filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey))
+
+      splog.info(s"Connecting to database...")
+      val db = workerResource(liteDbAdapter.create(dbFile.getAbsolutePath))
+      val dbColumns = db.getTableColumnNames(query.getTableName)
+      query.checkColumns(dbColumns)
+
+      val results = db.executeAndGetResult(query.selectCountOnColumn(column, locations.toSet))
+
       ""
     }
   }

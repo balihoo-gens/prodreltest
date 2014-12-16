@@ -42,10 +42,16 @@ trait LightweightDatabaseAdapterComponent {
    */
   trait LightweightDatabase extends AutoCloseable {
 
+
     /**
-     * Execute a sql statement.
+     * Execute a sql statement and return an iterable over the result.
      */
     def execute(statement: String)
+
+    /**
+     * Execute a sql statement and return an iterable.
+     */
+    def executeAndGetResult(statement: String): Iterable[Seq[Any]]
 
     /**
      * @return a new batcher to process db operations in batch.
@@ -143,6 +149,13 @@ trait LightweightDatabaseAdapterComponent {
       connection.setAutoCommit(true)
       newStatement().executeUpdate(stmt)
       connection.setAutoCommit(false)
+    }
+
+    override def executeAndGetResult(stmt: String): DbResultSetPage = {
+      connection.setAutoCommit(true)
+      val resultSet = newStatement().executeQuery(stmt)
+      connection.setAutoCommit(false)
+      new JdbcDbResultSetPage(resultSet)
     }
 
     override def pagedSelect(statement: String, totalCount: Int, pageSize: Int = 1000): DbPagedResultSet = {

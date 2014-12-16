@@ -22,11 +22,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   /** Implicit Query json formatter. */
   implicit val queryDefinitionFormat = Json.format[EmailQueryDefinition]
 
-  val s3keySepCharPattern = "[/]".r
-  val s3filenameSepCharPattern = "[\\.]".r
-  val s3DirConfig = "s3dir"
-
-  def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
+  def destinationS3Key = swfAdapter.config.getString("s3dir")
 
   object FilterListQueryActivityParameter
     extends ObjectActivityParameter("query", "JSON representation of a SQL query", List(

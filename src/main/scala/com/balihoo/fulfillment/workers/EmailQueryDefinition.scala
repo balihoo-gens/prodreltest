@@ -112,4 +112,21 @@ case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = So
     if (whereExpression.isEmpty) throw new RuntimeException("SQL is empty")
     if (whereExpression.contains(";")) throw new RuntimeException("SQL contains reserved separator ';'")
   }
+
+  /**
+   * @param column the column on which we group the count
+   * @param values restrict the column values
+   * @return a select expression which yield a string column and a count of results for that column.
+   *         If restricting values are specified, then it adds that in the where expression.
+   */
+  def selectCountOnColumn(column: String, values: Set[String] = Set.empty) = {
+    require(column.trim.nonEmpty)
+
+    val restrictingExpr = if (values.nonEmpty) {
+      val restrictingValues = values.map("'" + _ + "'").mkString("(", ",", ")")
+      s""" and "$column" in $restrictingValues"""
+    } else ""
+
+    s"""select "$column", count(*) from "$getTableName" where $whereExpression$restrictingExpr group by "$column" order by "$column""""
+  }
 }
