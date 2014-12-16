@@ -43,6 +43,7 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
         "com.balihoo.fulfillment.workers.htmlrenderer": True,
         "com.balihoo.fulfillment.workers.email_createdb": True,
+        "com.balihoo.fulfillment.workers.email_filter": True,
         "com.balihoo.fulfillment.workers.workflow": True,
         "com.balihoo.fulfillment.workers.layoutrenderer": False,
         "com.balihoo.fulfillment.workers.email_addressverifier": False,
@@ -53,7 +54,10 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.ftp_uploadvalidator": False,
         "com.balihoo.fulfillment.workers.rest_client": True,
         "com.balihoo.fulfillment.workers.benchmark": False,
-        "com.balihoo.fulfillment.workers.sendgrid_lookupsubaccount": False,
+        "com.balihoo.fulfillment.workers.sendgrid_lookupsubaccount": True,
+        "com.balihoo.fulfillment.workers.sendgrid_createsubaccount": True,
+        "com.balihoo.fulfillment.workers.sendgrid_updatesubaccount": True,
+        "com.balihoo.fulfillment.workers.sendgrid_email": True,
         "com.balihoo.fulfillment.dashboard.dashboard": False,
     }
 
@@ -242,7 +246,7 @@ class Launcher(object):
 
     def launch(self, classes=None):
         """ launch a each class provided, or the default set if none are provided
-        @params classes list of strings or None - the list of class names with a main 
+        @params classes list of strings or None - the list of class names with a main
             that can be launched in the jar
         """
         if classes == None or len(classes) < 1:
