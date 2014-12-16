@@ -7,6 +7,7 @@ import java.util.Date
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers.ses.{TableDefinition, ColumnDefinition, DataTypes, AbstractEmailCreateDBWorker}
 import org.junit.runner._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._

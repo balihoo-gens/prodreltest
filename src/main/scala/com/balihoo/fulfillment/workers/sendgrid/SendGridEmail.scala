@@ -1,13 +1,16 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.sendgrid
 
 import java.io.InputStreamReader
 import java.net.URI
+
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
 import org.joda.time.DateTime
 import play.api.libs.json.JsObject
 import resource._
+
 import scala.util.{Failure, Success, Try}
 
 abstract class AbstractSendGridEmail extends FulfillmentWorker {

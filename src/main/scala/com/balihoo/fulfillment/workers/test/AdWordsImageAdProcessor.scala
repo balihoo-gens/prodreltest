@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.workers.adwords.{ImageAdCreatorComponent, CampaignCreatorComponent, AdGroupCreatorComponent}
 
 abstract class ImageAdTest(cfg: PropertiesLoader)
     extends AdWordsAdapterComponent

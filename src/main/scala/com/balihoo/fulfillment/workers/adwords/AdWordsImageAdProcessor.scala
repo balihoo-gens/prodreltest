@@ -1,13 +1,13 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
 import java.net.{URI, URL}
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201409.cm._
-
-import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
   this: LoggingAdwordsWorkflowAdapter
@@ -19,7 +19,7 @@ abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
 
   override def handleTask(params: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Image Ad Processor", {
-      adWordsAdapter.setClientId(params("account"))
+      adWordsAdapter.setClientId(params[String]("account"))
 
       val imageAd = adCreator.getImageAd(params) match {
         case ad:ImageAd =>
@@ -52,7 +52,7 @@ trait ImageAdCreatorComponent {
       new ActivitySpecification(List(
         new StringParameter("account", "Participant AdWords account ID"),
         new StringParameter("name", "Name of this ad (used to reference the ad later)"),
-        new IntegerParameter("adGroupId", "AdWords AdGroup ID"),
+        new StringParameter("adGroupId", "AdWords AdGroup ID"),
         new UriParameter("url", "Landing page URL"),
         new UriParameter("displayUrl", "Visible Ad URL"),
         new UriParameter("imageUrl", "URL Location of image data for this ad"),
@@ -63,8 +63,8 @@ trait ImageAdCreatorComponent {
 
     def getImageAd(params: ActivityArgs): ImageAd = {
 
-      val name = params("name")
-      val adGroupId = params("adGroupId")
+      val name = params[String]("name")
+      val adGroupId = params[String]("adGroupId")
       val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
 
       val selector = new SelectorBuilder()
@@ -97,7 +97,7 @@ trait ImageAdCreatorComponent {
 
     def newImageAd(params:ActivityArgs): ImageAd = {
 
-      val name = params("name")
+      val name = params[String]("name")
       val url = AdWordsPolicy.destinationUrl(params[URI]("url").toString)
       val displayUrl = AdWordsPolicy.displayUrl(params[URI]("displayUrl").toString)
       val imageUrl = params[URI]("imageUrl").toURL

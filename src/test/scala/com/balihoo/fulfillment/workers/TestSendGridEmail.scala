@@ -6,6 +6,7 @@ import java.net.URI
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers.sendgrid.AbstractSendGridEmail
 import org.apache.http.client.methods.HttpRequestBase
 import org.joda.time.DateTime
 import org.junit.runner.RunWith

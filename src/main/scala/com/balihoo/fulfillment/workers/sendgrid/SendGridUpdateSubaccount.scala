@@ -1,7 +1,8 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.sendgrid
 
 import java.net.URI
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -41,14 +42,14 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
     val credentials = sendGridAdapter.getCredentials(subaccountUser)
     val subaccount = new SendGridSubaccount(
       _credentials = credentials,
-      _firstName = params("firstName"),
-      _lastName = params("lastName"),
-      _address = params("address"),
-      _city = params("city"),
-      _state = params("state"),
-      _zip = params("zip"),
-      _country = params("country"),
-      _phone = params("phone"))
+      _firstName = params[String]("firstName"),
+      _lastName = params[String]("lastName"),
+      _address = params[String]("address"),
+      _city = params[String]("city"),
+      _state = params[String]("state"),
+      _zip = params[String]("zip"),
+      _country = params[String]("country"),
+      _phone = params[String]("phone"))
     sendGridAdapter.updateProfile(subaccount)
     sendGridAdapter.configureEventNotificationApp(subaccountUser, webhookUrl, webhookUsername, webhookPassword)
     sendGridAdapter.setIpAddress(subaccountUser, ipAddress)

@@ -1,15 +1,13 @@
 package com.balihoo.fulfillment.workers
 
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.config.PropertiesLoader
 import org.junit.runner.RunWith
 import org.specs2.matcher._
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{Map => MutableMap, MutableList}
+import scala.collection.mutable.MutableList
 import play.api.libs.json._
 
 @RunWith(classOf[JUnitRunner])

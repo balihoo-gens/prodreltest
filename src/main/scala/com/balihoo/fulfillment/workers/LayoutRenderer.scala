@@ -64,12 +64,12 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
   }
 
   override def handleTask(params: ActivityArgs):ActivityResult = {
-    val id = params("formid")
-    val bdata = URLEncoder.encode(params("branddata"), "UTF-8")
-    val idata = URLEncoder.encode(params("inputdata"))
+    val id = params[String]("formid")
+    val bdata = URLEncoder.encode(params[String]("branddata"), "UTF-8")
+    val idata = URLEncoder.encode(params[String]("inputdata"))
 
     val cliptuple = if (params.has("clipselector")) { (
-      "clipselector", params("clipselector"))
+      "clipselector", params[String]("clipselector"))
     } else {
       ("ignore", "undefined")
     }
@@ -78,7 +78,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
     val cleaninput = Json.stringify(Json.toJson(Map(
       "source" -> endPoint.toString,
       "data" -> s"inputdata=$bdata&inputdata=$idata",
-      "target" -> params("target"),
+      "target" -> params[String]("target"),
       cliptuple
     )))
 
@@ -90,7 +90,7 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
       case 0 =>
         val jres = Json.parse(result.out)
         val htmlFileName = (jres \ "result").as[String]
-        val s3location = s3Move(htmlFileName, params("target"))
+        val s3location = s3Move(htmlFileName, params[String]("target"))
         getSpecification.createResult(s3location)
       case _ =>
         throw new FailTaskException(s"Process returned code '${result.code}'", result.err)

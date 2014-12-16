@@ -1,9 +1,9 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
-
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201409.cm._
 import org.joda.time.DateTime
@@ -20,7 +20,7 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
 
   override def handleTask(params: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Campaign Processor", {
-      adWordsAdapter.setClientId(params("account"))
+      adWordsAdapter.setClientId(params[String]("account"))
 
       val campaign = campaignCreator.getCampaign(params) match {
         case campaign: Campaign =>
@@ -278,7 +278,7 @@ trait CampaignCreatorComponent {
         newCampaignCriterionOperations ++= proximityOps(campaign, params[ActivityArgs]("proximity"), existingCriterion)
       }
       if(params.has("adschedule")) {
-        newCampaignCriterionOperations ++= adScheduleOps(campaign, params("adschedule"), existingCriterion)
+        newCampaignCriterionOperations ++= adScheduleOps(campaign, params[List[String]]("adschedule"), existingCriterion)
       }
 
       adWordsAdapter.withErrorsHandled[Any]("processing Campaign Criterion", {
@@ -301,7 +301,7 @@ trait CampaignCreatorComponent {
       }
 
       if(params.has("status")) {
-        campaign.setStatus(CampaignStatus.fromString(params("status")))
+        campaign.setStatus(CampaignStatus.fromString(params[String]("status")))
       }
       if(params.has("endDate")) {
         campaign.setEndDate(params[DateTime]("endDate").toString("YYYYMMdd"))

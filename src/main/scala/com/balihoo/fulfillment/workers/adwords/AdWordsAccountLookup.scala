@@ -1,10 +1,10 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
-import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters._
-import com.google.api.ads.adwords.axis.v201409.mcm.ManagedCustomer
-
+import com.balihoo.fulfillment.workers._
+import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
+import com.google.api.ads.adwords.axis.v201409.mcm.ManagedCustomer
 
 abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
   this: LoggingAdwordsWorkflowAdapter

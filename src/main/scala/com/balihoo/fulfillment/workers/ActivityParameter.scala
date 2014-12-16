@@ -170,7 +170,7 @@ class ObjectParameter(override val name:String
   def parseValue(js:JsValue):Any = {
     new ActivityArgs(
       (for((name, property) <- js.as[JsObject].fields)
-      yield name -> (if(propsMap contains name) propsMap(name).parseValue(property) else js)).toMap
+      yield name -> (if(propsMap contains name) propsMap(name).parseValue(property) else property)).toMap
       , Json.stringify(js))
   }
 }

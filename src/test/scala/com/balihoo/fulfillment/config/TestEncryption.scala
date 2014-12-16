@@ -42,6 +42,17 @@ class TestEncryption extends Specification {
       aes_string mustNotEqual aes_bytes
       hmac_string mustNotEqual hmac_bytes
     }
+
+    "t" in {
+
+      val appSecret = "09340934fopijfpioj34f0t934poijwe5gpoijrfpokefa4wp9k34fvpoke4f"
+      val accessToken = "98349834lkidflkj3q4f0934094flke0p9w4f4opij34f9j34f0934fmervlgkjergf5opji34op9j345io34fjio3498043to0we4rtsdrf"
+      val crypter = new Crypter("config/crypto")
+      println("\n\n"+crypter.encrypt(appSecret)+"\n\n")
+      println(crypter.encrypt(accessToken)+"\n\n")
+
+      success
+    }
   }
 
 }

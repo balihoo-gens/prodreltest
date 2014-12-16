@@ -1,12 +1,12 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201409.cm.Operator
-import com.google.api.ads.adwords.axis.v201409.cm.Selector
-import com.google.api.ads.adwords.axis.v201409.mcm.{ManagedCustomerOperation, ManagedCustomer}
 import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.workers._
+import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201409.cm.{Operator, Selector}
+import com.google.api.ads.adwords.axis.v201409.mcm.{ManagedCustomer, ManagedCustomerOperation}
 
 /*
  * this is the dependency-injectable class containing all functionality
@@ -100,9 +100,9 @@ trait AccountCreatorComponent {
 
     def createAccount(params:ActivityArgs):ManagedCustomer = {
 
-      val name = params("name")
-      val currencyCode = params("currencyCode")
-      val timeZone = params("timeZone")
+      val name = params[String]("name")
+      val currencyCode = params[String]("currencyCode")
+      val timeZone = params[String]("timeZone")
       val context = s"createAccount(name='$name', currencyCode='$currencyCode', timeZone='$timeZone')"
 
       val customer:ManagedCustomer = new ManagedCustomer()

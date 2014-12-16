@@ -1,13 +1,14 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.ses
 
 import java.io.Reader
 import java.net.URI
 import java.text.SimpleDateFormat
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import play.api.libs.json.{JsString, JsValue, JsObject, Json}
+import play.api.libs.json.Json
 
 import scala.util.{Failure, Success, Try}
 

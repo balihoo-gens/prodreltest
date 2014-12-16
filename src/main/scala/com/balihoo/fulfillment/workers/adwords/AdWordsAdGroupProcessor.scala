@@ -1,13 +1,13 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
-import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
+import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers._
+import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
-
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201409.cm._
-import play.api.libs.json.{JsArray, JsString, Json, JsObject}
+import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 import scala.collection.mutable
 
@@ -26,7 +26,7 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
 
   override def handleTask(params: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("AdGroup Processor", {
-      adWordsAdapter.setClientId(params("account"))
+      adWordsAdapter.setClientId(params[String]("account"))
 
       val adGroup = adGroupCreator.getAdGroup(params) match {
         case group: AdGroup =>

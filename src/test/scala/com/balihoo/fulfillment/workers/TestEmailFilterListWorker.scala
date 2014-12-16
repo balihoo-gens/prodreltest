@@ -5,6 +5,7 @@ import java.net.URI
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers.ses.{QueryDefinition, AbstractEmailFilterListWorker, InvalidColumnException}
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification

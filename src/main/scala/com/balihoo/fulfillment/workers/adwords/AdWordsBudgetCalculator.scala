@@ -1,14 +1,14 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
 import java.io.InputStream
 
-import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
-
-import com.balihoo.fulfillment.util.{UTCFormatter, Splogger}
+import com.balihoo.fulfillment.config.PropertiesLoader
+import com.balihoo.fulfillment.util.{Splogger, UTCFormatter}
 import com.google.api.ads.adwords.lib.jaxb.v201409._
-import org.joda.time.{Days, DateTime}
-import play.api.libs.json.{Json, JsObject}
+import org.joda.time.{DateTime, Days}
+import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConversions._
 import scala.io.Source
