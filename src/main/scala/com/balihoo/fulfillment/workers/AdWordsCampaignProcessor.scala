@@ -18,8 +18,8 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
     campaignCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("Campaign Processor", {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("Campaign Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val campaign = campaignCreator.getCampaign(params) match {
@@ -29,7 +29,7 @@ abstract class AbstractAdWordsCampaignProcessor extends FulfillmentWorker {
           campaignCreator.createCampaign(params)
       }
 
-      completeTask(String.valueOf(campaign.getId))
+      getSpecification.createResult(String.valueOf(campaign.getId))
     })
   }
 }
@@ -126,33 +126,33 @@ trait CampaignCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("account", "Participant AdWords account ID"),
-        new StringActivityParameter("name", "Name of the Campaign"),
-        new EnumActivityParameter("channel", "The advertising channel", List("SEARCH", "DISPLAY", "SHOPPING")),
-        new NumberActivityParameter("budget", "The monthly budget"),
-        new EnumActivityParameter("status", "Always PAUSED on Campaign creation", List("ACTIVE", "PAUSED", "DELETED"), required=false),
-        new DateTimeActivityParameter("startDate", "First day the campaign will run. Ignored on update."),
-        new DateTimeActivityParameter("endDate", "Last day the campaign will run"),
-        new StringsActivityParameter("targetzips", "An array of zip codes", required=false),
-        new ObjectActivityParameter("proximity", "A proximity is an area within a certain radius of a point with the center point being described by a lat/lon pair", properties=List(
-          new NumberActivityParameter("lat", "Latitude in micro-degrees"),
-          new NumberActivityParameter("lon", "Longitude in micro-degrees"),
-          new NumberActivityParameter("radius", "Distance from lat/lon point"),
-          new EnumActivityParameter("radiusUnits", "", List("MILES", "KILOMETERS"))
+        new StringParameter("account", "Participant AdWords account ID"),
+        new StringParameter("name", "Name of the Campaign"),
+        new EnumParameter("channel", "The advertising channel", List("SEARCH", "DISPLAY", "SHOPPING")),
+        new NumberParameter("budget", "The monthly budget"),
+        new EnumParameter("status", "Always PAUSED on Campaign creation", List("ACTIVE", "PAUSED", "DELETED"), required=false),
+        new DateTimeParameter("startDate", "First day the campaign will run. Ignored on update."),
+        new DateTimeParameter("endDate", "Last day the campaign will run"),
+        new StringsParameter("targetzips", "An array of zip codes", required=false),
+        new ObjectParameter("proximity", "A proximity is an area within a certain radius of a point with the center point being described by a lat/lon pair", properties=List(
+          new NumberParameter("lat", "Latitude in micro-degrees"),
+          new NumberParameter("lon", "Longitude in micro-degrees"),
+          new NumberParameter("radius", "Distance from lat/lon point"),
+          new EnumParameter("radiusUnits", "", List("MILES", "KILOMETERS"))
         ), required = false),
-        new EnumsActivityParameter("adschedule", "Days of the week to run ads", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun")),
-        new ObjectActivityParameter("location", "Location Extension information", properties=List(
-          new StringActivityParameter("street address", "Street address line 1"),
-          new StringActivityParameter("city", "Name of the city"),
-          new StringActivityParameter("postal code", "Postal code"),
-          new StringActivityParameter("country code", "Country code"),
-          new StringActivityParameter("company name", "The name of the company located at the given address.", required=false, maxLength = Some(80), minLength = Some(1)),
-          new StringActivityParameter("phone number", "The phone number for the location", required=false)
+        new EnumsParameter("adschedule", "Days of the week to run ads", options=List("Mon","Tue","Wed","Thu","Fri","Sat","Sun")),
+        new ObjectParameter("location", "Location Extension information", properties=List(
+          new StringParameter("street address", "Street address line 1"),
+          new StringParameter("city", "Name of the city"),
+          new StringParameter("postal code", "Postal code"),
+          new StringParameter("country code", "Country code"),
+          new StringParameter("company name", "The name of the company located at the given address.", required=false, maxLength = Some(80), minLength = Some(1)),
+          new StringParameter("phone number", "The phone number for the location", required=false)
         ), required = false)
-      ), new StringActivityResult("AdWords Campaign ID"))
+      ), new StringResultType("AdWords Campaign ID"))
     }
 
-    def getCampaign(params: ActivityParameters):Campaign = {
+    def getCampaign(params: ActivityArgs):Campaign = {
 
       val name = params[String]("name")
       val channel = params[String]("channel")
@@ -193,7 +193,7 @@ trait CampaignCreatorComponent {
       })
     }
 
-    def createCampaign(params:ActivityParameters):Campaign = {
+    def createCampaign(params:ActivityArgs):Campaign = {
 
       val name = params[String]("name")
       val channel = params[String]("channel")
@@ -256,12 +256,12 @@ trait CampaignCreatorComponent {
       processCampaignCriterion(campaign, params)
 
       if(params.has("location")) {
-        setLocationExtension(campaign, params[ActivityParameters]("location"))
+        setLocationExtension(campaign, params[ActivityArgs]("location"))
       }
       madeCampaign
     }
 
-    def processCampaignCriterion(campaign:Campaign, params:ActivityParameters) = {
+    def processCampaignCriterion(campaign:Campaign, params:ActivityArgs) = {
 
       val existingCriterion =
         if(campaign.getId > 0)
@@ -275,7 +275,7 @@ trait CampaignCreatorComponent {
         newCampaignCriterionOperations ++= targetZipsOps(campaign, params[List[String]]("targetzips"), existingCriterion)
       }
       if(params.has("proximity")) {
-        newCampaignCriterionOperations ++= proximityOps(campaign, params[ActivityParameters]("proximity"), existingCriterion)
+        newCampaignCriterionOperations ++= proximityOps(campaign, params[ActivityArgs]("proximity"), existingCriterion)
       }
       if(params.has("adschedule")) {
         newCampaignCriterionOperations ++= adScheduleOps(campaign, params("adschedule"), existingCriterion)
@@ -286,12 +286,12 @@ trait CampaignCreatorComponent {
       })
     }
 
-    def updateCampaign(campaign: Campaign, params: ActivityParameters) = {
+    def updateCampaign(campaign: Campaign, params: ActivityArgs) = {
 
       processCampaignCriterion(campaign, params)
 
       if(params.has("location")) {
-        setLocationExtension(campaign, params[ActivityParameters]("location"))
+        setLocationExtension(campaign, params[ActivityArgs]("location"))
       }
 
       if(params.has("budget")) {
@@ -418,7 +418,7 @@ trait CampaignCreatorComponent {
       operations.toArray
     }
 
-    def proximityOps(campaign:Campaign, proximityParams:ActivityParameters, existingCriterion:CampaignCriterionPage):Array[CampaignCriterionOperation] = {
+    def proximityOps(campaign:Campaign, proximityParams:ActivityArgs, existingCriterion:CampaignCriterionPage):Array[CampaignCriterionOperation] = {
 
       val operations = new mutable.ArrayBuffer[CampaignCriterionOperation]()
 
@@ -511,7 +511,7 @@ trait CampaignCreatorComponent {
       operations.toArray
     }
 
-    def setLocationExtension(campaign:Campaign, params:ActivityParameters) = {
+    def setLocationExtension(campaign:Campaign, params:ActivityArgs) = {
 
       val address = new Address()
       address.setStreetAddress(params[String]("street address"))
@@ -569,7 +569,7 @@ trait CampaignCreatorComponent {
       })
     }
 
-    def _addLocationExtension(campaign:Campaign, address:Address, params:ActivityParameters) = {
+    def _addLocationExtension(campaign:Campaign, address:Address, params:ActivityArgs) = {
 
       val geoLocationSelector = new GeoLocationSelector()
       geoLocationSelector.setAddresses(Array(address))

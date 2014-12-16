@@ -8,11 +8,11 @@ abstract class AbstractNoop extends FulfillmentWorker {
   this: LoggingWorkflowAdapter =>
 
   override def getSpecification: ActivitySpecification = {
-    new ActivitySpecification(List(), new ObjectActivityResult("Confirmation that nothing happened."))
+    new ActivitySpecification(List(), new ObjectResultType("Confirmation that nothing happened."))
   }
 
-  override def handleTask(task: ActivityParameters) = {
-    completeTask("""{"-NOOP-" : "true"}""")
+  override def handleTask(task: ActivityArgs) = {
+    getSpecification.createResult(Map("-NOOP-" -> "true"))
   }
 }
 

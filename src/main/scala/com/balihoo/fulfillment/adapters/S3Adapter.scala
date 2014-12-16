@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{Closeable, File}
+import java.io.{Closeable, File, InputStream}
 import java.net.{URI, URL}
 
 import com.amazonaws.auth.BasicAWSCredentials
@@ -107,6 +107,41 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
   }
 
   /**
+   * Upload a stream s3.
+   *
+   * @param key key name.
+   * @param istream InputStream to upload
+   * @param len content length
+   * @param bucket bucket name.
+   * @param userMetaData extra s3 metadata to add.
+   * @param visibility object visibility in s3 (determine permissions).
+   *
+   * @return a s3 URI to that file.
+   */
+  def uploadStream(
+    key: String,
+    istream: InputStream,
+    len: Int,
+    bucket: String = defaultBucket,
+    userMetaData: Map[String, String] = Map.empty,
+    visibility: S3Visibility = PrivateS3Visibility
+  ): Try[URI] = {
+
+    val metaData = new ObjectMetadata()
+    metaData.setContentLength(len) /* required in order to enable streaming */
+    metaData.setUserMetadata(userMetaData.asJava)
+
+    val request = new PutObjectRequest(bucket, key, istream, metaData).withCannedAcl(visibility)
+
+    val start = System.currentTimeMillis
+    splog.debug(s"Uploading... key=$key bucket=$bucket length=$len visibility=$visibility")
+    Try(client.putObject(request)).map { putObjectResult =>
+      splog.debug(s"Upload complete time=${System.currentTimeMillis - start}")
+      new URI(s"s3://$bucket/$key")
+    }
+  }
+
+  /**
    * Gets the contents of an S3 object as a string.
    * @param bucket
    * @param key
@@ -121,7 +156,6 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
     }
     resource.acquireAndGet(s => s)
   }
-
 }
 
 class S3Adapter(cfg: PropertiesLoader, override val splog: Splogger)

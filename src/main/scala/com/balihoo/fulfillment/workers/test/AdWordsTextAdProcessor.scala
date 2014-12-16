@@ -45,7 +45,7 @@ object adWordsAdGroupTextAd {
           ,"endDate" -> "20161012"
           ,"targetzips" -> "83713,83704"
       )
-      val campaignParams = campaignCreator.getSpecification.getParameters(campaignParamsJson)
+      val campaignParams = campaignCreator.getSpecification.getArgs(campaignParamsJson)
       val campaign = campaignCreator.getCampaign(campaignParams)
       val adgroupParams = Json.toJson(Map(
          "name" -> "Secondary Market"
@@ -56,7 +56,7 @@ object adWordsAdGroupTextAd {
         ,"bidDollars" -> "10"
       )).as[JsObject]
 
-      val params = adGroupCreator.getSpecification.getParameters(adgroupParams)
+      val params = adGroupCreator.getSpecification.getArgs(adgroupParams)
 
       val adgroup = adGroupCreator.getAdGroup(params) match {
         case ag:AdGroup => ag
@@ -75,7 +75,7 @@ object adWordsAdGroupTextAd {
         "description2" -> "wrapped in newspaper"
       )).as[JsObject]
 
-      val textAd = adCreator.createTextAd(adCreator.getSpecification.getParameters(textAdParams))
+      val textAd = adCreator.createTextAd(adCreator.getSpecification.getArgs(textAdParams))
       println(textAd.getHeadline)
 
     }
@@ -99,15 +99,15 @@ object adWordsGetAdGroupTextAd {
           "channel" -> "SEARCH"
         ,"account" -> "100-019-2687"
       )
-      val campaignParams = campaignCreator.getSpecification.getParameters(campaignParamsJson)
+      val campaignParams = campaignCreator.getSpecification.getArgs(campaignParamsJson)
       val campaign = campaignCreator.getCampaign(campaignParams)
-      val adgroupParams = new ActivityParameters(Map(
+      val adgroupParams = new ActivityArgs(Map(
         "name" -> "Secondary Market",
         "campaignId" -> s"${campaign.getId}"
       ))
       val adgroup = adGroupCreator.getAdGroup(adgroupParams)
 
-      val textAdParams = new ActivityParameters(Map(
+      val textAdParams = new ActivityArgs(Map(
         "headline" -> "Dog Face",
         "adGroupId" -> s"${adgroup.getId}"
       ))
@@ -135,14 +135,14 @@ object adWordsUpdateAdGroupTextAd {
         "channel" -> "SEARCH"
         ,"account" -> "100-019-2687"
       )
-      val campaignParams = campaignCreator.getSpecification.getParameters(campaignParamsJson)
+      val campaignParams = campaignCreator.getSpecification.getArgs(campaignParamsJson)
       val campaign = campaignCreator.getCampaign(campaignParams)
       val adgroupParams = Map(
          "name" -> "Secondary Market",
           "campaignId" -> s"${campaign.getId}"
         )
 
-      val adgroup = adGroupCreator.getAdGroup(new ActivityParameters(adgroupParams))
+      val adgroup = adGroupCreator.getAdGroup(new ActivityArgs(adgroupParams))
 
       val textAdParams = Map(
          "headline" -> "Dog Face",
@@ -153,9 +153,9 @@ object adWordsUpdateAdGroupTextAd {
           "description2" -> "wrapped in newspaper"
         )
 
-      val ad = adCreator.getTextAd(new ActivityParameters(textAdParams))
+      val ad = adCreator.getTextAd(new ActivityArgs(textAdParams))
 
-      val textAd = adCreator.updateTextAd(ad, new ActivityParameters(textAdParams))
+      val textAd = adCreator.updateTextAd(ad, new ActivityArgs(textAdParams))
       println(textAd.getHeadline)
     }
   }

@@ -24,8 +24,8 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
     adGroupCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("AdGroup Processor", {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("AdGroup Processor", {
       adWordsAdapter.setClientId(params("account"))
 
       val adGroup = adGroupCreator.getAdGroup(params) match {
@@ -35,7 +35,7 @@ abstract class AbstractAdWordsAdGroupProcessor extends FulfillmentWorker {
           adGroupCreator.createAdGroup(params)
       }
 
-      completeTask(String.valueOf(adGroup.getId))
+      getSpecification.createResult(String.valueOf(adGroup.getId))
     })
   }
 }
@@ -64,22 +64,22 @@ trait AdGroupCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("account", "Participant AdWords account ID"),
-        new StringActivityParameter("name", "Name of this AdGroup"),
-        new StringActivityParameter("campaignId", "AdWords Campaign ID"),
-        new NumberActivityParameter("bidDollars", "Bid amount in dollars"),
-        new NumberActivityParameter("mobile bid modifier", "Proportion of bidDollars to be bid for mobile", required=false),
-        new EnumActivityParameter("status", "", List("ENABLED","PAUSED","DELETED")),
-        new ObjectActivityParameter("target", /*"JSON",*/ "Mysterious and magical Form Builder output!", required=false),
-        new StringsActivityParameter("interests", "List of Interests\nhttps://developers.google.com/adwords/api/docs/appendix/verticals", required=false),
-        new StringsActivityParameter("exact keywords", "List of EXACT Match Keywords", required=false),
-        new StringsActivityParameter("broad keywords", "List of BROAD Match Keywords", required=false),
-        new StringsActivityParameter("phrase keywords", "List of PHRASE Match Keywords", required=false),
-        new StringsActivityParameter("negative keywords", "List of NEGATIVE Match Keywords", required=false)
-      ), new StringActivityResult("AdGroup ID"))
+        new StringParameter("account", "Participant AdWords account ID"),
+        new StringParameter("name", "Name of this AdGroup"),
+        new StringParameter("campaignId", "AdWords Campaign ID"),
+        new NumberParameter("bidDollars", "Bid amount in dollars"),
+        new NumberParameter("mobile bid modifier", "Proportion of bidDollars to be bid for mobile", required=false),
+        new EnumParameter("status", "", List("ENABLED","PAUSED","DELETED")),
+        new ObjectParameter("target", /*"JSON",*/ "Mysterious and magical Form Builder output!", required=false),
+        new StringsParameter("interests", "List of Interests\nhttps://developers.google.com/adwords/api/docs/appendix/verticals", required=false),
+        new StringsParameter("exact keywords", "List of EXACT Match Keywords", required=false),
+        new StringsParameter("broad keywords", "List of BROAD Match Keywords", required=false),
+        new StringsParameter("phrase keywords", "List of PHRASE Match Keywords", required=false),
+        new StringsParameter("negative keywords", "List of NEGATIVE Match Keywords", required=false)
+      ), new StringResultType("AdGroup ID"))
     }
 
-    def getAdGroup(params: ActivityParameters): AdGroup = {
+    def getAdGroup(params: ActivityArgs): AdGroup = {
 
       val name = params[String]("name")
       val campaignId = params[String]("campaignId")
@@ -104,7 +104,7 @@ trait AdGroupCreatorComponent {
     /*
      * uses 'campaignCreator' from mixed in CampaignCreatorComponent
      */
-    def createAdGroup(params: ActivityParameters): AdGroup = {
+    def createAdGroup(params: ActivityArgs): AdGroup = {
 
       val name = params[String]("name")
       val campaignId = params[String]("campaignId")
@@ -151,7 +151,7 @@ trait AdGroupCreatorComponent {
       newGroup
     }
 
-    def updateAdGroup(adGroup: AdGroup, params: ActivityParameters): AdGroup = {
+    def updateAdGroup(adGroup: AdGroup, params: ActivityArgs): AdGroup = {
 
       val context = s"updateAdGroup(name='${adGroup.getId}', params=$params)"
 
@@ -448,7 +448,7 @@ trait AdGroupCreatorComponent {
       }
     }
 
-    def _processOptionalParams(adGroup: AdGroup, params: ActivityParameters) = {
+    def _processOptionalParams(adGroup: AdGroup, params: ActivityArgs) = {
 
       if(params.has("interests")) {
         _processInterests(adGroup, params[List[String]]("interests"))

@@ -32,7 +32,7 @@ object adWordsCampaignCreator {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
          "name" -> "test campaign",
           "channel" -> "DISPLAY",
           "budget" -> "11",
@@ -65,7 +65,7 @@ object adWordsLocationCriterion {
 
       val zipString = List("53001", "53002", "90210")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
          "name" -> "fulfillment Campaign",
           "channel" -> "DISPLAY"
       ))
@@ -90,7 +90,7 @@ object adWordsSchedule {
 
       val scheduleString = List("T", "Th")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       ))
@@ -170,14 +170,14 @@ object adWordsAddress {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY"
       ))
 
       val campaign = campaignCreator.getCampaign(campaignParams)
 
-      val locationExtension = new ActivityParameters(Map(
+      val locationExtension = new ActivityArgs(Map(
         "city" -> "Boise",
         "street address" -> "6700 W Fairview Ave",
         "postal code" -> "83704",
@@ -201,10 +201,10 @@ object adWordsProximity {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("100-019-2687")
 
-      val campaignParams = new ActivityParameters(Map(
+      val campaignParams = new ActivityArgs(Map(
         "name" -> "fulfillment Campaign",
         "channel" -> "DISPLAY",
-        "proximity" -> new ActivityParameters(Map(
+        "proximity" -> new ActivityArgs(Map(
           "lat" -> 33.8090, // Disneyland
           "lon" -> -117.9190,
           "radius" -> 15.0,

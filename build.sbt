@@ -52,7 +52,8 @@ libraryDependencies ++= Seq(
   "org.xerial" % "sqlite-jdbc" % "3.8.7",
   "com.github.fge" % "json-schema-validator" % "2.2.6",
   "com.netaporter" %% "scala-uri" % "0.4.3",
-  "com.jsuereth" %% "scala-arm" % "1.3"
+  "com.jsuereth" %% "scala-arm" % "1.3",
+  "org.scalaj" %% "scalaj-http" % "1.1.0"
 )
 
 

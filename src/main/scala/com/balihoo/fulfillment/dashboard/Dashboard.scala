@@ -318,7 +318,7 @@ class AbstractWorkerServlet extends RestServlet {
 
   get("/worker", (rsq:RestServletQuery) => {
 
-    val workers = workerTable.get()
+    val workers = workerTable.get(dynamoAdapter.config.getString("domain"))
 
     val workerMap = collection.mutable.Map[String, JsValue]()
     for(worker:FulfillmentWorkerEntry <- workers) {

@@ -35,27 +35,27 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   def destinationS3Bucket = swfAdapter.config.getString(s3BucketConfig)
   def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
 
-  object FilterListQueryActivityParameter
-    extends ObjectActivityParameter("query", "JSON representation of a SQL query", List(
-      new ObjectActivityParameter("select", "select columns definition", required = true)
+  object FilterListQueryParameter$
+    extends ObjectParameter("query", "JSON representation of a SQL query", List(
+      new ObjectParameter("select", "select columns definition", required = true)
     ), required = true)
 
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        FilterListQueryActivityParameter,
-        new StringActivityParameter("source", "URL to a database file to use"),
-        new IntegerActivityParameter("pageSize", "Maximum records the produced csv files can contain")
+        FilterListQueryParameter$,
+        new StringParameter("source", "URL to a database file to use"),
+        new IntegerParameter("pageSize", "Maximum records the produced csv files can contain")
       ),
-      new StringsActivityResult("List of URLs to resulting CSV file"),
+      new StringsResultType("List of URLs to resulting CSV file"),
       "transform a json query to a sql query and perform that query against the specified database file")
   }
 
   /**
    * Extract, validate and return parameters for this task.
    */
-  private def getParams(params: ActivityParameters) = {
-    val maybeQuery =  params.get[ActivityParameters]("query")
+  private def getParams(params: ActivityArgs) = {
+    val maybeQuery =  params.get[ActivityArgs]("query")
     if (maybeQuery.isEmpty) throw new IllegalArgumentException("query param is required")
 
     val queryDefinition = Try(Json.parse(maybeQuery.get.input).as[QueryDefinition]) match {
@@ -81,7 +81,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     (queryDefinition, source.getHost, source.getPath.tail, pageSize)
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
 
     val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
 
@@ -137,7 +137,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
           }
         }
 
-        completeTask(JsArray(uris.toSeq.map(JsString)).toString())
+        getSpecification.createResult(uris.toSeq.map(JsString))
       } finally {
         db.close()
         dbFile.delete()
