@@ -327,6 +327,17 @@ class ObjectActivityParameter(override val name:String
   }
 }
 
+class StringMapActivityParameter(override val name:String
+                              ,override val description:String
+                              ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "object"
+
+  def parseValue(js:JsValue):Any = _parseBasic[Map[String, String]](js)
+}
+
+
 class ArrayActivityParameter(override val name:String
                               ,override val description:String
                               ,val element:ActivityParameter

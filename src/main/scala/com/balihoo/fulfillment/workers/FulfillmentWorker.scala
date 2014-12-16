@@ -179,6 +179,7 @@ abstract class FulfillmentWorker {
         splog("INFO", cancel.details + " " + cancel.getMessage)
         cancelTask(cancel.details)
       case e:Exception =>
+        splog.error(e.getMessage + " " + e.getStackTraceString)
         failTask("Task Failed", e.getMessage + " " + e.getStackTraceString take 150)
     }
   }
