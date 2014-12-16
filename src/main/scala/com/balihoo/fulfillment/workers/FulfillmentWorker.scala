@@ -176,7 +176,22 @@ abstract class FulfillmentWorker {
 
   def handleTask(params:ActivityArgs):ActivityResult
 
+<<<<<<< HEAD
   def withTaskHandling(code: => ActivityResult) {
+=======
+  def withTaskHandling(code: => String) {
+    try {
+      val result:String = code
+      completeTask(result)
+    } catch {
+      case cancel:CancelTaskException =>
+        splog("INFO", cancel.details + " " + cancel.getMessage)
+        cancelTask(cancel.details)
+      case e:Exception =>
+        splog.error(e.getMessage + " " + e.getStackTraceString)
+        failTask("Task Failed", e.getMessage + " " + e.getStackTraceString take 150)
+    }
+>>>>>>> fix-rest-client
   }
 
   def declareWorker() = {

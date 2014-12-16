@@ -13,15 +13,32 @@ class AbstractRESTClient extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
+<<<<<<< HEAD
       new UriParameter("url", "The service URL"),
       new ObjectParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
       new EnumParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
       new StringParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
     ), new StringResultType("Rest response data"))
+=======
+      new UriActivityParameter("url", "The service URL"),
+      new StringMapActivityParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
+      new EnumActivityParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
+      new StringActivityParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
+    ), new StringActivityResult("Rest response data"))
+>>>>>>> fix-rest-client
   }
 
   override def handleTask(params: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
+<<<<<<< HEAD
+=======
+    withTaskHandling {
+      val url = params[URI]("url").toURL
+      val headers = params.getOrElse[Map[String, String]]("headers", Map()).toList
+      val method = params[String]("method")
+      lazy val body = params[String]("body")
+      splog.info(s"REST client was asked to $method $url")
+>>>>>>> fix-rest-client
 
     val url = params[URI]("url").toURL
     val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
