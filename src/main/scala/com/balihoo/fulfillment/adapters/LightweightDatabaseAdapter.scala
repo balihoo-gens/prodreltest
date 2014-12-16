@@ -40,7 +40,7 @@ trait LightweightDatabaseAdapterComponent {
   /**
    * Encapsulate a db and expose operations to be done on it.
    */
-  trait LightweightDatabase {
+  trait LightweightDatabase extends AutoCloseable {
 
     /**
      * Execute a sql statement.

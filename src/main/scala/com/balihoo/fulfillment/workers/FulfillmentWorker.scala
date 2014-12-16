@@ -28,7 +28,7 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util._
 
-abstract class FulfillmentWorker {
+abstract class FulfillmentWorker extends WithResources {
   this: LoggingWorkflowAdapter =>
 
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
@@ -140,6 +140,8 @@ abstract class FulfillmentWorker {
               case e:Exception =>
                 splog.warning(s"activity failed: exception=${e.toString}")
                 failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
+            } finally {
+              closeResources()
             }
           case None =>
             splog.info("no task available")
