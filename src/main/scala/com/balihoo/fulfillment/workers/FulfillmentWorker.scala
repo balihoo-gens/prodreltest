@@ -21,7 +21,6 @@ import play.api.libs.json._
 
 //other external
 import org.joda.time.DateTime
-import org.keyczar.Crypter
 
 //local imports
 import com.balihoo.fulfillment.adapters._
@@ -175,24 +174,6 @@ abstract class FulfillmentWorker {
   def getSpecification: ActivitySpecification
 
   def handleTask(params:ActivityArgs):ActivityResult
-
-<<<<<<< HEAD
-  def withTaskHandling(code: => ActivityResult) {
-=======
-  def withTaskHandling(code: => String) {
-    try {
-      val result:String = code
-      completeTask(result)
-    } catch {
-      case cancel:CancelTaskException =>
-        splog("INFO", cancel.details + " " + cancel.getMessage)
-        cancelTask(cancel.details)
-      case e:Exception =>
-        splog.error(e.getMessage + " " + e.getStackTraceString)
-        failTask("Task Failed", e.getMessage + " " + e.getStackTraceString take 150)
-    }
->>>>>>> fix-rest-client
-  }
 
   def declareWorker() = {
     val status = s"Declaring $name $domain $taskListName"

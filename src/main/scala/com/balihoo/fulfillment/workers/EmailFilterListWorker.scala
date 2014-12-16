@@ -35,7 +35,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   def destinationS3Bucket = swfAdapter.config.getString(s3BucketConfig)
   def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
 
-  object FilterListQueryParameter$
+  object FilterListQueryParameter
     extends ObjectParameter("query", "JSON representation of a SQL query", List(
       new ObjectParameter("select", "select columns definition", required = true)
     ), required = true)
@@ -43,7 +43,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        FilterListQueryParameter$,
+        FilterListQueryParameter,
         new StringParameter("source", "URL to a database file to use"),
         new IntegerParameter("pageSize", "Maximum records the produced csv files can contain")
       ),
