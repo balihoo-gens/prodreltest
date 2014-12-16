@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{OutputStream, File}
+import java.io.{File, OutputStream}
 import java.net.URI
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
@@ -10,7 +10,6 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import org.specs2.specification.Scope
-import play.api.libs.json.{JsString, JsArray, Json}
 
 import scala.collection.immutable.TreeSet
 import scala.util.Success
@@ -149,7 +148,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       val in =
         """
           |{
-          |  "source": "s3://some.bucket/long/key/some.db",
+          |  "source": "s3://some.bucket/long/key/some.db.gz",
           |  "pageSize": 4,
           |  "query": {
           |    "select": {
@@ -166,6 +165,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
         """.stripMargin
       s3Adapter.getMeta(===(data.s3_bucket), ===(data.db_s3_key)) returns Success(db_s3_meta_mock)
       db_s3_meta_mock.filename returns data.db_s3_meta_filename
+      db_s3_meta_mock.filenameNoExtension returns data.db_s3_meta_filename
       db_s3_meta_mock.getContentStream returns db_s3_contentStream_mock
       db_file_mock.getAbsolutePath returns data.db_file_path
       filesystemAdapter.newTempFileFromStream(db_s3_contentStream_mock, data.db_s3_key) returns db_file_mock
@@ -192,6 +192,9 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       csvAdapter.newWriter(csv_outputStream1_mock) returns csv_writer1_mock
       csvAdapter.newWriter(csv_outputStream2_mock) returns csv_writer2_mock
       csvAdapter.newWriter(csv_outputStream3_mock) returns csv_writer3_mock
+      filesystemAdapter.gzip(csv_file1_mock) returns csv_file1_mock
+      filesystemAdapter.gzip(csv_file2_mock) returns csv_file2_mock
+      filesystemAdapter.gzip(csv_file3_mock) returns csv_file3_mock
       s3Adapter.upload(data.csv_s3_key1, csv_file1_mock) returns Success(data.csv_s3_uri1)
       s3Adapter.upload(data.csv_s3_key2, csv_file2_mock) returns Success(data.csv_s3_uri2)
       s3Adapter.upload(data.csv_s3_key3, csv_file3_mock) returns Success(data.csv_s3_uri3)
@@ -217,17 +220,18 @@ class TestEmailFilterListWorker extends Specification with Mockito {
 
   object data {
     val s3_bucket = "some.bucket"
-    val db_s3_key = "long/key/some.db"
+    val db_s3_key = "long/key/some.db.gz"
     val db_s3_meta_filename = db_s3_key.split("/").last
+    val db_s3_meta_filename_noext = db_s3_key.split("/").last.split('.').init.mkString(".")
     val db_file_path = "some/file"
     val dbTableName = "recipients"
     val dbColumns = TreeSet("blength", "ccexpiredate", "cstat", "ctype", "email", "firstname", "fuel")
     val selectColumns = """"blength", "ccexpiredate", "cstat", "ctype", "email", "firstname", "fuel""""
     val selectWhere = """(("blength"<12) or ("blength">=14 and "blength"<18)) and ("ccexpiredate"='2020-01-01') and (("cstat"='HOLD') or ("cstat"='CUR')) and ("ctype"='COM') and ("fuel"='DIESEL')"""
     val csvHeaders = dbColumns.toSeq
-    val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv"
-    val csv_s3_key2 = s"mock/$db_s3_meta_filename.2.csv"
-    val csv_s3_key3 = s"mock/$db_s3_meta_filename.3.csv"
+    val csv_s3_key1 = s"mock/$db_s3_meta_filename.1.csv.gz"
+    val csv_s3_key2 = s"mock/$db_s3_meta_filename.2.csv.gz"
+    val csv_s3_key3 = s"mock/$db_s3_meta_filename.3.csv.gz"
     val csv_s3_uri1 = new URI("s3://host1/path1")
     val csv_s3_uri2 = new URI("s3://host2/path2")
     val csv_s3_uri3 = new URI("s3://host3/path3")

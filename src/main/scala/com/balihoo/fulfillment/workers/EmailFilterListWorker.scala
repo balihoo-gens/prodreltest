@@ -79,7 +79,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
       val uris = for ((page, pageNum) <- pages.zipWithIndex) yield {
 
         splog.info(s"Processing CSV file #${pageNum + 1}...")
-        val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.${pageNum + 1}.csv"
+        val csvS3Key = s"$destinationS3Key/${dbMeta.filenameNoExtension}.${pageNum + 1}.csv.gz"
         val csvTempFile = workerFile(filesystemAdapter.newTempFile(csvS3Key))
         val csvOutputStream = workerResource(filesystemAdapter.newOutputStream(csvTempFile))
         val csvWriter = csvAdapter.newWriter(csvOutputStream)
@@ -91,8 +91,9 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
         }
 
         splog.info(s"Uploading CSV to S3... csvS3Key=$csvS3Key csvTempFile=${csvTempFile.getAbsolutePath}")
+        val csvGzip = filesystemAdapter.gzip(csvTempFile)
         s3Adapter
-          .upload(csvS3Key, csvTempFile)
+          .upload(csvS3Key, csvGzip)
           .map(uri => JsString(uri.toString))
           .get
       }

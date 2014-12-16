@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import play.api.libs.json.{JsString, JsValue, JsObject, Json}
+import play.api.libs.json.Json
 
 import scala.util.{Failure, Success, Try}
 
@@ -149,15 +149,21 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     /**
      * Add a parameter to the prepared statement based on db type and index.
      */
-    def addSqlParam(sqlParamIndex: Int, dbType: DataTypes.DataType, value: String) = dbType match {
-      case DataTypes.Text => dbBatch.param(sqlParamIndex, value)
-      case DataTypes.Integer => dbBatch.param(sqlParamIndex, value.toLong)
-      case DataTypes.Date => dbBatch.param(sqlParamIndex, new java.sql.Date(sqlDateParser.parse(value).getTime))
-      /** TODO (jmelanson) support timestamp (need requirements) */
-      case DataTypes.Timestamp => dbBatch.param(sqlParamIndex, value)
-      case DataTypes.Boolean => dbBatch.param(sqlParamIndex, value.toBoolean)
-      case DataTypes.Real => dbBatch.param(sqlParamIndex, value.toDouble)
-      case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
+    def addSqlParam(sqlParamIndex: Int, dbType: DataTypes.DataType, value: String) = {
+      if (Option(value).isEmpty || value.trim.isEmpty)
+        dbBatch.param(sqlParamIndex, None)
+      else dbType match {
+        case DataTypes.Text => dbBatch.param(sqlParamIndex, Some(value))
+        case DataTypes.Integer => dbBatch.param(sqlParamIndex, Some(value.toLong))
+        case DataTypes.Date =>
+          val aDate = new java.sql.Date(sqlDateParser.parse(value).getTime)
+          dbBatch.param(sqlParamIndex, Some(aDate))
+        /** TODO (jmelanson) support timestamp (need requirements) */
+        case DataTypes.Timestamp => dbBatch.param(sqlParamIndex, Some(value))
+        case DataTypes.Boolean => dbBatch.param(sqlParamIndex, Some(value.toBoolean))
+        case DataTypes.Real => dbBatch.param(sqlParamIndex, Some(value.toDouble))
+        case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
+      }
     }
 
     /* main loop, insert all rows in db */
@@ -211,7 +217,11 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   override def handleTask(params: ActivityParameters) = {
 
     val (bucket, key, dbName, tableDefinition) = getParams(params)
-    val dbS3Key = s"$s3dir/$dbName"
+
+    val dbS3Key = {
+      val gzDbName = if (dbName.endsWith(".gz")) dbName else s"$dbName.gz"
+      s"$s3dir/$gzDbName"
+    }
 
     val csvMeta = s3Adapter.getMeta(bucket, key).get
     val dbMetaTry = s3Adapter.getMeta(dbS3Key)
@@ -243,11 +253,13 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
         createDb(db, tableDefinition, csvInputStreamReader)
 
+        val gzDbFile = filesystemAdapter.gzip(dbTempFile)
+
         val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
         val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
         val dbUri =
           s3Adapter
-            .upload(dbS3Key, dbTempFile, userMetaData = metaData)
+            .upload(dbS3Key, gzDbFile, userMetaData = metaData)
             .map(_.toString)
             .get
 
@@ -255,8 +267,8 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
       } finally {
         db.close()
-        csvInputStreamReader.close()
         csvMeta.close()
+        csvInputStreamReader.close()
         dbTempFile.delete()
       }
 
