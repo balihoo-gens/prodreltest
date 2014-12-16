@@ -68,9 +68,9 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
               uriPromise.failure(new FailTaskException("unable to determine response length", t.getMessage))
           }
         case n if 500 until 600 contains n =>
-          uriPromise.failure(new CancelTaskException("Server Error", "server returned $code"))
+          uriPromise.failure(new CancelTaskException("Server Error", s"server returned $code"))
         case _ =>
-          uriPromise.failure(new FailTaskException("processStream", "server returned $code"))
+          uriPromise.failure(new FailTaskException("Bad Response Code", s"server returned $code"))
       }
     }
 

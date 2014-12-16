@@ -138,14 +138,17 @@ abstract class FulfillmentWorker {
               splog.info(s"Task processed time=$time")
             } catch {
               case cancel:CancelTaskException =>
-                splog("INFO", cancel.details + " " + cancel.getMessage)
-                cancelTask(cancel.details)
+                val msg = cancel.toJsonString
+                splog.info(msg)
+                cancelTask(msg)
               case fail:FailTaskException => // Deliberate failures
-                splog("INFO", fail.details + " " + fail.getMessage)
-                failTask("Task Failed", fail.getMessage + " " + fail.getStackTraceString take 150)
+                splog.warning(fail.toJsonString)
+                failTask("Task Failed", fail.toShortJsonString)
               case e:Exception =>
-                splog("ERROR", "UNEXPECTED ERROR! " + e.getMessage + " " + e.getStackTraceString)
-                failTask("UNEXPECTED ERROR!", e.getMessage + " " + e.getStackTraceString take 150)
+                val msg = Json.stringify(Json.obj("message" -> e.getMessage, "stacktrace" -> e.getStackTraceString))
+                splog.error(msg)
+                val shortMsg = Json.stringify(Json.obj("message" -> e.getMessage, "stacktrace" -> e.getStackTraceString.take(150)))
+                failTask("UNEXPECTED ERROR!", shortMsg)
             }
           case None =>
             splog.info("no task available")
@@ -291,8 +294,39 @@ abstract class FulfillmentWorker {
 
 }
 
-class CancelTaskException(val exception:String, val details:String) extends Exception(exception)
-class FailTaskException(val exception:String, val details:String) extends Exception(exception)
+abstract class FulFillmentException(val exception:String, val details:String) extends Exception(exception) {
+  def asJson:JsObject
+  def toJsonString = Json.stringify(asJson)
+  def asShortJson:JsObject
+  def toShortJsonString = Json.stringify(asShortJson)
+}
+
+class CancelTaskException(override val exception:String, override val details:String) extends FulFillmentException(exception, details) {
+  override def asJson:JsObject = {
+    Json.obj(
+      "message" -> getMessage,
+      "details" -> details
+    )
+  }
+  override def asShortJson = asJson
+}
+
+class FailTaskException(override val exception:String, override val details:String) extends FulFillmentException(exception, details) {
+  override def asJson:JsObject = {
+    Json.obj(
+      "message" -> getMessage,
+      "details" -> details,
+      "stacktrace" -> getStackTrace.mkString("\n").take(256)
+    )
+  }
+  override def asShortJson:JsObject = {
+    Json.obj(
+      "message" -> getMessage,
+      "details" -> details,
+      "stacktrace" -> getStackTrace.mkString("\n").take(256)
+    )
+  }
+}
 
 class TaskResolution(val resolution:String, val details:String) {
   val when = UTCFormatter.format(DateTime.now)
