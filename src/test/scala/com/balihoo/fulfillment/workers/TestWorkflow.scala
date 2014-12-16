@@ -111,7 +111,8 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
       val input = Json.stringify(jsonInput)
 
       val result = wfgen.handleTask(wfgen.getSpecification.getArgs(input))
-      result.result.as[String] match {
+//      println(result.serialize())
+      result.serialize() match {
         case s:String =>
           val results = Json.parse(s).as[List[JsObject]]
           results must have size(4)
@@ -141,7 +142,7 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
       )
       val input = Json.stringify(jsonInput)
       val result = wfgen.handleTask(wfgen.getSpecification.getArgs(input))
-      result.result.as[String] match {
+      result.serialize() match {
         case s:String =>
           val results = Json.parse(s).as[List[JsObject]]
           results must have size(1)

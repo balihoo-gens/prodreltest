@@ -149,7 +149,7 @@ abstract class AbstractWorkflowGenerator
       submitTask(template, tags)
     }
 
-    getSpecification.createResult(workflowCreator.toString)
+    getSpecification.createResult(for(result <- workflowCreator.results) yield result.toJson)
   }
 
 
