@@ -26,59 +26,71 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(
         List(
-          new UriActivityParameter("source", "The service URL"),
-          new EnumActivityParameter("method", "", List("GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE")),
-          new StringActivityParameter("target", "File name for where the body content will be saved"),
-          new ObjectActivityParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
-          new StringActivityParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE", required=false)
+          new UriParameter("source", "The service URL"),
+          new EnumParameter("method", "", List("GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE")),
+          new StringParameter("target", "File name for where the body content will be saved"),
+          new ObjectParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
+          new StringParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE", required=false)
         ),
-        new StringActivityResult("the S3 URL of the saved data.")
+        new StringResultType("the S3 URL of the saved data.")
       )
   }
 
 
   def makeRequest(url:URI, method:String):HttpRequest = Http(url.toString).method(method)
 
-  override def handleTask(params: ActivityParameters) = {
-    withTaskHandling {
-      val uriPromise = Promise[String]()
-      val url = params[URI]("url")
-      val method = params[String]("method")
-      val target = params[String]("target")
-      val req = makeRequest(url, method)
+  def executeRequest(req:HttpRequest, callback:(Int, Map[String,String], InputStream) => Unit) = {
+    req.exec[Unit](callback)
+  }
 
-      def processStream(code:Int, headers:Map[String,String], is:InputStream) = {
-        code match {
-          case n if 200 until 300 contains n =>
-            Try(headers("Content-Length").toInt) match {
-              case Success(len) => s3Adapter.uploadStream(s"$destinationS3Key/$target", is, len) match {
-                case Success(s3Uri) => uriPromise.success(s3Uri.toString)
-                case Failure(t) => uriPromise.failure(t)
+  override def handleTask(params: ActivityArgs) = {
+    val uriPromise = Promise[String]()
+    val source = params[URI]("source")
+    val method = params[String]("method")
+    val target = params[String]("target")
+    val maybeHeaders = params.get[ActivityArgs]("headers")
+    val req = makeRequest(source, method)
+
+    def processStream(code:Int, headers:Map[String,String], is:InputStream) = {
+      code match {
+        case n if 200 until 300 contains n =>
+          Try(headers("Content-Length").toInt) match {
+            case Success(len) if len > 0 =>
+              s3Adapter.uploadStream(s"$destinationS3Key/$target", is, len) match {
+                case Success(s3Uri) =>
+                  uriPromise.success(s3Uri.toString)
+                case Failure(t) =>
+                  uriPromise.failure(new FailTaskException("failed to upload", t.getMessage))
               }
-              case Failure(t) => uriPromise.failure(t)
-            }
-          case _ => uriPromise.failure(new Exception("server returned $code"))
-        }
+            case Success(len) =>
+              uriPromise.failure(new FailTaskException("zero length response", s"content length = $len"))
+            case Failure(t) =>
+              uriPromise.failure(new FailTaskException("unable to determine response length", t.getMessage))
+          }
+        case n if 500 until 600 contains n =>
+          uriPromise.failure(new CancelTaskException("Server Error", "server returned $code"))
+        case _ =>
+          uriPromise.failure(new FailTaskException("processStream", "server returned $code"))
       }
-
-      if (params.has("headers")) {
-        params[JsObject]("headers").validate[Map[String, String]] match {
-          case headers:JsSuccess[Map[String, String]] =>
-            req.headers(headers.get)
-          case _ => throw new IllegalArgumentException("invalid header object")
-        }
-      }
-
-      if (params.has("body") && (method == "POST")) {
-        Try(params[String]("body")) match {
-          case Success(body) => req.postData(body)
-          case Failure(t) => throw new IllegalArgumentException("invalid body string", t)
-        }
-      }
-
-      req.exec[Unit](processStream _)
-      Await.result(uriPromise.future, taskTimeout seconds)
     }
+
+    if (maybeHeaders.isDefined) {
+      Try(Json.parse(maybeHeaders.get.input).as[Map[String, String]]) match {
+        case Success(headers) => req.headers(headers)
+        case Failure(t) => throw new IllegalArgumentException("invalid header object")
+      }
+    }
+
+    if (params.has("body") && (method == "POST")) {
+      Try(params[String]("body")) match {
+        case Success(body) => req.postData(body)
+        case Failure(t) => throw new IllegalArgumentException("invalid body string", t)
+      }
+    }
+
+    executeRequest(req, processStream _)
+
+    getSpecification.createResult(Await.result(uriPromise.future, taskTimeout seconds))
   }
 }
 
