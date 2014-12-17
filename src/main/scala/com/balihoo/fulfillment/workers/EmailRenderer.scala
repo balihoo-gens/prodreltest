@@ -22,6 +22,8 @@ class AbstractEmailRenderer extends AbstractRESTClient {
     )
   }
 
+  def destinationS3Key = swfAdapter.config.getString("s3dir")
+
   override def handleTask(params: ActivityArgs) = {
     val url = params[URI]("url").toURL
     val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
@@ -64,7 +66,7 @@ class AbstractEmailRenderer extends AbstractRESTClient {
 
         //upload the body to s3
         val is = new ByteArrayInputStream(body.getBytes)
-        s3Adapter.uploadStream(s"$target", is, body.size) match {
+        s3Adapter.uploadStream(s"$destinationS3Key/$target", is, body.size) match {
           case Success(s3Uri) =>
             val jsonS3Uri = JsString(s3Uri.toString)
             getSpecification.createResult(Json.obj("body" -> jsonS3Uri, "data" -> data))
@@ -76,7 +78,7 @@ class AbstractEmailRenderer extends AbstractRESTClient {
         throw new CancelTaskException("Server Error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
       case _ =>
         // Redirection or Client Error or anything else we didn't anticipate
-        throw new FailTaskException("Unexpected respnse error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
+        throw new FailTaskException("Unexpected response error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
     }
   }
 }
