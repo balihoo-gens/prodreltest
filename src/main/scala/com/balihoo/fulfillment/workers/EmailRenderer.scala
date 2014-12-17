@@ -6,7 +6,8 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
 import play.api.libs.json._
-
+import scala.util.{Success, Failure, Try}
+import java.io.ByteArrayInputStream
 
 class AbstractEmailRenderer extends AbstractRESTClient {
   this: LoggingWorkflowAdapter
@@ -47,25 +48,26 @@ class AbstractEmailRenderer extends AbstractRESTClient {
               case Success(data) =>
                 Try((jsonResponse \ "layout").as[String]) match {
                   case Success(body) =>
-                    s3Adapter.uploadStream(s"$destinationS3Key/$target", is, len) match {
+                    val is = new ByteArrayInputStream(body.getBytes)
+                    s3Adapter.uploadStream(s"$target", is, body.size) match {
                       case Success(s3Uri) =>
                         getSpecification.createResult(
                           Json.obj(
-                            "body" -> JsString(s3Name),
+                            "body" -> JsString(s3Uri.toString),
                             "data" -> data
                           )
                         )
                       case Failure(t) =>
-                        throw new FailTaskException("failed to upload", t.getMessage))
+                        throw new FailTaskException("failed to upload", t.getMessage)
                     }
                   case Failure(t) =>
-                    throw new FailTaskException("'layout' tag not found in response", t.getMessage))
+                    throw new FailTaskException("'layout' tag not found in response", t.getMessage)
                 }
               case Failure(t) =>
-                throw new FailTaskException("'json' tag not found in response", t.getMessage))
+                throw new FailTaskException("'json' tag not found in response", t.getMessage)
             }
           case Failure(t) =>
-            throw new FailTaskException("response not parsable json", t.getMessage))
+            throw new FailTaskException("response not parsable json", t.getMessage)
         }
       case n if 500 until 600 contains n =>
         // Server Error
@@ -74,11 +76,6 @@ class AbstractEmailRenderer extends AbstractRESTClient {
         // Redirection or Client Error or anything else we didn't anticipate
         throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
     }
-  }
-
-  def s3upload(body:String, target:String):String = {
-    println("uploaded ${body take 12} to ${target}")
-    "s3://blablabla"
   }
 }
 
