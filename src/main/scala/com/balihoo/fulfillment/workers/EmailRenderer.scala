@@ -41,40 +41,42 @@ class AbstractEmailRenderer extends AbstractRESTClient {
     response.code.code match {
       case n if 200 until 300 contains n =>
         // SUCCESS!
-        Try(Json.toJson(response.bodyString)) match {
-          case Success(jsonResponse) =>
-            println(jsonResponse)
-            Try((jsonResponse \ "json").as[JsObject]) match {
-              case Success(data) =>
-                Try((jsonResponse \ "layout").as[String]) match {
-                  case Success(body) =>
-                    val is = new ByteArrayInputStream(body.getBytes)
-                    s3Adapter.uploadStream(s"$target", is, body.size) match {
-                      case Success(s3Uri) =>
-                        getSpecification.createResult(
-                          Json.obj(
-                            "body" -> JsString(s3Uri.toString),
-                            "data" -> data
-                          )
-                        )
-                      case Failure(t) =>
-                        throw new FailTaskException("failed to upload", t.getMessage)
-                    }
-                  case Failure(t) =>
-                    throw new FailTaskException("'layout' tag not found in response", t.getMessage)
-                }
-              case Failure(t) =>
-                throw new FailTaskException("'json' tag not found in response", t.getMessage)
-            }
+        val rs = response.bodyString
+        splog.debug(s"Http response: $rs")
+
+        //parse the response as json
+        val jsonResponse = Try(Json.parse(rs)) match {
+          case Success(jsonResponse) => jsonResponse
+          case Failure(t) => throw new FailTaskException(s"response not parsable json: $rs", t.getMessage)
+        }
+
+        //extract the json meta data
+        val data = Try((jsonResponse \ "json").as[JsValue]) match {
+          case Success(data) => data
+          case Failure(t) => throw new FailTaskException(s"invalid 'json' tag in response: $rs", t.getMessage)
+        }
+
+        //extract the email body, from the 'layout' tag
+        val body =  Try((jsonResponse \ "layout").as[String]) match {
+          case Success(body) => body
+          case Failure(t) => throw new FailTaskException(s"invalid 'layout' tag (must be a string): $rs", t.getMessage)
+        }
+
+        //upload the body to s3
+        val is = new ByteArrayInputStream(body.getBytes)
+        s3Adapter.uploadStream(s"$target", is, body.size) match {
+          case Success(s3Uri) =>
+            val jsonS3Uri = JsString(s3Uri.toString)
+            getSpecification.createResult(Json.obj("body" -> jsonS3Uri, "data" -> data))
           case Failure(t) =>
-            throw new FailTaskException("response not parsable json", t.getMessage)
+            throw new FailTaskException("failed to upload", t.getMessage)
         }
       case n if 500 until 600 contains n =>
         // Server Error
         throw new CancelTaskException("Server Error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
       case _ =>
         // Redirection or Client Error or anything else we didn't anticipate
-        throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
+        throw new FailTaskException("Unexpected respnse error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
     }
   }
 }
