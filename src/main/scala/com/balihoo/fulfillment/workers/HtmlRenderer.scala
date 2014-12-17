@@ -66,9 +66,9 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
       ), new StringResultType("the target URL if successfully saved"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
-    val target = params[String]("target")
-    val source = params[URI]("source")
+  override def handleTask(args: ActivityArgs):ActivityResult = {
+    val target = args[String]("target")
+    val source = args[URI]("source")
 
     val input = MutableMap(
       "action" -> "render",
@@ -78,17 +78,17 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
     //optionally add the optional parameters
     for (s <- Seq("data", "clipselector")
-         if params.has(s)
+         if args.has(s)
     ) yield {
-      input(s) = params[String](s)
+      input(s) = args[String](s)
     }
 
-    if (params.has("headers")) {
-      input("headers") = Json.stringify(params[JsObject]("headers"))
+    if (args.has("headers")) {
+      input("headers") = Json.stringify(args[JsObject]("headers"))
     }
 
-    val maxsize = params.getOrElse("maxsize", maxsizeDefault )
-    val minquality = params.getOrElse("minquality", minqualityDefault)
+    val maxsize = args.getOrElse("maxsize", maxsizeDefault )
+    val minquality = args.getOrElse("minquality", minqualityDefault)
     if (maxsize < 0) throw new Exception("max size must be > 0")
     if (minquality < 0) throw new Exception("min quality must be > 0")
 

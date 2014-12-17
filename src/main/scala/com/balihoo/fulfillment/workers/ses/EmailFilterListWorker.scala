@@ -55,8 +55,8 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   /**
    * Extract, validate and return parameters for this task.
    */
-  private def getParams(params: ActivityArgs) = {
-    val maybeQuery =  params.get[ActivityArgs]("query")
+  private def getArguments(args: ActivityArgs) = {
+    val maybeQuery =  args.get[ActivityArgs]("query")
     if (maybeQuery.isEmpty) throw new IllegalArgumentException("query param is required")
 
     val queryDefinition = Try(Json.parse(maybeQuery.get.input).as[QueryDefinition]) match {
@@ -64,7 +64,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
       case Failure(t) => throw new IllegalArgumentException("invalid select query object", t)
     }
 
-    val maybeSource = params.get[String]("source")
+    val maybeSource = args.get[String]("source")
     if (maybeSource.isEmpty || maybeSource.get.trim().isEmpty) throw new IllegalArgumentException("source param is empty")
 
     val source = Try(new URI(maybeSource.get)) match {
@@ -74,7 +74,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     if (!source.getScheme.equalsIgnoreCase("s3")) throw new IllegalArgumentException("invalid source URI scheme")
 
-    val maybePageSize =  params.get[Int]("pageSize")
+    val maybePageSize =  args.get[Int]("pageSize")
     if (maybePageSize.isEmpty) throw new IllegalArgumentException("pageSize param is required")
     val pageSize = maybePageSize.get
     if (pageSize < 1) throw new IllegalArgumentException("pageSize param is invalid")
@@ -82,9 +82,9 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     (queryDefinition, source.getHost, source.getPath.tail, pageSize)
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
 
-    val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getParams(params)
+    val (queryDefinition, sourceBucket, sourceKey, recordsPerPage) = getArguments(args)
 
     val dbMeta = s3Adapter.getMeta(sourceBucket, sourceKey).get
 

@@ -72,22 +72,22 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     }
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val appId = params[String]("appId")
-    val appSecret = params[String]("appSecret")
-    val accessToken = params[String]("accessToken")
+    val appId = args[String]("appId")
+    val appSecret = args[String]("appSecret")
+    val accessToken = args[String]("accessToken")
     val connection = new FacebookConnection(appId, appSecret, accessToken)
-    val postType = params[String]("postType")
-    val pageId = params[String]("pageId")
-    val target = createTarget(params[ActivityArgs]("target"))
-    val message = params.getOrElse[String]("message", null)
-    lazy val linkUri = params.getOrElse[URI]("linkUrl", null)
-    lazy val photoUri = params.get[URI]("photoUrl")
+    val postType = args[String]("postType")
+    val pageId = args[String]("pageId")
+    val target = createTarget(args[ActivityArgs]("target"))
+    val message = args.getOrElse[String]("message", null)
+    lazy val linkUri = args.getOrElse[URI]("linkUrl", null)
+    lazy val photoUri = args.get[URI]("photoUrl")
     lazy val photoBytes = getPhotoBytes(photoUri)
     lazy val photoName = getPhotoName(photoUri)
-    val action = params[String]("action")
+    val action = args[String]("action")
     splog.info(s"Facebook poster was asked to $action a $postType. The page ID is $pageId.")
 
     getSpecification.createResult(

@@ -28,16 +28,16 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
     ), new ObjectResultType("completed time and token"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     val timeReceived = new DateTime(DateTimeZone.UTC)
-    val countMax = params.getOrElse("maxcount", 1)
-    val countPrevious = params.getOrElse("count", 0)
-    val multiply = params.getOrElse("multiply", 1)
-    val token = params.getOrElse("token", uuid)
+    val countMax = args.getOrElse("maxcount", 1)
+    val countPrevious = args.getOrElse("count", 0)
+    val multiply = args.getOrElse("multiply", 1)
+    val token = args.getOrElse("token", uuid)
 
     val count = countPrevious + 1
 
-    val durationLast:Option[Duration] = params.get("submit_time") match {
+    val durationLast:Option[Duration] = args.get("submit_time") match {
       case Some(timeSubmittedString) =>
         try {
           val timeSubmitted = DateTime.parse(timeSubmittedString)
@@ -52,7 +52,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
 
     val durationAvg:Option[Duration] = durationLast match {
       case Some(duration) =>
-        params.get[Long]("avg_duration") match {
+        args.get[Long]("avg_duration") match {
           case Some(durationAvgPrevious) =>
             val prevMillis = durationAvgPrevious
             val curMillis = duration.getMillis

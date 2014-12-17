@@ -13,7 +13,7 @@ abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
     new ActivitySpecification(List(), new StringsResultType("Array of email addresses"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     getSpecification.createResult(listVerifiedEmailAddresses())
