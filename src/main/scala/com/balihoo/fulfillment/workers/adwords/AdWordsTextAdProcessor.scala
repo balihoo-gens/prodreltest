@@ -1,13 +1,13 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
 import java.net.URI
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201409.cm._
-
-import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
   this: LoggingAdwordsWorkflowAdapter
@@ -17,9 +17,9 @@ abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
     adCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("Text Ad Processor", {
-      adWordsAdapter.setClientId(params("account"))
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("Text Ad Processor", {
+      adWordsAdapter.setClientId(params[String]("account"))
 
       val textAd = adCreator.getTextAd(params) match {
         case ad:TextAd =>
@@ -27,7 +27,8 @@ abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
         case _ =>
           adCreator.createTextAd(params)
       }
-      completeTask(String.valueOf(textAd.getId))
+
+      getSpecification.createResult(String.valueOf(textAd.getId))
 
     })
   }
@@ -49,21 +50,21 @@ trait TextAdCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("account", "Participant AdWords account ID"),
-        new IntegerActivityParameter("adGroupId", "AdWords AdGroup ID"),
-        new StringActivityParameter("headline", "Headline of the ad", maxLength=Some(25)),
-        new StringActivityParameter("description1", "First line of ad text", maxLength=Some(35)),
-        new StringActivityParameter("description2", "Second line of ad text", maxLength=Some(35)),
-        new UriActivityParameter("url", "Landing page URL (domain must match displayUrl)"),
-        new UriActivityParameter("displayUrl", "Visible Ad URL")
-      ), new StringActivityResult("TextAd ID"),
+        new StringParameter("account", "Participant AdWords account ID"),
+        new StringParameter("adGroupId", "AdWords AdGroup ID"),
+        new StringParameter("headline", "Headline of the ad", maxLength=Some(25)),
+        new StringParameter("description1", "First line of ad text", maxLength=Some(35)),
+        new StringParameter("description2", "Second line of ad text", maxLength=Some(35)),
+        new UriParameter("url", "Landing page URL (domain must match displayUrl)"),
+        new UriParameter("displayUrl", "Visible Ad URL")
+      ), new StringResultType("TextAd ID"),
         "Create a Google AdWords Text Ad.\nhttps://developers.google.com/adwords/api/docs/reference/v201409/AdGroupAdService.TextAd\nhttps://developers.google.com/adwords/api/docs/appendix/limits#ad" )
     }
 
-    def getTextAd(params: ActivityParameters): TextAd = {
+    def getTextAd(params: ActivityArgs): TextAd = {
 
-      val name = params("headline")
-      val adGroupId = params("adGroupId")
+      val name = params[String]("headline")
+      val adGroupId = params[String]("adGroupId")
       val context = s"getTextAd(name='$name', adGroup='$adGroupId')"
 
       val selector = new SelectorBuilder()
@@ -82,11 +83,11 @@ trait TextAdCreatorComponent {
       })
     }
 
-    def newTextAd(params:ActivityParameters): TextAd = {
+    def newTextAd(params:ActivityArgs): TextAd = {
 
-      val headline = AdWordsPolicy.limitString(params("headline"), 25)
-      val desc1 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params("description1"), 35))
-      val desc2 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params("description2"), 35))
+      val headline = AdWordsPolicy.limitString(params[String]("headline"), 25)
+      val desc1 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params[String]("description1"), 35))
+      val desc2 = AdWordsPolicy.fixUpperCaseViolations(AdWordsPolicy.limitString(params[String]("description2"), 35))
       val displayUrl = AdWordsPolicy.displayUrl(params[URI]("displayUrl").toString)
       val url = AdWordsPolicy.destinationUrl(params[URI]("url").toString)
 
@@ -102,11 +103,11 @@ trait TextAdCreatorComponent {
       tad
     }
 
-    def createTextAd(params:ActivityParameters): TextAd = {
+    def createTextAd(params:ActivityArgs): TextAd = {
       _add(newTextAd(params), params)
     }
 
-    def updateTextAd(existingAd:TextAd, params:ActivityParameters): TextAd = {
+    def updateTextAd(existingAd:TextAd, params:ActivityArgs): TextAd = {
 
       val newAd = newTextAd(params)
 
@@ -121,7 +122,7 @@ trait TextAdCreatorComponent {
       newAd
     }
 
-    def _add(tad:TextAd, params:ActivityParameters):TextAd = {
+    def _add(tad:TextAd, params:ActivityArgs):TextAd = {
       val aga = new AdGroupAd()
       aga.setAd(tad)
       aga.setAdGroupId(params[Long]("adGroupId"))
@@ -142,7 +143,7 @@ trait TextAdCreatorComponent {
       }
     }
 
-    def _remove(tad:TextAd, params:ActivityParameters) = {
+    def _remove(tad:TextAd, params:ActivityArgs) = {
       val aga = new AdGroupAd()
       aga.setAd(tad)
       aga.setAdGroupId(params[Long]("adGroupId"))

@@ -1,12 +1,12 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
-import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
-import com.google.api.ads.adwords.axis.v201409.cm.Operator
-import com.google.api.ads.adwords.axis.v201409.cm.Selector
-import com.google.api.ads.adwords.axis.v201409.mcm.{ManagedCustomerOperation, ManagedCustomer}
 import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.workers._
+import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
+import com.google.api.ads.adwords.axis.v201409.cm.{Operator, Selector}
+import com.google.api.ads.adwords.axis.v201409.mcm.{ManagedCustomer, ManagedCustomerOperation}
 
 /*
  * this is the dependency-injectable class containing all functionality
@@ -19,8 +19,8 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
     accountCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("Account Creator", {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("Account Creator", {
       adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
       val account = accountCreator.getAccount(params) match {
@@ -28,7 +28,7 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
         case _ =>
           accountCreator.createAccount(params)
       }
-      completeTask(String.valueOf(account.getCustomerId))
+      getSpecification.createResult(String.valueOf(account.getCustomerId))
     })
   }
 }
@@ -54,14 +54,14 @@ trait AccountCreatorComponent {
 
     def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("parent", "Parent AdWords account name"),
-        new StringActivityParameter("name", "Name of this Account"),
-        new StringActivityParameter("currencyCode", "Usually US. https://developers.google.com/adwords/api/docs/appendix/currencycodes "),
-        new StringActivityParameter("timeZone", "https://developers.google.com/adwords/api/docs/appendix/timezones")
-      ), new StringActivityResult("AdWords Account ID"))
+        new StringParameter("parent", "Parent AdWords account name"),
+        new StringParameter("name", "Name of this Account"),
+        new StringParameter("currencyCode", "Usually US. https://developers.google.com/adwords/api/docs/appendix/currencycodes "),
+        new StringParameter("timeZone", "https://developers.google.com/adwords/api/docs/appendix/timezones")
+      ), new StringResultType("AdWords Account ID"))
     }
 
-    def getManagerAccount(params:ActivityParameters):ManagedCustomer = {
+    def getManagerAccount(params:ActivityArgs):ManagedCustomer = {
       val parent = params[String]("parent")
       val context = s"getManagerAccount(parent='$parent')"
 
@@ -74,7 +74,7 @@ trait AccountCreatorComponent {
       _getAccount(selector, parent, context)
     }
 
-    def getAccount(params:ActivityParameters):ManagedCustomer = {
+    def getAccount(params:ActivityArgs):ManagedCustomer = {
       val name = params[String]("name")
       val context = s"getAccount(name='$name')"
 
@@ -98,11 +98,11 @@ trait AccountCreatorComponent {
       })
     }
 
-    def createAccount(params:ActivityParameters):ManagedCustomer = {
+    def createAccount(params:ActivityArgs):ManagedCustomer = {
 
-      val name = params("name")
-      val currencyCode = params("currencyCode")
-      val timeZone = params("timeZone")
+      val name = params[String]("name")
+      val currencyCode = params[String]("currencyCode")
+      val timeZone = params[String]("timeZone")
       val context = s"createAccount(name='$name', currencyCode='$currencyCode', timeZone='$timeZone')"
 
       val customer:ManagedCustomer = new ManagedCustomer()
@@ -119,7 +119,7 @@ trait AccountCreatorComponent {
       })
     }
 
-    def lookupParentAccount(params:ActivityParameters):String = {
+    def lookupParentAccount(params:ActivityArgs):String = {
       val parentName = params[String]("parent")
       brandAccountCache.contains(parentName) match {
         case true =>

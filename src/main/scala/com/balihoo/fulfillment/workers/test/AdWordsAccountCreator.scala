@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.workers.adwords.AccountCreatorComponent
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201409.cm.Operator
 import com.google.api.ads.adwords.axis.v201409.cm.Selector
@@ -49,7 +50,7 @@ object adWordsGetAccounts {
       adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId(adWordsAdapter.baseAccountId) // Dogtopia
 
-      val m:ManagedCustomer = accountCreator.getManagerAccount(new ActivityParameters(Map("parent" -> "brand-demo")))
+      val m:ManagedCustomer = accountCreator.getManagerAccount(new ActivityArgs(Map("parent" -> "brand-demo")))
       println(m.getCustomerId)
       println(m.getName)
       println(m.getCompanyName)
@@ -76,7 +77,7 @@ object adWordsAccountCreator {
        //    adWordsAdapter.setValidateOnly(false)
       adWordsAdapter.setClientId("981-046-8123") // Dogtopia
 
-      val newId = accountCreator.createAccount(new ActivityParameters(Map(
+      val newId = accountCreator.createAccount(new ActivityArgs(Map(
         "name" -> "test campaign",
         "currencyCode" -> "USD",
         "timeZone" -> "America/Boise"
