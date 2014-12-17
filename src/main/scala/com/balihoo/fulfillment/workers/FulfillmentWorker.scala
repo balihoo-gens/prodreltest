@@ -179,9 +179,6 @@ abstract class FulfillmentWorker {
 
   def handleTask(params:ActivityArgs):ActivityResult
 
-  def withTaskHandling(code: => ActivityResult) {
-  }
-
   def declareWorker() = {
     val status = s"Declaring $name $domain $taskListName"
     splog("INFO",status)
@@ -316,7 +313,7 @@ class FailTaskException(override val exception:String, override val details:Stri
     Json.obj(
       "message" -> getMessage,
       "details" -> details,
-      "stacktrace" -> getStackTrace.mkString("\n").take(256)
+      "stacktrace" -> getStackTrace.mkString("\n")
     )
   }
   override def asShortJson:JsObject = {

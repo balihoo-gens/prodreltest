@@ -8,7 +8,7 @@ import com.balihoo.fulfillment.util.Splogger
 import play.api.libs.json._
 
 
-class AbstractEmailWorker extends AbstractRESTClient {
+class AbstractEmailRenderer extends AbstractRESTClient {
   this: LoggingWorkflowAdapter
   with S3AdapterComponent
   with HTTPAdapterComponent =>
@@ -16,45 +16,63 @@ class AbstractEmailWorker extends AbstractRESTClient {
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       super.getSpecification.params :+
-      new StringActivityParameter("target", "File name for where the body content will be saved"),
-      new ObjectActivityResult("Json object containing the email body and data")
+      new StringParameter("target", "File name for where the body content will be saved"),
+      new ObjectResultType("Json object containing the email body and data")
     )
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    withTaskHandling {
-      val url = params[URI]("url").toURL
-      val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
-      val method = params[String]("method")
-      val target = params[String]("target")
-      lazy val body = params[String]("body")
-      splog.info(s"Email worker was asked to $method $url")
+  override def handleTask(params: ActivityArgs) = {
+    val url = params[URI]("url").toURL
+    val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
+    val method = params[String]("method")
+    val target = params[String]("target")
+    lazy val body = params[String]("body")
+    splog.info(s"Email worker was asked to $method $url")
 
-      val response = method match {
-        case "DELETE" => httpAdapter.delete(url, headers = headers)
-        case "GET" => httpAdapter.get(url, headers = headers)
-        case "POST" => httpAdapter.post(url, body, headers = headers)
-        case "PUT" => httpAdapter.put(url, body, headers = headers)
-        case _ => throw new IllegalArgumentException(s"Invalid method: $method")
-      }
+    val response = method match {
+      case "DELETE" => httpAdapter.delete(url, headers = headers)
+      case "GET" => httpAdapter.get(url, headers = headers)
+      case "POST" => httpAdapter.post(url, body, headers = headers)
+      case "PUT" => httpAdapter.put(url, body, headers = headers)
+      case _ => throw new IllegalArgumentException(s"Invalid method: $method")
+    }
 
-      if(200 <= response.code.code && response.code.code < 300) {
+    response.code.code match {
+      case n if 200 until 300 contains n =>
         // SUCCESS!
-        val jsonResponse = Json.toJson(response.bodyString)
-        val data = (jsonResponse \ "json").as[JsObject]
-        val body = (jsonResponse \ "layout").as[String]
-        val s3Name = s3upload(body, target)
-        Json.stringify(Json.obj(
-          "body" -> JsString(s3Name),
-          "data" -> data
-        ))
-      } else if(500 <= response.code.code && response.code.code < 600) {
+        Try(Json.toJson(response.bodyString)) match {
+          case Success(jsonResponse) =>
+            println(jsonResponse)
+            Try((jsonResponse \ "json").as[JsObject]) match {
+              case Success(data) =>
+                Try((jsonResponse \ "layout").as[String]) match {
+                  case Success(body) =>
+                    s3Adapter.uploadStream(s"$destinationS3Key/$target", is, len) match {
+                      case Success(s3Uri) =>
+                        getSpecification.createResult(
+                          Json.obj(
+                            "body" -> JsString(s3Name),
+                            "data" -> data
+                          )
+                        )
+                      case Failure(t) =>
+                        throw new FailTaskException("failed to upload", t.getMessage))
+                    }
+                  case Failure(t) =>
+                    throw new FailTaskException("'layout' tag not found in response", t.getMessage))
+                }
+              case Failure(t) =>
+                throw new FailTaskException("'json' tag not found in response", t.getMessage))
+            }
+          case Failure(t) =>
+            throw new FailTaskException("response not parsable json", t.getMessage))
+        }
+      case n if 500 until 600 contains n =>
         // Server Error
         throw new CancelTaskException("Server Error", s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
-      } else {
+      case _ =>
         // Redirection or Client Error or anything else we didn't anticipate
         throw new Exception(s"Code ${response.code.code} ${response.code.stringVal}: ${response.bodyString}")
-      }
     }
   }
 
@@ -64,8 +82,8 @@ class AbstractEmailWorker extends AbstractRESTClient {
   }
 }
 
-class EmailWorker(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractEmailWorker
+class EmailRenderer(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractEmailRenderer
   with LoggingWorkflowAdapterImpl
   with S3AdapterComponent
   with HTTPAdapterComponent {
@@ -75,8 +93,8 @@ class EmailWorker(override val _cfg: PropertiesLoader, override val _splog: Splo
     override val s3Adapter = new S3Adapter(_cfg, _splog)
 }
 
-object email_worker extends FulfillmentWorkerApp {
+object email_renderer extends FulfillmentWorkerApp {
   override def createWorker(cfg: PropertiesLoader, splog: Splogger): FulfillmentWorker = {
-    new EmailWorker(cfg, splog)
+    new EmailRenderer(cfg, splog)
   }
 }

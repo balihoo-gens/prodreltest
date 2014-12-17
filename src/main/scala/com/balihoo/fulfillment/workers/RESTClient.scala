@@ -18,11 +18,10 @@ class AbstractRESTClient extends FulfillmentWorker {
       new EnumParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
       new StringParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
     ), new StringResultType("Rest response data"))
-  }
+ }
 
   override def handleTask(params: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
-
     val url = params[URI]("url").toURL
     val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
     val method = params[String]("method")
