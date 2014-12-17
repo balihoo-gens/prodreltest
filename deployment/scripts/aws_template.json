@@ -15,12 +15,12 @@
 
     "WorkerInstanceType" : {
       "Description" : "Worker EC2 instance type",
-      "Type" : "String",
+      "Type" : "String"
     },
 
     "DashboardInstanceType" : {
       "Description" : "WebServer EC2 instance type",
-      "Type" : "String",
+      "Type" : "String"
     },
 
     "MinInstances" : {
