@@ -239,7 +239,7 @@ class TestDatabaseQueryAndExportToCsv extends Specification with Mockito {
     val pageSizeInvalid = 0
   }
 
-  trait WithWorker extends AbstractDatabaseQueryAndExportToCsv with Scope
+  trait WithWorker extends AbstractDatabaseCsvExport with Scope
     with LoggingWorkflowAdapterTestImpl
     with S3AdapterComponent
     with LightweightDatabaseAdapterComponent

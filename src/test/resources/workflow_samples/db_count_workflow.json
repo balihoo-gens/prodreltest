@@ -2,7 +2,7 @@
     "sections": {
         "count recipients per location": {
             "action": {
-                "name": "Email-countlist",
+                "name": "db_count",
                 "version": "1"
             },
             "params": {

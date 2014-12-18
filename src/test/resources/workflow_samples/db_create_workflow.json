@@ -1,8 +1,8 @@
 {
     "sections": {
-        "create_db": {
+        "create database": {
             "action": {
-                "name": "Email-createdb",
+                "name": "db_create",
                 "version": "1"
             },
             "params": {

@@ -2,7 +2,7 @@
     "sections": {
         "Get recipients with a first and last name starting with 'a'": {
             "action": {
-                "name": "Email-filterlist",
+                "name": "db_csv_export",
                 "version": "1"
             },
             "params": {

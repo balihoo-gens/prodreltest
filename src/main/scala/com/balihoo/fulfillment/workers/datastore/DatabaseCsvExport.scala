@@ -12,7 +12,7 @@ import play.api.libs.json._
  * Worker that execute a SQL query over a database file ot yield a set of CSV files
  * (put in s3) that contains recipients email address for bulk email delivery.
  */
-abstract class AbstractDatabaseQueryAndExportToCsv extends FulfillmentWorker {
+abstract class AbstractDatabaseCsvExport extends FulfillmentWorker {
 
   this: LoggingWorkflowAdapter
     with LightweightDatabaseAdapterComponent
@@ -100,8 +100,8 @@ abstract class AbstractDatabaseQueryAndExportToCsv extends FulfillmentWorker {
 /**
  * Production-ready worker class.
  */
-class DatabaseQueryAndExportToCsv(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractDatabaseQueryAndExportToCsv
+class DatabaseCsvExport(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractDatabaseCsvExport
     with LoggingWorkflowAdapterImpl
     with SQLiteLightweightDatabaseAdapterComponent
     with S3AdapterComponent
@@ -113,8 +113,8 @@ class DatabaseQueryAndExportToCsv(override val _cfg: PropertiesLoader, override 
 /**
  * Email FilterList worker application instance.
  */
-object db_query_and_export_to_csv extends FulfillmentWorkerApp {
+object db_csv_export extends FulfillmentWorkerApp {
   override def createWorker(cfg: PropertiesLoader, splog: Splogger): FulfillmentWorker = {
-    new DatabaseQueryAndExportToCsv(cfg, splog)
+    new DatabaseCsvExport(cfg, splog)
   }
 }

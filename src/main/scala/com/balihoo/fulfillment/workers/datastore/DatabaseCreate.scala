@@ -37,7 +37,7 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
   def s3dir = swfAdapter.config.getString("s3dir")
   def s3bucket = swfAdapter.config.getString("s3bucket")
 
-  object EmailDatabaseSchemaDefinitionParameter$
+  object EmailDatabaseSchemaDefinitionParameter
     extends ObjectParameter(
       "dtd",
       "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)",
@@ -62,7 +62,7 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
       List(
         new UriParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
         new StringParameter("dbname", "Name of the lightweight database file that will be generated", minLength = Some(1)),
-        EmailDatabaseSchemaDefinitionParameter$
+        EmailDatabaseSchemaDefinitionParameter
       ),
       new StringResultType("URL to the lightweight database file"),
       "Insert all records from a CSV file to a lightweight database file, according to a DTD")
@@ -278,13 +278,6 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
     )
   }
 }
-
-
-
-
-
-
-
 
 class DatabaseCreate(override val _cfg: PropertiesLoader, override val _splog: Splogger) extends AbstractDatabaseCreate
   with ScalaCsvAdapterComponent
