@@ -573,6 +573,137 @@ class TestFulfillmentSection extends Specification with Mockito
       strresult must beEqualTo("I love it when a plan comes together")
     }
 
+    "  convert various values to strings" in {
+
+      val json = Json.parse(s"""{
+            "<(toString)>" : 555
+        }""").as[JsObject]
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val strresult = param.getResult.getOrElse(JsString("nope!")).as[String]
+      strresult must beEqualTo("555")
+
+      val json1 = Json.parse(s"""{
+            "<(toString)>" : 555.6666
+        }""").as[JsObject]
+      val param1 = new SectionParameter(json1)
+      param1.evaluate(null, Map[String, JsValue]())
+      val strresult1 = param1.getResult.getOrElse(JsString("nope!")).as[String]
+      strresult1 must beEqualTo("555.6666")
+
+      val json2 = Json.parse(s"""{
+            "<(toString)>" : "555.7777"
+        }""").as[JsObject]
+      val param2 = new SectionParameter(json2)
+      param2.evaluate(null, Map[String, JsValue]())
+      val strresult2 = param2.getResult.getOrElse(JsString("nope!")).as[String]
+      strresult2 must beEqualTo("555.7777")
+
+      val json3 = Json.parse(s"""{
+            "<(toString)>" : [ "a", 6, ["b", 4, false]]
+        }""").as[JsObject]
+      val param3 = new SectionParameter(json3)
+      param3.evaluate(null, Map[String, JsValue]())
+      val strresult3 = param3.getResult.getOrElse(JsString("nope!")).as[String]
+      // "a" is expected.. cause it processes args(0).. which is the first one in the case
+      // of an incoming array
+      strresult3 must beEqualTo("a")
+
+      val json4 = Json.parse(s"""{
+            "<(toString)>" : { "a": 6, "mooneee" : ["b", 4, false] }
+        }""").as[JsObject]
+      val param4 = new SectionParameter(json4)
+      param4.evaluate(null, Map[String, JsValue]())
+      val strresult4 = param4.getResult.getOrElse(JsString("nope!")).as[String]
+      // "nope!" is expected.. cause it processes args(0).. which is not available in an incoming jsobject
+      strresult4 must beEqualTo("nope!")
+
+    }
+
+    "  convert various values to integers" in {
+
+      val json = Json.parse(s"""{
+            "<(toInt)>" : 555
+        }""").as[JsObject]
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val strresult = param.getResult.getOrElse(JsNumber(9999)).as[Int]
+      strresult must beEqualTo(555)
+
+      val json1 = Json.parse(s"""{
+            "<(toInt)>" : 554.6666
+        }""").as[JsObject]
+      val param1 = new SectionParameter(json1)
+      param1.evaluate(null, Map[String, JsValue]())
+      val strresult1 = param1.getResult.getOrElse(JsNumber(9999)).as[Int]
+      strresult1 must beEqualTo(554)
+
+      val json2 = Json.parse(s"""{
+            "<(toInt)>" : "556.7777"
+        }""").as[JsObject]
+      val param2 = new SectionParameter(json2)
+      param2.evaluate(null, Map[String, JsValue]())
+      val strresult2 = param2.getResult.getOrElse(JsNumber(9999)).as[Int]
+      strresult2 must beEqualTo(556)
+
+      val json3 = Json.parse(s"""{
+            "<(toInt)>" : [ "a", 6, ["b", 4, false]]
+        }""").as[JsObject]
+      val param3 = new SectionParameter(json3)
+      param3.evaluate(null, Map[String, JsValue]())
+      val strresult3 = param3.getResult.getOrElse(JsNumber(9999)).as[Int]
+      // 9999 is expected.. we have no strategy for converting an array to an int
+      strresult3 must beEqualTo(9999)
+
+    }
+
+    "  convert various values to numbers" in {
+
+      val json = Json.parse(s"""{
+            "<(tonumber)>" : 555
+        }""").as[JsObject]
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      val strresult = param.getResult.getOrElse(JsNumber(9999)).as[Double]
+      strresult must beEqualTo(555)
+
+      val json1 = Json.parse(s"""{
+            "<(toNumber)>" : 554.6666
+        }""").as[JsObject]
+      val param1 = new SectionParameter(json1)
+      param1.evaluate(null, Map[String, JsValue]())
+      val strresult1 = param1.getResult.getOrElse(JsNumber(9999)).as[Double]
+      strresult1 must beEqualTo(554.6666)
+
+      val json2 = Json.parse(s"""{
+            "<(toNumber)>" : "556.7777"
+        }""").as[JsObject]
+      val param2 = new SectionParameter(json2)
+      param2.evaluate(null, Map[String, JsValue]())
+      val strresult2 = param2.getResult.getOrElse(JsNumber(9999)).as[Double]
+      strresult2 must beEqualTo(556.7777)
+
+      val json3 = Json.parse(s"""{
+            "<(toNumber)>" : [ "a", 6, ["b", 4, false]]
+        }""").as[JsObject]
+      val param3 = new SectionParameter(json3)
+      param3.evaluate(null, Map[String, JsValue]())
+      val strresult3 = param3.getResult.getOrElse(JsNumber(9999)).as[Double]
+      // 9999 is expected.. we have no strategy for converting an array to an int
+      strresult3 must beEqualTo(9999)
+
+    }
+
+    "  clearly complain about non-existent operator" in {
+
+      val json = Json.parse(s"""{
+            "<(doesNotEvenExistNope)>" : 555
+        }""").as[JsObject]
+      val param = new SectionParameter(json)
+      param.evaluate(null, Map[String, JsValue]())
+      Json.stringify(param.toJson.as[JsObject].value("timeline").as[JsArray].value(0)).contains("""Unexpected Exception! There is no operator '<(doesNotEvenExistNope)>' available!""")
+
+    }
 
   }
 }

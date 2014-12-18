@@ -15,10 +15,10 @@ abstract class AbstractEmailAddressVerifier extends FulfillmentWorker {
     ), new ObjectResultType("Result of Verification"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    getSpecification.createResult(verifyAddress(params[String]("address")))
+    getSpecification.createResult(verifyAddress(args[String]("address")))
   }
 
   def verifyAddress(address: String):String = {

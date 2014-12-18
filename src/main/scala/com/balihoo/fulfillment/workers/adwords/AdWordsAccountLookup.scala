@@ -17,12 +17,12 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
     ), new StringResultType("AdWords Account ID"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Account Lookup", {
-      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
+      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(args))
 
-      val aname = params[String]("name")
-      accountCreator.getAccount(params) match {
+      val aname = args[String]("name")
+      accountCreator.getAccount(args) match {
         case existing:ManagedCustomer =>
           getSpecification.createResult(String.valueOf(existing.getCustomerId))
         case _ =>

@@ -19,14 +19,14 @@ abstract class AbstractAdWordsAccountCreator extends FulfillmentWorker {
     accountCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Account Creator", {
-      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
+      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(args))
 
-      val account = accountCreator.getAccount(params) match {
+      val account = accountCreator.getAccount(args) match {
         case account:ManagedCustomer => account
         case _ =>
-          accountCreator.createAccount(params)
+          accountCreator.createAccount(args)
       }
       getSpecification.createResult(String.valueOf(account.getCustomerId))
     })
@@ -61,8 +61,8 @@ trait AccountCreatorComponent {
       ), new StringResultType("AdWords Account ID"))
     }
 
-    def getManagerAccount(params:ActivityArgs):ManagedCustomer = {
-      val parent = params[String]("parent")
+    def getManagerAccount(args:ActivityArgs):ManagedCustomer = {
+      val parent = args[String]("parent")
       val context = s"getManagerAccount(parent='$parent')"
 
       val selector = new SelectorBuilder()
@@ -74,8 +74,8 @@ trait AccountCreatorComponent {
       _getAccount(selector, parent, context)
     }
 
-    def getAccount(params:ActivityArgs):ManagedCustomer = {
-      val name = params[String]("name")
+    def getAccount(args:ActivityArgs):ManagedCustomer = {
+      val name = args[String]("name")
       val context = s"getAccount(name='$name')"
 
       val selector = new SelectorBuilder()
@@ -98,11 +98,11 @@ trait AccountCreatorComponent {
       })
     }
 
-    def createAccount(params:ActivityArgs):ManagedCustomer = {
+    def createAccount(args:ActivityArgs):ManagedCustomer = {
 
-      val name = params[String]("name")
-      val currencyCode = params[String]("currencyCode")
-      val timeZone = params[String]("timeZone")
+      val name = args[String]("name")
+      val currencyCode = args[String]("currencyCode")
+      val timeZone = args[String]("timeZone")
       val context = s"createAccount(name='$name', currencyCode='$currencyCode', timeZone='$timeZone')"
 
       val customer:ManagedCustomer = new ManagedCustomer()
@@ -119,14 +119,14 @@ trait AccountCreatorComponent {
       })
     }
 
-    def lookupParentAccount(params:ActivityArgs):String = {
-      val parentName = params[String]("parent")
+    def lookupParentAccount(args:ActivityArgs):String = {
+      val parentName = args[String]("parent")
       brandAccountCache.contains(parentName) match {
         case true =>
           brandAccountCache(parentName)
         case false =>
           adWordsAdapter.setClientId(adWordsAdapter.baseAccountId)
-          getManagerAccount(params) match {
+          getManagerAccount(args) match {
             case existing: ManagedCustomer =>
               brandAccountCache += (parentName -> String.valueOf(existing.getCustomerId))
               String.valueOf(existing.getCustomerId)

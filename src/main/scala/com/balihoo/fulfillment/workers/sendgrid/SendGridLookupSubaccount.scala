@@ -16,10 +16,10 @@ abstract class AbstractSendGridLookupSubaccount extends FulfillmentWorker {
     ), new StringResultType("The subaccount username"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
+    val subaccountId = SendGridSubaccountId(args("participantId"), args[Boolean]("useTestSubaccount"))
     val apiUser = sendGridAdapter.checkSubaccountExists(subaccountId)
     apiUser match {
       case Some(s) => getSpecification.createResult(s)

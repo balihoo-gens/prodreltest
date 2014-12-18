@@ -17,15 +17,15 @@ abstract class AbstractAdWordsTextAdProcessor extends FulfillmentWorker {
     adCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Text Ad Processor", {
-      adWordsAdapter.setClientId(params[String]("account"))
+      adWordsAdapter.setClientId(args[String]("account"))
 
-      val textAd = adCreator.getTextAd(params) match {
+      val textAd = adCreator.getTextAd(args) match {
         case ad:TextAd =>
-          adCreator.updateTextAd(ad, params)
+          adCreator.updateTextAd(ad, args)
         case _ =>
-          adCreator.createTextAd(params)
+          adCreator.createTextAd(args)
       }
 
       getSpecification.createResult(String.valueOf(textAd.getId))
@@ -103,35 +103,35 @@ trait TextAdCreatorComponent {
       tad
     }
 
-    def createTextAd(params:ActivityArgs): TextAd = {
-      _add(newTextAd(params), params)
+    def createTextAd(args:ActivityArgs): TextAd = {
+      _add(newTextAd(args), args)
     }
 
-    def updateTextAd(existingAd:TextAd, params:ActivityArgs): TextAd = {
+    def updateTextAd(existingAd:TextAd, args:ActivityArgs): TextAd = {
 
-      val newAd = newTextAd(params)
+      val newAd = newTextAd(args)
 
       if(newAd.equals(existingAd)) {
         // The existing add is exactly the same..
         return existingAd
       }
 
-      _remove(existingAd, params)
-      _add(newAd, params)
+      _remove(existingAd, args)
+      _add(newAd, args)
 
       newAd
     }
 
-    def _add(tad:TextAd, params:ActivityArgs):TextAd = {
+    def _add(tad:TextAd, args:ActivityArgs):TextAd = {
       val aga = new AdGroupAd()
       aga.setAd(tad)
-      aga.setAdGroupId(params[Long]("adGroupId"))
+      aga.setAdGroupId(args[Long]("adGroupId"))
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)
       operation.setOperator(Operator.ADD)
 
-      val context = s"Adding a Text Ad $params"
+      val context = s"Adding a Text Ad $args"
 
       adWordsAdapter.withErrorsHandled[AdGroupAd](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation)).getValue(0)
@@ -143,16 +143,16 @@ trait TextAdCreatorComponent {
       }
     }
 
-    def _remove(tad:TextAd, params:ActivityArgs) = {
+    def _remove(tad:TextAd, args:ActivityArgs) = {
       val aga = new AdGroupAd()
       aga.setAd(tad)
-      aga.setAdGroupId(params[Long]("adGroupId"))
+      aga.setAdGroupId(args[Long]("adGroupId"))
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)
       operation.setOperator(Operator.REMOVE)
 
-      val context = s"Removing a Text Ad $params"
+      val context = s"Removing a Text Ad $args"
 
       adWordsAdapter.withErrorsHandled[Any](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation))

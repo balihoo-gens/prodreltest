@@ -11,10 +11,10 @@ abstract class AbstractFTPUploader extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = FTPUploadConfig.getSpecification
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    ftpAdapter.uploadFile(new FTPUploadConfig(params, config))
+    ftpAdapter.uploadFile(new FTPUploadConfig(args, config))
 
       // No exceptions, so call it good.
     getSpecification.createResult("OK")

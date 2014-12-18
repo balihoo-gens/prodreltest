@@ -19,9 +19,9 @@ abstract class AbstractParticipantData extends FulfillmentWorker {
       ), new ObjectResultType("An object of affiliate data"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     // We're passing the raw JSON string to the command. The command will digest it.
-    val result = command.run(params.input)
+    val result = command.run(args.input)
     result.code match {
       case 0 =>
         getSpecification.createResult(result.out)

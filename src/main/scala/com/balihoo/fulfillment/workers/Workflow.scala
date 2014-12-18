@@ -136,14 +136,14 @@ abstract class AbstractWorkflowGenerator
   }
 
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
 
-    val template = params[ActivityArgs]("template").input
-    val tags = Try(params[List[String]]("tags")) getOrElse List[String]()
+    val template = args[ActivityArgs]("template").input
+    val tags = Try(args[List[String]]("tags")) getOrElse List[String]()
     val workflowCreator = new WorkFlowCreator(template, tags)
 
-    if (params.has("substitutions")) {
-      val subTable = params[SubTable]("substitutions")
+    if (args.has("substitutions")) {
+      val subTable = args[SubTable]("substitutions")
       multipleSubstitute(subTable, workflowCreator)
     } else {
       submitTask(template, tags)

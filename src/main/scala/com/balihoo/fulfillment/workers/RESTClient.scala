@@ -19,13 +19,12 @@ class AbstractRESTClient extends FulfillmentWorker {
     ), new StringResultType("Rest response data"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
-
-    val url = params[URI]("url").toURL
-    val headers = params.getOrElse[Map[String, String]]("headers", Map()).toList
-    val method = params[String]("method")
-    lazy val body = params[String]("body")
+    val url = args[URI]("url").toURL
+    val headers = args.getOrElse[Map[String, String]]("headers", Map()).toList
+    val method = args[String]("method")
+    lazy val body = args[String]("body")
     splog.info(s"REST client was asked to $method $url")
 
     val response = method match {

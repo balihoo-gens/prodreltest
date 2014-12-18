@@ -74,8 +74,7 @@ class Launcher(object):
         self._nragent_path = nragent_path
         self._components = {}
         self._log = Splogger(logfile)
-        if cfgfile:
-            self._task_poller = self._make_task_poller(cfgfile)
+        self._task_poller = self._make_task_poller(cfgfile) if cfgfile else None
 
     def _make_task_poller(self, cfgfile):
         """ creates an async Swf task poller

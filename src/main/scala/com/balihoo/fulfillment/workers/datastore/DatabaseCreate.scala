@@ -69,15 +69,15 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
   }
 
   /**
-   * Extract, validate and return parameters for this task.
+   * Extract, validate and return args for this task.
    */
-  private def getParams(parameters: ActivityArgs) = {
+  private def getArguments(args: ActivityArgs) = {
 
-    splog.info("Parsing parameters source, dbname and dtd")
+    splog.info("Parsing args source, dbname and dtd")
 
-    val maybeSource = parameters.get[URI]("source")
-    val maybeDbName = parameters.get[String]("dbname")
-    val maybeDtd = parameters.get[ActivityArgs]("dtd")
+    val maybeSource = args.get[URI]("source")
+    val maybeDbName = args.get[String]("dbname")
+    val maybeDtd = args.get[ActivityArgs]("dtd")
 
     if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
     val sourceUri = maybeSource.get
@@ -174,7 +174,7 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
         /* CSV row column count does not match CSV header column count */
         handleBadRow(rowNumber)
       } else {
-        /* extract all types and value from row and add as prepared statement parameters */
+        /* extract all types and value from row and add as prepared statement args */
         extractTypesAndValues(row)
           .view
           .zipWithIndex
@@ -212,9 +212,9 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
     db.commit()
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
 
-    val (bucket, key, dbName, tableDefinition) = getParams(params)
+    val (bucket, key, dbName, tableDefinition) = getArguments(args)
 
     val dbS3Key = {
       val gzDbName = if (dbName.endsWith(".gz")) dbName else s"$dbName.gz"

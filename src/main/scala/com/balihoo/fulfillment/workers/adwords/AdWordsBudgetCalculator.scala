@@ -19,11 +19,11 @@ abstract class AbstractAdWordsBudgetCalculator extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = budgetCalculator.getSpecification
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Budget Calculation", {
-      adWordsAdapter.setClientId(params[String]("account"))
+      adWordsAdapter.setClientId(args[String]("account"))
 
-      getSpecification.createResult(Json.stringify(budgetCalculator.computeDailyBudget(params)))
+      getSpecification.createResult(Json.stringify(budgetCalculator.computeDailyBudget(args)))
     })
   }
 }
@@ -65,14 +65,14 @@ trait BudgetCalculatorComponent {
       )
     }
 
-    def computeDailyBudget(params:ActivityArgs):JsObject = {
+    def computeDailyBudget(args:ActivityArgs):JsObject = {
 
-      val campaignId = params[String]("campaignId")
-      val startDate = params[DateTime]("startDate")
-      val today = params[DateTime]("today")
-      val endDate = params[DateTime]("endDate")
-      val adschedule = params[List[String]]("adschedule")
-      val budget = params[Double]("budget").toFloat
+      val campaignId = args[String]("campaignId")
+      val startDate = args[DateTime]("startDate")
+      val today = args[DateTime]("today")
+      val endDate = args[DateTime]("endDate")
+      val adschedule = args[List[String]]("adschedule")
+      val budget = args[Double]("budget").toFloat
 
       if(today.isBefore(startDate)) {
         throw new Exception(s"today (${UTCFormatter.format(today)}) is before startDate(${UTCFormatter.format(startDate)})")

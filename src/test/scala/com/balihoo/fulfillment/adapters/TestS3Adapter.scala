@@ -1,5 +1,6 @@
 package com.balihoo.fulfillment.adapters
 
+import java.io.{File, InputStream}
 import java.io.{ByteArrayInputStream, File}
 import java.net.URI
 
@@ -54,8 +55,6 @@ class TestS3Adapter extends Specification with Mockito {
   "upload" should {
     "return an URI if a aws putObject request succeeded" in new WithAdapter {
       val fileMock = mock[File]
-      val putObjectResult = mock[PutObjectResult]
-
       val result = upload(data.key, fileMock, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
 
       result must beSuccessfulTry.withValue(new URI(s"s3://${data.bucket}/${data.key}"))
@@ -63,10 +62,26 @@ class TestS3Adapter extends Specification with Mockito {
     }
     "throw an exception if the aws putObject request failed" in new WithAdapter {
       val fileMock = mock[File]
-      val putObjectResult = mock[PutObjectResult]
       client.putObject(any[PutObjectRequest]) throws new AmazonClientException("damn")
 
       val result = upload(data.key, fileMock, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
+      result must beFailedTry.withThrowable[AmazonClientException]
+    }
+  }
+
+  "uploadStream" should {
+    "return an URI if a aws putObject request succeeded" in new WithAdapter {
+      val inputStreamMock = mock[InputStream]
+      val result = uploadStream(data.key, inputStreamMock, 0, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
+
+      result must beSuccessfulTry.withValue(new URI(s"s3://${data.bucket}/${data.key}"))
+      there was one(client).putObject(any[PutObjectRequest])
+    }
+    "throw an exception if the aws putObject request failed" in new WithAdapter {
+      val inputStreamMock = mock[InputStream]
+      client.putObject(any[PutObjectRequest]) throws new AmazonClientException("damn")
+
+      val result = uploadStream(data.key, inputStreamMock, 0, data.bucket, Map("some" -> "metadata"), PublicS3Visibility)
       result must beFailedTry.withThrowable[AmazonClientException]
     }
   }

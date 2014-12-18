@@ -94,7 +94,6 @@ class ActivitySpecification(val params:List[ActivityParameter]
   def createResult[T](o: T)(implicit tjs: Writes[T]): ActivityResult = result.jsToResult(tjs.writes(o))
 }
 
-
 class ActivityArgs(val params:Map[String,Any], val input:String = "{}") {
 
   def has(param:String):Boolean = {
