@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.datastore
 
 import java.io.{File, InputStream, InputStreamReader}
 import java.net.URI
@@ -7,7 +7,8 @@ import java.util.Date
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.workers.ses.{AbstractEmailCreateDBWorker, ColumnDefinition, DataTypes, TableDefinition}
+import com.balihoo.fulfillment.workers.ses.AbstractDatabaseCreate
+import com.balihoo.fulfillment.workers._
 import org.junit.runner._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -18,7 +19,7 @@ import play.api.libs.json.{JsString, Json}
 import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
-class TestEmailCreateDBWorker extends Specification with Mockito {
+class TestDatabaseCreate extends Specification with Mockito {
 
   "email create database worker" should {
     "return a valid specification" in new WithWorker {
@@ -311,9 +312,6 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       there was one(db_mock).execute("create index \"fullname\" on \"recipients\" (\"firstname\", \"lastname\")")
       there was one(db_mock).execute("create index \"bday\" on \"recipients\" (\"birthday\")")
 
-      there was one(db_mock).close()
-      there was one(csv_reader_mock).close()
-      there was one(db_file_mock).delete()
     }
     "complete task by returning cached db uri if db lastModified is equal or greater to csv lastModified" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
@@ -328,8 +326,6 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       result.result must ===(new JsString(data.db_s3_uri.toString))
 
       there was no(filesystemAdapter).newTempFileFromStream(any[InputStream], anyString)
-      there was one(db_s3_meta_mock).close()
-      there was one(csv_s3_meta_mock).close()
     }
   }
 
@@ -404,7 +400,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val db_s3_uri = new URI(s"s3://$s3_bucket/$db_s3_key")
   }
 
-  trait WithWorker extends AbstractEmailCreateDBWorker with Scope
+  trait WithWorker extends AbstractDatabaseCreate with Scope
     with LoggingWorkflowAdapterTestImpl
     with S3AdapterComponent
     with CsvAdapterComponent
@@ -417,11 +413,6 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     override val filesystemAdapter = mock[JavaIOFilesystemAdapter]
     override val insertBatchSize = 2
     override val s3dir = data.s3_dir
-    override def completeTask(result: ActivityResult) = {
-      test_complete_result = result.serialize()
-    }
-
-    var test_complete_result = ""
 
     val csv_s3_meta_mock = mock[S3Meta]
     val csv_s3_content_stream = mock[S3ObjectInputStream]
@@ -433,102 +424,19 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val db_batch_mock = mock[DbBatch]
   }
 
-  "ColumnDefinition" should {
-    "detect text types" in new DbTestContext {
-      ColumnDefinition("aname", "nvarchar", "asource").dataType must beEqualTo(DataTypes.Text)
-      ColumnDefinition("aname", "char(3)", "asource").dataType must beEqualTo(DataTypes.Text)
-      ColumnDefinition("aname", "varchar(100)", "asource").dataType must beEqualTo(DataTypes.Text)
-      ColumnDefinition("aname", "text", "asource").dataType must beEqualTo(DataTypes.Text)
-    }
-    "detect integer types" in new DbTestContext {
-      ColumnDefinition("aname", "int", "asource").dataType must beEqualTo(DataTypes.Integer)
-      ColumnDefinition("aname", "integer", "asource").dataType must beEqualTo(DataTypes.Integer)
-      ColumnDefinition("aname", "bigint", "asource").dataType must beEqualTo(DataTypes.Integer)
-      ColumnDefinition("aname", "smallint", "asource").dataType must beEqualTo(DataTypes.Integer)
-    }
-    "detect real types" in new DbTestContext {
-      ColumnDefinition("aname", "real", "asource").dataType must beEqualTo(DataTypes.Real)
-      ColumnDefinition("aname", "float", "asource").dataType must beEqualTo(DataTypes.Real)
-      ColumnDefinition("aname", "double", "asource").dataType must beEqualTo(DataTypes.Real)
-    }
-    "detect date types" in new DbTestContext {
-      ColumnDefinition("aname", "date", "asource").dataType must beEqualTo(DataTypes.Date)
-    }
-    "detect timestamp types" in new DbTestContext {
-      ColumnDefinition("aname", "datetime", "asource").dataType must beEqualTo(DataTypes.Timestamp)
-      ColumnDefinition("aname", "timestamp", "asource").dataType must beEqualTo(DataTypes.Timestamp)
-    }
-  }
-
-  "TableDefinition" should {
-    "populate source to name map" in new DbTestContext {
-      val result = data.tableDefinition.source2name
-      result must beAnInstanceOf[Map[String, String]]
-      result.size must beEqualTo(data.tableDefinition.columns.size)
-      result.getOrElse("SOMEINT".toLowerCase, "") must beEqualTo("someint")
-      result.getOrElse("SOMEINT2".toLowerCase, "") must beEqualTo("someint2")
-      result.getOrElse("SOMESTRING".toLowerCase, "") must beEqualTo("somestring")
-      result.getOrElse("SOMEDATE".toLowerCase, "") must beEqualTo("somedate")
-      result.getOrElse("SOMESTRING2".toLowerCase, "") must beEqualTo("somestring2")
-      result.getOrElse("SOMESTRING3".toLowerCase, "") must beEqualTo("somestring3")
-      result.getOrElse("SOMEBOOL".toLowerCase, "") must beEqualTo("somebool")
-      result.getOrElse("SOMETIMESTAMP".toLowerCase, "") must beEqualTo("sometimestamp")
-      result.getOrElse("SOMEREAL".toLowerCase, "") must beEqualTo("somereal")
-    }
-    "populate names to db types map" in new DbTestContext {
-      val result = data.tableDefinition.name2type
-      result must beAnInstanceOf[Map[String, String]]
-      result.size must beEqualTo(data.tableDefinition.columns.size)
-      result.getOrElse("someint", "") must beEqualTo(DataTypes.Integer)
-      result.getOrElse("someint2", "") must beEqualTo(DataTypes.Integer)
-      result.getOrElse("somestring", "") must beEqualTo(DataTypes.Text)
-      result.getOrElse("somedate", "") must beEqualTo(DataTypes.Date)
-      result.getOrElse("somestring2", "") must beEqualTo(DataTypes.Text)
-      result.getOrElse("somestring3", "") must beEqualTo(DataTypes.Text)
-      result.getOrElse("somebool", "") must beEqualTo(DataTypes.Boolean)
-      result.getOrElse("sometimestamp", "") must beEqualTo(DataTypes.Timestamp)
-      result.getOrElse("somereal", "") must beEqualTo(DataTypes.Real)
-    }
-    "generate appropriate table creation sql statement" in new DbTestContext {
-      val result = data.tableDefinition.tableCreateSql
-      result must beAnInstanceOf[String]
-      result must beEqualTo("create table \"recipients\" (" +
-        "\"someint\" integer, " +
-        "\"someint2\" integer, " +
-        "\"somestring\" varchar(50), " +
-        "\"somedate\" date, " +
-        "\"somestring2\" char(3), " +
-        "\"somestring3\" char(3), " +
-        "\"somebool\" boolean, " +
-        "\"sometimestamp\" timestamp, " +
-        "\"somereal\" double, " +
-        "primary key (\"someint\", \"someint2\"))")
-    }
-    "generate appropriate unique indexes creation sql statements" in new DbTestContext {
-      val uniques = data.tableDefinition.uniqueIndexCreateSql
-      uniques must beAnInstanceOf[Seq[String]]
-      uniques must beEqualTo(Seq("create unique index \"somestring_unique_idx\" on \"recipients\" (\"somestring\")"))
-    }
-    "generate appropriate simple indexes creation sql statements" in new DbTestContext {
-      val simples = data.tableDefinition.simpleIndexCreateSql
-      simples must beAnInstanceOf[Seq[String]]
-      simples must beEqualTo(Seq("create index \"an_index_name\" on \"recipients\" (\"somestring2\", \"somestring3\")"))
-    }
-  }
-
   class DbTestContext extends Scope {
     object data {
-      val col1 = ColumnDefinition("someint", "integer", "SOMEINT", Some("primary key"))
-      val col2 = ColumnDefinition("someint2", "integer", "SOMEINT2", Some("primary key"))
-      val col3 = ColumnDefinition("somestring", "varchar(50)", "SOMESTRING", Some("unique"))
-      val col4 = ColumnDefinition("somedate", "date", "SOMEDATE")
-      val col5 = ColumnDefinition("somestring2", "char(3)", "SOMESTRING2", Some("an_index_name"))
-      val col6 = ColumnDefinition("somestring3", "char(3)", "SOMESTRING3", Some("an_index_name"))
-      val col7 = ColumnDefinition("somebool", "boolean", "SOMEBOOL")
-      val col8 = ColumnDefinition("sometimestamp", "timestamp", "SOMETIMESTAMP")
-      val col9 = ColumnDefinition("somereal", "double", "SOMEREAL")
+      val col1 = DatabaseColumnDefinition("someint", "integer", "SOMEINT", Some("primary key"))
+      val col2 = DatabaseColumnDefinition("someint2", "integer", "SOMEINT2", Some("primary key"))
+      val col3 = DatabaseColumnDefinition("somestring", "varchar(50)", "SOMESTRING", Some("unique"))
+      val col4 = DatabaseColumnDefinition("somedate", "date", "SOMEDATE")
+      val col5 = DatabaseColumnDefinition("somestring2", "char(3)", "SOMESTRING2", Some("an_index_name"))
+      val col6 = DatabaseColumnDefinition("somestring3", "char(3)", "SOMESTRING3", Some("an_index_name"))
+      val col7 = DatabaseColumnDefinition("somebool", "boolean", "SOMEBOOL")
+      val col8 = DatabaseColumnDefinition("sometimestamp", "timestamp", "SOMETIMESTAMP")
+      val col9 = DatabaseColumnDefinition("somereal", "double", "SOMEREAL")
       val tableDefinition =
-        TableDefinition(
+        DatabaseTableDefinition(
           Seq(
             col1,
             col2,

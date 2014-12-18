@@ -1,0 +1,22 @@
+{
+    "sections": {
+        "count recipients per location": {
+            "action": {
+                "name": "db_count",
+                "version": "1"
+            },
+            "params": {
+                "source": "s3://balihoo.dev.fulfillment/tmp/Email-createdb/JP-RecipientsData.db.gz",
+                "query": {
+                    "select": {
+                        "last_name":  "$v like 'a%'"
+                    }
+                },
+                "column": "zip",
+                "locations": ["0", "38168", "47712", "52410"]
+            },
+            "status": "READY",
+            "essential": true
+        }
+    }
+}
