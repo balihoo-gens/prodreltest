@@ -1,5 +1,6 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.ses
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
@@ -14,10 +15,10 @@ abstract class AbstractEmailAddressVerifier extends FulfillmentWorker {
     ), new ObjectResultType("Result of Verification"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    getSpecification.createResult(verifyAddress(params("address")))
+    getSpecification.createResult(verifyAddress(args[String]("address")))
   }
 
   def verifyAddress(address: String):String = {

@@ -1,11 +1,10 @@
 package com.balihoo.fulfillment.workers
 
-import java.net.{URI, URL}
+import java.net.URI
 
 import com.balihoo.fulfillment.adapters.{HTTPAdapter, HTTPAdapterComponent, LoggingWorkflowAdapterImpl, LoggingWorkflowAdapter}
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import play.api.libs.json._
 
 class AbstractRESTClient extends FulfillmentWorker {
   this: LoggingWorkflowAdapter
@@ -14,18 +13,18 @@ class AbstractRESTClient extends FulfillmentWorker {
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
       new UriParameter("url", "The service URL"),
-      new ObjectParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
+      new StringMapParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
       new EnumParameter("method", "", List("DELETE", "GET", "POST", "PUT")),
       new StringParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE")
     ), new StringResultType("Rest response data"))
- }
+  }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
-    val url = params[URI]("url").toURL
-    val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
-    val method = params[String]("method")
-    lazy val body = params[String]("body")
+    val url = args[URI]("url").toURL
+    val headers = args.getOrElse[Map[String, String]]("headers", Map()).toList
+    val method = args[String]("method")
+    lazy val body = args[String]("body")
     splog.info(s"REST client was asked to $method $url")
 
     val response = method match {

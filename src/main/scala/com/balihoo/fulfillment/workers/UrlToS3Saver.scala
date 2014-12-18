@@ -74,7 +74,7 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
     }
 
     if (args.has("headers")) {
-      Try(Json.parse(args[Map[String, String]]("headers")) match {
+      Try(args[Map[String, String]]("headers")) match {
         case Success(headers) => req.headers(headers)
         case Failure(t) => throw new IllegalArgumentException("invalid header object")
       }

@@ -22,10 +22,6 @@ import scala.util.{Success, Try}
 class TestUrlToS3Saver extends Specification with Mockito {
 
   "AbstractUrlToS3Saver.handleTask" should {
-    "fail task if header is invalid" in new WithWorker {
-      val args = getSpecification.getArgs(data.apBadHeader)
-      handleTask(args) must throwA[IllegalArgumentException]
-    }
     "cancel task if the response code is in the 500 range" in new WithWorker {
       val args = getSpecification.getArgs(data.apGoodReq)
       responseKey = "servererr"

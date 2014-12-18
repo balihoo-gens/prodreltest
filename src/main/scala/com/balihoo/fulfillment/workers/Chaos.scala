@@ -16,14 +16,14 @@ abstract class AbstractChaos extends FulfillmentWorker {
     ), new StringResultType("Message of little consequence."))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     val rand = new Random()
 
     val failActual = rand.nextFloat() * 100
     val cancelActual = rand.nextFloat() * 100
 
-    val failChances = params[Float]("chanceToFail")
-    val cancelChances = params[Float]("chanceToCancel")
+    val failChances = args[Double]("chanceToFail")
+    val cancelChances = args[Double]("chanceToCancel")
 
     if(failActual < failChances) {
       throw new FailTaskException("Chaos ensued!", s"Failing because $failActual < $failChances")

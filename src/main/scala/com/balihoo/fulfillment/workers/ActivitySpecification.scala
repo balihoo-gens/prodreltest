@@ -91,9 +91,6 @@ class ActivitySpecification(val params:List[ActivityParameter]
     new ActivityArgs(foundParams.toMap, Json.stringify(inputObject))
   }
 
-//  def createResult(s:String):ActivityResult = result.jsToResult(new JsString(s))
-//  def createResult(js:JsValue):ActivityResult = result.jsToResult(js)
-//  def createResult(w:Writes):ActivityResult = result.jsToResult(Json.toJson(w))
   def createResult[T](o: T)(implicit tjs: Writes[T]): ActivityResult = result.jsToResult(tjs.writes(o))
 }
 

@@ -32,7 +32,13 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
       new EncryptedParameter("accessToken", "The Facebook access token"),
       new EnumParameter("postType", "", List("link", "photo", "status update")),
       new StringParameter("pageId", "The Facebook page ID"),
-      new ObjectParameter("target", "The targeting data"),
+      new ObjectParameter("target", "The targeting data", properties = List(
+        new StringsParameter("countryCodes", "countryCodes", required = false),
+        new ArrayParameter("regionIds", "regionIds", required = false, element = new IntegerParameter("regionId", "regionId")),
+        new StringsParameter("subregions", "subregions", required = false),
+        new ArrayParameter("cityIds", "cityIds", required = false, element = new IntegerParameter("cityId", "cityId")),
+        new StringsParameter("cities", "cities", required = false)
+      )),
       new StringParameter("message", "The message to post", required = false),
       new UriParameter("linkUrl", "A link to include in the post", required = false),
       new UriParameter("photoUrl", "The URL of the photo to include in the post", required = false),
@@ -66,22 +72,22 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
     }
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val appId = params[String]("appId")
-    val appSecret = params[String]("appSecret")
-    val accessToken = params[String]("accessToken")
+    val appId = args[String]("appId")
+    val appSecret = args[String]("appSecret")
+    val accessToken = args[String]("accessToken")
     val connection = new FacebookConnection(appId, appSecret, accessToken)
-    val postType = params[String]("postType")
-    val pageId = params[String]("pageId")
-    val target = createTarget(params[JsObject]("target"))
-    val message = params.getOrElse[String]("message", null)
-    lazy val linkUri = params.getOrElse[URI]("linkUrl", null)
-    lazy val photoUri = params.get[URI]("photoUrl")
+    val postType = args[String]("postType")
+    val pageId = args[String]("pageId")
+    val target = createTarget(args[ActivityArgs]("target"))
+    val message = args.getOrElse[String]("message", null)
+    lazy val linkUri = args.getOrElse[URI]("linkUrl", null)
+    lazy val photoUri = args.get[URI]("photoUrl")
     lazy val photoBytes = getPhotoBytes(photoUri)
     lazy val photoName = getPhotoName(photoUri)
-    val action = params[String]("action")
+    val action = args[String]("action")
     splog.info(s"Facebook poster was asked to $action a $postType. The page ID is $pageId.")
 
     getSpecification.createResult(
@@ -108,16 +114,16 @@ abstract class AbstractFacebookPoster extends FulfillmentWorker {
    * - subregions is an array of names of counties or county equivalent areas, which will be resolved to city IDs by the worker.
    * - cityIds is an array of Facebook city IDs.
    * - cities is an array of city names, which will be resolved to city IDs by the worker.
-   * @param json JsObject the input
+   * @param args ActivityArgs the input
    * @return the output
    */
-  private def createTarget(json: JsObject): Target = {
+  private def createTarget(args: ActivityArgs): Target = {
     // Parse the JSON
-    val countryCodes = (json \ "countryCodes").asOpt[Seq[String]]
-    val regionIds = (json \ "regionIds").asOpt[Seq[Int]]
-    val subregions = (json \ "subregions").asOpt[Seq[String]]
-    val cityIds = (json \ "cityIds").asOpt[Seq[Int]]
-    val cityNames = (json \ "cities").asOpt[Seq[String]]
+    val countryCodes = args.get[List[String]]("countryCodes")
+    val regionIds = args.get[List[Int]]("regionIds")
+    val subregions = args.get[List[String]]("subregions")
+    val cityIds = args.get[List[Int]]("cityIds")
+    val cityNames = args.get[List[String]]("cities")
 
     // If the list of country codes is exactly one element long, that's the country code we'll use for resolving city IDs.
     // Otherwise, we won't be able to resolve city IDs.

@@ -1,5 +1,6 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.sendgrid
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -23,21 +24,21 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
     ), new StringResultType("The subaccount username"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
+    val subaccountId = SendGridSubaccountId(args[String]("participantId"), args[Boolean]("useTestSubaccount"))
     val credentials = sendGridAdapter.subaccountToCredentials(subaccountId)
     val subaccount = new SendGridSubaccount(
       _credentials = credentials,
-      _firstName = params("firstName"),
-      _lastName = params("lastName"),
-      _address = params("address"),
-      _city = params("city"),
-      _state = params("state"),
-      _zip = params("zip"),
-      _country = params("country"),
-      _phone = params("phone"))
+      _firstName = args[String]("firstName"),
+      _lastName = args[String]("lastName"),
+      _address = args[String]("address"),
+      _city = args[String]("city"),
+      _state = args[String]("state"),
+      _zip = args[String]("zip"),
+      _country = args[String]("country"),
+      _phone = args[String]("phone"))
     sendGridAdapter.createSubaccount(subaccount)
 
     // Configuration stuff that can be done at account creation time.  (This stuff won't need to change later.)

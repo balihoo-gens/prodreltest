@@ -1,5 +1,6 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.sendgrid
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -15,10 +16,10 @@ abstract class AbstractSendGridLookupSubaccount extends FulfillmentWorker {
     ), new StringResultType("The subaccount username"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
+    val subaccountId = SendGridSubaccountId(args("participantId"), args[Boolean]("useTestSubaccount"))
     val apiUser = sendGridAdapter.checkSubaccountExists(subaccountId)
     apiUser match {
       case Some(s) => getSpecification.createResult(s)

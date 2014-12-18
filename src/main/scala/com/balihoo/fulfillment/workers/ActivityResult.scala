@@ -1,11 +1,18 @@
 package com.balihoo.fulfillment.workers
 
+import scala.collection.mutable
+
+import com.github.fge.jsonschema.core.report.ProcessingMessage
+import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
 import org.keyczar.Crypter
+import play.api.libs.json.Json.JsValueWrapper
+import com.fasterxml.jackson.databind.ObjectMapper
 
 //play imports
 import play.api.libs.json._
 
 import scala.language.implicitConversions
+import collection.JavaConversions._
 
 class ActivityResult(val result:JsValue) {
   def serialize():String = Json.stringify(result)
@@ -20,6 +27,7 @@ class EncryptedResult(result:JsString)
   }
 }
 
+case class ActivityResultException(msg: String) extends Exception(msg)
 
 abstract class ActivityResultType(val description:String) {
   def jsonType:String
@@ -27,7 +35,7 @@ abstract class ActivityResultType(val description:String) {
   /**
    * This can be overriden to provide additional schema values
    */
-  def additionalSchemaValues: Map[String, JsValue] = Map()
+  def additionalSchemaValues: Map[String, JsValueWrapper] = Map()
 
   final def toSchema(includeVersion:Boolean = false):JsValue = {
     val schema = collection.mutable.Map[String, JsValue]()
@@ -37,11 +45,36 @@ abstract class ActivityResultType(val description:String) {
       schema("$schema") = Json.toJson("http://json-schema.org/draft-04/schema")
     }
 
-    Json.toJson(schema.toMap).as[JsObject] ++ Json.obj(additionalSchemaValues.mapValues(Json.toJsFieldJsValueWrapper(_)).toSeq:_*)
+    Json.toJson(schema.toMap).as[JsObject] ++ Json.obj(additionalSchemaValues.toList:_*)
   }
 
-  // TODO FIXME validate the outgoing result value with what's declared in the spec!!!
-  def jsToResult(js:JsValue):ActivityResult = new ActivityResult(js)
+  private def jsValue2JsNode(jsValue: JsValue) = __mapper.readTree(Json.stringify(jsValue))
+  private val __factory = JsonSchemaFactory.byDefault()
+  private val __mapper = new ObjectMapper()
+  private val __schema:JsonSchema = __factory.getJsonSchema(jsValue2JsNode(toSchema(includeVersion = true)))
+
+  protected def _jsToResult(js:JsValue):ActivityResult = new ActivityResult(js)
+
+  // We verify that the value we're attempting to return matches what we've declared
+  // in the spec.
+  final def jsToResult(js:JsValue):ActivityResult = {
+    val report = __schema.validate(jsValue2JsNode(js))
+    report.isSuccess match {
+      case false =>
+        val gripes = mutable.MutableList[String]()
+        for(m:ProcessingMessage <- report) {
+          val report = Json.toJson(m.asJson).as[JsObject]
+          val domain = report.value("domain").as[String]
+          val level = report.value("level").as[String]
+          val pointer = report.value("instance").as[JsObject].value("pointer").as[String]
+          val message = report.value("message").as[String]
+          gripes += s"$domain $level: $pointer $message"
+        }
+        throw ActivityResultException(gripes.mkString("\n"))
+      case _ =>
+        _jsToResult(js)
+    }
+  }
 
 }
 
@@ -49,8 +82,8 @@ class EncryptedResultType(override val description:String)
   extends ActivityResultType(description + " ENCRYPTED") {
   def jsonType = "string"
 
-  override def jsToResult(js:JsValue):ActivityResult
-  = new EncryptedResult(js.asOpt[JsString].getOrElse(throw new Exception("Encrypted result must be a STRING")))
+  override def _jsToResult(js:JsValue):ActivityResult
+    = new EncryptedResult(js.asOpt[JsString].getOrElse(throw new Exception("Encrypted result must be a STRING")))
 }
 
 class StringResultType(override val description:String)

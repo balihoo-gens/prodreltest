@@ -16,7 +16,7 @@ class AbstractEmailRenderer extends AbstractRESTClient {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(
-      super.getSpecification.args :+
+      super.getSpecification.params :+
       new StringParameter("target", "File name for where the body content will be saved"),
       new ObjectResultType("Json object containing the email body and data")
     )
@@ -26,7 +26,7 @@ class AbstractEmailRenderer extends AbstractRESTClient {
 
   override def handleTask(args: ActivityArgs) = {
     val url = args[URI]("url").toURL
-    val headers = args.getOrElse[Map[String, String]]("headers", Map()).toList
+    val headers = args.getOrElse[Map[String, String]]("headers", Map()).toList
     val method = args[String]("method")
     val target = args[String]("target")
     lazy val body = args[String]("body")

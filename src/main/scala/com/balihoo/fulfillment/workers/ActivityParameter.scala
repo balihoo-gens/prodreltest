@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.workers
 import java.net.URI
 import org.joda.time.DateTime
 import org.keyczar.Crypter
+import play.api.libs.json.Json.JsValueWrapper
 
 //play imports
 import play.api.libs.json._
@@ -17,7 +18,7 @@ abstract class ActivityParameter(val name:String
   /**
    * This can be overriden to provide additional schema values
    */
-  def additionalSchemaValues: Map[String, JsValue] = Map()
+  def additionalSchemaValues: Map[String, JsValueWrapper] = Map()
 
   def parseValue(js:JsValue):Any
 
@@ -25,7 +26,7 @@ abstract class ActivityParameter(val name:String
     Json.obj(
       "type" -> jsonType,
       "description" -> description
-    ) ++ Json.obj(additionalSchemaValues.mapValues(Json.toJsFieldJsValueWrapper(_)).toSeq:_*)
+    ) ++ Json.obj(additionalSchemaValues.toList:_*)
   }
 
   // This one works for anything that is automatically/implicitly convertible via Json.validate
@@ -63,19 +64,14 @@ class StringParameter(override val name:String
 
   def jsonType = "string"
 
-  override def additionalSchemaValues: Map[String, JsValue] = {
-    (maxLength.nonEmpty match {
-      case true => Map("maxLength" -> Json.toJson[Int](maxLength.get))
-      case _ => Map[String, JsValue]()
-    }) ++
-      (minLength.nonEmpty match {
-        case true => Map("minLength" -> Json.toJson[Int](minLength.get))
-        case _ => Map()
-      }) ++
-      (pattern.nonEmpty match {
-        case true => Map("pattern" -> Json.toJson(pattern.get))
-        case _ => Map()
-      })
+  override def additionalSchemaValues: Map[String, JsValueWrapper] = {
+    val schema = collection.mutable.Map[String, JsValueWrapper]()
+
+    if(maxLength.nonEmpty) schema("maxLength") = Json.toJson[Int](maxLength.get)
+    if(minLength.nonEmpty) schema("minLength") = Json.toJson[Int](minLength.get)
+    if(pattern.nonEmpty) schema("pattern") = Json.toJson(pattern.get)
+
+    schema.toMap
   }
 
   def parseValue(js:JsValue):Any = _parseBasic[String](js)
@@ -140,10 +136,11 @@ class EnumsParameter(override val name:String
   def parseValue(js:JsValue):Any = _parseBasic[List[String]](js)
 
   override def additionalSchemaValues =
-    Map("items" -> Json.obj(
-      "type" -> "string",
-      "enum" -> Json.toJson(options)
-    )
+    Map("items" ->
+      Json.obj(
+        "type" -> "string",
+        "enum" -> Json.toJson(options)
+      )
     )
 }
 
@@ -158,7 +155,7 @@ class ObjectParameter(override val name:String
   def jsonType = "object"
 
   override def additionalSchemaValues = {
-    val schema = collection.mutable.Map[String, JsValue]()
+    val schema = collection.mutable.Map[String, JsValueWrapper]()
     if(requiredProperties.size > 0) {
       // Schema gets upset if you have "required" with an empty list. so we omit it completely if there are
       // no required properties
@@ -173,7 +170,7 @@ class ObjectParameter(override val name:String
   def parseValue(js:JsValue):Any = {
     new ActivityArgs(
       (for((name, property) <- js.as[JsObject].fields)
-      yield name -> (if(propsMap contains name) propsMap(name).parseValue(property) else js)).toMap
+      yield name -> (if(propsMap contains name) propsMap(name).parseValue(property) else property)).toMap
       , Json.stringify(js))
   }
 }
@@ -189,9 +186,12 @@ class ArrayParameter(override val name:String
   def jsonType = "array"
 
   override def additionalSchemaValues = {
-    val base = Map("items" -> element.toSchema)
-    val withMinItems = if (minItems > 0) base + ("minItems" -> Json.toJson(minItems)) else base
-    if (uniqueItems) withMinItems + ("uniqueItems" -> Json.toJson(uniqueItems)) else withMinItems
+    val schema = collection.mutable.Map[String, JsValueWrapper]()
+    schema("items") = element.toSchema
+    if (minItems > 0) schema("minItems") = Json.toJson(minItems)
+    if (uniqueItems) schema("uniqueItems") = Json.toJson(uniqueItems)
+
+    schema.toMap
   }
 
   def parseValue(js:JsValue):Any = (for(item <- js.as[JsArray].value) yield element.parseValue(item)).toList
@@ -280,5 +280,15 @@ class HostnameParameter(override val name:String
   override def additionalSchemaValues = Map("format" -> Json.toJson("hostname"))
 
   def parseValue(js: JsValue): Any = _parseBasic[String](js)
+}
+
+class StringMapParameter(override val name:String
+                                 ,override val description:String
+                                 ,override val required:Boolean = true)
+  extends ActivityParameter(name, description, required) {
+
+  def jsonType = "object"
+
+  def parseValue(js:JsValue):Any = _parseBasic[Map[String, String]](js)
 }
 

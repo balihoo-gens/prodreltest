@@ -1,15 +1,13 @@
 package com.balihoo.fulfillment.workers
 
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.config.PropertiesLoader
 import org.junit.runner.RunWith
 import org.specs2.matcher._
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{Map => MutableMap, MutableList}
+import scala.collection.mutable.MutableList
 import play.api.libs.json._
 
 @RunWith(classOf[JUnitRunner])
@@ -111,7 +109,8 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
       val input = Json.stringify(jsonInput)
 
       val result = wfgen.handleTask(wfgen.getSpecification.getArgs(input))
-      result.result.as[String] match {
+//      println(result.serialize())
+      result.serialize() match {
         case s:String =>
           val results = Json.parse(s).as[List[JsObject]]
           results must have size(4)
@@ -141,7 +140,7 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
       )
       val input = Json.stringify(jsonInput)
       val result = wfgen.handleTask(wfgen.getSpecification.getArgs(input))
-      result.result.as[String] match {
+      result.serialize() match {
         case s:String =>
           val results = Json.parse(s).as[List[JsObject]]
           results must have size(1)

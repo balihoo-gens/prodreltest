@@ -1,5 +1,6 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.ses
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
@@ -18,15 +19,15 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
     ), new ObjectResultType("Result of Send"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     getSpecification.createResult(sendEmail(
-      params("from"),
-      params[List[String]]("recipients"),
-      params("subject"),
-      params("body"),
-      params[Boolean]("html")
+      args[String]("from"),
+      args[List[String]]("recipients"),
+      args[String]("subject"),
+      args[String]("body"),
+      args[Boolean]("html")
     ).toString)
   }
 

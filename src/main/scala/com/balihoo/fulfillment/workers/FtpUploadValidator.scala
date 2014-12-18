@@ -13,11 +13,11 @@ abstract class AbstractFTPUploadValidator extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = FTPUploadConfig.getSpecification
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     // Get the config data.
-    val conf = new FTPUploadConfig(params, config)
+    val conf = new FTPUploadConfig(args, config)
 
     // Verify that the source file exists.
     if (conf.sourceUrl.openConnection().getContentLength < 0)

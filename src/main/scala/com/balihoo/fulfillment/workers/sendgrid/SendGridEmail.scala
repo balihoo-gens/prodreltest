@@ -1,13 +1,16 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.sendgrid
 
 import java.io.InputStreamReader
 import java.net.URI
+
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
 import org.joda.time.DateTime
 import play.api.libs.json.JsObject
 import resource._
+
 import scala.util.{Failure, Success, Try}
 
 abstract class AbstractSendGridEmail extends FulfillmentWorker {
@@ -32,21 +35,21 @@ abstract class AbstractSendGridEmail extends FulfillmentWorker {
     ), new StringResultType("A success message that makes you feel good, but can be ignored"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val credentials = sendGridAdapter.getCredentials(params("subaccount"))
-    val metadata = params[JsObject]("metadata")
-    val subject = params[String]("subject")
-    val fromAddress = params[String]("fromAddress")
-    val fromName = params[String]("fromName")
-    val replyToAddress = params[String]("replyToAddress")
-    val bodyUrl = params[URI]("bodyUrl")
+    val credentials = sendGridAdapter.getCredentials(args("subaccount"))
+    val metadata = args[JsObject]("metadata")
+    val subject = args[String]("subject")
+    val fromAddress = args[String]("fromAddress")
+    val fromName = args[String]("fromName")
+    val replyToAddress = args[String]("replyToAddress")
+    val bodyUrl = args[URI]("bodyUrl")
     val (bodyBucket, bodyKey) = S3Adapter.dissectS3Url(bodyUrl)
-    val sendTime = params[DateTime]("sendTime")
-    val recipientIdHeading = params[String]("recipientIdHeading")
-    val emailHeading = params[String]("emailHeading")
-    val listUrl = params[URI]("listUrl")
+    val sendTime = args[DateTime]("sendTime")
+    val recipientIdHeading = args[String]("recipientIdHeading")
+    val emailHeading = args[String]("emailHeading")
+    val listUrl = args[URI]("listUrl")
     val (listBucket, listKey) = S3Adapter.dissectS3Url(listUrl)
 
     // Retrieve the email body

@@ -1,7 +1,8 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.sendgrid
 
 import java.net.URI
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -29,26 +30,26 @@ abstract class AbstractSendGridUpdateSubaccount extends FulfillmentWorker {
     ), new StringResultType("The subaccount name"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val subaccountUser = params[String]("subaccount")
-    val webhookUrl = params[URI]("webhookUrl").toURL
-    val webhookUsername = params[String]("webhookUsername")
-    val webhookPassword = params[String]("webhookPassword")
-    val ipAddress = params[String]("ipAddress")
-    val whitelabel = params[String]("whitelabel")
+    val subaccountUser = args[String]("subaccount")
+    val webhookUrl = args[URI]("webhookUrl").toURL
+    val webhookUsername = args[String]("webhookUsername")
+    val webhookPassword = args[String]("webhookPassword")
+    val ipAddress = args[String]("ipAddress")
+    val whitelabel = args[String]("whitelabel")
     val credentials = sendGridAdapter.getCredentials(subaccountUser)
     val subaccount = new SendGridSubaccount(
       _credentials = credentials,
-      _firstName = params("firstName"),
-      _lastName = params("lastName"),
-      _address = params("address"),
-      _city = params("city"),
-      _state = params("state"),
-      _zip = params("zip"),
-      _country = params("country"),
-      _phone = params("phone"))
+      _firstName = args[String]("firstName"),
+      _lastName = args[String]("lastName"),
+      _address = args[String]("address"),
+      _city = args[String]("city"),
+      _state = args[String]("state"),
+      _zip = args[String]("zip"),
+      _country = args[String]("country"),
+      _phone = args[String]("phone"))
     sendGridAdapter.updateProfile(subaccount)
     sendGridAdapter.configureEventNotificationApp(subaccountUser, webhookUrl, webhookUsername, webhookPassword)
     sendGridAdapter.setIpAddress(subaccountUser, ipAddress)

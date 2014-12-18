@@ -4,6 +4,7 @@ import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.AdWordsUserInterests
+import com.balihoo.fulfillment.workers.adwords.{CampaignCreatorComponent, AdGroupCreatorComponent}
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201409.cm._
 import play.api.libs.json.{JsArray, JsString, Json, JsObject}

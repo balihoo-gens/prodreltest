@@ -1,5 +1,6 @@
 package com.balihoo.fulfillment.workers
 
+import com.balihoo.fulfillment.workers.adwords.{AccountCreatorComponent, AbstractAdWordsAccountCreator}
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
 import org.specs2.runner._

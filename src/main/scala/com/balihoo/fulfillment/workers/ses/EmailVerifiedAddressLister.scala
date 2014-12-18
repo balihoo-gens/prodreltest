@@ -1,5 +1,6 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.ses
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
@@ -12,7 +13,7 @@ abstract class AbstractEmailVerifiedAddressLister extends FulfillmentWorker {
     new ActivitySpecification(List(), new StringsResultType("Array of email addresses"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     getSpecification.createResult(listVerifiedEmailAddresses())

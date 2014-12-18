@@ -1,13 +1,13 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
 import java.net.{URI, URL}
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.util.Splogger
 import com.google.api.ads.adwords.axis.utils.v201409.SelectorBuilder
 import com.google.api.ads.adwords.axis.v201409.cm._
-
-import com.balihoo.fulfillment.util.Splogger
 
 abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
   this: LoggingAdwordsWorkflowAdapter
@@ -17,15 +17,15 @@ abstract class AbstractAdWordsImageAdProcessor extends FulfillmentWorker {
     adCreator.getSpecification
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Image Ad Processor", {
-      adWordsAdapter.setClientId(params("account"))
+      adWordsAdapter.setClientId(args[String]("account"))
 
-      val imageAd = adCreator.getImageAd(params) match {
+      val imageAd = adCreator.getImageAd(args) match {
         case ad:ImageAd =>
-          adCreator.updateImageAd(ad, params)
+          adCreator.updateImageAd(ad, args)
         case _ =>
-          adCreator.createImageAd(params)
+          adCreator.createImageAd(args)
       }
 
       getSpecification.createResult(String.valueOf(imageAd.getId))
@@ -52,7 +52,7 @@ trait ImageAdCreatorComponent {
       new ActivitySpecification(List(
         new StringParameter("account", "Participant AdWords account ID"),
         new StringParameter("name", "Name of this ad (used to reference the ad later)"),
-        new IntegerParameter("adGroupId", "AdWords AdGroup ID"),
+        new StringParameter("adGroupId", "AdWords AdGroup ID"),
         new UriParameter("url", "Landing page URL"),
         new UriParameter("displayUrl", "Visible Ad URL"),
         new UriParameter("imageUrl", "URL Location of image data for this ad"),
@@ -63,8 +63,8 @@ trait ImageAdCreatorComponent {
 
     def getImageAd(params: ActivityArgs): ImageAd = {
 
-      val name = params("name")
-      val adGroupId = params("adGroupId")
+      val name = params[String]("name")
+      val adGroupId = params[String]("adGroupId")
       val context = s"getImageAd(name='$name', adGroup='$adGroupId')"
 
       val selector = new SelectorBuilder()
@@ -97,7 +97,7 @@ trait ImageAdCreatorComponent {
 
     def newImageAd(params:ActivityArgs): ImageAd = {
 
-      val name = params("name")
+      val name = params[String]("name")
       val url = AdWordsPolicy.destinationUrl(params[URI]("url").toString)
       val displayUrl = AdWordsPolicy.displayUrl(params[URI]("displayUrl").toString)
       val imageUrl = params[URI]("imageUrl").toURL
@@ -119,17 +119,17 @@ trait ImageAdCreatorComponent {
       _add(newImageAd(params), params)
     }
 
-    def updateImageAd(existingAd:ImageAd, params:ActivityArgs): ImageAd = {
+    def updateImageAd(existingAd:ImageAd, args:ActivityArgs): ImageAd = {
 
-      val url = AdWordsPolicy.destinationUrl(params[URI]("url").toString)
-      val displayUrl = AdWordsPolicy.displayUrl(params[URI]("displayUrl").toString)
+      val url = AdWordsPolicy.destinationUrl(args[URI]("url").toString)
+      val displayUrl = AdWordsPolicy.displayUrl(args[URI]("displayUrl").toString)
 
       if (existingAd.getUrl == url && existingAd.getDisplayUrl == displayUrl) {
         existingAd
       } else {
         existingAd.setUrl(url)
         existingAd.setDisplayUrl(displayUrl)
-        _update(existingAd, params)
+        _update(existingAd, args)
       }
 
     }
@@ -183,19 +183,19 @@ trait ImageAdCreatorComponent {
       }
     }
 
-    def _remove(iad:ImageAd, params:ActivityArgs) = {
+    def _remove(iad:ImageAd, args:ActivityArgs) = {
       val ad = new Ad()
       ad.setId(iad.getId)
 
       val aga = new AdGroupAd()
       aga.setAd(ad)
-      aga.setAdGroupId(params[Long]("adGroupId"))
+      aga.setAdGroupId(args[Long]("adGroupId"))
 
       val operation = new AdGroupAdOperation()
       operation.setOperand(aga)
       operation.setOperator(Operator.REMOVE)
 
-      val context = s"Removing an Image Ad $params"
+      val context = s"Removing an Image Ad $args"
 
       adWordsAdapter.withErrorsHandled[Any](context, {
         adWordsAdapter.adGroupAdService.mutate(Array(operation))

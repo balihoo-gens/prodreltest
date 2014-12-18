@@ -3,6 +3,7 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
+import com.balihoo.fulfillment.workers.adwords.{CampaignCreatorComponent, BudgetCalculatorComponent}
 import play.api.libs.json.Json
 
 abstract class BudgetCalculateTest(cfg: PropertiesLoader)

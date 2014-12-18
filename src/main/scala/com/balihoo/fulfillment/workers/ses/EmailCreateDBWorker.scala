@@ -1,13 +1,14 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.ses
 
 import java.io.Reader
 import java.net.URI
 import java.text.SimpleDateFormat
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
-import play.api.libs.json.{JsString, JsValue, JsObject, Json}
+import play.api.libs.json.Json
 
 import scala.util.{Failure, Success, Try}
 
@@ -67,15 +68,15 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   }
 
   /**
-   * Extract, validate and return parameters for this task.
+   * Extract, validate and return args for this task.
    */
-  private def getParams(parameters: ActivityArgs) = {
+  private def getArguments(args: ActivityArgs) = {
 
-    splog.info("Parsing parameters source, dbname and dtd")
+    splog.info("Parsing args source, dbname and dtd")
 
-    val maybeSource = parameters.get[URI]("source")
-    val maybeDbName = parameters.get[String]("dbname")
-    val maybeDtd = parameters.get[ActivityArgs]("dtd")
+    val maybeSource = args.get[URI]("source")
+    val maybeDbName = args.get[String]("dbname")
+    val maybeDtd = args.get[ActivityArgs]("dtd")
 
     if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
     val sourceUri = maybeSource.get
@@ -149,15 +150,21 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     /**
      * Add a parameter to the prepared statement based on db type and index.
      */
-    def addSqlParam(sqlParamIndex: Int, dbType: DataTypes.DataType, value: String) = dbType match {
-      case DataTypes.Text => dbBatch.param(sqlParamIndex, value)
-      case DataTypes.Integer => dbBatch.param(sqlParamIndex, value.toLong)
-      case DataTypes.Date => dbBatch.param(sqlParamIndex, new java.sql.Date(sqlDateParser.parse(value).getTime))
-      /** TODO (jmelanson) support timestamp (need requirements) */
-      case DataTypes.Timestamp => dbBatch.param(sqlParamIndex, value)
-      case DataTypes.Boolean => dbBatch.param(sqlParamIndex, value.toBoolean)
-      case DataTypes.Real => dbBatch.param(sqlParamIndex, value.toDouble)
-      case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
+    def addSqlParam(sqlParamIndex: Int, dbType: DataTypes.DataType, value: String) = {
+      if (Option(value).isEmpty || value.trim.isEmpty)
+        dbBatch.param(sqlParamIndex, None)
+      else dbType match {
+        case DataTypes.Text => dbBatch.param(sqlParamIndex, Some(value))
+        case DataTypes.Integer => dbBatch.param(sqlParamIndex, Some(value.toLong))
+        case DataTypes.Date =>
+          val aDate = new java.sql.Date(sqlDateParser.parse(value).getTime)
+          dbBatch.param(sqlParamIndex, Some(aDate))
+        /** TODO (jmelanson) support timestamp (need requirements) */
+        case DataTypes.Timestamp => dbBatch.param(sqlParamIndex, Some(value))
+        case DataTypes.Boolean => dbBatch.param(sqlParamIndex, Some(value.toBoolean))
+        case DataTypes.Real => dbBatch.param(sqlParamIndex, Some(value.toDouble))
+        case unhandledDbType => throw new RuntimeException(s"unhandled db type=$unhandledDbType")
+      }
     }
 
     /* main loop, insert all rows in db */
@@ -168,7 +175,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
         /* CSV row column count does not match CSV header column count */
         handleBadRow(rowNumber)
       } else {
-        /* extract all types and value from row and add as prepared statement parameters */
+        /* extract all types and value from row and add as prepared statement args */
         extractTypesAndValues(row)
           .view
           .zipWithIndex
@@ -208,10 +215,14 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     db.commit()
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
 
-    val (bucket, key, dbName, tableDefinition) = getParams(params)
-    val dbS3Key = s"$s3dir/$dbName"
+    val (bucket, key, dbName, tableDefinition) = getArguments(args)
+
+    val dbS3Key = {
+      val gzDbName = if (dbName.endsWith(".gz")) dbName else s"$dbName.gz"
+      s"$s3dir/$gzDbName"
+    }
 
     val csvMeta = s3Adapter.getMeta(bucket, key).get
     val dbMetaTry = s3Adapter.getMeta(dbS3Key)
@@ -244,11 +255,13 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
           createDb(db, tableDefinition, csvInputStreamReader)
 
+          val gzDbFile = filesystemAdapter.gzip(dbTempFile)
+
           val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
           val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
           val dbUri =
             s3Adapter
-              .upload(dbS3Key, dbTempFile, userMetaData = metaData)
+              .upload(dbS3Key, gzDbFile, userMetaData = metaData)
               .map(_.toString)
               .get
 

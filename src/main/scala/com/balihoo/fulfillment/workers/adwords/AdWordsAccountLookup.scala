@@ -1,10 +1,10 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
-import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters._
-import com.google.api.ads.adwords.axis.v201409.mcm.ManagedCustomer
-
+import com.balihoo.fulfillment.workers._
+import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
+import com.google.api.ads.adwords.axis.v201409.mcm.ManagedCustomer
 
 abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
   this: LoggingAdwordsWorkflowAdapter
@@ -17,12 +17,12 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
     ), new StringResultType("AdWords Account ID"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     adWordsAdapter.withErrorsHandled[ActivityResult]("Account Lookup", {
-      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
+      adWordsAdapter.setClientId(accountCreator.lookupParentAccount(args))
 
-      val aname = params[String]("name")
-      accountCreator.getAccount(params) match {
+      val aname = args[String]("name")
+      accountCreator.getAccount(args) match {
         case existing:ManagedCustomer =>
           getSpecification.createResult(String.valueOf(existing.getCustomerId))
         case _ =>
