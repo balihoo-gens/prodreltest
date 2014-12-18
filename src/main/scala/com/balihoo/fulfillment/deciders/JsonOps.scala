@@ -1,5 +1,7 @@
 package com.balihoo.fulfillment.deciders
 
+import scala.reflect.runtime.universe._
+
 import java.net.URLEncoder
 import java.security.MessageDigest
 
@@ -22,9 +24,15 @@ object JsonOpName extends Enumeration {
   val SUBSTRING = Value("substring")
   val REPLACE = Value("replace")
   val SWITCH = Value("switch")
-//  val ARRAY_UNION = Value("arrayunion")
+  val TO_STRING = Value("tostring")
+  val TO_NUMBER = Value("tonumber")
+  val TO_INT = Value("toint")
+  val ARRAY_UNION = Value("arrayunion")
 //  val ARRAY_DIFF = Value("arraydiff")
 //  val ARRAY_INTERSECT = Value("arrayintersect")
+//  val OBJECT_UNION = Value("objectunion")
+//  val OBJECT_DIFF = Value("objectdiff")
+//  val OBJECT_INTERSECT = Value("objectintersect")
   //  val SECTION = Value("Section") // NOT ACTUALLY AN OPERATOR!
 }
 
@@ -76,25 +84,25 @@ class JsonOpArgs(val kwargs:Map[String,JsValue], val args:Seq[JsValue], val inpu
     args(index)
   }
 
-  def apply[T](index:Int)(implicit r: Reads[T]):T = {
+  def apply[T: TypeTag](index:Int)(implicit r: Reads[T]):T = {
     if(args.size <= index) {
       throw new IndexOutOfBoundsException(s"Index $index not found!")
     }
     args(index).validate[T] match {
       case s: JsSuccess[T] => s.get
       case _ =>
-        throw new Exception(s"Type Error:Value '${args(index)}' was invalid at index $index")
+        throw new Exception(s"Type Error:Expected to find type '${typeOf[T]}' but value '${args(index)}' didn't match! (index $index)")
     }
   }
 
-  def apply[T](param:String)(implicit r: Reads[T]):T = {
+  def apply[T: TypeTag](param:String)(implicit r: Reads[T]):T = {
     if(!(kwargs contains param)) {
       throw new KeyNotFoundException(s"Key $param not found!".getBytes)
     }
     kwargs(param).validate[T] match {
       case s: JsSuccess[T] => s.get
       case _ =>
-        throw new Exception(s"Type Error:Value '${kwargs(param)}' was invalid at name $param")
+        throw new Exception(s"Type Error:Expected to find type '${typeOf[T]}' but value '${kwargs(param)}' didn't match! (index $param)")
     }
   }
 
@@ -106,7 +114,7 @@ class JsonOpArgs(val kwargs:Map[String,JsValue], val args:Seq[JsValue], val inpu
     for(a <- args) yield a.as[T]
   }
 
-  def getOrElse[T](param:String, default:T)(implicit m: Reads[T]):T = {
+  def getOrElse[T: TypeTag](param:String, default:T)(implicit m: Reads[T]):T = {
     if(has(param)) {
       return apply[T](param)
     }
@@ -334,6 +342,65 @@ object JsonOps {
         Json.toJson(clauses.getOrElse(expression, clauses("default")))
       })
 
+  protected val arrayUnionOperator =
+    new JsonOp(
+      JsonOpName.ARRAY_UNION,
+      new JsonOpSpec("Returns the union of two or more arrays (with duplicates)",
+        List(),
+        new JsonOpResult("Array[]", "")
+      ),
+      (args) => {
+        val result = Json.arr()
+        args.args.foldLeft[JsArray](result){ (r, i) => r ++ i.as[JsArray]}
+      })
+
+  protected val toStringOperator =
+    new JsonOp(
+      JsonOpName.TO_STRING,
+      new JsonOpSpec("Returns a string representation of the argument",
+        List(),
+        new JsonOpResult("string", "")
+      ),
+      (args) => {
+        args.args(0) match {
+          case s:JsString => s
+          case n:JsNumber => JsString(String.valueOf(n.value))
+          case _ => JsString(Json.stringify(args.args(0)))
+        }
+      })
+
+  protected val toIntOperator =
+    new JsonOp(
+      JsonOpName.TO_INT,
+      new JsonOpSpec("Returns an integer representation of the argument",
+        List(),
+        new JsonOpResult("integer", "")
+      ),
+      (args) => {
+        args.args(0) match {
+          case s:JsString => JsNumber(s.value.split("\\.")(0).toInt)
+          case n:JsNumber => JsNumber(n.value.toInt)
+          case b:JsBoolean => JsNumber(if(b.value) 1 else 0)
+          case _ => throw new Exception(s"${Json.stringify(args.args(0))} is NOT convertible to type integer")
+        }
+      })
+
+  protected val toNumberOperator =
+    new JsonOp(
+      JsonOpName.TO_NUMBER,
+      new JsonOpSpec("Returns a number representation of the argument",
+        List(),
+        new JsonOpResult("number", "")
+      ),
+      (args) => {
+        args.args(0) match {
+          case s:JsString => JsNumber(s.value.toDouble)
+          case n:JsNumber => n
+          case b:JsBoolean => JsNumber(if(b.value) 1f else 0f)
+          case _ => throw new Exception(s"${Json.stringify(args.args(0))} is NOT convertible to type float")
+        }
+      })
+
   protected val operators = Map[JsonOpName.Value, JsonOp](
     md5Operator.name -> md5Operator,
     stringFormatOperator.name -> stringFormatOperator,
@@ -345,7 +412,11 @@ object JsonOps {
     jsonStringifyOperator.name -> jsonStringifyOperator,
     subStringOperator.name -> subStringOperator,
     replaceOperator.name -> replaceOperator,
-    switchOperator.name -> switchOperator
+    switchOperator.name -> switchOperator,
+    toStringOperator.name -> toStringOperator,
+    toIntOperator.name -> toIntOperator,
+    toNumberOperator.name -> toNumberOperator,
+    arrayUnionOperator.name -> arrayUnionOperator
   )
 
   protected def _escapeDollar(s:String):String = {

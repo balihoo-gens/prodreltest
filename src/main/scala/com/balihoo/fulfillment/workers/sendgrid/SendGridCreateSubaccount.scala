@@ -24,21 +24,21 @@ abstract class AbstractSendGridCreateSubaccount extends FulfillmentWorker {
     ), new StringResultType("The subaccount username"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    val subaccountId = SendGridSubaccountId(params[String]("participantId"), params[Boolean]("useTestSubaccount"))
+    val subaccountId = SendGridSubaccountId(args[String]("participantId"), args[Boolean]("useTestSubaccount"))
     val credentials = sendGridAdapter.subaccountToCredentials(subaccountId)
     val subaccount = new SendGridSubaccount(
       _credentials = credentials,
-      _firstName = params[String]("firstName"),
-      _lastName = params[String]("lastName"),
-      _address = params[String]("address"),
-      _city = params[String]("city"),
-      _state = params[String]("state"),
-      _zip = params[String]("zip"),
-      _country = params[String]("country"),
-      _phone = params[String]("phone"))
+      _firstName = args[String]("firstName"),
+      _lastName = args[String]("lastName"),
+      _address = args[String]("address"),
+      _city = args[String]("city"),
+      _state = args[String]("state"),
+      _zip = args[String]("zip"),
+      _country = args[String]("country"),
+      _phone = args[String]("phone"))
     sendGridAdapter.createSubaccount(subaccount)
 
     // Configuration stuff that can be done at account creation time.  (This stuff won't need to change later.)

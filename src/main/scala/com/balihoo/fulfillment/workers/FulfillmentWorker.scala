@@ -173,7 +173,7 @@ abstract class FulfillmentWorker {
 
   def getSpecification: ActivitySpecification
 
-  def handleTask(params:ActivityArgs):ActivityResult
+  def handleTask(args:ActivityArgs):ActivityResult
 
   def declareWorker() = {
     val status = s"Declaring $name $domain $taskListName"

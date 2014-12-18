@@ -19,15 +19,15 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
     ), new ObjectResultType("Result of Send"))
   }
 
-  override def handleTask(params: ActivityArgs):ActivityResult = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
     getSpecification.createResult(sendEmail(
-      params[String]("from"),
-      params[List[String]]("recipients"),
-      params[String]("subject"),
-      params[String]("body"),
-      params[Boolean]("html")
+      args[String]("from"),
+      args[List[String]]("recipients"),
+      args[String]("subject"),
+      args[String]("body"),
+      args[Boolean]("html")
     ).toString)
   }
 
