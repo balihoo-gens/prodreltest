@@ -2,6 +2,8 @@ package com.balihoo.fulfillment.workers
 
 import java.io.File
 
+import com.sun.xml.internal.ws.api.model.ExceptionType
+
 import scala.collection.mutable.ListBuffer
 
 trait WithResources {
@@ -20,12 +22,19 @@ trait WithResources {
   }
 
   def closeResources() = {
+    import scala.util.control.Exception.ignoring
     for (resource <- resources) {
-      resource.close()
+      ignoring(classOf[Exception]) {
+        resource.close()
+      }
     }
+    resources.clear()
     for (file <- fileResources) {
-      file.delete()
+      ignoring(classOf[Exception]) {
+        file.delete()
+      }
     }
+    fileResources.clear()
   }
 
 }

@@ -19,9 +19,6 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
     with CsvAdapterComponent
     with FilesystemAdapterComponent =>
 
-  /** Implicit Query json formatter. */
-  implicit val queryDefinitionFormat = Json.format[EmailQueryDefinition]
-
   def destinationS3Key = swfAdapter.config.getString("s3dir")
 
   object FilterListQueryActivityParameter
@@ -48,7 +45,6 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
       val query = Json.parse(params[ActivityParameters]("query").input).as[EmailQueryDefinition]
       val pageSize = params[Int]("pageSize")
       if (source.getScheme != "s3") throw ActivitySpecificationException("Invalid source protocol")
-      query.validate()
       val (sourceBucket, sourceKey) = (source.getHost, source.getPath.tail)
 
       splog.info(s"Downloading database file...")
@@ -57,7 +53,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
       splog.info(s"Connecting to database...")
       val db = workerResource(liteDbAdapter.create(dbFile.getAbsolutePath))
-      val dbColumns = db.getTableColumnNames(query.getTableName)
+      val dbColumns = db.getAllTableColumns(query.getTableName)
       query.checkColumns(dbColumns)
 
       splog.info(s"Executing query count...")

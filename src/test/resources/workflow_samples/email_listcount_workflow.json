@@ -1,22 +1,19 @@
 {
     "sections": {
-        "Get recipients with a first and last name starting with 'a'": {
+        "count recipients per location": {
             "action": {
-                "name": "Email-filterlist",
+                "name": "Email-countlist",
                 "version": "1"
             },
             "params": {
-                "pageSize": 1000,
                 "source": "s3://balihoo.dev.fulfillment/tmp/Email-createdb/JP-RecipientsData.db.gz",
                 "query": {
                     "select": {
-                        "email": "",
-                        "zip": "",
-                        "first_name": "$v like 'a%'",
-                        "last_name": "$v like 'a%'",
-                        "birth_day": ""
+                        "last_name":  "$v like 'a%'"
                     }
-                }
+                },
+                "column": "zip",
+                "locations": ["0", "38168", "47712", "52410"]
             },
             "status": "READY",
             "essential": true

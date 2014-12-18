@@ -35,11 +35,11 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  "source": "s3://some/file",
           |  "pageSize": 1,
           |  "query": {
-          |   "select": {}
+          |   "invalid": {}
           |  }
           |}
         """.stripMargin
-      invoke(in) must throwA[EmailNoQueryColumnException]("No columns specified in select attribute")
+      invoke(in) must throwA[ActivitySpecificationException]("/query object has missing required properties \\(\\[\"select\"\\]\\)")
     }
     "fail task if source param is missing" in new WithWorker {
       val in =
@@ -177,7 +177,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       db_mock.selectCount(s"""select count(*) from "recipients"""") returns 100
       db_mock.selectCount(s"""select count(*) from "recipients" where ${data.selectWhere}""") returns data.recordsCount
       liteDbAdapter.calculatePageCount(data.recordsCount, data.pageSize) returns data.pageCount
-      db_mock.getTableColumnNames(===(data.dbTableName)) returns data.dbColumns
+      db_mock.getAllTableColumns(===(data.dbTableName)) returns data.dbColumns
       db_mock.pagedSelect(===(s"""select ${data.selectColumns} from "recipients" where ${data.selectWhere} order by "blength""""), ===(data.recordsCount), ===(data.pageSize)) returns pages
 
       val (csv_file1_mock, csv_file2_mock, csv_file3_mock) = (mock[File], mock[File], mock[File])

@@ -329,6 +329,7 @@ abstract class FulfillmentWorkerApp {
     }
     catch {
       case e:Exception =>
+        e.printStackTrace()
         splog.exception(e.getMessage)
     }
     splog.info(s"Terminated $name")

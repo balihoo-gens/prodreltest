@@ -51,7 +51,7 @@ trait LightweightDatabaseAdapterComponent {
     /**
      * Execute a sql statement and return an iterable.
      */
-    def executeAndGetResult(statement: String): Iterable[Seq[Any]]
+    def executeAndGetResult(statement: String): Seq[Seq[Any]]
 
     /**
      * @return a new batcher to process db operations in batch.
@@ -92,7 +92,7 @@ trait LightweightDatabaseAdapterComponent {
     /**
      * @return a set of column names for the specified table.
      */
-    def getTableColumnNames(tableName: String): Set[String]
+    def getAllTableColumns(tableName: String): Set[String]
   }
 
   /**
@@ -151,11 +151,32 @@ trait LightweightDatabaseAdapterComponent {
       connection.setAutoCommit(false)
     }
 
-    override def executeAndGetResult(stmt: String): DbResultSetPage = {
+    private def extractRow(rs: ResultSet): Seq[Any] = {
+      val metaData = rs.getMetaData
+      (for {
+        i <- 1 to metaData.getColumnCount
+      } yield {
+        metaData.getColumnType(i) match {
+          case Types.TINYINT | Types.SMALLINT | Types.INTEGER | Types.BIGINT => rs.getInt(i)
+          case Types.CLOB | Types.CHAR | Types.VARCHAR | Types.NCHAR | Types.NVARCHAR => rs.getString(i)
+          case Types.REAL | Types.DOUBLE | Types.FLOAT | Types.NUMERIC | Types.DECIMAL => rs.getDouble(i)
+          case Types.BOOLEAN => rs.getBoolean(i)
+          case Types.DATE => rs.getString(i)
+          case Types.TIME | Types.TIMESTAMP => rs.getLong(i)
+          case _ => rs.getObject(i)
+        }
+      }).toList
+    }
+
+    override def executeAndGetResult(stmt: String): Seq[Seq[Any]] = {
       connection.setAutoCommit(true)
-      val resultSet = newStatement().executeQuery(stmt)
+      val rs = newStatement().executeQuery(stmt)
       connection.setAutoCommit(false)
-      new JdbcDbResultSetPage(resultSet)
+      Iterator
+        .continually((rs.next(), rs))
+        .takeWhile(_._1)
+        .map(r => extractRow(r._2))
+        .toSeq
     }
 
     override def pagedSelect(statement: String, totalCount: Int, pageSize: Int = 1000): DbPagedResultSet = {
@@ -283,7 +304,7 @@ trait SQLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdapt
   private[this] class SQLiteLightweightDatabase(connection: Connection)
     extends JdbcLightweightDatabase(connection, splog) {
 
-    override def getTableColumnNames(tableName: String): Set[String] = {
+    override def getAllTableColumns(tableName: String): Set[String] = {
       val statement = newStatement()
       val columns = collection.mutable.Set[String]()
       try {

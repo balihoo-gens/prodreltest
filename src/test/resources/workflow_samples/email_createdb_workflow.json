@@ -1,114 +1,116 @@
 {
-  "create_db": {
-    "action": {
-      "name": "Email-createdb",
-      "version": "1"
-    },
-    "params": {
-      "source": "s3://balihoo.dev.fulfillment/lists/RecipientsData.csv.gz",
-      "dbname": "JP-RecipientsData.db",
-      "dtd": {
-        "columns": [
-          {
-            "name": "recipient_id",
-            "type": "int",
-            "source": "recipientid"
-          },
-          {
-            "name": "location_id",
-            "type": "varchar",
-            "source": "locationid"
-          },
-          {
-            "name": "first_name",
-            "type": "varchar",
-            "source": "firstname"
-          },
-          {
-            "name": "last_name",
-            "type": "varchar",
-            "source": "lastname"
-          },
-          {
-            "name": "email",
-            "type": "varchar",
-            "source": "email"
-          },
-          {
-            "name": "birth_day",
-            "type": "date",
-            "source": "birthday"
-          },
-          {
-            "name": "member_since",
-            "type": "date",
-            "source": "member_since"
-          },
-          {
-            "name": "phone",
-            "type": "varchar",
-            "source": "phone"
-          },
-          {
-            "name": "company",
-            "type": "varchar",
-            "source": "company"
-          },
-          {
-            "name": "address",
-            "type": "varchar",
-            "source": "address"
-          },
-          {
-            "name": "city",
-            "type": "varchar",
-            "source": "city"
-          },
-          {
-            "name": "state",
-            "type": "varchar",
-            "source": "state"
-          },
-          {
-            "name": "zip",
-            "type": "varchar",
-            "source": "zipcode"
-          },
-          {
-            "name": "description",
-            "type": "varchar",
-            "source": "description"
-          },
-          {
-            "name": "lat",
-            "type": "real",
-            "source": "latitude"
-          },
-          {
-            "name": "long",
-            "type": "real",
-            "source": "longitude"
-          },
-          {
-            "name": "country",
-            "type": "varchar",
-            "source": "country"
-          },
-          {
-            "name": "tz",
-            "type": "varchar",
-            "source": "timezone"
-          },
-          {
-            "name": "gender",
-            "type": "char",
-            "source": "gender"
-          }
-        ]
-      }
-    },
-    "prereqs": [],
-    "status": "READY",
-    "essential": true
-  }
+    "sections": {
+        "create_db": {
+            "action": {
+                "name": "Email-createdb",
+                "version": "1"
+            },
+            "params": {
+                "source": "s3://balihoo.dev.fulfillment/lists/RecipientsData.csv.gz",
+                "dbname": "JP-RecipientsData.db",
+                "dtd": {
+                    "columns": [
+                        {
+                            "name": "recipient_id",
+                            "type": "int",
+                            "source": "recipientid"
+                        },
+                        {
+                            "name": "location_id",
+                            "type": "varchar",
+                            "source": "locationid"
+                        },
+                        {
+                            "name": "first_name",
+                            "type": "varchar",
+                            "source": "firstname"
+                        },
+                        {
+                            "name": "last_name",
+                            "type": "varchar",
+                            "source": "lastname"
+                        },
+                        {
+                            "name": "email",
+                            "type": "varchar",
+                            "source": "email"
+                        },
+                        {
+                            "name": "birth_day",
+                            "type": "date",
+                            "source": "birthday"
+                        },
+                        {
+                            "name": "member_since",
+                            "type": "date",
+                            "source": "member_since"
+                        },
+                        {
+                            "name": "phone",
+                            "type": "varchar",
+                            "source": "phone"
+                        },
+                        {
+                            "name": "company",
+                            "type": "varchar",
+                            "source": "company"
+                        },
+                        {
+                            "name": "address",
+                            "type": "varchar",
+                            "source": "address"
+                        },
+                        {
+                            "name": "city",
+                            "type": "varchar",
+                            "source": "city"
+                        },
+                        {
+                            "name": "state",
+                            "type": "varchar",
+                            "source": "state"
+                        },
+                        {
+                            "name": "zip",
+                            "type": "varchar",
+                            "source": "zipcode"
+                        },
+                        {
+                            "name": "description",
+                            "type": "varchar",
+                            "source": "description"
+                        },
+                        {
+                            "name": "lat",
+                            "type": "real",
+                            "source": "latitude"
+                        },
+                        {
+                            "name": "long",
+                            "type": "real",
+                            "source": "longitude"
+                        },
+                        {
+                            "name": "country",
+                            "type": "varchar",
+                            "source": "country"
+                        },
+                        {
+                            "name": "tz",
+                            "type": "varchar",
+                            "source": "timezone"
+                        },
+                        {
+                            "name": "gender",
+                            "type": "char",
+                            "source": "gender"
+                        }
+                    ]
+                }
+            },
+            "status": "READY",
+            "essential": true
+        }
+    }
+
 }

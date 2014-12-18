@@ -18,19 +18,17 @@ abstract class AbstractEmailCountListWorker extends FulfillmentWorker {
     with S3AdapterComponent
     with FilesystemAdapterComponent =>
 
-  implicit val queryDefinitionFormat = Json.format[EmailQueryDefinition]
-
   object FilterListQueryActivityParameter
     extends ObjectActivityParameter("query", "JSON representation of a SQL query", List(
       new ObjectActivityParameter("select", "select columns definition", required = true)
-    ), required = true)
+    ), required = false)
 
-  override lazy val getSpecification: ActivitySpecification = {
+  override def getSpecification = {
     new ActivitySpecification(
       List(
         FilterListQueryActivityParameter,
         new UriActivityParameter("source", "URL to a database file to use"),
-        new StringActivityParameter("column", "location column name"),
+        new StringActivityParameter("column", "location column name", minLength = Some(1)),
         new StringsActivityParameter("locations", "location ids array", required = false)
       ),
       new ObjectActivityResult("query count (total) for each location")
@@ -42,25 +40,44 @@ abstract class AbstractEmailCountListWorker extends FulfillmentWorker {
 
       splog.info(s"Checking parameters...")
       val source = params[URI]("source")
+      if (source.getScheme != "s3") throw ActivitySpecificationException("source parameter protocol is unsupported")
       val column = params[String]("column")
-      val query = Json.parse(params[ActivityParameters]("query").input).as[EmailQueryDefinition]
-      val locations = params[Seq[String]]("locations")
-      if (source.getScheme != "s3") throw ActivitySpecificationException("Invalid source protocol")
-      query.validate()
-      val (sourceBucket, sourceKey) = (source.getHost, source.getPath.tail)
+      val locations = params.get[Seq[String]]("locations").getOrElse(Seq.empty)
+      if (locations.isEmpty)
+        Json.arr().toString()
+      else {
 
-      splog.info(s"Downloading database file...")
-      val dbMeta = workerResource(s3Adapter.getMeta(sourceBucket, sourceKey).get)
-      val dbFile = workerFile(filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey))
+        splog.info(s"Parsing query...")
+        val queryDef =
+          params
+            .get[ActivityParameters]("query")
+            .fold(new EmailQueryDefinition(Json.obj())) { query =>
+              Json.parse(query.input).as[EmailQueryDefinition]
+            }
 
-      splog.info(s"Connecting to database...")
-      val db = workerResource(liteDbAdapter.create(dbFile.getAbsolutePath))
-      val dbColumns = db.getTableColumnNames(query.getTableName)
-      query.checkColumns(dbColumns)
+        splog.info(s"Downloading database file...")
+        val (sourceBucket, sourceKey) = (source.getHost, source.getPath.tail)
+        val dbMeta = workerResource(s3Adapter.getMeta(sourceBucket, sourceKey).get)
+        val dbFile = workerFile(filesystemAdapter.newTempFileFromStream(dbMeta.getContentStream, sourceKey))
 
-      val results = db.executeAndGetResult(query.selectCountOnColumn(column, locations.toSet))
+        splog.info(s"Connecting to database...")
+        val db = workerResource(liteDbAdapter.create(dbFile.getAbsolutePath))
+        val dbColumns = db.getAllTableColumns(queryDef.getTableName)
+        queryDef.checkColumns(dbColumns)
 
-      ""
+        splog.info(s"Querying database...")
+        val selectQuery = queryDef.selectCountOnColumn(column, locations.toSet)
+        val results = db.executeAndGetResult(selectQuery).flatMap {
+          case first +: second +: tail =>
+            val discriminant = first.asInstanceOf[String]
+            val count = second.asInstanceOf[Int]
+            if (count > 0) Some(Json.obj(column -> discriminant, "count" -> count)) else None
+          case row => throw new IllegalStateException(s"row data count different than expected, got $row")
+        }
+
+        splog.info(s"Writing results...")
+        JsArray(results).toString()
+      }
     }
   }
 
@@ -74,7 +91,6 @@ class EmailCountListWorker(override val _cfg: PropertiesLoader, override val _sp
     with LoggingWorkflowAdapterImpl
     with SQLiteLightweightDatabaseAdapterComponent
     with S3AdapterComponent
-    with ScalaCsvAdapterComponent
     with FilesystemAdapterComponent {
   override val s3Adapter = new S3Adapter(_cfg, _splog)
 }

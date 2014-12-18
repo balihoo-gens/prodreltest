@@ -1,6 +1,6 @@
 package com.balihoo.fulfillment.workers
 
-import play.api.libs.json.{JsArray, JsObject, JsString}
+import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 import scala.collection.immutable.TreeSet
 
@@ -31,8 +31,6 @@ class EmailNoQueryColumnException
  */
 case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = Some("recipients")) {
 
-  if (select.fields.isEmpty) throw new EmailNoQueryColumnException
-
   /**
    * Placeholder in json model for field name in clauses.
    */
@@ -47,6 +45,11 @@ case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = So
    * List of column names to be returned by select statement.
    */
   val columns = TreeSet(select.fields.map(_._1):_*)
+
+  /**
+   * `true` if at least one column is defined.
+   */
+  val hasColumns = columns.nonEmpty
 
   /**
    * Sorted select column definitions.
@@ -75,6 +78,12 @@ case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = So
   }
 
   /**
+   * Determine if this query has criterions.
+   * It is possible to define a query with columns without any criterions.
+   */
+  val hasCriterions = column2criterions.map(_._2).filter(_.nonEmpty).nonEmpty
+
+  /**
    * Map field name to a an expression (combined criterions)
    */
   val criterionExpressions = column2criterions.map { case (name, criterions) =>
@@ -93,24 +102,51 @@ case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = So
   /**
    * SQL where expression.
    */
-  val whereExpression = criterionExpressions.mkString(" and ")
+  val whereExpression =
+    if (hasCriterions) "where " + criterionExpressions.mkString(" and ") else ""
 
   /**
-   * SQL select expression to get projected query count.
+   * Order by expression, if at least one column is defined.
    */
-  val selectCountSql = s"""select count(*) from "$getTableName" where $whereExpression"""
+  val orderByExpression =
+    if (hasColumns) s"""order by "${columns.head}"""" else ""
 
   /**
-   * SQL select expression to get query results.
+   * From expression with table name.
    */
-  val selectSql = s"""select $columnsExpression from "$getTableName" where $whereExpression order by "${columns.head}""""
+  val fromExpression = s"""from "$getTableName""""
 
   /**
-   * Check generated SQL is valid.
+   * A sql select statement to get a projected query count.
    */
-  def validate() = {
-    if (whereExpression.isEmpty) throw new RuntimeException("SQL is empty")
-    if (whereExpression.contains(";")) throw new RuntimeException("SQL contains reserved separator ';'")
+  val selectCountSql = {
+    val b = new StringBuilder()
+    b ++= "select count(*) "
+    b ++= fromExpression
+    if (hasCriterions) b ++= " " ++= whereExpression
+    b.toString()
+  }
+
+  /**
+   * A sql select expression based on defined columns.
+   */
+  val selectExpression = {
+    if (columns.isEmpty)
+      "select *"
+    else
+      s"select $columnsExpression"
+  }
+
+  /**
+   * A complete sql select statement based on current query spec.
+   */
+  val selectSql = {
+    val b = new StringBuilder()
+    b ++= selectExpression
+    b ++= " " ++= fromExpression
+    if (hasCriterions) b ++= " " ++= whereExpression
+    if (columns.nonEmpty) b ++= " " ++= orderByExpression
+    b.toString()
   }
 
   /**
@@ -121,12 +157,23 @@ case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = So
    */
   def selectCountOnColumn(column: String, values: Set[String] = Set.empty) = {
     require(column.trim.nonEmpty)
-
-    val restrictingExpr = if (values.nonEmpty) {
-      val restrictingValues = values.map("'" + _ + "'").mkString("(", ",", ")")
-      s""" and "$column" in $restrictingValues"""
-    } else ""
-
-    s"""select "$column", count(*) from "$getTableName" where $whereExpression$restrictingExpr group by "$column" order by "$column""""
+    val b = new StringBuilder()
+    b ++= "select "
+    b ++= "\"" ++= column ++= "\""
+    b ++= ", count(*) "
+    b ++= fromExpression
+    if (hasCriterions) b ++= " " ++= whereExpression
+    if (values.nonEmpty) {
+      val newCriterion = values.map("'" + _ + "'").mkString("(", ",", ")")
+      if (hasCriterions) b ++= " and \"" ++= column ++= "\" in " ++= newCriterion
+      else b ++= " where \"" ++= column ++= "\" in " ++= newCriterion
+    }
+    b ++= " group by \"" ++= column ++= "\""
+    b ++= " order by \"" ++= column ++= "\""
+    b.toString()
   }
+}
+
+object EmailQueryDefinition {
+  implicit val jsonFormat = Json.format[EmailQueryDefinition]
 }

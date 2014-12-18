@@ -1,14 +1,9 @@
 package com.balihoo.fulfillment.workers
 
 import org.specs2.mutable.Specification
-import play.api.libs.json.{JsNumber, JsArray, Json}
+import play.api.libs.json.{JsNumber, Json}
 
 class TestEmailQueryDefinition extends Specification {
-  "constructor" should {
-    "throw exception if no fields are provided" in {
-      EmailQueryDefinition(Json.obj()) must throwA[EmailNoQueryColumnException]
-    }
-  }
   "getTableName" should {
     "use provided table name if specified" in {
       val select = Json.obj("col1" -> Json.arr(), "col2" -> Json.arr())
@@ -20,6 +15,16 @@ class TestEmailQueryDefinition extends Specification {
       val select = Json.obj("col1" -> Json.arr(), "col2" -> Json.arr(), "col5" -> Json.arr(), "col6" -> Json.arr())
       val queryDef = EmailQueryDefinition(select)
       queryDef.checkColumns(Set("col1", "col2", "col3", "col4")) must throwA[EmailInvalidQueryColumnException]("Invalid columns names: col5, col6")
+    }
+  }
+  "hasCriterions" should {
+    "return true if criterions defined" in {
+      val select = Json.obj("col2" -> Json.arr("$v=0", "$v>5 and $v<10"), "col1" -> Json.arr("$v>0"))
+      EmailQueryDefinition(select).hasCriterions must beTrue
+    }
+    "return false if no criterions defined" in {
+      val select = Json.obj("col2" -> Json.arr(), "col1" -> Json.arr())
+      EmailQueryDefinition(select).hasCriterions must beFalse
     }
   }
   "field2criterions" should {
@@ -56,7 +61,20 @@ class TestEmailQueryDefinition extends Specification {
   "whereExpression" should {
     "return complete where expression for query" in {
       val select = Json.obj("col2" -> Json.arr("$v=0", "$v>5 and $v<10"), "col1" -> Json.arr("$v>0"))
-      EmailQueryDefinition(select).whereExpression must beEqualTo("""("col1">0) and (("col2"=0) or ("col2">5 and "col2"<10))""")
+      EmailQueryDefinition(select).whereExpression must beEqualTo("""where ("col1">0) and (("col2"=0) or ("col2">5 and "col2"<10))""")
+    }
+    "return empty string if no criterions" in {
+      val select = Json.obj("col2" -> Json.arr(), "col1" -> Json.arr())
+      EmailQueryDefinition(select).whereExpression must beEqualTo("")
+    }
+  }
+  "orderByExpression" should {
+    "return complete order by expression for query (first column in list)" in {
+      val select = Json.obj("col2" -> Json.arr("$v=0", "$v>5 and $v<10"), "col1" -> Json.arr("$v>0"))
+      EmailQueryDefinition(select).orderByExpression must beEqualTo("""order by "col1"""")
+    }
+    "return empty string if no columns" in {
+      EmailQueryDefinition(Json.obj()).orderByExpression must beEqualTo("")
     }
   }
   "selectCountSql" should {

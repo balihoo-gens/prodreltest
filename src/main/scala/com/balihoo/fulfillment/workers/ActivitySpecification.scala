@@ -268,12 +268,16 @@ class BooleanActivityParameter(override val name:String
 
 class StringsActivityParameter(override val name:String
                                ,override val description:String
-                               ,override val required:Boolean = true)
+                               ,override val required:Boolean = true
+                               ,val minItems: Int = 0)
   extends ActivityParameter(name, description, required) {
 
   def jsonType = "array"
 
-  override def additionalSchemaValues = Map("items" -> Json.obj("type" -> "string"))
+  override def additionalSchemaValues = Map(
+    "items" -> Json.obj("type" -> "string"),
+    "minItems" -> Json.toJson(minItems)
+  )
 
   def parseValue(js: JsValue): Any = _parseBasic[List[String]](js)
 }
