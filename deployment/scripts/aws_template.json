@@ -15,16 +15,12 @@
 
     "WorkerInstanceType" : {
       "Description" : "Worker EC2 instance type",
-      "Type" : "String",
-      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.medium", "m1.small", "m1.large", "m1.xlarge" ],
-      "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
+      "Type" : "String"
     },
 
     "DashboardInstanceType" : {
       "Description" : "WebServer EC2 instance type",
-      "Type" : "String",
-      "AllowedValues" : [ "t1.micro", "t2.micro", "t2.small", "t2.medium", "m1.medium", "m1.small", "m1.large", "m1.xlarge" ],
-      "ConstraintDescription" : "EC2 Instance: t2.micro through m1.xlarge"
+      "Type" : "String"
     },
 
     "MinInstances" : {
@@ -82,6 +78,15 @@
       "t2.micro"    : { "AMIMap" : "AWSRegion2AMIvHVM" },
       "t2.small"    : { "AMIMap" : "AWSRegion2AMIvHVM" },
       "t2.medium"   : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "m3.medium"   : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "m3.large"    : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "m3.xlarge"   : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "m3.2xlarge"  : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "r3.large"    : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "r3.xlarge"   : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "r3.2xlarge"  : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "r3.4xlarge"  : { "AMIMap" : "AWSRegion2AMIvHVM" },
+      "r3.8xlarge"  : { "AMIMap" : "AWSRegion2AMIvHVM" },
       "m1.small"    : { "AMIMap" : "AWSRegion2AMIvPV" },
       "m1.medium"   : { "AMIMap" : "AWSRegion2AMIvPV" },
       "m1.large"    : { "AMIMap" : "AWSRegion2AMIvPV" },
