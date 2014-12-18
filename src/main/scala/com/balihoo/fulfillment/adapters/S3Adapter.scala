@@ -7,6 +7,7 @@ import java.util.zip.GZIPInputStream
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.{CannedAccessControlList, ObjectMetadata, PutObjectRequest, S3Object}
+import com.amazonaws.regions.{Regions, Region}
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
 import resource._
@@ -153,11 +154,8 @@ class S3Adapter(cfg: PropertiesLoader, override val splog: Splogger)
     * creating a client through the region as AWSAdapter does results in a 301 error
     * from amazon. Creating a region-less instance here makes it default to east-1
     */
-  protected override def createClient:AmazonS3Client = {
-    val accessKey: String = config.getString("aws.accessKey")
-    val secretKey = config.getString("aws.secretKey")
-    val credentials = new BasicAWSCredentials(accessKey, secretKey)
-    new AmazonS3Client(credentials)
+   protected override def createClient:AmazonS3Client = {
+     new AmazonS3Client()
   }
 }
 

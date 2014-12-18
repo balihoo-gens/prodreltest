@@ -1,15 +1,13 @@
 package com.balihoo.fulfillment.workers
 
-import com.amazonaws.services.simpleworkflow.model.ActivityTask
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.config.PropertiesLoader
 import org.junit.runner.RunWith
 import org.specs2.matcher._
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{Map => MutableMap, MutableList}
+import scala.collection.mutable.MutableList
 import play.api.libs.json._
 
 @RunWith(classOf[JUnitRunner])
@@ -25,9 +23,6 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
 
     // This will change after the task completes successfully.
     var result: Option[String] = None
-
-    // Override this method to simplify testing and to avoid swallowing exceptions.
-    override def withTaskHandling(code: => String): Unit = result = Some(code)
 
     // Override this method to avoid actually submitting, but record the input instead
     override def submitTask(input:String, tags: List[String]) = {
@@ -113,9 +108,10 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
       )
       val input = Json.stringify(jsonInput)
 
-      wfgen.handleTask(wfgen.getSpecification.getParameters(input))
-      wfgen.result match {
-        case Some(s) =>
+      val result = wfgen.handleTask(wfgen.getSpecification.getArgs(input))
+//      println(result.serialize())
+      result.serialize() match {
+        case s:String =>
           val results = Json.parse(s).as[List[JsObject]]
           results must have size(4)
           for (result <- results) {
@@ -143,9 +139,9 @@ class TestWorkflow extends Specification with JsonMatchers with Mockito {
         "tags" -> Json.arr("#LOC#", "NOLOC", "\"#LOC#\"")
       )
       val input = Json.stringify(jsonInput)
-      wfgen.handleTask(wfgen.getSpecification.getParameters(input))
-      wfgen.result match {
-        case Some(s) =>
+      val result = wfgen.handleTask(wfgen.getSpecification.getArgs(input))
+      result.serialize() match {
+        case s:String =>
           val results = Json.parse(s).as[List[JsObject]]
           results must have size(1)
           for (result <- results) {

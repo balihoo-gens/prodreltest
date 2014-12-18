@@ -15,26 +15,21 @@ abstract class AbstractZipCodeDemographics extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new ObjectActivityParameter("demographicsQuery", "Demographics Query"),
-        new StringActivityParameter("participantId", "Participant Identifier")
-      ), new StringsActivityResult("A array of zip codes"))
+        new ObjectParameter("demographicsQuery", "Demographics Query"),
+        new StringParameter("participantId", "Participant Identifier")
+      ), new StringsResultType("A array of zip codes"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    try {
-      // We're passing the raw JSON string to the command. The command will digest it.
-      val result = command.run(params.input)
-      result.code match {
-        case 0 =>
-          completeTask(result.out)
-        case 1 => // Special case. We're using 1 to mean CANCEL
-          cancelTask(result.out)
-        case _ =>
-          failTask(s"Process returned code '${result.code}'", result.err)
-      }
-    } catch {
-      case exception:Exception =>
-        failTask(exception.toString, exception.getMessage)
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    // We're passing the raw JSON string to the command. The command will digest it.
+    val result = command.run(params.input)
+    result.code match {
+      case 0 =>
+        getSpecification.createResult(result.out.split(","))
+      case 1 => // Special case. We're using 1 to mean CANCEL
+        throw new CancelTaskException("Cancelled", result.out)
+      case _ =>
+        throw new FailTaskException(s"Process returned code '${result.code}'", result.err)
     }
   }
 }

@@ -6,6 +6,7 @@ import java.net.URI
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers.sendgrid.AbstractSendGridEmail
 import org.apache.http.client.methods.HttpRequestBase
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
@@ -13,7 +14,7 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import org.specs2.specification.Scope
-import play.api.libs.json.Json
+import play.api.libs.json.{JsString, Json}
 
 import scala.io.Codec
 import scala.util.Success
@@ -23,20 +24,20 @@ class TestSendGridEmail extends Specification with Mockito {
   "SendGridEmail" should {
     "handle a normal request" in new Adapter {
       implicit val order = inOrder(_sendGridAdapter, listStream, listMeta)
-      worker.handleTask(params)
-      worker.result.get === "OK"
+      val result = worker.handleTask(params)
+      result.result === new JsString("OK")
       (there was one(_sendGridAdapter).sendEmail(credentials, metadata, sendTime, email, recipientsStream, recipientIdHeading, emailHeading)
         andThen one(listStream).close
         andThen one(listMeta).close)
     }
 
     "reject a bad list URL" in new Adapter {
-      val params2 = new ActivityParameters(params.params + ("listUrl" -> bogusUrl))
+      val params2 = new ActivityArgs(params.params + ("listUrl" -> bogusUrl))
       worker.handleTask(params2) must throwA[SendGridException]
     }
 
     "reject a bad email body URL" in new Adapter {
-      val params2 = new ActivityParameters(params.params + ("bodyUrl" -> bogusUrl))
+      val params2 = new ActivityArgs(params.params + ("bodyUrl" -> bogusUrl))
       worker.handleTask(params2) must throwA[SendGridException]
     }
   }
@@ -65,7 +66,7 @@ class TestSendGridEmail extends Specification with Mockito {
     val sendTime = new DateTime("2014-12-02T18:00:00-07")
     val recipientIdHeading = "personId"
     val emailHeading = "email"
-    val params = new ActivityParameters(Map(
+    val params = new ActivityArgs(Map(
       "metadata" -> metadata,
       "subaccount" -> subaccount,
       "listUrl" -> new URI(s"S3://$bucket/$listKey"),
@@ -100,8 +101,6 @@ class TestSendGridEmail extends Specification with Mockito {
 
       // Storage place for the task result
       var result: Option[String] = None
-
-      override def withTaskHandling(code: => String): Unit = result = Some(code)
 
       /**
        * The call to Stream.toList causes the Stream object to buffer all its content.  This allows the Specs2 argument

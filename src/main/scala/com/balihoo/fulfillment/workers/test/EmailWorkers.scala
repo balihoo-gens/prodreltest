@@ -3,11 +3,7 @@ package com.balihoo.fulfillment.workers.test
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.util.Splogger
-import com.balihoo.fulfillment.workers.{
-  EmailSender,
-  EmailAddressVerifier,
-  EmailVerifiedAddressLister
-}
+import com.balihoo.fulfillment.workers.ses.{EmailVerifiedAddressLister, EmailSender, EmailAddressVerifier}
 import com.amazonaws.services.simpleworkflow.model.{
   StartWorkflowExecutionRequest,
   TaskList,

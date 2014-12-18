@@ -1,9 +1,10 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.ses
 
 import java.io.Reader
 import java.net.URI
 import java.text.SimpleDateFormat
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -35,19 +36,19 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   def s3dir = swfAdapter.config.getString("s3dir")
   def s3bucket = swfAdapter.config.getString("s3bucket")
 
-  object EmailDatabaseSchemaDefinitionActivityParameter
-    extends ObjectActivityParameter(
+  object EmailDatabaseSchemaDefinitionParameter$
+    extends ObjectParameter(
       "dtd",
       "JSON configuration document that describes the columns: SQL data type, name mappings from source to canonical, indexes, etc. (more to come)",
       required = true,
       properties = List(
-        new StringActivityParameter("name", "database table name", required = false),
-        new ArrayActivityParameter("columns", "database columns definitions",
-          new ObjectActivityParameter("", "", List(
-            new StringActivityParameter("name", "table column's name", minLength = Some(1)),
-            new StringActivityParameter("type", "table column's type", minLength = Some(1)),
-            new StringActivityParameter("source", "source csv header name", minLength = Some(1)),
-            new StringActivityParameter("index", "table column's index name or type", required = false, minLength = Some(1))
+        new StringParameter("name", "database table name", required = false),
+        new ArrayParameter("columns", "database columns definitions",
+          new ObjectParameter("", "", List(
+            new StringParameter("name", "table column's name", minLength = Some(1)),
+            new StringParameter("type", "table column's type", minLength = Some(1)),
+            new StringParameter("source", "source csv header name", minLength = Some(1)),
+            new StringParameter("index", "table column's index name or type", required = false, minLength = Some(1))
           )),
           minItems = 1,
           uniqueItems = true
@@ -58,24 +59,24 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        new UriActivityParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
-        new StringActivityParameter("dbname", "Name of the lightweight database file that will be generated", minLength = Some(1)),
-        EmailDatabaseSchemaDefinitionActivityParameter
+        new UriParameter("source", "URL that indicates where the source data is downloaded from (S3)"),
+        new StringParameter("dbname", "Name of the lightweight database file that will be generated", minLength = Some(1)),
+        EmailDatabaseSchemaDefinitionParameter$
       ),
-      new StringActivityResult("URL to the lightweight database file"),
+      new StringResultType("URL to the lightweight database file"),
       "Insert all records from a CSV file to a lightweight database file, according to a DTD")
   }
 
   /**
    * Extract, validate and return parameters for this task.
    */
-  private def getParams(parameters: ActivityParameters) = {
+  private def getParams(parameters: ActivityArgs) = {
 
     splog.info("Parsing parameters source, dbname and dtd")
 
     val maybeSource = parameters.get[URI]("source")
     val maybeDbName = parameters.get[String]("dbname")
-    val maybeDtd = parameters.get[ActivityParameters]("dtd")
+    val maybeDtd = parameters.get[ActivityArgs]("dtd")
 
     if (!maybeSource.isDefined || maybeSource.get.toString.trim.isEmpty) throw new IllegalArgumentException("source parameter is empty")
     val sourceUri = maybeSource.get
@@ -214,7 +215,7 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
     db.commit()
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
 
     val (bucket, key, dbName, tableDefinition) = getParams(params)
 
@@ -234,45 +235,46 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
     if (dbMetaTry.isSuccess) dbMetaTry.get.close()
 
-    if (useCache) {
+    getSpecification.createResult(
+      if (useCache) {
 
-      csvMeta.close()
-      val s3uri = dbMetaTry.get.s3Uri.toString
-      splog.info(s"Re-using existing database (cached) uri=$s3uri")
-      completeTask(s3uri)
-
-    } else {
-
-      splog.info("Generating database from csv...")
-
-      val dbTempFile = filesystemAdapter.newTempFile(dbName + ".sqlite")
-      val db = liteDbAdapter.create(dbTempFile.getAbsolutePath)
-      val csvInputStreamReader = filesystemAdapter.newReader(csvMeta.getContentStream)
-
-      try {
-
-        createDb(db, tableDefinition, csvInputStreamReader)
-
-        val gzDbFile = filesystemAdapter.gzip(dbTempFile)
-
-        val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
-        val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
-        val dbUri =
-          s3Adapter
-            .upload(dbS3Key, gzDbFile, userMetaData = metaData)
-            .map(_.toString)
-            .get
-
-        completeTask(dbUri.toString)
-
-      } finally {
-        db.close()
         csvMeta.close()
-        csvInputStreamReader.close()
-        dbTempFile.delete()
-      }
+        val s3uri = dbMetaTry.get.s3Uri.toString
+        splog.info(s"Re-using existing database (cached) uri=$s3uri")
+        s3uri
 
-    }
+      } else {
+
+        splog.info("Generating database from csv...")
+
+        val dbTempFile = filesystemAdapter.newTempFile(dbName + ".sqlite")
+        val db = liteDbAdapter.create(dbTempFile.getAbsolutePath)
+        val csvInputStreamReader = filesystemAdapter.newReader(csvMeta.getContentStream)
+
+        try {
+
+          createDb(db, tableDefinition, csvInputStreamReader)
+
+          val gzDbFile = filesystemAdapter.gzip(dbTempFile)
+
+          val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
+          val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
+          val dbUri =
+            s3Adapter
+              .upload(dbS3Key, gzDbFile, userMetaData = metaData)
+              .map(_.toString)
+              .get
+
+          dbUri.toString
+
+        } finally {
+          db.close()
+          csvInputStreamReader.close()
+          csvMeta.close()
+          dbTempFile.delete()
+        }
+      }
+    )
   }
 }
 

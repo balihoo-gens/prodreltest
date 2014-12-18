@@ -15,6 +15,7 @@ import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import play.api.libs.json.Json
+import play.api.libs.json.Json.JsValueWrapper
 import scala.collection.JavaConversions._
 
 @RunWith(classOf[JUnitRunner])
@@ -45,8 +46,6 @@ class TestFacebookPoster extends Specification with Mockito {
     // This will change after the task completes successfully.
     var result: Option[String] = None
 
-    // Override this method to simplify testing and to avoid swallowing exceptions.
-    override def withTaskHandling(code: => String): Unit = result = Some(code)
   }
 
   // Implicitly convert List[Int] to java.util.List[Integer] for the sake of the Java libraries
@@ -55,7 +54,9 @@ class TestFacebookPoster extends Specification with Mockito {
   // Constants
   val appId = "439034opifpiojew4fpo34p9o4fok"
   val appSecret = "09340934fopijfpioj34f0t934poijwe5gpoijrfpokefa4wp9k34fvpoke4f"
+  val encryptedAppSecret = "AIrJ6SaGoS5HdDQxhejzx0eNmswBIZ3nUHlDkCtytT5d9BCbSj71lUCZJW6vEkx-rrtsBJvFW1xry9HIlDnM-NZVFr2TvTMi4al8SP2Lelc6pdDam-tmtrGywdQwDtUuq3MTREX2DU1B"
   val accessToken = "98349834lkidflkj3q4f0934094flke0p9w4f4opij34f9j34f0934fmervlgkjergf5opji34op9j345io34fjio3498043to0we4rtsdrf"
+  val encryptedAccessToken = "AIrJ6Sa3zbzMVP_s3I1WFG1b8M1FubLZSWR4sfhkA8_GgJM6c6OvlVlfQ9-BiMcb-3zA7NNedveU3_k-EJfVysUZka5Akoiq14_0GoLImdRvNipKYXBa1ROwwBlvS3EARaYrWoGir-if0l8go-cbShREHRFy8NlV8hqc9rq80lI_Hl1bPkkG_uC9eQEpJBNPe40OWnPU7KY7"
   val pageId = "43984984380349034095905309354"
   val linkPostId = pageId + "_94834589258902309234092340990"
   val photoPostId = pageId + "_2398234298489040420239049493"
@@ -82,10 +83,10 @@ class TestFacebookPoster extends Specification with Mockito {
   val target = new Target(List(usa, canada), List(idahoId, washingtonId), List(boiseId, meridianId, nampaId))
 
   // Parameters that all tests have in common
-  val baseParams = Map(
+  val baseParams:Map[String,JsValueWrapper] = Map(
     "appId" -> appId,
-    "appSecret" -> appSecret,
-    "accessToken" -> accessToken,
+    "appSecret" -> encryptedAppSecret,
+    "accessToken" -> encryptedAccessToken,
     "pageId" -> pageId,
     "target" -> Json.parse(s"""{"countryCodes": ["$usa","$canada"], "regionIds": [$idahoId,$washingtonId], "cityIds": [$boiseId,$meridianId,$nampaId]}"""),
     "message" -> message)
@@ -102,6 +103,10 @@ class TestFacebookPoster extends Specification with Mockito {
   // We'll need a web server to host a geo service and a photo.
   implicit val server = new MockWebServer
 
+  def getArgs(poster:TestableFacebookPoster, extras:Map[String, JsValueWrapper]):ActivityArgs = {
+    poster.getSpecification.getArgs(Json.obj((baseParams ++ extras).toList:_*))
+  }
+
   // Fire up web server.
   step {
     server.setUp()
@@ -111,81 +116,67 @@ class TestFacebookPoster extends Specification with Mockito {
   "FacebookPoster" should {
     "validate a link post" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "link", "linkUrl" -> linkUrl, "action" -> validateAction))
-      poster.handleTask(params)
+      val params = getArgs(poster, Map("postType" -> "link", "linkUrl" -> linkUrl.toString, "action" -> validateAction))
+      poster.handleTask(params).serialize() mustEqual """"OK""""
 
       there was one(poster.facebookAdapter).validateLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl.toString), ===(message))
-      
-      poster.result must beSome("OK")
     }
 
     "publish a link post" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "link", "linkUrl" -> linkUrl, "action" -> publishAction))
-      poster.handleTask(params)
+      val params = getArgs(poster, Map("postType" -> "link", "linkUrl" -> linkUrl.toString, "action" -> publishAction))
+      poster.handleTask(params).serialize() mustEqual s""""$linkPostId""""
 
       there was one(poster.facebookAdapter).publishLinkPost(connectionMatcher, ===(pageId), ===(target), ===(linkUrl.toString), ===(message))
-
-      poster.result must beSome(linkPostId)
     }
 
     "validate a status update" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> validateAction))
-      poster.handleTask(params)
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> validateAction))
+      poster.handleTask(params).serialize() mustEqual """"OK""""
 
       there was one(poster.facebookAdapter).validateStatusUpdate(connectionMatcher, ===(pageId), ===(target), ===(message))
-     
-      poster.result must beSome("OK")
     }
 
     "publish a status update" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction))
-      poster.handleTask(params)
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> publishAction))
+      poster.handleTask(params).serialize() mustEqual s""""$statusUpdatePostId""""
 
       there was one(poster.facebookAdapter).publishStatusUpdate(connectionMatcher, ===(pageId), ===(target), ===(message))
-     
-      poster.result must beSome(statusUpdatePostId)
     }
 
     "validate a photo post" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "photo", "photoUrl" -> photoUrl, "action" -> validateAction))
-      poster.handleTask(params)
+      val params = getArgs(poster, Map("postType" -> "photo", "photoUrl" -> photoUrl.toString, "action" -> validateAction))
+      poster.handleTask(params).serialize() mustEqual """"OK""""
       
       there was one(poster.facebookAdapter).validatePhotoPost(connectionMatcher, ===(pageId), ===(target),
         ===(server.getPhotoFileContents), ===(photoName), ===(message))
-
-      poster.result must beSome("OK")
     }
 
     "publish a photo post" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "photo", "photoUrl" -> photoUrl, "action" -> publishAction))
-      poster.handleTask(params)
+      val params = getArgs(poster, Map("postType" -> "photo", "photoUrl" -> photoUrl.toString, "action" -> publishAction))
+      poster.handleTask(params).serialize() mustEqual s""""$photoPostId""""
       
       there was one(poster.facebookAdapter).publishPhotoPost(connectionMatcher, ===(pageId), ===(target),
         ===(server.getPhotoFileContents), ===(photoName), ===(message))
-     
-      poster.result must beSome(photoPostId)
     }
 
     "resolve subregions" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> publishAction,
         "target" -> Json.parse(s"""{"countryCodes": ["$usa"], "subregions": ["$ada","$canyon"]}""")))
-      poster.handleTask(params)
+      poster.handleTask(params).serialize() mustEqual s""""$statusUpdatePostId""""
       
       val expectedTarget = new Target(List(usa), List(), List(boiseId, meridianId, nampaId))
       there was one(poster.facebookAdapter).publishStatusUpdate(connectionMatcher, ===(pageId), ===(expectedTarget), ===(message))
-     
-      poster.result must beSome(statusUpdatePostId)
     }
 
     "reject subregions if there are multiple countries" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> publishAction,
         "target" -> Json.parse(s"""{"countryCodes": ["$usa","$canada"], "subregions": ["$ada"]}""")))
 
       try {
@@ -200,7 +191,7 @@ class TestFacebookPoster extends Specification with Mockito {
 
     "reject subregions if there are no countries" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> publishAction,
         "target" -> Json.parse(s"""{"countryCodes": [], "subregions": ["$ada"]}""")))
 
       try {
@@ -215,19 +206,17 @@ class TestFacebookPoster extends Specification with Mockito {
 
     "resolve cities" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> publishAction,
         "target" -> Json.parse(s"""{"countryCodes": ["$usa"], "cities": ["$boise","$meridian","NoSuchCity,Ada,ID"]}""")))
-      poster.handleTask(params)
+      poster.handleTask(params).serialize() mustEqual s""""$statusUpdatePostId""""
       
       val expectedTarget = new Target(List(usa), List(), List(boiseId, meridianId))
       there was one(poster.facebookAdapter).publishStatusUpdate(connectionMatcher, ===(pageId), ===(expectedTarget), ===(message))
-     
-      poster.result must beSome(statusUpdatePostId)
     }
 
     "reject cities if there are multiple countries" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> publishAction,
         "target" -> Json.parse(s"""{"countryCodes": ["$usa","$canada"], "cities": ["$boise"]}""")))
 
       try {
@@ -242,7 +231,7 @@ class TestFacebookPoster extends Specification with Mockito {
 
     "reject cities if there are no countries" in {
       val poster = new TestableFacebookPoster
-      val params = new ActivityParameters(baseParams +("postType" -> "status update", "action" -> publishAction,
+      val params = getArgs(poster, Map("postType" -> "status update", "action" -> publishAction,
         "target" -> Json.parse(s"""{"countryCodes": [], "cities": ["$boise"]}""")))
 
       try {
