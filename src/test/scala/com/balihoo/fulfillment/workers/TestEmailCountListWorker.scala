@@ -203,23 +203,10 @@ class TestEmailCountListWorker extends Specification with Mockito {
     with LightweightDatabaseAdapterComponent
     with FilesystemAdapterComponent {
 
-    /* overrides */
     override val s3Adapter = mock[AbstractS3Adapter]
     override val liteDbAdapter = mock[LightweightDatabaseAdapter]
     override val filesystemAdapter = mock[JavaIOFilesystemAdapter]
 
-    /* hack into completeTask base worker to get result */
-    var test_complete_result = ""
-    override def withTaskHandling(code: => String): Unit = {
-      test_complete_result = code
-    }
-
-    def invokeAndGetResult(in: String) = {
-      handleTask(getSpecification.getParameters(in))
-      test_complete_result
-    }
-
-    /* mocks */
-
+    def invokeAndGetResult(in: String) = handleTask(getSpecification.getArgs(in)).serialize()
   }
 }

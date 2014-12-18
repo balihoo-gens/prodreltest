@@ -78,7 +78,7 @@ class FulfillmentWorkerTable {
     dynamoAdapter.update(entry.getDynamoUpdate)
   }
 
-  def get() = {
+  def get(domain:String) = {
     val scanExp:DynamoDBScanExpression = new DynamoDBScanExpression()
 
     val oldest = DateTime.now.minusDays(1)
@@ -87,6 +87,11 @@ class FulfillmentWorkerTable {
       new Condition()
         .withComparisonOperator(ComparisonOperator.GT)
         .withAttributeValueList(new AttributeValue().withS(UTCFormatter.format(oldest))))
+
+    scanExp.addFilterCondition("domain",
+      new Condition()
+        .withComparisonOperator(ComparisonOperator.EQ)
+        .withAttributeValueList(new AttributeValue().withS(domain)))
 
     val list = dynamoAdapter.mapper.scan(classOf[FulfillmentWorkerEntry], scanExp,
       new DynamoDBMapperConfig(new TableNameOverride(tableName)))

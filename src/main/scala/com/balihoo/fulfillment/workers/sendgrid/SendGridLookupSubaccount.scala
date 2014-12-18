@@ -1,5 +1,6 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.sendgrid
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
@@ -10,21 +11,19 @@ abstract class AbstractSendGridLookupSubaccount extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("participantId", "The participant ID used to identify the SendGrid subaccount"),
-      new BooleanActivityParameter("useTestSubaccount", "True if the SendGrid test account should be used")
-    ), new StringActivityResult("The subaccount username"))
+      new StringParameter("participantId", "The participant ID used to identify the SendGrid subaccount"),
+      new BooleanParameter("useTestSubaccount", "True if the SendGrid test account should be used")
+    ), new StringResultType("The subaccount username"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
     splog.info(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    withTaskHandling {
-      val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
-      val apiUser = sendGridAdapter.checkSubaccountExists(subaccountId)
-      apiUser match {
-        case Some(s) => s
-        case _ => throw new SendGridException("Subaccount not found.") // Throw an exception to cause the task to fail.
-      }
+    val subaccountId = SendGridSubaccountId(params("participantId"), params[Boolean]("useTestSubaccount"))
+    val apiUser = sendGridAdapter.checkSubaccountExists(subaccountId)
+    apiUser match {
+      case Some(s) => getSpecification.createResult(s)
+      case _ => throw new SendGridException("Subaccount not found.") // Throw an exception to cause the task to fail.
     }
   }
 }

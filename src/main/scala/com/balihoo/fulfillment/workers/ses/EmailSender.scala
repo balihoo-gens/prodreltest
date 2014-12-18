@@ -1,5 +1,6 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.ses
 
+import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util.Splogger
@@ -10,26 +11,24 @@ abstract class AbstractEmailSender extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new EmailActivityParameter("from", ""),
-      new StringsActivityParameter("recipients", "Array of email addresses"),
-      new StringActivityParameter("subject", ""),
-      new StringActivityParameter("body", ""),
-      new BooleanActivityParameter("html", "Send email in HTML format")
-    ), new ObjectActivityResult("Result of Send"))
+      new EmailParameter("from", ""),
+      new StringsParameter("recipients", "Array of email addresses"),
+      new StringParameter("subject", ""),
+      new StringParameter("body", ""),
+      new BooleanParameter("html", "Send email in HTML format")
+    ), new ObjectResultType("Result of Send"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    withTaskHandling {
-      sendEmail(
-        params("from"),
-        params[List[String]]("recipients"),
-        params("subject"),
-        params("body"),
-        params[Boolean]("html")
-      ).toString
-    }
+    getSpecification.createResult(sendEmail(
+      params[String]("from"),
+      params[List[String]]("recipients"),
+      params[String]("subject"),
+      params[String]("body"),
+      params[Boolean]("html")
+    ).toString)
   }
 
   def sendEmail(from: String, recipients: List[String], subject: String, body: String, html: Boolean = true): String = {

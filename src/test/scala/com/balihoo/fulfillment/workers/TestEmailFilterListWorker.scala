@@ -5,6 +5,7 @@ import java.net.URI
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers.ses.AbstractEmailFilterListWorker
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -26,7 +27,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  "pageSize": 1
           |}
         """.stripMargin
-       invoke(in) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"query\"\\]\\)")
+      invokeAndGetResult(in) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"query\"\\]\\)")
     }
     "fail task if query param is invalid json" in new WithWorker {
       val in =
@@ -39,7 +40,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  }
           |}
         """.stripMargin
-      invoke(in) must throwA[ActivitySpecificationException]("/query object has missing required properties \\(\\[\"select\"\\]\\)")
+      invokeAndGetResult(in) must throwA[ActivitySpecificationException]("/query object has missing required properties \\(\\[\"select\"\\]\\)")
     }
     "fail task if source param is missing" in new WithWorker {
       val in =
@@ -59,7 +60,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  }
           |}
         """.stripMargin
-      invoke(in) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"source\"\\]\\)")
+      invokeAndGetResult(in) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"source\"\\]\\)")
     }
     "fail task if source param is invalid uri" in new WithWorker {
       val in =
@@ -80,7 +81,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  }
           |}
         """.stripMargin
-      invoke(in) must throwA[ActivitySpecificationException]("/source string \"in valid\" is not a valid URI")
+      invokeAndGetResult(in) must throwA[ActivitySpecificationException]("/source string \"in valid\" is not a valid URI")
     }
     "fail task if source param is invalid uri protocol" in new WithWorker {
       val in =
@@ -101,7 +102,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  }
           |}
         """.stripMargin
-      invoke(in) must throwA[ActivitySpecificationException]("Invalid source protocol")
+      invokeAndGetResult(in) must throwA[ActivitySpecificationException]("Invalid source protocol")
     }
     "fail task if pageSize param is missing" in new WithWorker {
       val in =
@@ -121,7 +122,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  }
           |}
         """.stripMargin
-      invoke(in) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"pageSize\"\\]\\)")
+      invokeAndGetResult(in) must throwA[ActivitySpecificationException]("object has missing required properties \\(\\[\"pageSize\"\\]\\)")
     }
     "fail task if pageSize param is invalid" in new WithWorker {
       val in =
@@ -142,7 +143,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
           |  }
           |}
         """.stripMargin
-      invoke(in) must throwA[ActivitySpecificationException]("/pageSize instance type \\(string\\) does not match any allowed primitive type \\(allowed: \\[\"integer\"\\]\\)")
+      invokeAndGetResult(in) must throwA[ActivitySpecificationException]("/pageSize instance type \\(string\\) does not match any allowed primitive type \\(allowed: \\[\"integer\"\\]\\)")
     }
     "complete task if db file downloaded from s3, query performed, csv files created and uploaded to s3" in new WithWorker {
       val in =
@@ -199,10 +200,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
       s3Adapter.upload(data.csv_s3_key2, csv_file2_mock) returns Success(data.csv_s3_uri2)
       s3Adapter.upload(data.csv_s3_key3, csv_file3_mock) returns Success(data.csv_s3_uri3)
 
-      invoke(in)
-
-      val expectedResult = s"""["${data.csv_s3_uri1}","${data.csv_s3_uri2}","${data.csv_s3_uri3}"]"""
-      test_complete_result must beEqualTo(expectedResult)
+      invokeAndGetResult(in) must beEqualTo(s"""["${data.csv_s3_uri1}","${data.csv_s3_uri2}","${data.csv_s3_uri3}"]""")
 
       got {
 
@@ -254,13 +252,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     override val csvAdapter = mock[CsvAdapter]
     override val filesystemAdapter = mock[JavaIOFilesystemAdapter]
 
-    /* hack into completeTask base worker to get result */
-    var test_complete_result = ""
-    override def withTaskHandling(code: => String): Unit = {
-      test_complete_result = code
-    }
-
-    def invoke(in: String) = handleTask(getSpecification.getParameters(in))
+    def invokeAndGetResult(in: String) = handleTask(getSpecification.getArgs(in)).serialize()
 
     /* mocks */
     val db_s3_meta_mock = mock[S3Meta]

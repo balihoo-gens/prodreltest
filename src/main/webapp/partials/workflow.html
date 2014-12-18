@@ -153,7 +153,7 @@
                             <h3>Parameters</h3>
                             <table class="table table-condensed table-hover block params" style="width:95%">
                                 <tr ng-repeat="(pname, param) in section.params" ng-class="{info : param.edited}">
-                                    <td style="width:110px">
+                                    <td style="width:180px">
                                     <span class="fa fa-circle timeline-SUCCESS" ng-show="!param.root.needsEvaluation"></span>
                                     <span class="fa fa-exclamation-triangle timeline-WARNING" ng-show="param.root.needsEvaluation && !param.root.resolved && param.root.resolvable" title="Parameter has not been resolved!"></span>
                                         <span class="fa fa-check-circle timeline-SUCCESS" ng-show="param.root.needsEvaluation && param.root.resolved"></span>

@@ -1,10 +1,10 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.adwords
 
-import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.adapters._
-import com.google.api.ads.adwords.axis.v201409.mcm.ManagedCustomer
-
+import com.balihoo.fulfillment.workers._
+import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
+import com.google.api.ads.adwords.axis.v201409.mcm.ManagedCustomer
 
 abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
   this: LoggingAdwordsWorkflowAdapter
@@ -12,21 +12,21 @@ abstract class AbstractAdWordsAccountLookup extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new StringActivityParameter("parent", "Parent AdWords account name"),
-      new StringActivityParameter("name", "Name of the Account")
-    ), new StringActivityResult("AdWords Account ID"))
+      new StringParameter("parent", "Parent AdWords account name"),
+      new StringParameter("name", "Name of the Account")
+    ), new StringResultType("AdWords Account ID"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    adWordsAdapter.withErrorsHandled[Any]("Account Lookup", {
+  override def handleTask(params: ActivityArgs):ActivityResult = {
+    adWordsAdapter.withErrorsHandled[ActivityResult]("Account Lookup", {
       adWordsAdapter.setClientId(accountCreator.lookupParentAccount(params))
 
       val aname = params[String]("name")
       accountCreator.getAccount(params) match {
         case existing:ManagedCustomer =>
-          completeTask(String.valueOf(existing.getCustomerId))
+          getSpecification.createResult(String.valueOf(existing.getCustomerId))
         case _ =>
-          failTask(s"No account with name '$aname' was found!", "-")
+          throw new FailTaskException(s"No account with name '$aname' was found!", "-")
       }
     })
   }

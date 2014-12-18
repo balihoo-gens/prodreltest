@@ -2,6 +2,7 @@ package com.balihoo.fulfillment.workers
 
 import java.io.ByteArrayInputStream
 
+import com.balihoo.fulfillment.workers.adwords.{BudgetCalculatorComponent, AbstractAdWordsBudgetCalculator}
 import com.google.api.ads.adwords.lib.utils.v201409.ReportDownloader
 import com.google.api.ads.adwords.lib.utils.ReportDownloadResponse
 import org.joda.time.DateTime

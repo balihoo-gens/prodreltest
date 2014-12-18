@@ -21,7 +21,6 @@ import play.api.libs.json._
 
 //other external
 import org.joda.time.DateTime
-import org.keyczar.Crypter
 
 //local imports
 import com.balihoo.fulfillment.adapters._
@@ -40,8 +39,6 @@ abstract class FulfillmentWorker extends WithResources {
   def version = swfAdapter.version
   def taskListName = swfAdapter.taskListName
   def taskList = swfAdapter.taskList
-
-  val crypter = new Crypter("config/crypto")
 
   val defaultTaskHeartbeatTimeout = swfAdapter.config.getString("default_task_heartbeat_timeout")
   val defaultTaskScheduleToCloseTimeout = swfAdapter.config.getString("default_task_schedule_to_close_timeout")
@@ -133,14 +130,21 @@ abstract class FulfillmentWorker extends WithResources {
               val shortToken = _lastTaskToken takeRight 10
               updateStatus("Processing task.." + shortToken )
               val start = System.currentTimeMillis()
-              handleTask(getSpecification.getParameters(task.getInput))
+
+              completeTask(handleTask(getSpecification.getArgs(task.getInput)))
+
               val time = System.currentTimeMillis() - start
               splog.info(s"Task processed time=$time")
             } catch {
+              case cancel:CancelTaskException =>
+                splog("INFO", cancel.details + " " + cancel.getMessage)
+                cancelTask(cancel.details)
+              case fail:FailTaskException => // Deliberate failures
+                splog("INFO", fail.details + " " + fail.getMessage)
+                failTask("Task Failed", fail.getMessage + " " + fail.getStackTraceString take 150)
               case e:Exception =>
-                e.printStackTrace()
-                splog.warning(s"activity failed: exception=${e.toString}")
-                failTask(s"""{"$name": "${e.toString}"}""", e.getMessage)
+                splog("ERROR", "UNEXPECTED ERROR! " + e.getMessage + " " + e.getStackTraceString)
+                failTask("UNEXPECTED ERROR!", e.getMessage + " " + e.getStackTraceString take 150)
             } finally {
               closeResources()
             }
@@ -171,20 +175,7 @@ abstract class FulfillmentWorker extends WithResources {
 
   def getSpecification: ActivitySpecification
 
-  def handleTask(params:ActivityParameters)
-
-  def withTaskHandling(code: => String) {
-    try {
-      val result:String = code
-      completeTask(result)
-    } catch {
-      case cancel:CancelTaskException =>
-        splog("INFO", cancel.details + " " + cancel.getMessage)
-        cancelTask(cancel.details)
-      case e:Exception =>
-        failTask("Task Failed", e.getMessage + " " + e.getStackTraceString take 150)
-    }
-  }
+  def handleTask(params:ActivityArgs):ActivityResult
 
   def declareWorker() = {
     val status = s"Declaring $name $domain $taskListName"
@@ -219,16 +210,13 @@ abstract class FulfillmentWorker extends WithResources {
     updateStatus(resolution.resolution)
   }
 
-  def completeTask(result:String) = {
+  def completeTask(result:ActivityResult) = {
     completedTasks += 1
     try {
       if (_lastTaskToken != null && _lastTaskToken.nonEmpty) {
         val response:RespondActivityTaskCompletedRequest = new RespondActivityTaskCompletedRequest
         response.setTaskToken(_lastTaskToken)
-        response.setResult(getSpecification.result match {
-          case e:EncryptedActivityResult => crypter.encrypt(result)
-          case _ => result
-        })
+        response.setResult(result.serialize())
         swfAdapter.client.respondActivityTaskCompleted(response)
       } else {
         throw new Exception("empty task token")
@@ -237,7 +225,7 @@ abstract class FulfillmentWorker extends WithResources {
       case e:Exception =>
         splog.error(s"error completing task: ${e.getMessage}")
     }
-    _resolveTask(new TaskResolution("Completed", result))
+    _resolveTask(new TaskResolution("Completed", result.serialize()))
   }
 
   def failTask(reason:String, details:String) = {
@@ -302,6 +290,7 @@ abstract class FulfillmentWorker extends WithResources {
 }
 
 class CancelTaskException(val exception:String, val details:String) extends Exception(exception)
+class FailTaskException(val exception:String, val details:String) extends Exception(exception)
 
 class TaskResolution(val resolution:String, val details:String) {
   val when = UTCFormatter.format(DateTime.now)
