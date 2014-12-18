@@ -43,7 +43,7 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
         "com.balihoo.fulfillment.workers.htmlrenderer": True,
         "com.balihoo.fulfillment.workers.datastore.db_create": True,
-        "com.balihoo.fulfillment.workers.datastore.db_count": False,
+        "com.balihoo.fulfillment.workers.datastore.db_count": True,
         "com.balihoo.fulfillment.workers.datastore.db_csv_export": True,
         "com.balihoo.fulfillment.workers.workflow": True,
         "com.balihoo.fulfillment.workers.layoutrenderer": False,
