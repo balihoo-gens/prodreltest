@@ -13,20 +13,18 @@ abstract class AbstractFTPUploadValidator extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = FTPUploadConfig.getSpecification
 
-  override def handleTask(params: ActivityParameters) = {
-    println(s"Running ${getClass.getSimpleName} handleTask: processing $name")
+  override def handleTask(args: ActivityArgs):ActivityResult = {
+    splog.debug(s"Running ${getClass.getSimpleName} handleTask: processing $name")
 
-    withTaskHandling {
-      // Get the config data.
-      val conf = new FTPUploadConfig(params, config)
+    // Get the config data.
+    val conf = new FTPUploadConfig(args, config)
 
-      // Verify that the source file exists.
-      if (conf.sourceUrl.openConnection().getContentLength() < 0)
-        throw new IOException("Unable to get size of " + conf.sourceUrl)
+    // Verify that the source file exists.
+    if (conf.sourceUrl.openConnection().getContentLength < 0)
+      throw new IOException("Unable to get size of " + conf.sourceUrl)
 
-      // No exceptions, so call it good.
-      "OK"
-    }
+    // No exceptions, so call it good.
+    getSpecification.createResult("OK")
   }
 }
 

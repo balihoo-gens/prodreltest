@@ -54,51 +54,46 @@ abstract class AbstractLayoutRenderer extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new StringActivityParameter("formid", "The form id of the form to render"),
-        new StringActivityParameter("branddata", "The branddata to use as input to the form"),
-        new StringActivityParameter("inputdata", "The inputdata to use as input to the form"),
-        new UriActivityParameter("endpoint", "The endpoint URL to use (overrides default)", required=false),
-        new StringActivityParameter("clipselector", "The selector used to clip the page", required=false),
-        new StringActivityParameter("target", "The S3 filename of the resulting page")
-      ), new StringActivityResult("the target URL if successfully saved"))
+        new StringParameter("formid", "The form id of the form to render"),
+        new StringParameter("branddata", "The branddata to use as input to the form"),
+        new StringParameter("inputdata", "The inputdata to use as input to the form"),
+        new UriParameter("endpoint", "The endpoint URL to use (overrides default)", required=false),
+        new StringParameter("clipselector", "The selector used to clip the page", required=false),
+        new StringParameter("target", "The S3 filename of the resulting page")
+      ), new StringResultType("the target URL if successfully saved"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    try {
-      val id = params("formid")
-      val bdata = URLEncoder.encode(params("branddata"), "UTF-8")
-      val idata = URLEncoder.encode(params("inputdata"))
+  override def handleTask(args: ActivityArgs):ActivityResult = {
+    val id = args[String]("formid")
+    val bdata = URLEncoder.encode(args[String]("branddata"), "UTF-8")
+    val idata = URLEncoder.encode(args[String]("inputdata"))
 
-      val cliptuple = if (params.has("clipselector")) { (
-        "clipselector", params("clipselector"))
-      } else {
-        ("ignore", "undefined")
-      }
+    val cliptuple = if (args.has("clipselector")) { (
+      "clipselector", args[String]("clipselector"))
+    } else {
+      ("ignore", "undefined")
+    }
 
-      val endPoint = params.getOrElse[URI]("endpoint", new URI(s"$formBuilderSite/forms/$id/render-layout"))
-      val cleaninput = Json.stringify(Json.toJson(Map(
-        "source" -> endPoint.toString,
-        "data" -> s"inputdata=$bdata&inputdata=$idata",
-        "target" -> params("target"),
-        cliptuple
-      )))
+    val endPoint = args.getOrElse[URI]("endpoint", new URI(s"$formBuilderSite/forms/$id/render-layout"))
+    val cleaninput = Json.stringify(Json.toJson(Map(
+      "source" -> endPoint.toString,
+      "data" -> s"inputdata=$bdata&inputdata=$idata",
+      "target" -> args[String]("target"),
+      cliptuple
+    )))
 
-      splog.debug(s"running process with $cleaninput")
-      val result = command.run(cleaninput)
-      splog.debug(s"process out: ${result.out}")
-      splog.debug(s"process err: ${result.err}")
-      result.code match {
-        case 0 =>
-          val jres = Json.parse(result.out)
-          val htmlFileName = (jres \ "result").as[String]
-          val s3location = s3Move(htmlFileName, params("target"))
-          completeTask(s3location)
-        case _ =>
-          failTask(s"Process returned code '${result.code}'", result.err)
-      }
-    } catch {
-      case exception:Exception =>
-        failTask(exception.toString, exception.getMessage)
+    splog.debug(s"running process with $cleaninput")
+    val result = command.run(cleaninput)
+    splog.debug(s"process out: ${result.out}")
+    splog.debug(s"process err: ${result.err}")
+    result.code match {
+      case 0 =>
+        val jres = Json.parse(result.out)
+        val htmlFileName = (jres \ "result").as[String]
+        val s3location = s3Move(htmlFileName, args[String]("target"))
+        getSpecification.createResult(s3location)
+      case _ =>
+        throw new FailTaskException(s"Process returned code '${result.code}'", result.err)
     }
   }
 }

@@ -48,14 +48,14 @@ class TestSQLiteLightweightDatabaseAdapter extends Specification with Mockito {
     "batch" in new WithLightweigthDatabase {
       db.execute("create table recipients (id integer, name string)")
       val dbBatch = db.batch("insert into recipients (id, name) values (?, ?)")
-      dbBatch.param(1, 1)
-      dbBatch.param(2, "roger")
+      dbBatch.param(1, Some(1))
+      dbBatch.param(2, Some("roger"))
       dbBatch.add()
-      dbBatch.param(1, 2)
-      dbBatch.param(2, "rafael")
+      dbBatch.param(1, Some(2))
+      dbBatch.param(2, Some("rafael"))
       dbBatch.add()
-      dbBatch.param(1, 3)
-      dbBatch.param(2, "novak")
+      dbBatch.param(1, Some(3))
+      dbBatch.param(2, Some("novak"))
       dbBatch.add()
       dbBatch.execute()
       val selectCount = db.selectCount("select count(id) from recipients where name like 'r%'")
@@ -71,7 +71,7 @@ class TestSQLiteLightweightDatabaseAdapter extends Specification with Mockito {
     }
     "getTableColumnNames should return a set of column names" in new WithLightweigthDatabase {
       db.execute(data.createTableSql)
-      db.getTableColumnNames(data.tableName) must beEqualTo(Set("id", "bday", "name"))
+      db.getAllTableColumns(data.tableName) must beEqualTo(Set("id", "bday", "name"))
     }
     "pagedSelect should give paged access to table rows" in new WithLightweigthDatabase {
       db.execute(data.createTableSql)
@@ -111,6 +111,23 @@ class TestSQLiteLightweightDatabaseAdapter extends Specification with Mockito {
       row5.size must beEqualTo(3)
       row5 must contain(allOf(5, "Sarah"))
       page3.hasNext must beFalse
+    }
+    "executeAndGetResult should return a sequence of rows" in new WithLightweigthDatabase {
+      db.execute(data.createTableSql)
+      db.execute("insert into recipients (id, name) values (1, 'a')")
+      db.execute("insert into recipients (id, name) values (2, 'b')")
+      db.execute("insert into recipients (id, name) values (3, 'c')")
+      val results = db.executeAndGetResult("select id, name from recipients order by id")
+      results must haveSize(3)
+      results(0) must haveSize(2)
+      results(0)(0) must beEqualTo(1)
+      results(0)(1) must beEqualTo("a")
+      results(1) must haveSize(2)
+      results(1)(0) must beEqualTo(2)
+      results(1)(1) must beEqualTo("b")
+      results(2) must haveSize(2)
+      results(2)(0) must beEqualTo(3)
+      results(2)(1) must beEqualTo("c")
     }
   }
 

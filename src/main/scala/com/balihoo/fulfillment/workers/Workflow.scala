@@ -76,30 +76,6 @@ case class WorkflowExecutionIds(workflowId:String, runId:String) {
   }
 }
 
-/** json version of a list of workflow execution ids */
-class WorkflowIdsActivityResult(override val description:String)
-  extends ActivityResult(description) {
-  def jsonType = "array"
-
-  override def toSchema:JsValue = {
-    Json.obj(
-      "type" -> jsonType,
-      "description" -> description,
-      "items" -> Json.obj(
-        "type" -> "object",
-        "properties" -> Json.obj(
-          "workflowId" -> Json.obj(
-            "type" -> "string"
-          ),
-          "runId" -> Json.obj(
-            "type" -> "string"
-          )
-        )
-      )
-    )
-  }
-}
-
 /**
  * Worker to generate one or more workflows
  */
@@ -111,10 +87,15 @@ abstract class AbstractWorkflowGenerator
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new ObjectActivityParameter("template", "the template for the workflows"),
-        new SubTableActivityParameter("substitutions", "substitution data for workflows", required=false),
-        new StringsActivityParameter("tags", "tags to put on the resulting workflows", required=false)
-    ), new WorkflowIdsActivityResult("list of workflow ids"))
+      new ObjectParameter("template", "the template for the workflows"),
+      new SubTableActivityParameter("substitutions", "substitution data for workflows", required=false),
+      new StringsParameter("tags", "tags to put on the resulting workflows", required=false)
+    ), new ArrayResultType("list of workflow ids", elementType =
+      new ObjectResultType("workflow id", properties = Map(
+        "workflowId" -> new StringResultType(""),
+        "runId" -> new StringResultType("")
+      ))
+    ))
   }
 
   trait SubProcessor {
@@ -155,22 +136,20 @@ abstract class AbstractWorkflowGenerator
   }
 
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
 
-    withTaskHandling {
-      val template = params[ActivityParameters]("template").input
-      val tags = Try(params[List[String]]("tags")) getOrElse List[String]()
-      val workflowCreator = new WorkFlowCreator(template, tags)
+    val template = args[ActivityArgs]("template").input
+    val tags = Try(args[List[String]]("tags")) getOrElse List[String]()
+    val workflowCreator = new WorkFlowCreator(template, tags)
 
-      if (params.has("substitutions")) {
-        val subTable = params[SubTable]("substitutions")
-        multipleSubstitute(subTable, workflowCreator)
-      } else {
-        submitTask(template, tags)
-      }
-
-      workflowCreator.toString
+    if (args.has("substitutions")) {
+      val subTable = args[SubTable]("substitutions")
+      multipleSubstitute(subTable, workflowCreator)
+    } else {
+      submitTask(template, tags)
     }
+
+    getSpecification.createResult(for(result <- workflowCreator.results) yield result.toJson)
   }
 
 

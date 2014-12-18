@@ -613,7 +613,14 @@ class SectionParameter(input:JsValue) {
     val (rawop, operand) : (String, JsValue) = jObj.fields(0)
     val opName = rawop.substring(2, rawop.length - 2) // trim off the <( .. )>
 
-    JsonOps(JsonOpName.withName(opName.toLowerCase), _evaluateJsValue(operand))
+    val operator = try {
+      JsonOpName.withName(opName.toLowerCase)
+    } catch {
+      case nsee:NoSuchElementException =>
+        throw new Exception(s"There is no operator '$rawop' available!")
+    }
+
+    JsonOps(operator, _evaluateJsValue(operand))
   }
 
   protected def _processContext(key:String):JsValue = {
@@ -652,7 +659,7 @@ class SectionParameter(input:JsValue) {
           timeline.error(s"Reference not resolvable! ${rnr.getMessage}", Some(DateTime.now()))
           resolvable = false
         case e:Exception =>
-          timeline.error(e.getMessage, Some(DateTime.now()))
+          timeline.error("Unexpected Exception! "+ e.getMessage, Some(DateTime.now()))
           resolvable = false
       }
     }

@@ -1,7 +1,8 @@
 package com.balihoo.fulfillment.adapters
 
-import java.io.{Closeable, File}
+import java.io.{Closeable, File, InputStream}
 import java.net.{URI, URL}
+import java.util.zip.GZIPInputStream
 
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
@@ -28,17 +29,35 @@ case object PrivateS3Visibility extends S3Visibility
 
 /**
  * Wrapper for an s3 object.
- * This object must be released as fast as possible per the amazon API.
+ * This object must be released as fast as possible per the amazon's API.
  */
 case class S3Meta(awsObject: S3Object, key: String, bucket: String) extends Closeable {
   lazy val lastModified = awsObject.getObjectMetadata.getLastModified
+  lazy val contentType = awsObject.getObjectMetadata.getContentType
   lazy val httpsUrl = new URL("https", "s3.amazonaws.com", s"$bucket/$key")
   lazy val s3Url = new URL("s3", bucket, key)
   lazy val s3Uri = new URI(s"s3://$bucket/$key")
   lazy val userMetaData = awsObject.getObjectMetadata.getUserMetadata.asScala.toMap
   lazy val filename = awsObject.getKey.split("/").last
+  lazy val filenameNoExtension = filename.split('.').init.mkString(".")
+  lazy val isGzip = "application/x-gzip" == contentType || filename.endsWith(".gz")
+
+  /**
+   * Release the S3 object.
+   */
   override def close() = awsObject.close()
-  def getContentStream = awsObject.getObjectContent
+
+  /**
+   * @return an `InputStream` the content's input stream. An appropriate `InputStream` decoder will
+   *         be provided based on the file extension.
+   */
+  def getContentStream: InputStream = {
+    if (isGzip)
+      new GZIPInputStream(awsObject.getObjectContent)
+    else
+      awsObject.getObjectContent
+  }
+
 }
 
 /**
@@ -107,6 +126,41 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
   }
 
   /**
+   * Upload a stream s3.
+   *
+   * @param key key name.
+   * @param istream InputStream to upload
+   * @param len content length
+   * @param bucket bucket name.
+   * @param userMetaData extra s3 metadata to add.
+   * @param visibility object visibility in s3 (determine permissions).
+   *
+   * @return a s3 URI to that file.
+   */
+  def uploadStream(
+    key: String,
+    istream: InputStream,
+    len: Int,
+    bucket: String = defaultBucket,
+    userMetaData: Map[String, String] = Map.empty,
+    visibility: S3Visibility = PrivateS3Visibility
+  ): Try[URI] = {
+
+    val metaData = new ObjectMetadata()
+    metaData.setContentLength(len) /* required in order to enable streaming */
+    metaData.setUserMetadata(userMetaData.asJava)
+
+    val request = new PutObjectRequest(bucket, key, istream, metaData).withCannedAcl(visibility)
+
+    val start = System.currentTimeMillis
+    splog.debug(s"Uploading... key=$key bucket=$bucket length=$len visibility=$visibility")
+    Try(client.putObject(request)).map { putObjectResult =>
+      splog.debug(s"Upload complete time=${System.currentTimeMillis - start}")
+      new URI(s"s3://$bucket/$key")
+    }
+  }
+
+  /**
    * Gets the contents of an S3 object as a string.
    * @param bucket
    * @param key
@@ -121,7 +175,6 @@ abstract class AbstractS3Adapter extends AWSAdapter[AmazonS3Client] {
     }
     resource.acquireAndGet(s => s)
   }
-
 }
 
 class S3Adapter(cfg: PropertiesLoader, override val splog: Splogger)

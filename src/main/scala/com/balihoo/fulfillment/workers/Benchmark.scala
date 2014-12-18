@@ -19,25 +19,25 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-        new StringActivityParameter("token", "some identifier to tie the chain together", required=false),
-        new IntegerActivityParameter("maxcount", "How many workflows to iterate", required=false),
-        new IntegerActivityParameter("multiply", "Exponential multiplication factor at each iteration", required=false),
-        new IntegerActivityParameter("count", "system: How manieth workflow this is", required=false),
-        new IntegerActivityParameter("submit_time", "system: the time this workflow was submitted", required=false),
-        new IntegerActivityParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", required=false)
-    ), new ObjectActivityResult("completed time and token"))
+        new StringParameter("token", "some identifier to tie the chain together", required=false),
+        new IntegerParameter("maxcount", "How many workflows to iterate", required=false),
+        new IntegerParameter("multiply", "Exponential multiplication factor at each iteration", required=false),
+        new IntegerParameter("count", "system: How manieth workflow this is", required=false),
+        new IntegerParameter("submit_time", "system: the time this workflow was submitted", required=false),
+        new IntegerParameter("avg_duration", "system: the average time between submittal and handling for workflows in this chain", required=false)
+    ), new ObjectResultType("completed time and token"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     val timeReceived = new DateTime(DateTimeZone.UTC)
-    val countMax = params.getOrElse("maxcount", 1)
-    val countPrevious = params.getOrElse("count", 0)
-    val multiply = params.getOrElse("multiply", 1)
-    val token = params.getOrElse("token", uuid)
+    val countMax = args.getOrElse("maxcount", 1)
+    val countPrevious = args.getOrElse("count", 0)
+    val multiply = args.getOrElse("multiply", 1)
+    val token = args.getOrElse("token", uuid)
 
     val count = countPrevious + 1
 
-    val durationLast:Option[Duration] = params.get("submit_time") match {
+    val durationLast:Option[Duration] = args.get("submit_time") match {
       case Some(timeSubmittedString) =>
         try {
           val timeSubmitted = DateTime.parse(timeSubmittedString)
@@ -52,7 +52,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
 
     val durationAvg:Option[Duration] = durationLast match {
       case Some(duration) =>
-        params.get[Long]("avg_duration") match {
+        args.get[Long]("avg_duration") match {
           case Some(durationAvgPrevious) =>
             val prevMillis = durationAvgPrevious
             val curMillis = duration.getMillis
@@ -116,7 +116,7 @@ abstract class AbstractBenchmark extends FulfillmentWorker {
     addDuration("Duration", durationLast)
     addDuration("Average Duration", durationAvg)
 
-    completeTask(Json.stringify(Json.toJson(result.toMap)))
+    getSpecification.createResult(result.toMap)
   }
 
   def uuid = java.util.UUID.randomUUID.toString

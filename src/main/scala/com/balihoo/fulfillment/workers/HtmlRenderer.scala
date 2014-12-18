@@ -56,72 +56,65 @@ abstract class AbstractHtmlRenderer extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
       new ActivitySpecification(List(
-        new UriActivityParameter("source", "The URL of of the page to render"),
-        new StringActivityParameter("clipselector", "The selector used to clip the page", required=false),
-        new StringActivityParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", required=false),
-        new ObjectActivityParameter("headers", "Optional headers", required=false),
-        new IntegerActivityParameter("maxsize", "Maximum size for the image (bytes)", required=false),
-        new IntegerActivityParameter("minquality", "Minimum quality of the image (percent)", required=false),
-        new StringActivityParameter("target", "The S3 filename of the resulting image")
-      ), new StringActivityResult("the target URL if successfully saved"))
+        new UriParameter("source", "The URL of of the page to render"),
+        new StringParameter("clipselector", "The selector used to clip the page", required=false),
+        new StringParameter("data", "Optional URLEncoded POST data. Not providing this will use GET", required=false),
+        new ObjectParameter("headers", "Optional headers", required=false),
+        new IntegerParameter("maxsize", "Maximum size for the image (bytes)", required=false),
+        new IntegerParameter("minquality", "Minimum quality of the image (percent)", required=false),
+        new StringParameter("target", "The S3 filename of the resulting image")
+      ), new StringResultType("the target URL if successfully saved"))
   }
 
-  override def handleTask(params: ActivityParameters) = {
-    try {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
+    val target = args[String]("target")
+    val source = args[URI]("source")
 
-      val target = params[String]("target")
-      val source = params[URI]("source")
+    val input = MutableMap(
+      "action" -> "render",
+      "source" -> source.toString,
+      "target" -> target
+    )
 
-      val input = MutableMap(
-        "action" -> "render",
-        "source" -> source.toString,
-        "target" -> target
-      )
+    //optionally add the optional parameters
+    for (s <- Seq("data", "clipselector")
+         if args.has(s)
+    ) yield {
+      input(s) = args[String](s)
+    }
 
-      //optionally add the optional parameters
-      for (s <- Seq("data", "clipselector")
-        if params.has(s)
-      ) yield {
-        input(s) = params[String](s)
+    if (args.has("headers")) {
+      input("headers") = Json.stringify(args[JsObject]("headers"))
+    }
+
+    val maxsize = args.getOrElse("maxsize", maxsizeDefault )
+    val minquality = args.getOrElse("minquality", minqualityDefault)
+    if (maxsize < 0) throw new Exception("max size must be > 0")
+    if (minquality < 0) throw new Exception("min quality must be > 0")
+
+    var quality = 100
+    var filesize: Long = Long.MaxValue
+    var imageFileName: Option[String] = None
+    while (filesize > maxsize) {
+      if (quality < minquality)
+        throw new Exception("Unable to render image within size and quality constraints")
+      input("quality") = quality.toString
+      val filename = render(input)
+      filesize = new File(filename).length
+      imageFileName = Some(filename)
+      quality = if (quality > minquality) {
+        math.max(quality-10,minquality)
+      } else {
+        minquality - 1
       }
+    }
 
-      if (params.has("headers")) {
-        input("headers") = Json.stringify(params[JsObject]("headers"))
-      }
-
-      val maxsize = params.getOrElse("maxsize", maxsizeDefault )
-      val minquality = params.getOrElse("minquality", minqualityDefault)
-      if (maxsize < 0) throw new Exception("max size must be > 0")
-      if (minquality < 0) throw new Exception("min quality must be > 0")
-
-      var quality = 100
-      var filesize: Long = Long.MaxValue
-      var imageFileName: Option[String] = None
-      while (filesize > maxsize) {
-        if (quality < minquality)
-          throw new Exception("Unable to render image within size and quality constraints")
-        input("quality") = quality.toString
-        val filename = render(input)
-        filesize = new File(filename).length
-        imageFileName = Some(filename)
-        quality = if (quality > minquality) {
-          math.max(quality-10,minquality)
-        } else {
-          minquality - 1
-        }
-      }
-
-      imageFileName match {
-        case Some(filename) =>
-          val s3location = s3Move(filename, target)
-          completeTask(s3location)
-        case None =>
-          throw new Exception("Failed to render image")
-      }
-
-    } catch {
-      case exception:Exception =>
-        failTask(exception.toString, exception.getMessage)
+    imageFileName match {
+      case Some(filename) =>
+        val s3location = s3Move(filename, target)
+        getSpecification.createResult(s3location)
+      case None =>
+        throw new FailTaskException("Failed to render image", s"target=$target")
     }
   }
 

@@ -11,26 +11,26 @@ abstract class AbstractChaos extends FulfillmentWorker {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(List(
-      new NumberActivityParameter("chanceToFail", "0-100 Chance to Fail"),
-      new NumberActivityParameter("chanceToCancel", "0-100 Chance to Cancel")
-    ), new StringActivityResult("Message of little consequence."))
+      new NumberParameter("chanceToFail", "0-100 Chance to Fail"),
+      new NumberParameter("chanceToCancel", "0-100 Chance to Cancel")
+    ), new StringResultType("Message of little consequence."))
   }
 
-  override def handleTask(params: ActivityParameters) = {
+  override def handleTask(args: ActivityArgs):ActivityResult = {
     val rand = new Random()
 
     val failActual = rand.nextFloat() * 100
     val cancelActual = rand.nextFloat() * 100
 
-    val failChances = params[Float]("chanceToFail")
-    val cancelChances = params[Float]("chanceToCancel")
+    val failChances = args[Double]("chanceToFail")
+    val cancelChances = args[Double]("chanceToCancel")
 
     if(failActual < failChances) {
-      failTask("Chaos ensued!", s"Failing because $failActual < $failChances")
+      throw new FailTaskException("Chaos ensued!", s"Failing because $failActual < $failChances")
     } else if(cancelActual < cancelChances) {
-      cancelTask(s"I don't feel like processing this right now $cancelActual < $cancelChances")
+      throw new CancelTaskException("Cancelling", s"I don't feel like processing this right now $cancelActual < $cancelChances")
     } else {
-      completeTask("Everything went better than expected!")
+      getSpecification.createResult("Everything went better than expected!")
     }
   }
 }

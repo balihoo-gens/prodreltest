@@ -40,12 +40,18 @@ trait LightweightDatabaseAdapterComponent {
   /**
    * Encapsulate a db and expose operations to be done on it.
    */
-  trait LightweightDatabase {
+  trait LightweightDatabase extends AutoCloseable {
+
 
     /**
-     * Execute a sql statement.
+     * Execute a sql statement and return an iterable over the result.
      */
     def execute(statement: String)
+
+    /**
+     * Execute a sql statement and return an iterable.
+     */
+    def executeAndGetResult(statement: String): Seq[Seq[Any]]
 
     /**
      * @return a new batcher to process db operations in batch.
@@ -86,7 +92,7 @@ trait LightweightDatabaseAdapterComponent {
     /**
      * @return a set of column names for the specified table.
      */
-    def getTableColumnNames(tableName: String): Set[String]
+    def getAllTableColumns(tableName: String): Set[String]
   }
 
   /**
@@ -97,7 +103,7 @@ trait LightweightDatabaseAdapterComponent {
     /**
      * Add parameter to current batch record.
      */
-    def param[T <: Any](index: Int, value: T)
+    def param[T <: Any](index: Int, value: Option[T])
 
     /**
      * Add current record to batch.
@@ -145,6 +151,34 @@ trait LightweightDatabaseAdapterComponent {
       connection.setAutoCommit(false)
     }
 
+    private def extractRow(rs: ResultSet): Seq[Any] = {
+      val metaData = rs.getMetaData
+      (for {
+        i <- 1 to metaData.getColumnCount
+      } yield {
+        metaData.getColumnType(i) match {
+          case Types.TINYINT | Types.SMALLINT | Types.INTEGER | Types.BIGINT => rs.getInt(i)
+          case Types.CLOB | Types.CHAR | Types.VARCHAR | Types.NCHAR | Types.NVARCHAR => rs.getString(i)
+          case Types.REAL | Types.DOUBLE | Types.FLOAT | Types.NUMERIC | Types.DECIMAL => rs.getDouble(i)
+          case Types.BOOLEAN => rs.getBoolean(i)
+          case Types.DATE => rs.getString(i)
+          case Types.TIME | Types.TIMESTAMP => rs.getLong(i)
+          case _ => rs.getObject(i)
+        }
+      }).toList
+    }
+
+    override def executeAndGetResult(stmt: String): Seq[Seq[Any]] = {
+      connection.setAutoCommit(true)
+      val rs = newStatement().executeQuery(stmt)
+      connection.setAutoCommit(false)
+      Iterator
+        .continually((rs.next(), rs))
+        .takeWhile(_._1)
+        .map(r => extractRow(r._2))
+        .toSeq
+    }
+
     override def pagedSelect(statement: String, totalCount: Int, pageSize: Int = 1000): DbPagedResultSet = {
       val stmt = statement.toLowerCase
       if (pageSize < 1) throw new IllegalArgumentException("invalid page size")
@@ -177,14 +211,15 @@ trait LightweightDatabaseAdapterComponent {
    */
   private[this] class JdbcBatch(preparedStatement: PreparedStatement) extends DbBatch {
 
-    override def param[T <: Any](index: Int, value: T) = value match {
-      case anInt: Int => preparedStatement.setInt(index, anInt)
-      case aLong: Long => preparedStatement.setLong(index, aLong)
-      case aFloat: Float => preparedStatement.setFloat(index, aFloat)
-      case aDouble: Double => preparedStatement.setDouble(index, aDouble)
-      case aString: String => preparedStatement.setString(index, aString)
-      case aDate: java.sql.Date => preparedStatement.setDate(index, aDate)
-      case aTimestamp: java.sql.Timestamp => preparedStatement.setTimestamp(index, aTimestamp)
+    override def param[T <: Any](index: Int, value: Option[T]) = value match {
+      case None => preparedStatement.setInt(index, java.sql.Types.NULL)
+      case Some(anInt: Int) => preparedStatement.setInt(index, anInt)
+      case Some(aLong: Long) => preparedStatement.setLong(index, aLong)
+      case Some(aFloat: Float) => preparedStatement.setFloat(index, aFloat)
+      case Some(aDouble: Double) => preparedStatement.setDouble(index, aDouble)
+      case Some(aString: String) => preparedStatement.setString(index, aString)
+      case Some(aDate: java.sql.Date) => preparedStatement.setDate(index, aDate)
+      case Some(aTimestamp: java.sql.Timestamp) => preparedStatement.setTimestamp(index, aTimestamp)
       case anUnsupportedSqlType => throw new RuntimeException("unsupported type " + value.getClass)
     }
 
@@ -269,7 +304,7 @@ trait SQLiteLightweightDatabaseAdapterComponent extends LightweightDatabaseAdapt
   private[this] class SQLiteLightweightDatabase(connection: Connection)
     extends JdbcLightweightDatabase(connection, splog) {
 
-    override def getTableColumnNames(tableName: String): Set[String] = {
+    override def getAllTableColumns(tableName: String): Set[String] = {
       val statement = newStatement()
       val columns = collection.mutable.Set[String]()
       try {

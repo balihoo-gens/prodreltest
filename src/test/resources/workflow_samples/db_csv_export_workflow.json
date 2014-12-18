@@ -1,0 +1,25 @@
+{
+    "sections": {
+        "Get recipients with a first and last name starting with 'a'": {
+            "action": {
+                "name": "db_csv_export",
+                "version": "1"
+            },
+            "params": {
+                "pageSize": 1000,
+                "source": "s3://balihoo.dev.fulfillment/tmp/Email-createdb/JP-RecipientsData.db.gz",
+                "query": {
+                    "select": {
+                        "email": "",
+                        "zip": "",
+                        "first_name": "$v like 'a%'",
+                        "last_name": "$v like 'a%'",
+                        "birth_day": ""
+                    }
+                }
+            },
+            "status": "READY",
+            "essential": true
+        }
+    }
+}

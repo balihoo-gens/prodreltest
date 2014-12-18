@@ -42,8 +42,9 @@ class Launcher(object):
         "com.balihoo.fulfillment.workers.adwords_budgetcalculator": True,
         "com.balihoo.fulfillment.workers.geonames_timezoneretriever": True,
         "com.balihoo.fulfillment.workers.htmlrenderer": True,
-        "com.balihoo.fulfillment.workers.email_createdb": True,
-        "com.balihoo.fulfillment.workers.email_filter": True,
+        "com.balihoo.fulfillment.workers.datastore.db_create": True,
+        "com.balihoo.fulfillment.workers.datastore.db_count": True,
+        "com.balihoo.fulfillment.workers.datastore.db_csv_export": True,
         "com.balihoo.fulfillment.workers.workflow": True,
         "com.balihoo.fulfillment.workers.layoutrenderer": False,
         "com.balihoo.fulfillment.workers.email_addressverifier": False,
@@ -73,8 +74,7 @@ class Launcher(object):
         self._nragent_path = nragent_path
         self._components = {}
         self._log = Splogger(logfile)
-        if cfgfile:
-            self._task_poller = self._make_task_poller(cfgfile)
+        self._task_poller = self._make_task_poller(cfgfile) if cfgfile else None
 
     def _make_task_poller(self, cfgfile):
         """ creates an async Swf task poller

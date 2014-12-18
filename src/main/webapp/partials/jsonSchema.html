@@ -1,0 +1,25 @@
+<div class="schemaJson" ng-switch="schema.type">
+    <div ng-switch-when="object">
+        <div ng-bind-html="formatUtil.formatURLs(schema.description)" ng-show="schema.description"></div>
+        OBJECT {<br/><div class="block" ng-repeat="(name, prop) in ::schema.properties">
+            <span style="min-width: 200px; display:inline-block;"><b>{{name}}</b>&nbsp;
+            <i class="fa fa-flash muted" ng-show="formatUtil.inArray(schema.required, name)" title="Property is REQUIRED"></i>&nbsp;
+            <i class="fa fa-eye-slash muted" ng-show="" title="Parameter will be ENCRYPTED"></i></span>
+            <json-schema schema="prop"></json-schema>
+        </div><br/>}
+    </div>
+    <div ng-switch-when="array">
+        ARRAY [<json-schema schema="schema.items"></json-schema>]<br/>
+    </div>
+    <div ng-switch-default>
+        <b>{{schema.type}}</b> - <span ng-bind-html="formatUtil.formatURLs(schema.description)"></span><br/>
+        <div ng-show="schema.enum" class="label label-default" ng-repeat="e in schema.enum">{{e}}</div>
+        <div ng-show="schema.format"><b>Format</b>:&nbsp;{{schema.format}}</div>
+        <div ng-show="schema.maxLength"><b>Max Length</b>:&nbsp;{{schema.maxLength}}</div>
+        <div ng-show="schema.minLength"><b>Min Length</b>:&nbsp;{{schema.minLength}}</div>
+        <div ng-show="schema.patterm"><b>Pattern</b>:&nbsp;{{schema.pattern}}</div>
+        <div ng-show="schema.minItems"><b>Min Items</b>:&nbsp;{{schema.minItems}}</div>
+        <div ng-show="schema.uniqueItems"><b>Unique Items</b>:&nbsp;{{schema.uniqueItems}}</div>
+    </div>
+</div>
+
