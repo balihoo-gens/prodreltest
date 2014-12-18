@@ -1,0 +1,23 @@
+{
+  "filter_recipients": {
+    "action": {
+      "name": "Email-filterlist",
+      "version": "1"
+    },
+    "params": {
+      "pageSize": 10000,
+      "source": "s3://balihoo.dev.fulfillment/tmp/Email-createdb/JP-RecipientsData.db.gz",
+      "query": {
+        "select": {
+          "email": "",
+          "first_name": "$v like 'a%'",
+          "last_name":  "$v like 'a%'",
+          "birth_day": ""
+        }
+      }
+    },
+    "prereqs": [],
+    "status": "READY",
+    "essential": true
+  }
+}

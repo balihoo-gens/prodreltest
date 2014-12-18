@@ -97,7 +97,7 @@ trait LightweightDatabaseAdapterComponent {
     /**
      * Add parameter to current batch record.
      */
-    def param[T <: Any](index: Int, value: T)
+    def param[T <: Any](index: Int, value: Option[T])
 
     /**
      * Add current record to batch.
@@ -177,14 +177,15 @@ trait LightweightDatabaseAdapterComponent {
    */
   private[this] class JdbcBatch(preparedStatement: PreparedStatement) extends DbBatch {
 
-    override def param[T <: Any](index: Int, value: T) = value match {
-      case anInt: Int => preparedStatement.setInt(index, anInt)
-      case aLong: Long => preparedStatement.setLong(index, aLong)
-      case aFloat: Float => preparedStatement.setFloat(index, aFloat)
-      case aDouble: Double => preparedStatement.setDouble(index, aDouble)
-      case aString: String => preparedStatement.setString(index, aString)
-      case aDate: java.sql.Date => preparedStatement.setDate(index, aDate)
-      case aTimestamp: java.sql.Timestamp => preparedStatement.setTimestamp(index, aTimestamp)
+    override def param[T <: Any](index: Int, value: Option[T]) = value match {
+      case None => preparedStatement.setInt(index, java.sql.Types.NULL)
+      case Some(anInt: Int) => preparedStatement.setInt(index, anInt)
+      case Some(aLong: Long) => preparedStatement.setLong(index, aLong)
+      case Some(aFloat: Float) => preparedStatement.setFloat(index, aFloat)
+      case Some(aDouble: Double) => preparedStatement.setDouble(index, aDouble)
+      case Some(aString: String) => preparedStatement.setString(index, aString)
+      case Some(aDate: java.sql.Date) => preparedStatement.setDate(index, aDate)
+      case Some(aTimestamp: java.sql.Timestamp) => preparedStatement.setTimestamp(index, aTimestamp)
       case anUnsupportedSqlType => throw new RuntimeException("unsupported type " + value.getClass)
     }
 

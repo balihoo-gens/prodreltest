@@ -33,7 +33,6 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
   val s3BucketConfig = "s3bucket"
   val s3DirConfig = "s3dir"
 
-  def destinationS3Bucket = swfAdapter.config.getString(s3BucketConfig)
   def destinationS3Key = swfAdapter.config.getString(s3DirConfig)
 
   object FilterListQueryParameter
@@ -113,7 +112,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
           pageNum += 1
           splog.info(s"Processing csv file #$pageNum...")
 
-          val csvS3Key = s"$destinationS3Key/${dbMeta.filename}.$pageNum.csv"
+          val csvS3Key = s"$destinationS3Key/${dbMeta.filenameNoExtension}.$pageNum.csv.gz"
           val csvTempFile = filesystemAdapter.newTempFile(csvS3Key)
           val csvOutputStream = filesystemAdapter.newOutputStream(csvTempFile)
           val csvWriter = csvAdapter.newWriter(csvOutputStream)
@@ -128,7 +127,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
             }
 
             s3Adapter
-              .upload(csvS3Key, csvTempFile)
+              .upload(csvS3Key, filesystemAdapter.gzip(csvTempFile))
               .map(_.toString)
               .get
 

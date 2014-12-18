@@ -1,13 +1,13 @@
 package com.balihoo.fulfillment.workers
 
-import java.io.{InputStream, File, InputStreamReader}
+import java.io.{File, InputStream, InputStreamReader}
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.workers.ses.{TableDefinition, ColumnDefinition, DataTypes, AbstractEmailCreateDBWorker}
+import com.balihoo.fulfillment.workers.ses.{AbstractEmailCreateDBWorker, ColumnDefinition, DataTypes, TableDefinition}
 import org.junit.runner._
 import org.specs2.mock.Mockito
 import org.specs2.mutable._
@@ -262,7 +262,8 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
       liteDbAdapter.create(===(data.db_temp_file_path)) returns db_mock
       csvAdapter.parseReaderAsStream(csv_reader_mock) returns Success(data.csv_stream)
       db_mock.batch(anyString) returns db_batch_mock
-      s3Adapter.upload(===(data.db_s3_key), ===(db_file_mock), anyString, any[Map[String, String]], any[S3Visibility]) returns Success(data.db_s3_uri)
+      filesystemAdapter.gzip(db_file_mock) returns db_gzip_file_mock
+      s3Adapter.upload(===(data.db_s3_key), ===(db_gzip_file_mock), anyString, any[Map[String, String]], any[S3Visibility]) returns Success(data.db_s3_uri)
 
       val result = handleTask(data.activityParameter)
 
@@ -281,26 +282,26 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
         "(\"recipientid\", \"locationid\", \"email\", \"firstname\", \"lastname\", \"birthday\") " +
         "values (?, ?, ?, ?, ?, ?)")
 
-      there was one(db_batch_mock).param(1, "b")
-      there was one(db_batch_mock).param(2, 2.toLong)
-      there was one(db_batch_mock).param(3, "rafael@nike.com")
-      there was one(db_batch_mock).param(4, "rafael")
-      there was one(db_batch_mock).param(5, "nadal")
-      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1986-06-03").getTime))
+      there was one(db_batch_mock).param(1, Some("b"))
+      there was one(db_batch_mock).param(2, Some(2.toLong))
+      there was one(db_batch_mock).param(3, Some("rafael@nike.com"))
+      there was one(db_batch_mock).param(4, Some("rafael"))
+      there was one(db_batch_mock).param(5, Some("nadal"))
+      there was one(db_batch_mock).param(6, Some(new java.sql.Date(sqlDateParser.parse("1986-06-03").getTime)))
 
-      there was one(db_batch_mock).param(1, "a")
-      there was one(db_batch_mock).param(2, 1.toLong)
-      there was one(db_batch_mock).param(3, "roger@nike.com")
-      there was one(db_batch_mock).param(4, "roger")
-      there was one(db_batch_mock).param(5, "federer")
-      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1981-08-08").getTime))
+      there was one(db_batch_mock).param(1, Some("a"))
+      there was one(db_batch_mock).param(2, Some(1.toLong))
+      there was one(db_batch_mock).param(3, Some("roger@nike.com"))
+      there was one(db_batch_mock).param(4, Some("roger"))
+      there was one(db_batch_mock).param(5, Some("federer"))
+      there was one(db_batch_mock).param(6, Some(new java.sql.Date(sqlDateParser.parse("1981-08-08").getTime)))
 
-      there was one(db_batch_mock).param(1, "c")
-      there was one(db_batch_mock).param(2, 3.toLong)
-      there was one(db_batch_mock).param(3, "novak@uniqlo.com")
-      there was one(db_batch_mock).param(4, "novak")
-      there was one(db_batch_mock).param(5, "djokovic")
-      there was one(db_batch_mock).param(6, new java.sql.Date(sqlDateParser.parse("1987-05-22").getTime))
+      there was one(db_batch_mock).param(1, Some("c"))
+      there was one(db_batch_mock).param(2, Some(3.toLong))
+      there was one(db_batch_mock).param(3, Some("novak@uniqlo.com"))
+      there was one(db_batch_mock).param(4, Some("novak"))
+      there was one(db_batch_mock).param(5, Some("djokovic"))
+      there was one(db_batch_mock).param(6, Some(new java.sql.Date(sqlDateParser.parse("1987-05-22").getTime)))
 
       there was three(db_batch_mock).add()
       there was two(db_batch_mock).execute()
@@ -399,7 +400,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val db_s3_userMetaDataUseCache = Map("csvlastmodified" -> dateFormat.format(db_s3_LastModified))
     val db_temp_file_uri = new URI("s3://some/valid")
     val s3_dir = "test_dubdir"
-    val db_s3_key = s"$s3_dir/$param_dbname"
+    val db_s3_key = s"$s3_dir/$param_dbname.gz"
     val db_s3_uri = new URI(s"s3://$s3_bucket/$db_s3_key")
   }
 
@@ -427,6 +428,7 @@ class TestEmailCreateDBWorker extends Specification with Mockito {
     val csv_reader_mock = mock[InputStreamReader]
     val db_s3_meta_mock = mock[S3Meta]
     val db_file_mock = mock[File]
+    val db_gzip_file_mock = mock[File]
     val db_mock = mock[LightweightDatabase]
     val db_batch_mock = mock[DbBatch]
   }

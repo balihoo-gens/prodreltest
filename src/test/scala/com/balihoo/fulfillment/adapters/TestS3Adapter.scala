@@ -4,7 +4,7 @@ import java.io.{ByteArrayInputStream, File}
 import java.net.URI
 
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.{PutObjectRequest, PutObjectResult, S3Object, S3ObjectInputStream}
+import com.amazonaws.services.s3.model._
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
 import com.balihoo.fulfillment.config.{PropertiesLoader, PropertiesLoaderComponent}
 import com.balihoo.fulfillment.util.{Splogger, SploggerComponent}
@@ -41,6 +41,8 @@ class TestS3Adapter extends Specification with Mockito {
       val inputStream = spy(new S3ObjectInputStream(new ByteArrayInputStream(expected.getBytes), mock[HttpRequestBase]))
       val awsObjectMock = mock[S3Object]
       implicit val order = inOrder(inputStream, awsObjectMock)
+      awsObjectMock.getKey returns "somefile"
+      awsObjectMock.getObjectMetadata returns new ObjectMetadata()
       awsObjectMock.getObjectContent returns inputStream
       client.getObject(data.bucket, data.key) returns awsObjectMock
       val result = getObjectContentAsString(data.bucket, data.key)
