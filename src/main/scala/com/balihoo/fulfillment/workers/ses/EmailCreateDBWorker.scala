@@ -217,17 +217,12 @@ abstract class AbstractEmailCreateDBWorker extends FulfillmentWorker {
 
   override def handleTask(args: ActivityArgs):ActivityResult = {
 
-<<<<<<< HEAD
     val (bucket, key, dbName, tableDefinition) = getArguments(args)
-    val dbS3Key = s"$s3dir/$dbName"
-=======
-    val (bucket, key, dbName, tableDefinition) = getParams(params)
 
     val dbS3Key = {
       val gzDbName = if (dbName.endsWith(".gz")) dbName else s"$dbName.gz"
       s"$s3dir/$gzDbName"
     }
->>>>>>> develop
 
     val csvMeta = s3Adapter.getMeta(bucket, key).get
     val dbMetaTry = s3Adapter.getMeta(dbS3Key)
