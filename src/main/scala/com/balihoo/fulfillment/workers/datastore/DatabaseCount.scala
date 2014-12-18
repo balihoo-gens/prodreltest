@@ -1,17 +1,18 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.datastore
 
 import java.net.URI
 
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.workers._
 import play.api.libs.json._
 
 /**
  * Worker that execute a SQL query over a database file ot yield a set of CSV files
  * (put in s3) that contains recipients email address for bulk email delivery.
  */
-abstract class AbstractEmailCountListWorker extends FulfillmentWorker {
+abstract class AbstractDatabaseCount extends FulfillmentWorker {
 
   this: LoggingWorkflowAdapter
     with LightweightDatabaseAdapterComponent
@@ -53,8 +54,8 @@ abstract class AbstractEmailCountListWorker extends FulfillmentWorker {
       val queryDef =
         params
           .get[ActivityArgs]("query")
-          .fold(new EmailQueryDefinition(Json.obj())) { query =>
-            Json.parse(query.input).as[EmailQueryDefinition]
+          .fold(new DatabaseQueryDefinition(Json.obj())) { query =>
+            Json.parse(query.input).as[DatabaseQueryDefinition]
           }
 
       splog.info(s"Downloading database file...")
@@ -87,8 +88,8 @@ abstract class AbstractEmailCountListWorker extends FulfillmentWorker {
 /**
  * Production-ready worker class.
  */
-class EmailCountListWorker(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractEmailCountListWorker
+class DatabaseCount(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractDatabaseCount
     with LoggingWorkflowAdapterImpl
     with SQLiteLightweightDatabaseAdapterComponent
     with S3AdapterComponent
@@ -99,8 +100,8 @@ class EmailCountListWorker(override val _cfg: PropertiesLoader, override val _sp
 /**
  * Email FilterList worker application instance.
  */
-object email_countlist extends FulfillmentWorkerApp {
+object db_count extends FulfillmentWorkerApp {
   override def createWorker(cfg: PropertiesLoader, splog: Splogger): FulfillmentWorker = {
-    new EmailCountListWorker(cfg, splog)
+    new DatabaseCount(cfg, splog)
   }
 }

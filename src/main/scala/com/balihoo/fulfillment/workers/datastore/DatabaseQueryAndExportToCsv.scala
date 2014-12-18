@@ -1,18 +1,18 @@
-package com.balihoo.fulfillment.workers.ses
+package com.balihoo.fulfillment.workers.datastore
 
 import java.net.URI
 
-import com.balihoo.fulfillment.workers._
 import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config.PropertiesLoader
 import com.balihoo.fulfillment.util.Splogger
+import com.balihoo.fulfillment.workers._
 import play.api.libs.json._
 
 /**
  * Worker that execute a SQL query over a database file ot yield a set of CSV files
  * (put in s3) that contains recipients email address for bulk email delivery.
  */
-abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
+abstract class AbstractDatabaseQueryAndExportToCsv extends FulfillmentWorker {
 
   this: LoggingWorkflowAdapter
     with LightweightDatabaseAdapterComponent
@@ -42,7 +42,7 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 
     splog.info(s"Checking parameters...")
     val source = params[URI]("source")
-    val query = Json.parse(params[ActivityArgs]("query").input).as[EmailQueryDefinition]
+    val query = Json.parse(params[ActivityArgs]("query").input).as[DatabaseQueryDefinition]
     val pageSize = params[Int]("pageSize")
     if (source.getScheme != "s3") throw ActivitySpecificationException("Invalid source protocol")
     val (sourceBucket, sourceKey) = (source.getHost, source.getPath.tail)
@@ -100,8 +100,8 @@ abstract class AbstractEmailFilterListWorker extends FulfillmentWorker {
 /**
  * Production-ready worker class.
  */
-class EmailFilterListWorker(override val _cfg: PropertiesLoader, override val _splog: Splogger)
-  extends AbstractEmailFilterListWorker
+class DatabaseQueryAndExportToCsv(override val _cfg: PropertiesLoader, override val _splog: Splogger)
+  extends AbstractDatabaseQueryAndExportToCsv
     with LoggingWorkflowAdapterImpl
     with SQLiteLightweightDatabaseAdapterComponent
     with S3AdapterComponent
@@ -113,8 +113,8 @@ class EmailFilterListWorker(override val _cfg: PropertiesLoader, override val _s
 /**
  * Email FilterList worker application instance.
  */
-object email_filterlist extends FulfillmentWorkerApp {
+object db_query_and_export_to_csv extends FulfillmentWorkerApp {
   override def createWorker(cfg: PropertiesLoader, splog: Splogger): FulfillmentWorker = {
-    new EmailFilterListWorker(cfg, splog)
+    new DatabaseQueryAndExportToCsv(cfg, splog)
   }
 }

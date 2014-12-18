@@ -1,8 +1,9 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.datastore
 
 import java.io.{File, InputStream}
 
 import com.balihoo.fulfillment.adapters._
+import com.balihoo.fulfillment.workers.ActivitySpecificationException
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -12,7 +13,7 @@ import org.specs2.specification.Scope
 import scala.util.Success
 
 @RunWith(classOf[JUnitRunner])
-class TestEmailCountListWorker extends Specification with Mockito {
+class TestDatabaseCount extends Specification with Mockito {
 
   "email countlist worker" should {
     "require source parameter" in new WithWorker {
@@ -197,7 +198,7 @@ class TestEmailCountListWorker extends Specification with Mockito {
     val dbResults = Seq(Seq("a", 3), Seq("b", 0), Seq("c", 1))
   }
 
-  trait WithWorker extends AbstractEmailCountListWorker with Scope
+  trait WithWorker extends AbstractDatabaseCount with Scope
     with LoggingWorkflowAdapterTestImpl
     with S3AdapterComponent
     with LightweightDatabaseAdapterComponent

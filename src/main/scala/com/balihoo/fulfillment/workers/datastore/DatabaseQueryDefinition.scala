@@ -1,4 +1,4 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.datastore
 
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
@@ -7,14 +7,8 @@ import scala.collection.immutable.TreeSet
 /**
  * Error thrown when an invalid column specified in query.
  */
-case class EmailInvalidQueryColumnException(columns: Set[String])
+case class DatabaseInvalidQueryColumnException(columns: Set[String])
   extends RuntimeException("Invalid columns names: " + columns.mkString(", "))
-
-/**
- * Error thrown when no columns specified in select.
- */
-class EmailNoQueryColumnException
-  extends ActivitySpecificationException("No columns specified in select attribute")
 
 /**
  * SQL query definition.
@@ -29,7 +23,7 @@ class EmailNoQueryColumnException
  *
  * Utilities helps building the end where clause and select expression.
  */
-case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = Some("recipients")) {
+case class DatabaseQueryDefinition(select: JsObject, tableName: Option[String] = Some("recipients")) {
 
   /**
    * Placeholder in json model for field name in clauses.
@@ -58,11 +52,11 @@ case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = So
 
   /**
    * Check if all columns in a set are valid.
-   * @throws EmailInvalidQueryColumnException if some fields invalids.
+   * @throws DatabaseInvalidQueryColumnException if some fields invalids.
    */
   def checkColumns(dbColumns: Set[String]) = {
     val invalidFields = columns.diff(dbColumns)
-    if (invalidFields.nonEmpty) throw EmailInvalidQueryColumnException(invalidFields)
+    if (invalidFields.nonEmpty) throw DatabaseInvalidQueryColumnException(invalidFields)
   }
 
   /**
@@ -174,6 +168,6 @@ case class EmailQueryDefinition(select: JsObject, tableName: Option[String] = So
   }
 }
 
-object EmailQueryDefinition {
-  implicit val jsonFormat = Json.format[EmailQueryDefinition]
+object DatabaseQueryDefinition {
+  implicit val jsonFormat = Json.format[DatabaseQueryDefinition]
 }

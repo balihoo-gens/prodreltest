@@ -1,11 +1,11 @@
-package com.balihoo.fulfillment.workers
+package com.balihoo.fulfillment.workers.datastore
 
 import java.io.{File, OutputStream}
 import java.net.URI
 
 import com.amazonaws.services.s3.model.S3ObjectInputStream
 import com.balihoo.fulfillment.adapters._
-import com.balihoo.fulfillment.workers.ses.AbstractEmailFilterListWorker
+import com.balihoo.fulfillment.workers.ActivitySpecificationException
 import org.junit.runner.RunWith
 import org.specs2.mock.Mockito
 import org.specs2.mutable.Specification
@@ -16,7 +16,7 @@ import scala.collection.immutable.TreeSet
 import scala.util.Success
 
 @RunWith(classOf[JUnitRunner])
-class TestEmailFilterListWorker extends Specification with Mockito {
+class TestDatabaseQueryAndExportToCsv extends Specification with Mockito {
 
   "email filter list worker" should {
     "fail task if query param is missing" in new WithWorker {
@@ -239,7 +239,7 @@ class TestEmailFilterListWorker extends Specification with Mockito {
     val pageSizeInvalid = 0
   }
 
-  trait WithWorker extends AbstractEmailFilterListWorker with Scope
+  trait WithWorker extends AbstractDatabaseQueryAndExportToCsv with Scope
     with LoggingWorkflowAdapterTestImpl
     with S3AdapterComponent
     with LightweightDatabaseAdapterComponent
