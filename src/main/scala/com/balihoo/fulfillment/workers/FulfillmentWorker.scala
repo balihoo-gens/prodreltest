@@ -27,7 +27,7 @@ import com.balihoo.fulfillment.adapters._
 import com.balihoo.fulfillment.config._
 import com.balihoo.fulfillment.util._
 
-abstract class FulfillmentWorker {
+abstract class FulfillmentWorker extends WithResources {
   this: LoggingWorkflowAdapter =>
 
   implicit val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(10))
@@ -148,6 +148,8 @@ abstract class FulfillmentWorker {
                 splog.error(msg)
                 val shortMsg = Json.stringify(Json.obj("message" -> e.getMessage, "stacktrace" -> e.getStackTraceString.take(150)))
                 failTask("UNEXPECTED ERROR!", shortMsg)
+            } finally {
+              closeResources()
             }
           case None =>
             splog.info("no task available")

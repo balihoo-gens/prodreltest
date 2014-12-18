@@ -71,7 +71,7 @@ class TestSQLiteLightweightDatabaseAdapter extends Specification with Mockito {
     }
     "getTableColumnNames should return a set of column names" in new WithLightweigthDatabase {
       db.execute(data.createTableSql)
-      db.getTableColumnNames(data.tableName) must beEqualTo(Set("id", "bday", "name"))
+      db.getAllTableColumns(data.tableName) must beEqualTo(Set("id", "bday", "name"))
     }
     "pagedSelect should give paged access to table rows" in new WithLightweigthDatabase {
       db.execute(data.createTableSql)
@@ -111,6 +111,23 @@ class TestSQLiteLightweightDatabaseAdapter extends Specification with Mockito {
       row5.size must beEqualTo(3)
       row5 must contain(allOf(5, "Sarah"))
       page3.hasNext must beFalse
+    }
+    "executeAndGetResult should return a sequence of rows" in new WithLightweigthDatabase {
+      db.execute(data.createTableSql)
+      db.execute("insert into recipients (id, name) values (1, 'a')")
+      db.execute("insert into recipients (id, name) values (2, 'b')")
+      db.execute("insert into recipients (id, name) values (3, 'c')")
+      val results = db.executeAndGetResult("select id, name from recipients order by id")
+      results must haveSize(3)
+      results(0) must haveSize(2)
+      results(0)(0) must beEqualTo(1)
+      results(0)(1) must beEqualTo("a")
+      results(1) must haveSize(2)
+      results(1)(0) must beEqualTo(2)
+      results(1)(1) must beEqualTo("b")
+      results(2) must haveSize(2)
+      results(2)(0) must beEqualTo(3)
+      results(2)(1) must beEqualTo("c")
     }
   }
 
