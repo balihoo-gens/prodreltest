@@ -23,31 +23,30 @@ class TestUrlToS3Saver extends Specification with Mockito {
 
   "AbstractUrlToS3Saver.handleTask" should {
     "fail task if header is invalid" in new WithWorker {
-      val params = getSpecification.getArgs(data.apBadHeader)
-      handleTask(params) must throwA[IllegalArgumentException]
+      val args = getSpecification.getArgs(data.apBadHeader)
+      handleTask(args) must throwA[IllegalArgumentException]
     }
     "cancel task if the response code is in the 500 range" in new WithWorker {
-      val params = getSpecification.getArgs(data.apGoodReq)
+      val args = getSpecification.getArgs(data.apGoodReq)
       responseKey = "servererr"
-      handleTask(params) must throwA[CancelTaskException]
+      handleTask(args) must throwA[CancelTaskException]
     }
      "fail task if the response code is anything else" in new WithWorker {
-      val params = getSpecification.getArgs(data.apGoodReq)
+      val args = getSpecification.getArgs(data.apGoodReq)
       responseKey = "bad"
-      handleTask(params) must throwA[FailTaskException]
+      handleTask(args) must throwA[FailTaskException]
     }
      "fail task if the response has no content" in new WithWorker {
-      val params = getSpecification.getArgs(data.apGoodReq)
+      val args = getSpecification.getArgs(data.apGoodReq)
       responseKey = "zerocontent"
-      handleTask(params) must throwA[FailTaskException]
+      handleTask(args) must throwA[FailTaskException]
     }
     "return the correct S3 Url" in new WithWorker {
       val resultS3Url = s"s3://${data.bucket}/${data.destKey}/${data.fileName}"
-      //s3Adapter.uploadStream(s"$destinationS3Key/$target", is, len) match {
       s3Adapter.uploadStream(data.fullKey, mockInputStream, data.contentLength) returns Success(new URI(resultS3Url))
-      val params = getSpecification.getArgs(data.apGoodReq)
+      val args = getSpecification.getArgs(data.apGoodReq)
       responseKey = "good"
-      handleTask(params).result.as[JsString].value must beEqualTo(resultS3Url)
+      handleTask(args).result.as[JsString].value must beEqualTo(resultS3Url)
     }
   }
 

@@ -29,7 +29,7 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
           new UriParameter("source", "The service URL"),
           new EnumParameter("method", "", List("GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE")),
           new StringParameter("target", "File name for where the body content will be saved"),
-          new ObjectParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
+          new StringMapParameter("headers", "This object's attributes will be added to the HTTP request headers.", required=false),
           new StringParameter("body", "The request body for POST or PUT operations, ignored for GET and DELETE", required=false)
         ),
         new StringResultType("the S3 URL of the saved data.")
@@ -43,12 +43,11 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
     req.exec[Unit](callback)
   }
 
-  override def handleTask(params: ActivityArgs) = {
+  override def handleTask(args: ActivityArgs) = {
     val uriPromise = Promise[String]()
-    val source = params[URI]("source")
-    val method = params[String]("method")
-    val target = params[String]("target")
-    val maybeHeaders = params.get[ActivityArgs]("headers")
+    val source = args[URI]("source")
+    val method = args[String]("method")
+    val target = args[String]("target")
     val req = makeRequest(source, method)
 
     def processStream(code:Int, headers:Map[String,String], is:InputStream) = {
@@ -74,15 +73,15 @@ abstract class AbstractUrlToS3Saver extends FulfillmentWorker {
       }
     }
 
-    if (maybeHeaders.isDefined) {
-      Try(Json.parse(maybeHeaders.get.input).as[Map[String, String]]) match {
+    if (args.has("headers")) {
+      Try(Json.parse(args[Map[String, String]]("headers")) match {
         case Success(headers) => req.headers(headers)
         case Failure(t) => throw new IllegalArgumentException("invalid header object")
       }
     }
 
-    if (params.has("body") && (method == "POST")) {
-      Try(params[String]("body")) match {
+    if (args.has("body") && (method == "POST")) {
+      Try(args[String]("body")) match {
         case Success(body) => req.postData(body)
         case Failure(t) => throw new IllegalArgumentException("invalid body string", t)
       }

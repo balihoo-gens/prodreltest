@@ -16,7 +16,7 @@ class AbstractEmailRenderer extends AbstractRESTClient {
 
   override def getSpecification: ActivitySpecification = {
     new ActivitySpecification(
-      super.getSpecification.params :+
+      super.getSpecification.args :+
       new StringParameter("target", "File name for where the body content will be saved"),
       new ObjectResultType("Json object containing the email body and data")
     )
@@ -24,12 +24,12 @@ class AbstractEmailRenderer extends AbstractRESTClient {
 
   def destinationS3Key = swfAdapter.config.getString("s3dir")
 
-  override def handleTask(params: ActivityArgs) = {
-    val url = params[URI]("url").toURL
-    val headers = params.getOrElse("headers", Json.obj()).as[Map[String, String]].toList
-    val method = params[String]("method")
-    val target = params[String]("target")
-    lazy val body = params[String]("body")
+  override def handleTask(args: ActivityArgs) = {
+    val url = args[URI]("url").toURL
+    val headers = args.getOrElse[Map[String, String]]("headers", Map()).toList
+    val method = args[String]("method")
+    val target = args[String]("target")
+    lazy val body = args[String]("body")
     splog.info(s"Email worker was asked to $method $url")
 
     val response = method match {
