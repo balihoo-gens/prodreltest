@@ -114,8 +114,6 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
    */
   private def writeCsvStreamToDb(csvStream: Stream[List[String]], tableDefinition: DatabaseTableDefinition, db: LightweightDatabase) = {
 
-    val time = System.currentTimeMillis()
-
     /*
       Map CSV headers to column names, using dtd.
       If CSV header not found, add it as a 'skipped' column.
@@ -201,8 +199,6 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
     splog.info(s"Testing DB...")
     val recipientsCount = db.selectCount(s"""select count(*) from "${tableDefinition.getName}"""")
     splog.info(s"Done with SQL inserts, recipientsDbCount=$recipientsCount")
-
-    splog.debug("csv to sql time=" + (System.currentTimeMillis() - time))
   }
 
   def createDb(db: LightweightDatabase, tableDefinition: DatabaseTableDefinition, csvReader: Reader) = {
@@ -225,7 +221,7 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
       s"$s3dir/$gzDbName"
     }
 
-    val csvMeta = s3Adapter.getMeta(bucket, key).get
+    val csvMeta = workerResource(s3Adapter.getMeta(bucket, key).get)
     val dbMetaTry = s3Adapter.getMeta(dbS3Key)
     val useCache = dbMetaTry
       .map(_.userMetaData(csvLastModifiedAttribute))
@@ -234,48 +230,40 @@ abstract class AbstractDatabaseCreate extends FulfillmentWorker {
       .map(_ >= csvMeta.lastModified.getTime / 1000) /* don't look at the millis (we don't store it) */
       .getOrElse(false)
 
-    if (dbMetaTry.isSuccess) dbMetaTry.get.close()
+    if (dbMetaTry.isSuccess) workerResource(dbMetaTry.get)
 
-    getSpecification.createResult(
-      if (useCache) {
 
-        csvMeta.close()
-        val s3uri = dbMetaTry.get.s3Uri.toString
-        splog.info(s"Re-using existing database (cached) uri=$s3uri")
-        s3uri
+    val uri = if (useCache) {
 
-      } else {
+      val s3uri = dbMetaTry.get.s3Uri.toString
+      splog.info(s"Returning cached database at uri=$s3uri")
+      s3uri
 
-        splog.info("Generating database from csv...")
+    } else {
 
-        val dbTempFile = filesystemAdapter.newTempFile(dbName + ".sqlite")
-        val db = liteDbAdapter.create(dbTempFile.getAbsolutePath)
-        val csvInputStreamReader = filesystemAdapter.newReader(csvMeta.getContentStream)
+      splog.info("Creating database with csv data...")
+      val dbTempFile = workerFile(filesystemAdapter.newTempFile(dbName + ".sqlite"))
+      val db = workerResource(liteDbAdapter.create(dbTempFile.getAbsolutePath))
+      val csvInputStreamReader = workerResource(filesystemAdapter.newReader(csvMeta.getContentStream))
+      createDb(db, tableDefinition, csvInputStreamReader)
 
-        try {
+      splog.info("Compressing database...")
+      val gzDbFile = filesystemAdapter.gzip(dbTempFile)
+      val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
+      val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
 
-          createDb(db, tableDefinition, csvInputStreamReader)
+      splog.info("Uploading database...")
+      val dbUri =
+        s3Adapter
+          .upload(dbS3Key, gzDbFile, userMetaData = metaData)
+          .map(_.toString)
+          .get
 
-          val gzDbFile = filesystemAdapter.gzip(dbTempFile)
+      dbUri.toString
 
-          val lastModifiedValue = csvLastModifiedDateFormat.format(csvMeta.lastModified)
-          val metaData = Map(csvLastModifiedAttribute -> lastModifiedValue)
-          val dbUri =
-            s3Adapter
-              .upload(dbS3Key, gzDbFile, userMetaData = metaData)
-              .map(_.toString)
-              .get
+    }
 
-          dbUri.toString
-
-        } finally {
-          db.close()
-          csvInputStreamReader.close()
-          csvMeta.close()
-          dbTempFile.delete()
-        }
-      }
-    )
+    getSpecification.createResult(uri)
   }
 }
 

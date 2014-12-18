@@ -16,7 +16,7 @@ import scala.collection.immutable.TreeSet
 import scala.util.Success
 
 @RunWith(classOf[JUnitRunner])
-class TestDatabaseQueryAndExportToCsv extends Specification with Mockito {
+class TestDatabaseCsvExport extends Specification with Mockito {
 
   "email filter list worker" should {
     "fail task if query param is missing" in new WithWorker {

@@ -22,15 +22,11 @@ abstract class AbstractDatabaseCsvExport extends FulfillmentWorker {
 
   def destinationS3Key = swfAdapter.config.getString("s3dir")
 
-  object FilterListQueryParameter
-    extends ObjectParameter("query", "JSON representation of a SQL query", List(
-      new ObjectParameter("select", "select columns definition", required = true)
-    ), required = true)
-
   override lazy val getSpecification: ActivitySpecification = {
     new ActivitySpecification(
       List(
-        FilterListQueryParameter,
+        new ObjectParameter("query", "JSON representation of a SQL query",
+          List(new ObjectParameter("select", "select columns definition", required = true)), required = true),
         new UriParameter("source", "URL to a database file to use"),
         new IntegerParameter("pageSize", "Maximum records the produced csv files can contain")
       ),

@@ -19,15 +19,11 @@ abstract class AbstractDatabaseCount extends FulfillmentWorker {
     with S3AdapterComponent
     with FilesystemAdapterComponent =>
 
-  object FilterListQueryActivityParameter
-    extends ObjectParameter("query", "JSON representation of a SQL query", List(
-      new ObjectParameter("select", "select columns definition", required = true)
-    ), required = false)
-
   override def getSpecification = {
     new ActivitySpecification(
       List(
-        FilterListQueryActivityParameter,
+        new ObjectParameter("query", "JSON representation of a SQL query",
+          List(new ObjectParameter("select", "select columns definition", required = true)), required = false),
         new UriParameter("source", "URL to a database file to use"),
         new StringParameter("column", "location column name", minLength = Some(1)),
         new StringsParameter("locations", "location ids array", required = false)

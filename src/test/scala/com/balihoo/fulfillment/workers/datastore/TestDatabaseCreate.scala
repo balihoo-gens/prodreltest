@@ -312,9 +312,6 @@ class TestDatabaseCreate extends Specification with Mockito {
       there was one(db_mock).execute("create index \"fullname\" on \"recipients\" (\"firstname\", \"lastname\")")
       there was one(db_mock).execute("create index \"bday\" on \"recipients\" (\"birthday\")")
 
-      there was one(db_mock).close()
-      there was one(csv_reader_mock).close()
-      there was one(db_file_mock).delete()
     }
     "complete task by returning cached db uri if db lastModified is equal or greater to csv lastModified" in new WithWorker {
       csv_s3_meta_mock.lastModified returns data.csv_s3_LastModified
@@ -329,8 +326,6 @@ class TestDatabaseCreate extends Specification with Mockito {
       result.result must ===(new JsString(data.db_s3_uri.toString))
 
       there was no(filesystemAdapter).newTempFileFromStream(any[InputStream], anyString)
-      there was one(db_s3_meta_mock).close()
-      there was one(csv_s3_meta_mock).close()
     }
   }
 
@@ -418,11 +413,6 @@ class TestDatabaseCreate extends Specification with Mockito {
     override val filesystemAdapter = mock[JavaIOFilesystemAdapter]
     override val insertBatchSize = 2
     override val s3dir = data.s3_dir
-    override def completeTask(result: ActivityResult) = {
-      test_complete_result = result.serialize()
-    }
-
-    var test_complete_result = ""
 
     val csv_s3_meta_mock = mock[S3Meta]
     val csv_s3_content_stream = mock[S3ObjectInputStream]
@@ -432,89 +422,6 @@ class TestDatabaseCreate extends Specification with Mockito {
     val db_gzip_file_mock = mock[File]
     val db_mock = mock[LightweightDatabase]
     val db_batch_mock = mock[DbBatch]
-  }
-
-  "ColumnDefinition" should {
-    "detect text types" in new DbTestContext {
-      DatabaseColumnDefinition("aname", "nvarchar", "asource").dataType must beEqualTo(DatabaseTypes.Text)
-      DatabaseColumnDefinition("aname", "char(3)", "asource").dataType must beEqualTo(DatabaseTypes.Text)
-      DatabaseColumnDefinition("aname", "varchar(100)", "asource").dataType must beEqualTo(DatabaseTypes.Text)
-      DatabaseColumnDefinition("aname", "text", "asource").dataType must beEqualTo(DatabaseTypes.Text)
-    }
-    "detect integer types" in new DbTestContext {
-      DatabaseColumnDefinition("aname", "int", "asource").dataType must beEqualTo(DatabaseTypes.Integer)
-      DatabaseColumnDefinition("aname", "integer", "asource").dataType must beEqualTo(DatabaseTypes.Integer)
-      DatabaseColumnDefinition("aname", "bigint", "asource").dataType must beEqualTo(DatabaseTypes.Integer)
-      DatabaseColumnDefinition("aname", "smallint", "asource").dataType must beEqualTo(DatabaseTypes.Integer)
-    }
-    "detect real types" in new DbTestContext {
-      DatabaseColumnDefinition("aname", "real", "asource").dataType must beEqualTo(DatabaseTypes.Real)
-      DatabaseColumnDefinition("aname", "float", "asource").dataType must beEqualTo(DatabaseTypes.Real)
-      DatabaseColumnDefinition("aname", "double", "asource").dataType must beEqualTo(DatabaseTypes.Real)
-    }
-    "detect date types" in new DbTestContext {
-      DatabaseColumnDefinition("aname", "date", "asource").dataType must beEqualTo(DatabaseTypes.Date)
-    }
-    "detect timestamp types" in new DbTestContext {
-      DatabaseColumnDefinition("aname", "datetime", "asource").dataType must beEqualTo(DatabaseTypes.Timestamp)
-      DatabaseColumnDefinition("aname", "timestamp", "asource").dataType must beEqualTo(DatabaseTypes.Timestamp)
-    }
-  }
-
-  "TableDefinition" should {
-    "populate source to name map" in new DbTestContext {
-      val result = data.tableDefinition.source2name
-      result must beAnInstanceOf[Map[String, String]]
-      result.size must beEqualTo(data.tableDefinition.columns.size)
-      result.getOrElse("SOMEINT".toLowerCase, "") must beEqualTo("someint")
-      result.getOrElse("SOMEINT2".toLowerCase, "") must beEqualTo("someint2")
-      result.getOrElse("SOMESTRING".toLowerCase, "") must beEqualTo("somestring")
-      result.getOrElse("SOMEDATE".toLowerCase, "") must beEqualTo("somedate")
-      result.getOrElse("SOMESTRING2".toLowerCase, "") must beEqualTo("somestring2")
-      result.getOrElse("SOMESTRING3".toLowerCase, "") must beEqualTo("somestring3")
-      result.getOrElse("SOMEBOOL".toLowerCase, "") must beEqualTo("somebool")
-      result.getOrElse("SOMETIMESTAMP".toLowerCase, "") must beEqualTo("sometimestamp")
-      result.getOrElse("SOMEREAL".toLowerCase, "") must beEqualTo("somereal")
-    }
-    "populate names to db types map" in new DbTestContext {
-      val result = data.tableDefinition.name2type
-      result must beAnInstanceOf[Map[String, String]]
-      result.size must beEqualTo(data.tableDefinition.columns.size)
-      result.getOrElse("someint", "") must beEqualTo(DatabaseTypes.Integer)
-      result.getOrElse("someint2", "") must beEqualTo(DatabaseTypes.Integer)
-      result.getOrElse("somestring", "") must beEqualTo(DatabaseTypes.Text)
-      result.getOrElse("somedate", "") must beEqualTo(DatabaseTypes.Date)
-      result.getOrElse("somestring2", "") must beEqualTo(DatabaseTypes.Text)
-      result.getOrElse("somestring3", "") must beEqualTo(DatabaseTypes.Text)
-      result.getOrElse("somebool", "") must beEqualTo(DatabaseTypes.Boolean)
-      result.getOrElse("sometimestamp", "") must beEqualTo(DatabaseTypes.Timestamp)
-      result.getOrElse("somereal", "") must beEqualTo(DatabaseTypes.Real)
-    }
-    "generate appropriate table creation sql statement" in new DbTestContext {
-      val result = data.tableDefinition.tableCreateSql
-      result must beAnInstanceOf[String]
-      result must beEqualTo("create table \"recipients\" (" +
-        "\"someint\" integer, " +
-        "\"someint2\" integer, " +
-        "\"somestring\" varchar(50), " +
-        "\"somedate\" date, " +
-        "\"somestring2\" char(3), " +
-        "\"somestring3\" char(3), " +
-        "\"somebool\" boolean, " +
-        "\"sometimestamp\" timestamp, " +
-        "\"somereal\" double, " +
-        "primary key (\"someint\", \"someint2\"))")
-    }
-    "generate appropriate unique indexes creation sql statements" in new DbTestContext {
-      val uniques = data.tableDefinition.uniqueIndexCreateSql
-      uniques must beAnInstanceOf[Seq[String]]
-      uniques must beEqualTo(Seq("create unique index \"somestring_unique_idx\" on \"recipients\" (\"somestring\")"))
-    }
-    "generate appropriate simple indexes creation sql statements" in new DbTestContext {
-      val simples = data.tableDefinition.simpleIndexCreateSql
-      simples must beAnInstanceOf[Seq[String]]
-      simples must beEqualTo(Seq("create index \"an_index_name\" on \"recipients\" (\"somestring2\", \"somestring3\")"))
-    }
   }
 
   class DbTestContext extends Scope {
